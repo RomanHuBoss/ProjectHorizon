@@ -1,16 +1,28 @@
 [gd_scene format=3 uid="uid://c5g30hu85qdr7"]
 
 [ext_resource type="Script" uid="uid://ciutpqapuu5sb" path="res://Scripts/DebugWorld.cs" id="1_qvuqh"]
+[ext_resource type="PackedScene" uid="uid://dg4e7visk71oc" path="res://Scenes/Player/Player.tscn" id="2_04xr5"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_xspls"]
+size = Vector3(20, 0.2, 20)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_dfegk"]
 size = Vector3(20, 0.2, 20)
 
 [node name="DebugWorld" type="Node3D" unique_id=8855545]
 script = ExtResource("1_qvuqh")
 
-[node name="Ground" type="MeshInstance3D" parent="." unique_id=1324122903]
-mesh = SubResource("BoxMesh_xspls")
-
 [node name="Camera3D" type="Camera3D" parent="." unique_id=510684994]
 transform = Transform3D(1, 0, 0, 0, 0.90630776, 0.42261827, 0, -0.42261827, 0.90630776, 0, 5, 8)
 current = true
+
+[node name="GroundBody" type="StaticBody3D" parent="." unique_id=1979697508]
+
+[node name="Ground" type="MeshInstance3D" parent="GroundBody" unique_id=1324122903]
+mesh = SubResource("BoxMesh_xspls")
+
+[node name="GroundCollision" type="CollisionShape3D" parent="GroundBody" unique_id=933782643]
+shape = SubResource("BoxShape3D_dfegk")
+
+[node name="Player" parent="." unique_id=1080557160 instance=ExtResource("2_04xr5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
