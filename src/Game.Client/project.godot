@@ -30,5 +30,5 @@ project/assembly_name="Game.Client"
 
 [rendering]
 
-rendering_device/driver.windows="d3d12"
 renderer/rendering_method="mobile"
+rendering_device/driver.windows="vulkan"
