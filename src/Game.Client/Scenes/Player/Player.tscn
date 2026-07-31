@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://dg4e7visk71oc"]
 
+[ext_resource type="Script" uid="uid://8so46n86t7lb" path="res://Scripts/Player/PlayerController.cs" id="1_s0eop"]
+
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dfegk"]
 radius = 0.4
 height = 1.8
@@ -9,11 +11,13 @@ radius = 0.4
 height = 1.8
 
 [node name="Player" type="CharacterBody3D" unique_id=1080557160]
+script = ExtResource("1_s0eop")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=574063826]
 shape = SubResource("CapsuleShape3D_dfegk")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1472186631]
+visible = false
 mesh = SubResource("CapsuleMesh_l3ax4")
 
 [node name="Head" type="Node3D" parent="." unique_id=1946092994]
