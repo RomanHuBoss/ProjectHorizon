@@ -3,35 +3,35 @@
 [ext_resource type="Script" uid="uid://ciutpqapuu5sb" path="res://Scripts/DebugWorld.cs" id="1_qvuqh"]
 [ext_resource type="PackedScene" uid="uid://dg4e7visk71oc" path="res://Scenes/Player/Player.tscn" id="2_04xr5"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_xspls"]
+[sub_resource type="BoxMesh" id="BoxMesh_ground"]
 size = Vector3(20, 0.2, 20)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_dfegk"]
+[sub_resource type="BoxShape3D" id="BoxShape_ground"]
 size = Vector3(20, 0.2, 20)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_04xr5"]
+[sub_resource type="BoxMesh" id="BoxMesh_wall_front"]
 size = Vector3(8, 3, 0.5)
 
-[sub_resource type="BoxMesh" id="BoxMesh_vygsr"]
-size = Vector3(1.5, 0.5, 1.5)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_r15hr"]
+[sub_resource type="BoxShape3D" id="BoxShape_wall_front"]
 size = Vector3(8, 3, 0.5)
 
-[sub_resource type="BoxMesh" id="BoxMesh_ps8hx"]
-size = Vector3(1.5, 0.5, 1.5)
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_xspls"]
-size = Vector3(8, 3, 0.5)
-
-[sub_resource type="BoxMesh" id="BoxMesh_dfegk"]
-size = Vector3(8, 3, 0.5)
-
-[sub_resource type="BoxMesh" id="BoxMesh_04xr5"]
+[sub_resource type="BoxMesh" id="BoxMesh_wall_side"]
 size = Vector3(0.5, 3, 8)
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_vygsr"]
+[sub_resource type="BoxShape3D" id="BoxShape_wall_side"]
 size = Vector3(0.5, 3, 8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_low_block"]
+size = Vector3(1.5, 0.5, 1.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape_low_block"]
+size = Vector3(1.5, 0.5, 1.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_high_block"]
+size = Vector3(1.5, 2, 1.5)
+
+[sub_resource type="BoxShape3D" id="BoxShape_high_block"]
+size = Vector3(1.5, 2, 1.5)
 
 [node name="DebugWorld" type="Node3D" unique_id=8855545]
 script = ExtResource("1_qvuqh")
@@ -39,10 +39,10 @@ script = ExtResource("1_qvuqh")
 [node name="GroundBody" type="StaticBody3D" parent="." unique_id=1979697508]
 
 [node name="Ground" type="MeshInstance3D" parent="GroundBody" unique_id=1324122903]
-mesh = SubResource("BoxMesh_xspls")
+mesh = SubResource("BoxMesh_ground")
 
 [node name="GroundCollision" type="CollisionShape3D" parent="GroundBody" unique_id=933782643]
-shape = SubResource("BoxShape3D_dfegk")
+shape = SubResource("BoxShape_ground")
 
 [node name="Player" parent="." unique_id=1080557160 instance=ExtResource("2_04xr5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
@@ -52,44 +52,38 @@ transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.766
 
 [node name="TestGeometry" type="Node3D" parent="." unique_id=697187286]
 
-[node name="LowBlock" type="StaticBody3D" parent="TestGeometry" unique_id=1562384132]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.35, -2.5)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/LowBlock" unique_id=669058400]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 0.5, 1.5)
-shape = SubResource("BoxShape3D_04xr5")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/LowBlock" unique_id=881491609]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.25, -3.5)
-mesh = SubResource("BoxMesh_vygsr")
-
-[node name="HighBlock" type="StaticBody3D" parent="TestGeometry" unique_id=881652140]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.1, -2.5)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/HighBlock" unique_id=1986146255]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 2, 1.5)
-shape = SubResource("BoxShape3D_r15hr")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/HighBlock" unique_id=2088930575]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.5, 2, 1.5)
-mesh = SubResource("BoxMesh_ps8hx")
-
 [node name="WallFront" type="StaticBody3D" parent="TestGeometry" unique_id=2107492637]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -6)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/WallFront" unique_id=676444720]
-shape = SubResource("BoxShape3D_xspls")
-
 [node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/WallFront" unique_id=495792769]
-mesh = SubResource("BoxMesh_dfegk")
+mesh = SubResource("BoxMesh_wall_front")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/WallFront" unique_id=676444720]
+shape = SubResource("BoxShape_wall_front")
 
 [node name="WallSide" type="StaticBody3D" parent="TestGeometry" unique_id=1167276878]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 1.6, -1)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/WallSide" unique_id=2085549347]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -5)
-mesh = SubResource("BoxMesh_04xr5")
+mesh = SubResource("BoxMesh_wall_side")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/WallSide" unique_id=1548556671]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 0, -5)
-shape = SubResource("BoxShape3D_vygsr")
+shape = SubResource("BoxShape_wall_side")
+
+[node name="LowBlock" type="StaticBody3D" parent="TestGeometry" unique_id=1562384132]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.5, 0.35, -2.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/LowBlock" unique_id=881491609]
+mesh = SubResource("BoxMesh_low_block")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/LowBlock" unique_id=669058400]
+shape = SubResource("BoxShape_low_block")
+
+[node name="HighBlock" type="StaticBody3D" parent="TestGeometry" unique_id=881652140]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.5, 1.1, -2.5)
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/HighBlock" unique_id=2088930575]
+mesh = SubResource("BoxMesh_high_block")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/HighBlock" unique_id=1986146255]
+shape = SubResource("BoxShape_high_block")
