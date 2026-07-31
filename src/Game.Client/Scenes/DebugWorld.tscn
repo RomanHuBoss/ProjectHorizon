@@ -12,10 +12,6 @@ size = Vector3(20, 0.2, 20)
 [node name="DebugWorld" type="Node3D" unique_id=8855545]
 script = ExtResource("1_qvuqh")
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=510684994]
-transform = Transform3D(1, 0, 0, 0, 0.90630776, 0.42261827, 0, -0.42261827, 0.90630776, 0, 5, 8)
-current = true
-
 [node name="GroundBody" type="StaticBody3D" parent="." unique_id=1979697508]
 
 [node name="Ground" type="MeshInstance3D" parent="GroundBody" unique_id=1324122903]
@@ -26,3 +22,6 @@ shape = SubResource("BoxShape3D_dfegk")
 
 [node name="Player" parent="." unique_id=1080557160 instance=ExtResource("2_04xr5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=258659471]
+transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
