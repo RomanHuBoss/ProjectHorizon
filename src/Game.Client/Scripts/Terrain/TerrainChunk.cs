@@ -78,6 +78,17 @@ public partial class TerrainChunk : StaticBody3D
     public TerrainEdgeStitchMask SkirtMask { get; private set; } =
         TerrainEdgeStitchMask.All;
 
+    public bool HasGeneratedVisualMesh => _meshInstance?.Mesh is not null;
+
+    public bool HasGeneratedCollisionShape =>
+        _collisionShape?.Shape is not null;
+
+    public int TopSurfaceVertexCount =>
+        _lastTopSurface?.Vertices.Count ?? 0;
+
+    public int TopSurfaceTriangleCount =>
+        (_lastTopSurface?.Indices.Count ?? 0) / 3;
+
     private MeshInstance3D? _meshInstance;
     private MeshInstance3D? _debugOverlay;
     private CollisionShape3D? _collisionShape;

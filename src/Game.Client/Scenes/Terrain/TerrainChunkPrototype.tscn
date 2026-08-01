@@ -38,6 +38,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 8)
 
 [node name="TerrainChunkManager" type="Node3D" parent="."]
 script = ExtResource("1_manager")
+SoakTestDurationSeconds = 120.0
+SoakTestDwellSeconds = 0.75
+SoakTestRouteRadius = 3
+SoakTestTransitionTimeoutSeconds = 20.0
+SoakTestAllowedManagedMemoryGrowthMegabytes = 64.0
 
 [node name="Hud" type="CanvasLayer" parent="."]
 
@@ -45,7 +50,7 @@ script = ExtResource("1_manager")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 910.0
-offset_bottom = 286.0
+offset_bottom = 316.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
