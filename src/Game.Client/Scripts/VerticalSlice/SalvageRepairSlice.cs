@@ -19,6 +19,13 @@ public enum SalvageRepairSliceState
     Exiting = 7
 }
 
+public enum SalvageRepairHudMode
+{
+    Detailed = 0,
+    Compact = 1,
+    Hidden = 2
+}
+
 public partial class SalvageRepairSlice : Node3D
 {
     private sealed record GracefulExitResult(
@@ -36,8 +43,10 @@ public partial class SalvageRepairSlice : Node3D
     private SaveAutosaveCoordinator? _autosave;
     private StarterRepairSession _session = new();
     private StarterShipRepairTerminal? _shipTerminal;
-    private CharacterBody3D? _player;
+    private PlayerController? _player;
+    private MarginContainer? _hudMargin;
     private Label? _hudLabel;
+    private PanelContainer? _hudHiddenHint;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
@@ -47,6 +56,8 @@ public partial class SalvageRepairSlice : Node3D
     private VerticalSliceAcceptanceReport? _acceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
+    private SalvageRepairHudMode _hudMode =
+        SalvageRepairHudMode.Detailed;
     private int _revision;
     private int _observedAutosaveBatches;
     private int _observedAutosaveFailures;
@@ -59,12 +70,18 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _Ready()
     {
+        _hudMargin = GetNodeOrNull<MarginContainer>(
+            "Hud/MarginContainer");
         _hudLabel = GetNodeOrNull<Label>(
             "Hud/MarginContainer/PanelContainer/Label");
+        _hudHiddenHint = GetNodeOrNull<PanelContainer>(
+            "Hud/HiddenHint");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
             "Gameplay/DamagedShip");
-        _player = GetNodeOrNull<CharacterBody3D>("Player");
-        if (_hudLabel is null || _shipTerminal is null || _player is null)
+        _player = GetNodeOrNull<PlayerController>("Player");
+        if (_hudMargin is null || _hudLabel is null ||
+            _hudHiddenHint is null || _shipTerminal is null ||
+            _player is null)
         {
             throw new InvalidOperationException(
                 "Vertical slice scene is missing HUD, player or ship.");
@@ -106,6 +123,7 @@ public partial class SalvageRepairSlice : Node3D
         SceneTree tree = GetTree();
         _previousAutoAcceptQuit = tree.AutoAcceptQuit;
         tree.AutoAcceptQuit = false;
+        ApplyHudMode();
         UpdateHud();
         GD.Print(
             "TASK-062 vertical slice initializing. " +
@@ -155,6 +173,15 @@ public partial class SalvageRepairSlice : Node3D
 
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
+        if (Matches(physical, logical, Key.H))
+        {
+            _hudMode = (SalvageRepairHudMode)(((int)_hudMode + 1) % 3);
+            ApplyHudMode();
+            GD.Print($"Vertical slice HUD mode: {_hudMode}.");
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (Matches(physical, logical, Key.F7) && CanStartCommand())
         {
             BeginAcceptance();
@@ -589,6 +616,32 @@ public partial class SalvageRepairSlice : Node3D
         _shipTerminal?.SetRepaired(_session.ShipRepaired);
     }
 
+    private void ApplyHudMode()
+    {
+        if (_hudMargin is null || _hudLabel is null ||
+            _hudHiddenHint is null)
+        {
+            return;
+        }
+
+        bool hidden = _hudMode == SalvageRepairHudMode.Hidden;
+        _hudMargin.Visible = !hidden;
+        _hudHiddenHint.Visible = hidden;
+
+        if (_hudMode == SalvageRepairHudMode.Compact)
+        {
+            _hudMargin.OffsetRight = 610.0f;
+            _hudMargin.OffsetBottom = 238.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(560.0f, 185.0f);
+        }
+        else if (_hudMode == SalvageRepairHudMode.Detailed)
+        {
+            _hudMargin.OffsetRight = 800.0f;
+            _hudMargin.OffsetBottom = 385.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(750.0f, 330.0f);
+        }
+    }
+
     private void UpdateHud()
     {
         if (_hudLabel is null)
@@ -618,19 +671,36 @@ public partial class SalvageRepairSlice : Node3D
               $"lastRev={_autosave.LastSavedRevision} • " +
               $"last={_autosave.LastCompletedTriggerSummary} • " +
               $"next={nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)}s";
+        string interaction = _player?.GetInteractionPrompt() ??
+            "interaction unavailable";
+
+        if (_hudMode == SalvageRepairHudMode.Compact)
+        {
+            _hudLabel.Text =
+                "VERTICAL SLICE 1 • H — HUD\n" +
+                $"{databaseLine}\n" +
+                $"Progress: salvage {_session.SalvageQuantity}/3 • " +
+                $"ship={(_session.ShipRepaired ? "REPAIRED" : "DAMAGED")} • " +
+                $"rev={_revision}\n" +
+                $"Interaction: {interaction}\n" +
+                $"Status: {_status}\n" +
+                "E — interact • F7 — acceptance • F8 — reset";
+            return;
+        }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 — SALVAGE → REPAIR → AUTOSAVE\n" +
+            "VERTICAL SLICE 1 — SALVAGE → REPAIR → AUTOSAVE • H — HUD\n" +
             databaseLine + "\n" +
             $"Snapshot: rev={_revision} • collected={_session.CollectedNodeCount}/3\n" +
             objective + "\n" +
             ship + "\n" +
+            $"Interaction: {interaction}\n" +
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
             $"TASK-062 acceptance (F7): {_acceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space — move • E — collect/repair • F7 — acceptance • " +
-            "F8 — reset loop • Esc — release mouse";
+            "WASD/Space — move • E — collect/repair • H — HUD • " +
+            "F7 — acceptance • F8 — reset loop • Esc — release mouse";
     }
 
     private static string BuildAcceptanceOutput(

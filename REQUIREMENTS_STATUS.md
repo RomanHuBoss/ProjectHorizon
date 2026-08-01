@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -42,6 +42,44 @@
 
 ## 3. Результат текущей итерации от 2026-08-01
 
+### 2026-08-01 — hotfix ручного взаимодействия и HUD (`TASK-062/TASK-063`)
+
+**Исходный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`  
+**Git SHA:** отсутствует в архиве  
+**Причина hotfix:** автоматическая `F7`-приёмка прошла, однако пользовательская runtime-проверка выявила, что низкие salvage-узлы не подбираются при обычном приближении, а заявленная клавиша `H` вообще не была реализована.
+
+**Полученные runtime-доказательства исходной редакции:**
+
+- локальная сборка завершилась с `0` предупреждений и `0` ошибок;
+- HUD показал `TASK-062 acceptance (F7): PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1`;
+- взаимодействие `E` с кораблём сработало и сформировало `ShipRepairBlocked`, то есть input action была зарегистрирована;
+- ручное взаимодействие с ресурсными конусами не давало результата;
+- нажатие `H` не меняло HUD, поскольку обработчик и режимы HUD отсутствовали в `SalvageRepairSlice`.
+
+**Исправлено:**
+
+- точный `InteractionRay` сохранён как приоритетный способ выбора цели;
+- добавлен proximity-fallback на ближайший активный узел группы `interactable` в радиусе `2,75 м`, с ограничением по направлению камеры;
+- собранные узлы с нулевым collision layer исключаются из fallback и не блокируют выбор следующего ресурса;
+- resource nodes и повреждённый корабль явно включены в группу `interactable`;
+- HUD теперь показывает фактическую цель: `aimed at ...` либо `near ... (N m) — press E`;
+- реализованы три режима `H`: `DETAILED → COMPACT → HIDDEN`; в скрытом режиме остаётся hint для возврата;
+- HUD-контролы переведены в `mouse_filter=IGNORE`, чтобы диагностическая панель не участвовала в обработке пользовательского ввода;
+- README и ручная приёмка синхронизированы с исправленным управлением.
+
+**Изменённые файлы hotfix:**
+
+- `src/Game.Client/Scripts/Player/PlayerController.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:** `TASK-062` и `VS-010`–`VS-016` остаются `IMPLEMENTED`; `TASK-063` и `VS-ACC-010`–`VS-ACC-016` остаются `IN_PROGRESS` до повторной ручной проверки `E`, `H`, ремонта и cold restart.
+
+**Повторная приёмка hotfix:** после `F8` подойти к каждому конусу до появления `Interaction: near Salvage... — press E`, нажать `E` и получить `1/3 → 2/3 → 3/3`; затем проверить ремонт корабля, три последовательных режима `H`, `F7: PASS`, graceful-exit и холодное восстановление.
+
 ### 2026-08-01 — первый сквозной цикл: сбор ресурса, ремонт корабля и domain autosave (`TASK-062`)
 
 **Исходный снимок:** `ProjectHorizon-main(3)(3).zip`  
@@ -65,7 +103,7 @@
 - стартовая сцена переключена на `Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
 - сцена объединяет принятого персонажа, физическое взаимодействие, три ресурсных узла, повреждённый корабль, SQLite и autosave coordinator;
 - добавлена Godot-независимая доменная модель `StarterRepairSession`; она запрещает повторный сбор одного узла и ремонт при наличии менее трёх единиц salvage;
-- сбор выполняется реальным взаимодействием `E` через существующий `IInteractable` и raycast игрока;
+- сбор выполняется реальным взаимодействием `E` через существующий `IInteractable`: точный raycast имеет приоритет, а hotfix добавляет proximity-fallback для низких узлов на близкой дистанции;
 - успешный ремонт расходует три единицы `resource.salvage_alloy`, переводит здоровье корабля с `28` до `100` и завершает стартовую ремонтную цель;
 - завершение цели формирует реальное доменное событие `StarterRepairQuestCompleted` и вызывает production-autosave с типизированной причиной `QuestCompleted`;
 - `resource.salvage_alloy` и `ship.starter.repairable` добавлены в известный content registry persistence, поэтому не превращаются в unknown placeholders;
@@ -76,6 +114,7 @@
 
 **Изменённые файлы:**
 
+- `src/Game.Client/Scripts/Player/PlayerController.cs`;
 - `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
 - `src/Game.Client/Scripts/VerticalSlice/SalvageResourceNode.cs`;
 - `src/Game.Client/Scripts/VerticalSlice/StarterShipRepairTerminal.cs`;
@@ -90,7 +129,7 @@
 **Проверки в среде подготовки:**
 
 - PDF-ТЗ визуально и текстово сверено по базовому циклу, inventory/quest-модели и составу Этапа 1;
-- проверены все новые `res://`-ссылки, UID, NodePath, группы и отсутствие конфликта `F7/F8`;
+- проверены все новые `res://`-ссылки, UID, NodePath, группы и отсутствие конфликта `H/F7/F8`;
 - доменная и acceptance-инфраструктура не обращаются к Godot API;
 - выполнена лексическая проверка C#-файлов, строк, комментариев и скобок;
 - проверено, что новый профиль и изолированная test-БД не затрагивают persistence-прототип;
@@ -1487,25 +1526,32 @@ TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=
 ```
 
 6. Нажать `F8`, дождаться `slot reset PASS`. Подойти к красному кораблю и нажать `E` до сбора ресурсов. HUD должен остаться `Ship: DAMAGED`, Output — показать `ShipRepairBlocked`.
-7. Собрать три голубых узла по `E`. После каждого узел исчезает, а HUD проходит `1/3 → 2/3 → 3/3`.
-8. Снова взаимодействовать с кораблём. Корабль должен стать зелёным, HUD — `Ship: REPAIRED`, а Output должен содержать:
+7. Подойти к каждому голубому узлу до появления `Interaction: near Salvage... — press E` либо `aimed at ... — press E`, затем нажать `E`. После каждого узел исчезает, а HUD проходит `1/3 → 2/3 → 3/3`.
+8. Трижды нажать `H` и подтвердить цикл `DETAILED → COMPACT → HIDDEN → DETAILED`; в скрытом режиме должен оставаться hint `HUD hidden — press H`.
+9. Снова взаимодействовать с кораблём. Корабль должен стать зелёным, HUD — `Ship: REPAIRED`, а Output должен содержать:
 
 ```text
 Vertical slice domain event: StarterRepairQuestCompleted; autosaveTrigger=QuestCompleted
 Vertical slice autosave PASS: revision=<N>; triggers=QuestCompleted; salvage=0; shipRepaired=1; pending=0
 ```
 
-9. Закрыть окно через `Alt+F4`. До завершения процесса ожидается:
+10. Закрыть окно через `Alt+F4`. До завершения процесса ожидается:
 
 ```text
 Vertical slice graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
 ```
 
-10. Повторно запустить проект. Должны восстановиться `Ship: REPAIRED`, `salvage=0`, исчезнувшие ресурсные узлы и revision из graceful-exit.
-11. Для приёмки прислать: результат сборки; screenshot `F7: PASS`; screenshot раннего `ShipRepairBlocked`; screenshot `Ship: REPAIRED`; полные строки F7, QuestCompleted autosave и graceful-exit; screenshot после повторного запуска.
-12. При `FAIL` прислать финальный HUD, последние 80 строк Output и наличие файлов `profiles/profile_vertical_slice/save_1.db`, backup, autosave log и `save_1.vertical-slice-test.db`.
+11. Повторно запустить проект. Должны восстановиться `Ship: REPAIRED`, `salvage=0`, исчезнувшие ресурсные узлы и revision из graceful-exit.
+12. Для приёмки прислать: результат сборки; screenshot `F7: PASS`; screenshot строки `Interaction: near Salvage...`; screenshot компактного или скрытого HUD; screenshot раннего `ShipRepairBlocked`; screenshot `Ship: REPAIRED`; полные строки F7, QuestCompleted autosave и graceful-exit; screenshot после повторного запуска.
+13. При `FAIL` прислать финальный HUD, последние 80 строк Output и наличие файлов `profiles/profile_vertical_slice/save_1.db`, backup, autosave log и `save_1.vertical-slice-test.db`.
 
 ## 11. Журнал проверок
+
+### 2026-08-01 — hotfix ручного `E` и переключения `H`
+
+**Runtime исходной редакции:** сборка `0/0`, `F7: PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1`; ручное `E` на корабле формировало `ShipRepairBlocked`, но низкие ресурсные конусы при обычном приближении не подбирались; `H` не обрабатывалась.
+
+**Исправление:** добавлен nearest-interactable proximity-fallback после точного raycast, явная группа `interactable`, исключение уже собранных узлов, HUD-подсказка фактической цели и три режима `H`. `TASK-062` остаётся `IMPLEMENTED`, `TASK-063` — `IN_PROGRESS` до повторного runtime-прогона.
 
 ### 2026-08-01 — `TASK-062`, первая интеграция вертикального среза
 
