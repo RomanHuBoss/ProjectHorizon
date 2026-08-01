@@ -431,8 +431,8 @@ public partial class SalvageRepairSlice : Node3D
 
         if (_craftingStation is null)
         {
-            string recipeId = _craftTimer.RecipeId;
-            double elapsed = _craftTimer.ElapsedSeconds;
+            string cancelledRecipeId = _craftTimer.RecipeId;
+            double cancelledElapsed = _craftTimer.ElapsedSeconds;
             double duration = _craftTimer.DurationSeconds;
             _craftTimer.Reset();
             _craftingInteractorName = "unknown";
@@ -441,8 +441,8 @@ public partial class SalvageRepairSlice : Node3D
             _status = "timed craft failed: crafting station became unavailable";
             GD.PushError(
                 "TASK-068 timed craft cancelled safely: " +
-                $"recipe={recipeId}; " +
-                $"elapsed={elapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"recipe={cancelledRecipeId}; " +
+                $"elapsed={cancelledElapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
                 $"duration={duration.ToString("0.0", CultureInfo.InvariantCulture)}; " +
                 "inputsConsumed=0; reason=crafting station became unavailable.");
             return;
