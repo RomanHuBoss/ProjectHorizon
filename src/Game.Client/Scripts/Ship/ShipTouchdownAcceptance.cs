@@ -61,8 +61,8 @@ public partial class ShipFlightPrototype
     private int _testLandedLocks;
     private int _testTakeoffs;
     private int _testRecoveries;
-    private int _testCollisions;
-    private int _testErrors;
+    private int _touchdownTestCollisions;
+    private int _touchdownTestErrors;
     private int _maximumGearContacts;
     private float _maximumTouchdownSpeed;
     private float _maximumLandedPositionError;
@@ -189,8 +189,8 @@ public partial class ShipFlightPrototype
         _testLandedLocks = 0;
         _testTakeoffs = 0;
         _testRecoveries = 0;
-        _testCollisions = 0;
-        _testErrors = 0;
+        _touchdownTestCollisions = 0;
+        _touchdownTestErrors = 0;
         _maximumGearContacts = 0;
         _maximumTouchdownSpeed = 0.0f;
         _maximumLandedPositionError = 0.0f;
@@ -399,13 +399,13 @@ public partial class ShipFlightPrototype
                 ShipTouchdownTestState.Failed,
                 $"takeoff clearance={_minimumTakeoffClearance:F2} m");
         }
-        else if (_testRecoveries > 0 || _testCollisions > 0 ||
-            _testErrors > 0)
+        else if (_testRecoveries > 0 || _touchdownTestCollisions > 0 ||
+            _touchdownTestErrors > 0)
         {
             FinishTouchdownTest(
                 ShipTouchdownTestState.Failed,
                 $"recoveries/collisions/errors=" +
-                $"{_testRecoveries}/{_testCollisions}/{_testErrors}");
+                $"{_testRecoveries}/{_touchdownTestCollisions}/{_touchdownTestErrors}");
         }
         else
         {
@@ -432,9 +432,9 @@ public partial class ShipFlightPrototype
             _ship.TakeoffCompletions - _takeoffCompletionBaseline;
         _testRecoveries =
             _ship.TouchdownRecoveries - _touchdownRecoveryBaseline;
-        _testCollisions =
+        _touchdownTestCollisions =
             _ship.CollisionEvents - _touchdownCollisionBaseline;
-        _testErrors =
+        _touchdownTestErrors =
             _ship.RuntimeErrorCount - _touchdownErrorBaseline;
     }
 
@@ -475,7 +475,7 @@ public partial class ShipFlightPrototype
             $"angularError={_maximumLandedAngularError:F3}; " +
             $"takeoffClearance={_minimumTakeoffClearance:F2}; " +
             $"recoveries={_testRecoveries}; " +
-            $"collisions={_testCollisions}; errors={_testErrors}; " +
+            $"collisions={_touchdownTestCollisions}; errors={_touchdownTestErrors}; " +
             $"result={result}");
     }
 
