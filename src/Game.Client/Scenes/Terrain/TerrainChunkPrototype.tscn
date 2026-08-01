@@ -42,10 +42,10 @@ script = ExtResource("1_manager")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 760.0
-offset_bottom = 132.0
+offset_bottom = 184.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
-text = "ПРОТОТИП B — СТРИМИНГ ЧАНКОВ И LOD\nИнициализация активной сетки рельефа..."
+text = "ПРОТОТИП B — БЕСШОВНЫЙ СТРИМИНГ И LOD\nИнициализация согласованных кромок и очереди чанков..."
