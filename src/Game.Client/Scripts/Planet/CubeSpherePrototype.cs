@@ -1999,7 +1999,8 @@ public partial class CubeSpherePrototype : Node3D
             $"L{GetMaximumLevel()}={_collisionFinePatchCount}  •  " +
             $"created={_collisionPatchesCreated}  •  unloaded={_collisionPatchesUnloaded}  •  " +
             $"fallback={(_fallbackCollisionEnabled ? "on" : "off")}  •  " +
-            $"activations={_collisionFallbackActivations}  •  errors={_collisionErrors}  •  " +
+            $"activations={_collisionFallbackActivations}  •  " +
+            $"recoveries={_collisionSafetyRecoveries}  •  errors={_collisionErrors}  •  " +
             $"lastBuild={_lastCollisionBuildMilliseconds:F2} мс\n" +
             $"LOD-швы: {lodSeamStatus}  •  atomic={_lodValidation?.AtomicSegments ?? 0}  •  " +
             $"open={_lodValidation?.OpenSegments ?? -1}  •  " +

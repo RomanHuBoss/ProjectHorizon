@@ -42,20 +42,20 @@ public partial class CubeSpherePrototype
     [Export]
     public bool EnableDynamicCollisionLod { get; set; } = true;
 
-    [Export(PropertyHint.Range, "10.0,80.0,0.5")]
-    public float CollisionResidentAngleDegrees { get; set; } = 42.0f;
-
     [Export(PropertyHint.Range, "0.05,1.0,0.05")]
     public float CollisionUpdateIntervalSeconds { get; set; } = 0.15f;
 
     [Export(PropertyHint.Range, "1,8,1")]
     public int MaxCollisionAppliesPerFrame { get; set; } = 2;
 
-    [Export(PropertyHint.Range, "1,6,1")]
-    public int CollisionOverlapPhysicsFrames { get; set; } = 2;
+    [Export(PropertyHint.Range, "1,12,1")]
+    public int CollisionOverlapPhysicsFrames { get; set; } = 4;
 
-    [Export(PropertyHint.Range, "4.0,40.0,0.5")]
-    public float CollisionSafetyFallbackAngleDegrees { get; set; } = 14.0f;
+    [Export(PropertyHint.Range, "1,20,1")]
+    public int CollisionCoverageConfirmationFrames { get; set; } = 6;
+
+    [Export(PropertyHint.Range, "0.0,4.0,0.1")]
+    public float CollisionRadialSafetyMargin { get; set; } = 0.5f;
 
     [Export(PropertyHint.Range, "20.0,120.0,1.0")]
     public float CollisionTestTimeoutSeconds { get; set; } = 75.0f;
@@ -82,12 +82,13 @@ public partial class CubeSpherePrototype
     private int _collisionFallbackActivations;
     private int _collisionErrors;
     private int _collisionOverlapFramesRemaining;
+    private int _collisionCoverageFramesRemaining;
+    private int _collisionSafetyRecoveries;
     private int _collisionBasePatchCount;
     private int _collisionMidPatchCount;
     private int _collisionFinePatchCount;
     private double _lastCollisionBuildMilliseconds;
     private bool _fallbackCollisionEnabled = true;
-    private Vector3 _collisionAnchorDirection = Vector3.Right;
     private string _collisionLastError = string.Empty;
 
     private float _collisionTestElapsed;
@@ -102,6 +103,10 @@ public partial class CubeSpherePrototype
     private int _collisionTestMinimumActive = int.MaxValue;
     private int _collisionTestMaximumActive;
     private string _collisionTestResult = "готов";
+    private PlanetaryPlayerRuntimeState _collisionTestStartPlayerState;
+    private bool _collisionTestHasStartPlayerState;
+    private float _collisionTestMinimumRadius = float.PositiveInfinity;
+    private int _collisionTestBaselineRecoveries;
 
     public bool CollisionTestRunning =>
         _collisionTestState == CubeSphereCollisionTestState.Preparing ||
@@ -117,7 +122,9 @@ public partial class CubeSpherePrototype
                 $"commits={_collisionCommits - _collisionTestBaselineCommits}, " +
                 $"active={_collisionPatches.Count}/{_targetCollisionLeaves.Count}, " +
                 $"gap={_collisionTestMaximumGroundGap:F2} с, " +
+                $"rMin={(_collisionTestMinimumRadius == float.PositiveInfinity ? 0.0f : _collisionTestMinimumRadius):F1} м, " +
                 $"fallback={(_fallbackCollisionEnabled ? "on" : "off")}, " +
+                $"recoveries={_collisionSafetyRecoveries - _collisionTestBaselineRecoveries}, " +
                 $"errors={_collisionErrors - _collisionTestBaselineErrors}";
 
             return _collisionTestState switch
@@ -145,7 +152,6 @@ public partial class CubeSpherePrototype
         _collisionTransitionState = CubeSphereCollisionTransitionState.Idle;
         _collisionTestState = CubeSphereCollisionTestState.Ready;
         _fallbackCollisionEnabled = true;
-        _collisionAnchorDirection = GetPlayerFocusDirection();
         _collisionLastError = string.Empty;
         SetFallbackCollisionEnabled(true, false);
     }
@@ -210,6 +216,9 @@ public partial class CubeSpherePrototype
             _collisionOverlapFramesRemaining = Math.Max(
                 1,
                 CollisionOverlapPhysicsFrames);
+            _collisionCoverageFramesRemaining = Math.Max(
+                1,
+                CollisionCoverageConfirmationFrames);
             _collisionTransitionState =
                 CubeSphereCollisionTransitionState.Overlap;
             return;
@@ -220,6 +229,22 @@ public partial class CubeSpherePrototype
         {
             _collisionOverlapFramesRemaining--;
             if (_collisionOverlapFramesRemaining > 0)
+            {
+                return;
+            }
+
+            if (_planetaryPlayer is null ||
+                !_planetaryPlayer.HasPhysicalGroundContact ||
+                !IsPlayerRadiallySafe())
+            {
+                _collisionCoverageFramesRemaining = Math.Max(
+                    1,
+                    CollisionCoverageConfirmationFrames);
+                return;
+            }
+
+            _collisionCoverageFramesRemaining--;
+            if (_collisionCoverageFramesRemaining > 0)
             {
                 return;
             }
@@ -264,45 +289,11 @@ public partial class CubeSpherePrototype
 
     private HashSet<CubeSpherePatchKey> BuildCollisionTarget(Vector3 focusDirection)
     {
+        _ = focusDirection;
         HashSet<CubeSpherePatchKey> target = new();
-        float residentAngle = Mathf.DegToRad(
-            Math.Clamp(CollisionResidentAngleDegrees, 10.0f, 80.0f));
-        Vector3 normalizedFocus = focusDirection.LengthSquared() <= 0.000001f
-            ? Vector3.Right
-            : focusDirection.Normalized();
-
-        foreach (CubeSpherePatchKey key in _targetResidentLeaves)
+        foreach (CubeSpherePatchKey key in _logicalLeaves)
         {
-            Vector3 centerDirection =
-                CubeSpherePatchBuilder.GetPatchCenterDirection(key);
-            float angularDistance = Mathf.Acos(Mathf.Clamp(
-                normalizedFocus.Dot(centerDirection),
-                -1.0f,
-                1.0f));
-            float angularExtent =
-                CubeSpherePatchBuilder.GetPatchAngularRadiusRadians(key);
-            if (angularDistance <= residentAngle + angularExtent)
-            {
-                target.Add(key);
-            }
-        }
-
-        if (target.Count == 0 && _targetResidentLeaves.Count > 0)
-        {
-            CubeSpherePatchKey nearest = default;
-            float nearestDot = float.NegativeInfinity;
-            foreach (CubeSpherePatchKey key in _targetResidentLeaves)
-            {
-                float candidateDot = normalizedFocus.Dot(
-                    CubeSpherePatchBuilder.GetPatchCenterDirection(key));
-                if (candidateDot > nearestDot)
-                {
-                    nearestDot = candidateDot;
-                    nearest = key;
-                }
-            }
-
-            target.Add(nearest);
+            target.Add(key);
         }
 
         return target;
@@ -355,19 +346,21 @@ public partial class CubeSpherePrototype
         while (budget-- > 0 && _pendingCollisionBuilds.Count > 0)
         {
             CubeSpherePatchKey key = _pendingCollisionBuilds.Dequeue();
-            if (!_patches.TryGetValue(key, out PatchRuntime? visualRuntime) ||
-                visualRuntime is null)
-            {
-                AbortCollisionPlan(
-                    $"visual patch unavailable: {key.DisplayName}");
-                return;
-            }
 
             try
             {
                 ulong startedAtMicroseconds = Time.GetTicksUsec();
+                CubeSpherePatchData collisionData =
+                    CubeSpherePatchBuilder.BuildPatch(
+                        key,
+                        FaceResolution,
+                        PlanetRadius,
+                        HeightAmplitude,
+                        NoiseFrequency,
+                        NoiseSeed,
+                        LodSkirtDepth);
                 ArrayMesh collisionMesh =
-                    CreatePatchCollisionMesh(visualRuntime.Data);
+                    CreatePatchCollisionMesh(collisionData);
                 ConcavePolygonShape3D shape =
                     collisionMesh.CreateTrimeshShape();
                 shape.BackfaceCollision = true;
@@ -445,7 +438,6 @@ public partial class CubeSpherePrototype
             _appliedCollisionLeaves.Add(key);
         }
 
-        _collisionAnchorDirection = GetPlayerFocusDirection();
         _collisionTransitionState = CubeSphereCollisionTransitionState.Idle;
         _collisionCommits++;
         UpdateCollisionCounters();
@@ -472,28 +464,34 @@ public partial class CubeSpherePrototype
 
     private void EnsureCollisionSafetyFallback()
     {
-        if (_collisionPatches.Count == 0 ||
-            _collisionTransitionState != CubeSphereCollisionTransitionState.Idle ||
-            _fallbackCollisionEnabled)
+        if (_planetaryPlayer is not null && !IsPlayerRadiallySafe())
         {
+            SetFallbackCollisionEnabled(true, true);
+            _collisionSafetyRecoveries++;
+            _planetaryPlayer.RecoverToRadialDistance(
+                PlanetRadius + HeightAmplitude + 2.0f);
+            _collisionUpdateAccumulator = CollisionUpdateIntervalSeconds;
+            GD.PushWarning(
+                "Collision safety recovery: player radial distance fell below " +
+                $"{GetMinimumSafeCollisionRadius():F2} m.");
             return;
         }
 
-        Vector3 focusDirection = GetPlayerFocusDirection();
-        float angularDistance = Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp(
-            focusDirection.Dot(_collisionAnchorDirection),
-            -1.0f,
-            1.0f)));
-        if (angularDistance > Math.Max(
-            4.0f,
-            CollisionSafetyFallbackAngleDegrees))
-        {
-            SetFallbackCollisionEnabled(true, true);
-            _collisionUpdateAccumulator = CollisionUpdateIntervalSeconds;
-            GD.Print(
-                "Collision safety fallback enabled: " +
-                $"player moved {angularDistance:F1}° from collision anchor.");
-        }
+        // The active collision set covers the complete logical topology.
+        // Fallback is therefore needed only during plan transitions or radial
+        // underflow recovery, not merely because the player moved angularly.
+    }
+
+    private float GetMinimumSafeCollisionRadius()
+    {
+        return PlanetRadius - HeightAmplitude -
+            Math.Max(0.0f, CollisionRadialSafetyMargin);
+    }
+
+    private bool IsPlayerRadiallySafe()
+    {
+        return _planetaryPlayer is null ||
+            _planetaryPlayer.RadialDistance >= GetMinimumSafeCollisionRadius();
     }
 
     private ArrayMesh CreatePatchCollisionMesh(CubeSpherePatchData patchData)
@@ -501,16 +499,15 @@ public partial class CubeSpherePrototype
         SurfaceTool surfaceTool = new();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
 
-        for (int i = 0; i < patchData.TopVertexCount; i++)
+        for (int i = 0; i < patchData.Vertices.Count; i++)
         {
             surfaceTool.SetNormal(patchData.Normals[i]);
             surfaceTool.AddVertex(patchData.Vertices[i]);
         }
 
-        int topIndexCount = patchData.TopTriangleCount * 3;
-        for (int i = 0; i < topIndexCount; i++)
+        foreach (int index in patchData.Indices)
         {
-            surfaceTool.AddIndex(patchData.Indices[i]);
+            surfaceTool.AddIndex(index);
         }
 
         return surfaceTool.Commit();
@@ -661,17 +658,23 @@ public partial class CubeSpherePrototype
         _collisionTestBaselineFallbackActivations =
             _collisionFallbackActivations;
         _collisionTestBaselineErrors = _collisionErrors;
+        _collisionTestBaselineRecoveries = _collisionSafetyRecoveries;
         _collisionTestMinimumActive = int.MaxValue;
         _collisionTestMaximumActive = 0;
+        _collisionTestMinimumRadius = float.PositiveInfinity;
         _collisionTestResult = "подготовка";
         _planetaryPlayer.CancelSeamTraversalTest(true);
+        _collisionTestStartPlayerState =
+            _planetaryPlayer.CaptureRuntimeState();
+        _collisionTestHasStartPlayerState = true;
         _planetaryPlayer.SetExternalMovementLocked(true);
         _collisionUpdateAccumulator = CollisionUpdateIntervalSeconds;
 
         GD.Print(
             "TASK-038 dynamic collision LOD acceptance started: " +
-            $"angle={CollisionResidentAngleDegrees:F1}°; " +
+            $"coverage=full-logical-topology; " +
             $"overlapFrames={CollisionOverlapPhysicsFrames}; " +
+            $"confirmationFrames={CollisionCoverageConfirmationFrames}; " +
             $"fallback={_collisionShapes.Count}@{_collisionResolution}x" +
             $"{_collisionResolution}");
     }
@@ -690,6 +693,18 @@ public partial class CubeSpherePrototype
         _collisionTestMaximumActive = Math.Max(
             _collisionTestMaximumActive,
             _collisionPatches.Count);
+        _collisionTestMinimumRadius = Math.Min(
+            _collisionTestMinimumRadius,
+            _planetaryPlayer.RadialDistance);
+
+        if (_planetaryPlayer.RadialDistance <
+            GetMinimumSafeCollisionRadius())
+        {
+            FinishCollisionAcceptanceTest(
+                CubeSphereCollisionTestState.Failed,
+                $"radial underflow={_planetaryPlayer.RadialDistance:F2} м");
+            return;
+        }
 
         if (_collisionTestState == CubeSphereCollisionTestState.Traversing ||
             _collisionTestState == CubeSphereCollisionTestState.WaitingForSettle)
@@ -798,6 +813,7 @@ public partial class CubeSpherePrototype
             createdDelta > 0 &&
             unloadedDelta > 0 &&
             fallbackDelta > 0 &&
+            _collisionSafetyRecoveries == _collisionTestBaselineRecoveries &&
             _collisionFinePatchCount > 0 &&
             _collisionPatches.Count == _targetCollisionLeaves.Count &&
             _collisionTestMaximumGroundGap <=
@@ -809,7 +825,8 @@ public partial class CubeSpherePrototype
             $"created={createdDelta}, unloaded={unloadedDelta}, " +
             $"fallback={fallbackDelta}, active={_collisionPatches.Count}, " +
             $"L{GetMaximumLevel()}={_collisionFinePatchCount}, " +
-            $"gap={_collisionTestMaximumGroundGap:F2} с, errors=0";
+            $"gap={_collisionTestMaximumGroundGap:F2} с, " +
+            $"rMin={_collisionTestMinimumRadius:F2} м, recoveries=0, errors=0";
         FinishCollisionAcceptanceTest(
             passed
                 ? CubeSphereCollisionTestState.Passed
@@ -840,9 +857,16 @@ public partial class CubeSpherePrototype
                 _planetaryPlayer.CancelSeamTraversalTest(true);
             }
 
+            _planetaryPlayer.SetExternalMovementLocked(true);
+            if (_collisionTestHasStartPlayerState)
+            {
+                _planetaryPlayer.RestoreRuntimeState(
+                    _collisionTestStartPlayerState);
+            }
             _planetaryPlayer.SetExternalMovementLocked(false);
         }
 
+        _collisionTestHasStartPlayerState = false;
         _collisionTestState = finalState;
         _collisionTestResult = result;
         string label = finalState switch
@@ -864,6 +888,8 @@ public partial class CubeSpherePrototype
             $"activeFinal={_collisionPatches.Count}; " +
             $"fine={_collisionFinePatchCount}; " +
             $"maxGroundGap={_collisionTestMaximumGroundGap:F3}s; " +
+            $"minimumRadius={(_collisionTestMinimumRadius == float.PositiveInfinity ? 0.0f : _collisionTestMinimumRadius):F3}m; " +
+            $"recoveries={_collisionSafetyRecoveries - _collisionTestBaselineRecoveries}; " +
             $"errors={_collisionErrors - _collisionTestBaselineErrors}; " +
             $"fallbackFinal={_fallbackCollisionEnabled}; result={result}");
     }

@@ -82,6 +82,12 @@ TASK-036 stream (I): PASS revisions=10, L3=12, resident=44/45,
 unloaded=93, queue=0, workers=0, stale=24, errors=0
 ```
 
+Первый runtime-запуск `TASK-038` выявил дефект предыдущей collision-версии:
+тест завершался `FAIL timeout`, игрок циклически проваливался до `r≈83 м` и
+возвращался fallback-поверхностью к `r≈90 м`. Текущий hotfix устраняет причину:
+collision cover больше не зависит от visual resident culling, а LOD-границы
+закрываются physics-skirts.
+
 Текущая итерация `TASK-038` добавляет динамический collision LOD поверх принятого визуального quadtree:
 
 - дерево использует три рабочих уровня `L1/L2/L3`;
@@ -103,12 +109,18 @@ unloaded=93, queue=0, workers=0, stale=24, errors=0
 - `I` запускает автоматический stress/acceptance test фонового стриминга;
 - ранее принятые тесты `T`, `Y`, `U` и `I` сохранены.
 
-- локальный collision resident-set выбирается из текущих `L1/L2/L3` leaves около игрока;
-- collision patches используют отдельные top-surface trimesh без visual skirts;
+- collision-набор строится по полной логической quadtree-топологии, поэтому покрытие
+  планеты не зависит от visual horizon culling;
+- collision patches используют отдельные trimesh с inward-skirts на границах LOD,
+  закрывающими T-junction между `L1/L2/L3`;
 - шесть полногранных поверхностей `129 × 129` сохранены как safety fallback;
 - новый collision-набор сначала создаётся disabled, затем включается deferred;
-- старый и новый наборы перекрываются несколько physics-кадров;
+- fallback, старый и новый наборы перекрываются не менее четырёх physics-кадров,
+  после чего контакт подтверждается ещё шестью последовательными кадрами;
 - после безопасного commit fallback и устаревшие patches отключаются и выгружаются;
+- angular movement больше не включает fallback при полном collision-cover;
+- radial underflow ниже безопасного радиуса немедленно включает fallback и
+  восстанавливает игрока выше максимальной поверхности;
 - HUD показывает collision plan, active/target/staged, `L1/L2/L3`, commits,
   fallback activations, created/unloaded и errors;
 - `K` запускает автоматический collision acceptance test с реальным межгранным
@@ -124,8 +136,8 @@ src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn
 
 ```text
 TASK-038 collision (K): PASS plans>=3, commits>=3,
-created>0, unloaded>0, fallback>0, active>0, L3>0,
-gap<=0.12 s, errors=0
+created>0, unloaded>0, fallback>0, active=logical, L3>0,
+gap<=0.12 s, rMin>=89.5 m, recoveries=0, errors=0
 ```
 
 ## Состояние реализации ТЗ
@@ -231,19 +243,19 @@ src/Game.Client/project.godot
 2. Дождаться импорта ресурсов и выполнить сборку C#.
 3. Нажать `F5`; после завершения фоновой загрузки HUD должен показывать:
    - visual `Applied = resident`, `queue=0`, `workers=0`, `errors=0`;
-   - collision `active=target>0`, `staged=0`, `queue=0`, `state=Idle`;
-   - collision `L3>0`, `fallback=off`, `errors=0`;
+   - collision `active=target=logical>0`, `staged=0`, `queue=0`, `state=Idle`;
+   - collision `L3>0`, `fallback=off`, `recoveries=0`, `errors=0`;
    - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
    - `ground=да`, `floor=да`, `probe=да`, радиальную систему `PASS`.
 4. Нажать `K` и не использовать управление до окончания теста. Тест запускает
-   принятый межгранный маршрут и проверяет, что локальный collision resident-set
+   принятый межгранный маршрут и проверяет, что topology-complete collision LOD
    перестраивается без потери контакта. Максимальное время — `75 с`.
 5. Ожидаемый итог HUD:
 
 ```text
 TASK-038 collision (K): PASS plans=..., commits=...,
-created=..., unloaded=..., fallback=..., active=...,
-L3=..., gap<=0.12 s, errors=0
+created=..., unloaded=..., fallback=..., active=logical,
+L3=..., gap<=0.12 s, rMin>=89.5 m, recoveries=0, errors=0
 ```
 
 6. В Godot Output должна появиться строка с префиксом:
@@ -254,8 +266,8 @@ TASK-038 dynamic collision LOD acceptance PASS
 
 7. Ручная проверка после теста:
    - игрок не проваливается и не подпрыгивает при переходах между гранями;
-   - в режиме `Debug → Visible Collision Shapes` около игрока видны локальные
-     collision patches, а устаревшие участки исчезают после commit;
+   - в режиме `Debug → Visible Collision Shapes` вся планета покрыта текущими
+     quadtree collision patches, а устаревшие участки исчезают после commit;
    - после стабилизации `active=target`, `staged=0`, collision queue `0`,
      `state=Idle`, `fallback=off`;
    - работают WASD, `Space`, `R`, `F1`, `F2`, `T`, `Y`, `U` и `I`.

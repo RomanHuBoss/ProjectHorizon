@@ -46,11 +46,11 @@ MaxPatchAppliesPerFrame = 2
 StreamingTestStepSeconds = 0.08
 StreamingTestSettleTimeoutSeconds = 12.0
 EnableDynamicCollisionLod = true
-CollisionResidentAngleDegrees = 42.0
 CollisionUpdateIntervalSeconds = 0.15
 MaxCollisionAppliesPerFrame = 2
-CollisionOverlapPhysicsFrames = 2
-CollisionSafetyFallbackAngleDegrees = 14.0
+CollisionOverlapPhysicsFrames = 4
+CollisionCoverageConfirmationFrames = 6
+CollisionRadialSafetyMargin = 0.5
 CollisionTestTimeoutSeconds = 75.0
 CollisionTestAllowedGroundGapSeconds = 0.12
 

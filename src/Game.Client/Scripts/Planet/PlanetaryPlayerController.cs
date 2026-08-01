@@ -11,6 +11,12 @@ public enum PlanetarySeamTestState
     Cancelled = 4
 }
 
+
+public readonly record struct PlanetaryPlayerRuntimeState(
+    Transform3D GlobalTransform,
+    Vector3 Velocity,
+    Vector3 CameraPitchRotation);
+
 public partial class PlanetaryPlayerController : CharacterBody3D
 {
     private enum SeamTestPhase
@@ -437,6 +443,53 @@ public partial class PlanetaryPlayerController : CharacterBody3D
                 _seamTestStartTransform,
                 translation);
         }
+    }
+
+
+    public PlanetaryPlayerRuntimeState CaptureRuntimeState()
+    {
+        return new PlanetaryPlayerRuntimeState(
+            GlobalTransform,
+            Velocity,
+            _cameraPitch?.Rotation ?? Vector3.Zero);
+    }
+
+    public void RestoreRuntimeState(PlanetaryPlayerRuntimeState state)
+    {
+        GlobalTransform = state.GlobalTransform;
+        Velocity = state.Velocity;
+        _groundGraceRemaining = 0.0f;
+        _jumpDetachRemaining = 0.0f;
+        if (_cameraPitch is not null)
+        {
+            _cameraPitch.Rotation = state.CameraPitchRotation;
+        }
+
+        SnapOrientationToRadialUp();
+        _currentFace = GetDominantFace(RadialUp);
+        UpdateGroundProbes();
+    }
+
+    public void RecoverToRadialDistance(float radialDistance)
+    {
+        if (_planetCenter is null)
+        {
+            return;
+        }
+
+        Vector3 radialUp = CalculateRadialUp();
+        float targetDistance = Math.Max(1.0f, radialDistance);
+        GlobalPosition = _planetCenter.GlobalPosition +
+            (radialUp * targetDistance);
+        Velocity = Vector3.Zero;
+        _groundGraceRemaining = 0.0f;
+        _jumpDetachRemaining = 0.0f;
+        SnapOrientationToRadialUp();
+        _currentFace = GetDominantFace(RadialUp);
+        UpdateGroundProbes();
+        GD.Print(
+            "Planetary player recovered to radial distance " +
+            $"{targetDistance:F2} m.");
     }
 
     public void ResetToSpawn()
