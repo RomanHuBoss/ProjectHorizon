@@ -47,6 +47,15 @@ public partial class TerrainChunkManager : Node3D
     [Export(PropertyHint.Range, "1,4,1")]
     public int MaxOperationsPerStep { get; set; } = 1;
 
+    [Export(PropertyHint.Range, "4,32,1")]
+    public int StressTestRevisionCount { get; set; } = 12;
+
+    [Export(PropertyHint.Range, "0.01,0.25,0.01")]
+    public float StressTestStepIntervalSeconds { get; set; } = 0.03f;
+
+    [Export(PropertyHint.Range, "5.0,60.0,1.0")]
+    public float StressTestTimeoutSeconds { get; set; } = 20.0f;
+
     [Export]
     public int NoiseSeed { get; set; } = 20260801;
 
@@ -100,6 +109,23 @@ public partial class TerrainChunkManager : Node3D
     private int _failedJobs;
     private int _cancelledJobs;
     private int _discardedStaleJobs;
+    private int _totalFailedJobs;
+    private int _totalCancelledJobs;
+    private int _totalDiscardedStaleJobs;
+    private TerrainStressTestState _stressTestState =
+        TerrainStressTestState.Idle;
+    private readonly List<Vector2I> _stressTestCenters = new();
+    private string _stressTestStatus = "не запускался";
+    private double _stressTestElapsedSeconds;
+    private double _stressTestStepAccumulator;
+    private int _stressTestNextCenterIndex;
+    private Vector3 _stressTestOriginalPlayerPosition;
+    private Vector2I _stressTestOriginalChunk;
+    private bool _stressTestPlayerPhysicsWasEnabled;
+    private int _stressTestStartingRevision;
+    private int _stressTestBaselineFailedJobs;
+    private int _stressTestBaselineCancelledJobs;
+    private int _stressTestBaselineStaleJobs;
 
     public override void _Ready()
     {
@@ -138,6 +164,12 @@ public partial class TerrainChunkManager : Node3D
             !eventKey.Pressed ||
             eventKey.IsEcho())
         {
+            return;
+        }
+
+        if (eventKey.Keycode == Key.F9)
+        {
+            StartTerrainStressTest();
             return;
         }
 
@@ -194,12 +226,20 @@ public partial class TerrainChunkManager : Node3D
             return;
         }
 
-        Vector2I nextCenter = CalculateHystereticCenter(_player.GlobalPosition);
-
-        if (nextCenter != _currentChunk)
+        if (_stressTestState != TerrainStressTestState.Idle)
         {
-            _currentChunk = nextCenter;
-            PlanRefresh(executeImmediately: false);
+            UpdateTerrainStressTest(delta);
+        }
+        else
+        {
+            Vector2I nextCenter =
+                CalculateHystereticCenter(_player.GlobalPosition);
+
+            if (nextCenter != _currentChunk)
+            {
+                _currentChunk = nextCenter;
+                PlanRefresh(executeImmediately: false);
+            }
         }
 
         _hudUpdateAccumulator += delta;
@@ -257,12 +297,14 @@ public partial class TerrainChunkManager : Node3D
             if (completedJob.IsCancelled)
             {
                 _cancelledJobs++;
+                _totalCancelledJobs++;
                 continue;
             }
 
             if (completedJob.Error is not null)
             {
                 _failedJobs++;
+                _totalFailedJobs++;
                 GD.PushError(
                     $"Terrain worker failed for " +
                     $"({activeJob.Operation.Coordinate.X}, " +
@@ -274,6 +316,7 @@ public partial class TerrainChunkManager : Node3D
             if (completedJob.Result is null)
             {
                 _failedJobs++;
+                _totalFailedJobs++;
                 GD.PushError(
                     "Terrain worker completed without a result.");
                 continue;
@@ -306,7 +349,21 @@ public partial class TerrainChunkManager : Node3D
             if (completedJob.Revision != _planRevision ||
                 activeJob.Operation.Revision != _planRevision)
             {
+                if (completedJob.Error is not null)
+                {
+                    _failedJobs++;
+                    _totalFailedJobs++;
+                    GD.PushError(
+                        $"Terrain stale worker failed for " +
+                        $"({activeJob.Operation.Coordinate.X}, " +
+                        $"{activeJob.Operation.Coordinate.Y}); " +
+                        $"jobRevision={completedJob.Revision}; " +
+                        $"currentRevision={_planRevision}: " +
+                        completedJob.Error);
+                }
+
                 _discardedStaleJobs++;
+                _totalDiscardedStaleJobs++;
                 GD.Print(
                     $"Terrain worker: discarded stale job={completedJob.JobId}; " +
                     $"jobRevision={completedJob.Revision}; " +
@@ -573,6 +630,22 @@ public partial class TerrainChunkManager : Node3D
     private void PlanRefresh(bool executeImmediately)
     {
         int discardedReadyJobCount = _readyJobs.Count;
+        int discardedReadyFailedJobCount = 0;
+
+        foreach (ReadyChunkJob readyJob in _readyJobs.Values)
+        {
+            if (readyJob.CompletedJob.Error is not null)
+            {
+                discardedReadyFailedJobCount++;
+                _totalFailedJobs++;
+                GD.PushError(
+                    $"Terrain ready worker result failed before revision " +
+                    $"switch; job={readyJob.CompletedJob.JobId}; " +
+                    $"jobRevision={readyJob.CompletedJob.Revision}; " +
+                    $"nextRevision={_planRevision + 1}: " +
+                    readyJob.CompletedJob.Error);
+            }
+        }
 
         // Cancel the previous revision, but do not dispose its source here:
         // in-flight workers may still be observing tokens created from it.
@@ -672,9 +745,10 @@ public partial class TerrainChunkManager : Node3D
         _completedCreates = 0;
         _completedUpdates = 0;
         _completedRemovals = 0;
-        _failedJobs = 0;
+        _failedJobs = discardedReadyFailedJobCount;
         _cancelledJobs = 0;
         _discardedStaleJobs = discardedReadyJobCount;
+        _totalDiscardedStaleJobs += discardedReadyJobCount;
 
         if (discardedReadyJobCount > 0)
         {
@@ -1014,6 +1088,348 @@ public partial class TerrainChunkManager : Node3D
     }
 
 
+    private void StartTerrainStressTest()
+    {
+        if (_player is null)
+        {
+            GD.PushError("Terrain async stress test requires a player node.");
+            return;
+        }
+
+        if (_stressTestState != TerrainStressTestState.Idle)
+        {
+            GD.Print("Terrain async stress test is already running.");
+            return;
+        }
+
+        _stressTestOriginalPlayerPosition = _player.GlobalPosition;
+        _stressTestOriginalChunk = _currentChunk;
+        _stressTestPlayerPhysicsWasEnabled = _player.IsPhysicsProcessing();
+        _player.SetPhysicsProcess(false);
+        _player.Velocity = Vector3.Zero;
+        _stressTestElapsedSeconds = 0.0;
+        _stressTestStepAccumulator = 0.0;
+        _stressTestNextCenterIndex = 0;
+        _stressTestCenters.Clear();
+        _stressTestStatus = "подготовка: ожидание пустых очередей";
+        _stressTestState = TerrainStressTestState.WaitingForInitialIdle;
+
+        GD.Print(
+            "Terrain async stress test: requested; waiting for the current " +
+            "streaming revision to become idle.");
+        UpdateHud();
+    }
+
+    private void UpdateTerrainStressTest(double delta)
+    {
+        if (_player is null)
+        {
+            FailTerrainStressTest("player node was lost");
+            return;
+        }
+
+        _stressTestElapsedSeconds += delta;
+
+        if (_stressTestElapsedSeconds >
+            Math.Max(5.0, StressTestTimeoutSeconds))
+        {
+            FailTerrainStressTest(
+                $"timeout after {_stressTestElapsedSeconds:F1} s; " +
+                GetQueueSnapshot());
+            return;
+        }
+
+        switch (_stressTestState)
+        {
+            case TerrainStressTestState.WaitingForInitialIdle:
+                _player.GlobalPosition = _stressTestOriginalPlayerPosition;
+                _player.Velocity = Vector3.Zero;
+
+                if (IsStreamingIdle())
+                {
+                    BeginTerrainStressRevisions();
+                }
+                break;
+
+            case TerrainStressTestState.IssuingRevisions:
+                _stressTestStepAccumulator += delta;
+
+                if (_stressTestNextCenterIndex < _stressTestCenters.Count &&
+                    _stressTestStepAccumulator >=
+                    Math.Max(0.01, StressTestStepIntervalSeconds))
+                {
+                    _stressTestStepAccumulator = 0.0;
+                    ForceStressTestCenter(
+                        _stressTestCenters[_stressTestNextCenterIndex]);
+                    _stressTestNextCenterIndex++;
+                    _stressTestStatus =
+                        $"RUNNING: revision " +
+                        $"{_stressTestNextCenterIndex}/" +
+                        $"{_stressTestCenters.Count}";
+                }
+
+                if (_stressTestNextCenterIndex >= _stressTestCenters.Count)
+                {
+                    _stressTestState =
+                        TerrainStressTestState.WaitingForFinalIdle;
+                    _stressTestStatus =
+                        "RUNNING: ожидание workers=0 и queue=0";
+                }
+                break;
+
+            case TerrainStressTestState.WaitingForFinalIdle:
+                _player.GlobalPosition = _stressTestOriginalPlayerPosition;
+                _player.Velocity = Vector3.Zero;
+
+                if (IsStreamingIdle())
+                {
+                    CompleteTerrainStressTest();
+                }
+                break;
+        }
+    }
+
+    private void BeginTerrainStressRevisions()
+    {
+        if (_player is null)
+        {
+            FailTerrainStressTest("player node was lost before start");
+            return;
+        }
+
+        Vector2I origin = _stressTestOriginalChunk;
+        int requestedRevisionCount = Math.Clamp(
+            StressTestRevisionCount,
+            4,
+            32);
+
+        for (int index = 0; index < requestedRevisionCount; index++)
+        {
+            int ring = 1 + (index / 8);
+            int positionOnRing = index % 8;
+            Vector2I offset = positionOnRing switch
+            {
+                0 => new Vector2I(ring, 0),
+                1 => new Vector2I(ring, ring),
+                2 => new Vector2I(0, ring),
+                3 => new Vector2I(-ring, ring),
+                4 => new Vector2I(-ring, 0),
+                5 => new Vector2I(-ring, -ring),
+                6 => new Vector2I(0, -ring),
+                _ => new Vector2I(ring, -ring)
+            };
+            _stressTestCenters.Add(origin + offset);
+        }
+
+        // The final revision always returns to the exact starting chunk so the
+        // test validates a deterministic final active set and leaves the scene
+        // where the operator started it.
+        _stressTestCenters.Add(origin);
+        _stressTestStartingRevision = _planRevision;
+        _stressTestBaselineFailedJobs = _totalFailedJobs;
+        _stressTestBaselineCancelledJobs = _totalCancelledJobs;
+        _stressTestBaselineStaleJobs = _totalDiscardedStaleJobs;
+        _stressTestStepAccumulator =
+            Math.Max(0.01, StressTestStepIntervalSeconds);
+        _stressTestState = TerrainStressTestState.IssuingRevisions;
+        _stressTestStatus =
+            $"RUNNING: revision 0/{_stressTestCenters.Count}";
+
+        GD.Print(
+            $"Terrain async stress test: started at center={origin}; " +
+            $"forcedRevisions={_stressTestCenters.Count}; " +
+            $"interval={Math.Max(0.01, StressTestStepIntervalSeconds):F2} s; " +
+            $"timeout={Math.Max(5.0, StressTestTimeoutSeconds):F1} s");
+    }
+
+    private void ForceStressTestCenter(Vector2I center)
+    {
+        if (_player is null)
+        {
+            return;
+        }
+
+        _currentChunk = center;
+        _player.GlobalPosition = new Vector3(
+            center.X * ChunkSize,
+            _stressTestOriginalPlayerPosition.Y,
+            center.Y * ChunkSize);
+        _player.Velocity = Vector3.Zero;
+        PlanRefresh(executeImmediately: false);
+    }
+
+    private void CompleteTerrainStressTest()
+    {
+        int failedDelta =
+            _totalFailedJobs - _stressTestBaselineFailedJobs;
+        int cancelledDelta =
+            _totalCancelledJobs - _stressTestBaselineCancelledJobs;
+        int staleDelta =
+            _totalDiscardedStaleJobs - _stressTestBaselineStaleJobs;
+        int revisionDelta = _planRevision - _stressTestStartingRevision;
+
+        if (!TryValidateTerrainStressResult(
+                failedDelta,
+                cancelledDelta,
+                staleDelta,
+                revisionDelta,
+                out string failureReason))
+        {
+            FailTerrainStressTest(failureReason, restoreWithReplan: false);
+            return;
+        }
+
+        _stressTestStatus =
+            $"PASS: rev={revisionDelta}, cancel={cancelledDelta}, " +
+            $"stale={staleDelta}, {_activeChunks.Count}/" +
+            $"{_desiredSpecs.Count}, queue=0, workers=0";
+
+        GD.Print(
+            $"Terrain async stress test: PASS; revisions={revisionDelta}; " +
+            $"cancelled={cancelledDelta}; stale={staleDelta}; " +
+            $"failed={failedDelta}; active={_activeChunks.Count}/" +
+            $"{_desiredSpecs.Count}; {GetQueueSnapshot()}; " +
+            $"elapsed={_stressTestElapsedSeconds:F2} s");
+        RestorePlayerAfterTerrainStressTest(replan: false);
+    }
+
+    private bool TryValidateTerrainStressResult(
+        int failedDelta,
+        int cancelledDelta,
+        int staleDelta,
+        int revisionDelta,
+        out string failureReason)
+    {
+        if (!IsStreamingIdle())
+        {
+            failureReason = "streaming did not become idle; " +
+                GetQueueSnapshot();
+            return false;
+        }
+
+        if (failedDelta != 0)
+        {
+            failureReason = $"worker failures detected: {failedDelta}";
+            return false;
+        }
+
+        if (cancelledDelta + staleDelta <= 0)
+        {
+            failureReason =
+                "rapid revisions produced neither cancellation nor stale " +
+                "results; increase resolution or reduce stress interval";
+            return false;
+        }
+
+        if (revisionDelta < _stressTestCenters.Count)
+        {
+            failureReason =
+                $"expected at least {_stressTestCenters.Count} revisions, " +
+                $"observed {revisionDelta}";
+            return false;
+        }
+
+        if (_activeChunks.Count != _desiredSpecs.Count)
+        {
+            failureReason =
+                $"active set mismatch: {_activeChunks.Count}/" +
+                $"{_desiredSpecs.Count}";
+            return false;
+        }
+
+        foreach (KeyValuePair<Vector2I, ChunkSpec> entry in _desiredSpecs)
+        {
+            if (!_activeChunks.TryGetValue(
+                    entry.Key,
+                    out TerrainChunk? chunk))
+            {
+                failureReason = $"missing final chunk {entry.Key}";
+                return false;
+            }
+
+            ChunkSpec spec = entry.Value;
+
+            if (chunk.RequiresDetailLevel(
+                    spec.LodLevel,
+                    spec.VisualResolution,
+                    spec.GenerateCollision,
+                    spec.StitchMask,
+                    spec.SkirtMask))
+            {
+                failureReason =
+                    $"final chunk {entry.Key} does not match the latest " +
+                    "revision";
+                return false;
+            }
+        }
+
+        foreach (Vector2I coordinate in _activeChunks.Keys)
+        {
+            if (!_desiredSpecs.ContainsKey(coordinate))
+            {
+                failureReason =
+                    $"unexpected stale chunk remained active: {coordinate}";
+                return false;
+            }
+        }
+
+        failureReason = string.Empty;
+        return true;
+    }
+
+    private void FailTerrainStressTest(
+        string reason,
+        bool restoreWithReplan = true)
+    {
+        _stressTestStatus = "FAIL: " + reason;
+        GD.PushError(
+            $"Terrain async stress test: FAIL; reason={reason}; " +
+            $"{GetQueueSnapshot()}; elapsed={_stressTestElapsedSeconds:F2} s");
+        RestorePlayerAfterTerrainStressTest(restoreWithReplan);
+    }
+
+    private void RestorePlayerAfterTerrainStressTest(bool replan)
+    {
+        if (_player is not null)
+        {
+            _player.GlobalPosition = _stressTestOriginalPlayerPosition;
+            _player.Velocity = Vector3.Zero;
+            _player.SetPhysicsProcess(_stressTestPlayerPhysicsWasEnabled);
+
+            if (replan)
+            {
+                Vector2I restoredCenter = _stressTestOriginalChunk;
+
+                if (restoredCenter != _currentChunk || !IsStreamingIdle())
+                {
+                    _currentChunk = restoredCenter;
+                    PlanRefresh(executeImmediately: false);
+                }
+            }
+        }
+
+        _stressTestState = TerrainStressTestState.Idle;
+        UpdateHud();
+    }
+
+    private bool IsStreamingIdle()
+    {
+        return _pendingOperations.Count == 0 &&
+            _activeJobs.Count == 0 &&
+            _jobApplyOrder.Count == 0 &&
+            _readyJobs.Count == 0 &&
+            _completedJobs.IsEmpty &&
+            _completedRevision == _planRevision;
+    }
+
+    private string GetQueueSnapshot()
+    {
+        return $"pending={_pendingOperations.Count}; " +
+            $"apply={_jobApplyOrder.Count}; ready={_readyJobs.Count}; " +
+            $"completed={_completedJobs.Count}; " +
+            $"workers={_activeJobs.Count}";
+    }
+
     private void ApplyDebugVisualization()
     {
         foreach (TerrainChunk chunk in _activeChunks.Values)
@@ -1053,7 +1469,10 @@ public partial class TerrainChunkManager : Node3D
         CountLodChunks(out int highDetailCount, out int lowDetailCount);
         int sideLength = (Math.Max(1, ActiveRadius) * 2) + 1;
         bool transitionActive = _pendingOperations.Count > 0 ||
-            _jobApplyOrder.Count > 0;
+            _activeJobs.Count > 0 ||
+            _jobApplyOrder.Count > 0 ||
+            _readyJobs.Count > 0 ||
+            !_completedJobs.IsEmpty;
         string transitionState = transitionActive
             ? "выполняется"
             : (_failedJobs > 0 ? "ошибка" : "стабильно");
@@ -1074,10 +1493,11 @@ public partial class TerrainChunkManager : Node3D
             $"границы: {GetToggleState(ShowChunkBorders)}\n" +
             $"Фоновая генерация с отменой  •  main-thread apply  •  " +
             $"ошибки: {_failedJobs}  •  stale: {_discardedStaleJobs}\n" +
+            $"TASK-025 stress (F9): {_stressTestStatus}\n" +
             $"Глобальные нормали  •  stitching  •  " +
             $"гистерезис: {ChunkSwitchHysteresis:F1} м  •  seed: {NoiseSeed}\n" +
             "F1 — режим цвета, F2 — мировая сетка, F3 — wireframe, " +
-            "F4 — границы чанков\n" +
+            "F4 — границы, F9 — async stress-test\n" +
             "WASD — движение, Space — прыжок, мышь — обзор, " +
             "Esc — освободить курсор";
     }
@@ -1087,6 +1507,14 @@ public partial class TerrainChunkManager : Node3D
         return Math.Max(
             Math.Abs(first.X - second.X),
             Math.Abs(first.Y - second.Y));
+    }
+
+    private enum TerrainStressTestState
+    {
+        Idle,
+        WaitingForInitialIdle,
+        IssuingRevisions,
+        WaitingForFinalIdle
     }
 
     private enum ChunkOperationType

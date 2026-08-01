@@ -45,7 +45,7 @@ script = ExtResource("1_manager")
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 910.0
-offset_bottom = 252.0
+offset_bottom = 286.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
