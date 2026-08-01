@@ -20,6 +20,7 @@ collision_layer = 2
 collision_mask = 1
 script = ExtResource("1_player")
 PlanetCenterPath = NodePath("../Planet")
+GroundProbesPath = NodePath("GroundProbes")
 GravityAcceleration = 24.0
 MoveSpeed = 8.0
 GroundAcceleration = 36.0
@@ -27,6 +28,15 @@ AirAcceleration = 10.0
 JumpVelocity = 8.0
 OrientationSharpness = 14.0
 MouseSensitivity = 0.0025
+SurfaceSnapLength = 1.25
+SurfaceAdhesionSpeed = 2.0
+GroundGraceSeconds = 0.12
+GroundProbeContactDistance = 0.9
+CollisionSafeMargin = 0.03
+SeamTestMoveSpeed = 12.0
+SeamTestTargetCrossings = 4
+SeamTestTimeoutSeconds = 65.0
+SeamTestAllowedUnsupportedSeconds = 0.12
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("CapsuleShape_planet_player")
@@ -35,6 +45,33 @@ shape = SubResource("CapsuleShape_planet_player")
 mesh = SubResource("CapsuleMesh_planet_player")
 material_override = SubResource("PlayerMaterial")
 cast_shadow = 1
+
+[node name="GroundProbes" type="Node3D" parent="."]
+
+[node name="Center" type="RayCast3D" parent="GroundProbes"]
+position = Vector3(0, -0.48, 0)
+target_position = Vector3(0, -1.35, 0)
+collision_mask = 1
+
+[node name="Right" type="RayCast3D" parent="GroundProbes"]
+position = Vector3(0.28, -0.48, 0)
+target_position = Vector3(0, -1.35, 0)
+collision_mask = 1
+
+[node name="Left" type="RayCast3D" parent="GroundProbes"]
+position = Vector3(-0.28, -0.48, 0)
+target_position = Vector3(0, -1.35, 0)
+collision_mask = 1
+
+[node name="Forward" type="RayCast3D" parent="GroundProbes"]
+position = Vector3(0, -0.48, -0.28)
+target_position = Vector3(0, -1.35, 0)
+collision_mask = 1
+
+[node name="Back" type="RayCast3D" parent="GroundProbes"]
+position = Vector3(0, -0.48, 0.28)
+target_position = Vector3(0, -1.35, 0)
+collision_mask = 1
 
 [node name="CameraPitch" type="Node3D" parent="."]
 position = Vector3(0, 0.8, 0)

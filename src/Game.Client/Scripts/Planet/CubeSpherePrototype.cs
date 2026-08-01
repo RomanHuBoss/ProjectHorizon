@@ -106,11 +106,41 @@ public partial class CubeSpherePrototype : Node3D
         }
         else if (keyEvent.Keycode == Key.F2)
         {
+            if (_planetaryPlayer?.SeamTestRunning == true)
+            {
+                _planetaryPlayer.CancelSeamTraversalTest(true);
+            }
+
             _cameraMode = _cameraMode == CubeSphereCameraMode.PlanetaryPlayer
                 ? CubeSphereCameraMode.OverviewOrbit
                 : CubeSphereCameraMode.PlanetaryPlayer;
             ApplyCameraMode();
             UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (keyEvent.Keycode == Key.T ||
+            keyEvent.PhysicalKeycode == Key.T)
+        {
+            if (_planetaryPlayer is not null &&
+                _cameraMode == CubeSphereCameraMode.PlanetaryPlayer)
+            {
+                if (_planetaryPlayer.SeamTestRunning)
+                {
+                    _planetaryPlayer.CancelSeamTraversalTest(true);
+                }
+                else
+                {
+                    _planetaryPlayer.BeginSeamTraversalTest();
+                }
+
+                UpdateHud();
+            }
+            else
+            {
+                GD.Print(
+                    "TASK-030 seam traversal requires planetary player camera mode.");
+            }
+
             GetViewport().SetInputAsHandled();
         }
         else if (keyEvent.Keycode == Key.Space &&
@@ -287,7 +317,7 @@ public partial class CubeSpherePrototype : Node3D
         if (_buildData is null)
         {
             _hudLabel.Text =
-                "ПРОТОТИП C — CUBE SPHERE\n" +
+                "ПРОТОТИП C — ХОДЬБА ЧЕРЕЗ ШВЫ\n" +
                 "Построение геометрии...";
             return;
         }
@@ -300,6 +330,8 @@ public partial class CubeSpherePrototype : Node3D
 
         string playerStatus = "игрок не найден";
         string radialStatus = "N/A";
+        string contactStatus = "контакт: N/A";
+        string seamTestStatus = "TASK-030 seam (T): N/A";
         if (_planetaryPlayer is not null)
         {
             bool radialPass =
@@ -312,6 +344,12 @@ public partial class CubeSpherePrototype : Node3D
                 $"ground={(_planetaryPlayer.IsGrounded ? "да" : "нет")}  •  " +
                 $"vₜ={_planetaryPlayer.TangentialSpeed:F1} м/с  •  " +
                 $"Δup={_planetaryPlayer.UpAlignmentErrorDegrees:F2}°";
+            contactStatus =
+                $"Грань: {_planetaryPlayer.CurrentFaceName}  •  " +
+                $"floor={(_planetaryPlayer.IsOnFloor() ? "да" : "нет")}  •  " +
+                $"probe={(_planetaryPlayer.ProbeGrounded ? "да" : "нет")}  •  " +
+                $"переходы={_planetaryPlayer.LifetimeSeamCrossings}";
+            seamTestStatus = _planetaryPlayer.SeamTestStatusText;
         }
 
         bool playerCamera =
@@ -324,17 +362,19 @@ public partial class CubeSpherePrototype : Node3D
             : "Space — пауза обзора";
 
         _hudLabel.Text =
-            "ПРОТОТИП C — РАДИАЛЬНАЯ ГРАВИТАЦИЯ\n" +
+            "ПРОТОТИП C — ХОДЬБА ЧЕРЕЗ ШВЫ\n" +
             $"Грани: {_faceMeshes.Count}/6  •  collision: {_collisionShapes.Count}/" +
             $"{(GenerateCollision ? 6 : 0)}  •  швы: {seamStatus} " +
             $"({_buildData.SeamComparisons}/{_buildData.ExpectedSeamComparisons})\n" +
             $"Игрок: {playerStatus}\n" +
+            $"{contactStatus}\n" +
             $"Радиальная система: {radialStatus}  •  камера: {cameraState}  •  " +
             $"режим: {debugMode}\n" +
+            $"{seamTestStatus}\n" +
             $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
             $"seed: {NoiseSeed}  •  сетка: {_buildData.Resolution}×{_buildData.Resolution}\n" +
             "WASD — касательное движение  •  мышь — обзор  •  " +
             $"{contextualSpace}  •  R — сброс\n" +
-            "F1 — цвета/нормали  •  F2 — игрок/обзор";
+            "F1 — цвета/нормали  •  F2 — игрок/обзор  •  T — seam-test/stop";
     }
 }
