@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://ciutpqapuu5sb" path="res://Scripts/DebugWorld.cs" id="1_qvuqh"]
 [ext_resource type="PackedScene" uid="uid://dg4e7visk71oc" path="res://Scenes/Player/Player.tscn" id="2_04xr5"]
+[ext_resource type="Script" uid="uid://aoj5b2r8nhc6r" path="res://Scripts/Interaction/TestInteractable.cs" id="3_interactable"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_ground"]
 size = Vector3(20, 0.2, 20)
@@ -32,6 +33,12 @@ size = Vector3(1.5, 2, 1.5)
 
 [sub_resource type="BoxShape3D" id="BoxShape_high_block"]
 size = Vector3(1.5, 2, 1.5)
+
+[sub_resource type="BoxMesh" id="BoxMesh_interaction_terminal"]
+size = Vector3(1.2, 2, 0.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape_interaction_terminal"]
+size = Vector3(1.2, 2, 0.8)
 
 [node name="DebugWorld" type="Node3D" unique_id=8855545]
 script = ExtResource("1_qvuqh")
@@ -87,3 +94,14 @@ mesh = SubResource("BoxMesh_high_block")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/HighBlock" unique_id=1986146255]
 shape = SubResource("BoxShape_high_block")
+
+
+[node name="InteractionTerminal" type="StaticBody3D" parent="TestGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.1, -3.5)
+script = ExtResource("3_interactable")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="TestGeometry/InteractionTerminal"]
+mesh = SubResource("BoxMesh_interaction_terminal")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TestGeometry/InteractionTerminal"]
+shape = SubResource("BoxShape_interaction_terminal")
