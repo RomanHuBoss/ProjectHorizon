@@ -127,6 +127,7 @@ public partial class ArcadeShipController : CharacterBody3D
         _spawnTransform = GlobalTransform;
         InitializeAtmosphere();
         InitializeLandingSystem();
+        InitializeTouchdownSystem();
         SetCameraMode(ShipCameraMode.Chase, false);
         Input.MouseMode = Input.MouseModeEnum.Captured;
         UpdateDiagnostics();
@@ -212,6 +213,16 @@ public partial class ArcadeShipController : CharacterBody3D
             : ReadManualCommand();
 
         UpdateAtmosphereContext();
+        if (ProcessTouchdownPhysics(deltaSeconds))
+        {
+            _mouseLookInput = _mouseLookInput.MoveToward(
+                Vector2.Zero,
+                MouseInputDecay);
+            UpdateAtmosphereContext();
+            UpdateDiagnostics();
+            return;
+        }
+
         if (ProcessLandingPhysics(deltaSeconds))
         {
             if (LandingState != ShipLandingAssistState.Aligned)
@@ -304,6 +315,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
     public void ResetToSpawn()
     {
+        CancelTouchdownSequence(false);
         CancelLandingAssist(false);
         ClearExternalCommand();
         ClearRadialGuidance();
@@ -330,6 +342,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
     public void RestoreRuntimeState(ArcadeShipRuntimeState state)
     {
+        CancelTouchdownSequence(false);
         CancelLandingAssist(false);
         ClearExternalCommand();
         ClearRadialGuidance();

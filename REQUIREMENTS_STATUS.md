@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-landing-point-alignment.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-touchdown-takeoff.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,73 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Свободный полёт и атмосферный режим приняты runtime; реализованы поиск посадочной точки, проверки уклона/препятствий, резервирование и автоматическое выравнивание, ожидающие `TASK-048` |
+| D. Корабль | `IN_PROGRESS` | Полёт, атмосфера и landing-point alignment приняты runtime; реализованы touchdown, трёхточечные опоры, `LANDED` physics lock и взлёт, ожидающие `TASK-050` |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-043`–`TASK-046` подтверждены: свободный полёт и атмосферный режим приняты. Текущая итерация реализует `TASK-047` — поиск допустимой поверхности, проверки уклона и препятствий, резервирование точки и автоматическое выравнивание на безопасной высоте; runtime-приёмка вынесена в `TASK-048`.
+**Вывод:** `TASK-043`–`TASK-048` подтверждены: свободный полёт, атмосфера и landing-point alignment приняты. Текущая итерация реализует `TASK-049` — финальное снижение, трёхточечные опоры, `LANDED` с physics lock, контролируемый взлёт и повторяемый цикл; runtime-приёмка вынесена в `TASK-050`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка `TASK-047/TASK-048` и реализация touchdown/takeoff `TASK-049`
+
+**Исходный снимок:** `ProjectHorizon-main(4)(1).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-touchdown-takeoff.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** разделы 14.4, 15.3, 36.4 и Прототип D раздела 39 PDF-ТЗ; `TASK-047`–`TASK-051`, `PD-030`–`PD-045`, `PD-ACC-020`–`PD-ACC-036`.
+
+**Runtime-доказательство предыдущей итерации:**
+
+- локальная сборка: `0` предупреждений, `0` ошибок;
+- ручной `M` завершился состоянием `Aligned`;
+- reserved slope `0,0°`, clearance `29,7 м`;
+- position error `0,00 м`, angular error `0,04°`;
+- `TASK-047 landing (N): PASS`;
+- `checks=3`, `slopeReject=1`, `obstacleReject=1`;
+- free-flight regression `J: PASS` сохранён.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/Ship/ArcadeShipTouchdown.cs`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipTouchdown.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ShipTouchdownAcceptance.cs`;
+- `src/Game.Client/Scripts/Ship/ShipTouchdownAcceptance.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipController.cs`;
+- `src/Game.Client/Scripts/Ship/ShipFlightPrototype.cs`;
+- `src/Game.Client/Scripts/Ship/ShipLandingAcceptance.cs`;
+- `src/Game.Client/Scripts/Ship/ShipAtmosphereAcceptance.cs`;
+- `src/Game.Client/Scenes/Ship/ArcadeShip.tscn`;
+- `src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Реализовано в `TASK-049`:**
+
+- добавлены три визуальные посадочные опоры и три независимых `RayCast3D` gear probes;
+- финальное снижение начинается только после подтверждённого состояния `Aligned` и действующей reservation;
+- скорость снижения ограничена `2,8 м/с`, basis продолжает сходиться к normal поверхности;
+- касание подтверждается всеми тремя физическими probes, ограничением скорости, position error и angular error;
+- после устойчивого контакта корабль переходит в `LANDED`: linear/angular velocity обнуляются, transform фиксируется на опорах, обычная flight/atmosphere physics не выполняется;
+- взлёт перемещает корабль по normal до clearance `12 м`, затем возвращает ручное управление и складывает опоры;
+- `M` выполняет ручной трёхэтапный цикл `alignment → touchdown → takeoff`;
+- `O` запускает автономный двухцикловый `TASK-049` acceptance test;
+- тест проверяет повторяемость reservation/alignment/touchdown/landed lock/takeoff, три gear contacts, контактную скорость, ошибки положения/ориентации, takeoff clearance и отсутствие recovery/collision/runtime errors;
+- `J`, `L`, `N`, `P` и ручные режимы блокируются во время активного touchdown test/sequence, чтобы исключить конфликт управляющих контуров.
+
+**Статические проверки:**
+
+- все `26` C#-файлов прошли лексическую проверку строк, комментариев и скобок;
+- проверены `res://`-ссылки, scene `load_steps`, NodePath и уникальность UID;
+- геометрия gear probes рассчитана для трёх контактов при center clearance `1,55 м`;
+- расчётный цикл: alignment ≈ `4,7 с`, descent ≈ `4 с`, landed hold `0,8 с`, takeoff ≈ `2 с`; два цикла укладываются в timeout `34 с`;
+- Godot/.NET SDK в текущей среде отсутствуют, поэтому сборка и runtime новой функции не заявляются.
+
+**Изменения статусов:**
+
+- `TASK-047`, `TASK-048`, `PD-030`–`PD-035`, `PD-ACC-020`–`PD-ACC-027` → `VERIFIED`;
+- `TASK-049`, `PD-040`–`PD-045` → `IMPLEMENTED`;
+- `TASK-050`, `PD-ACC-030`–`PD-ACC-036` → `IN_PROGRESS`.
+
+**Ограничение:** Прототип D переводится в `VERIFIED` только после локального `O: PASS`, ручного цикла `M` и подтверждения отсутствия регрессий. Нагрузочный сценарий 100 последовательных посадок остаётся отдельной `TASK-051` раздела 36.4 PDF-ТЗ.
 
 ### 2026-08-01 — приёмка `TASK-045/TASK-046` и реализация landing-point alignment `TASK-047`
 
@@ -799,20 +860,33 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-ACC-016` | Выход обратно в космос корректен | `VERIFIED` | exit ≥ 1, итоговый mode SPACE |
 | `PD-ACC-017` | Автоматический atmosphere test завершается PASS | `VERIFIED` | `TASK-045 atmosphere (L): PASS` |
 | `PD-ACC-018` | Free-flight и камеры не регрессировали | `VERIFIED` | После L работают J, F2 и ручное управление |
-| `PD-030` | Поиск допустимой посадочной поверхности | `IMPLEMENTED` | Physics ray probes по трём детерминированным кандидатам; fallback ring для общего случая |
-| `PD-031` | Проверка уклона посадочной поверхности | `IMPLEMENTED` | Угол normal к radial Up; предел `12°`; тестовый кандидат `18°` отклоняется |
-| `PD-032` | Проверка препятствий и clearance | `IMPLEMENTED` | Проверяется группа `landing_obstacle`; минимальный clearance `5,5 м` |
-| `PD-033` | Резервирование посадочной точки | `IMPLEMENTED` | Хранятся surface point, normal, slope, clearance и candidate index; marker видим в сцене |
-| `PD-034` | Автоматическое выравнивание над точкой | `IMPLEMENTED` | Основная ручная физика приостанавливается; position/basis сходятся к hover transform `12 м` |
-| `PD-035` | Диагностика и landing-point acceptance test | `IMPLEMENTED` | `M` — ручной assist; `N` — checks/rejects/reservation/alignment/restore |
-| `PD-ACC-020` | Landing-point редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
-| `PD-ACC-021` | Surface probe последовательно проверяет кандидаты | `IN_PROGRESS` | `checks >= 3`, `hits >= 3` |
-| `PD-ACC-022` | Крутая поверхность отклоняется | `IN_PROGRESS` | `slopeReject >= 1`, зарезервированный slope `<= 12°` |
-| `PD-ACC-023` | Препятствие отклоняется | `IN_PROGRESS` | `obstacleReject >= 1`, reserved clearance `>= 5,5 м` |
-| `PD-ACC-024` | Точка резервируется и визуально маркируется | `IN_PROGRESS` | `reservations >= 1`, marker находится на safe pad |
-| `PD-ACC-025` | Корабль устойчиво выравнивается над normal | `IN_PROGRESS` | `alignments >= 1`, posErr `<= 0,75 м`, angErr `<= 2,5°` |
-| `PD-ACC-026` | Alignment не вызывает столкновений и runtime ошибок | `IN_PROGRESS` | final speed `<= 0,8`, angular `<= 1°/с`, collisions/errors `0` |
-| `PD-ACC-027` | Предыдущие режимы не регрессировали | `IN_PROGRESS` | После `N: PASS` работают `J`, `L`, `P`, `F2`, ручное управление и HUD |
+| `PD-030` | Поиск допустимой посадочной поверхности | `VERIFIED` | Physics ray probes по трём детерминированным кандидатам; fallback ring для общего случая |
+| `PD-031` | Проверка уклона посадочной поверхности | `VERIFIED` | Угол normal к radial Up; предел `12°`; тестовый кандидат `18°` отклоняется |
+| `PD-032` | Проверка препятствий и clearance | `VERIFIED` | Проверяется группа `landing_obstacle`; минимальный clearance `5,5 м` |
+| `PD-033` | Резервирование посадочной точки | `VERIFIED` | Хранятся surface point, normal, slope, clearance и candidate index; marker видим в сцене |
+| `PD-034` | Автоматическое выравнивание над точкой | `VERIFIED` | Основная ручная физика приостанавливается; position/basis сходятся к hover transform `12 м` |
+| `PD-035` | Диагностика и landing-point acceptance test | `VERIFIED` | `M` — ручной assist; `N` — checks/rejects/reservation/alignment/restore |
+| `PD-ACC-020` | Landing-point редакция собирается 0/0 | `VERIFIED` | Пользовательская сборка: 0 предупреждений, 0 ошибок |
+| `PD-ACC-021` | Surface probe последовательно проверяет кандидаты | `VERIFIED` | `N: PASS`, checks=3; все три физические кандидата обработаны |
+| `PD-ACC-022` | Крутая поверхность отклоняется | `VERIFIED` | slopeReject=1; reserved slope=0,0° |
+| `PD-ACC-023` | Препятствие отклоняется | `VERIFIED` | obstacleReject=1; reserved clearance=29,7 м |
+| `PD-ACC-024` | Точка резервируется и визуально маркируется | `VERIFIED` | Ручной M и screenshot подтверждают safe pad и marker |
+| `PD-ACC-025` | Корабль устойчиво выравнивается над normal | `VERIFIED` | Aligned; posErr=0,00 м; angErr=0,04° |
+| `PD-ACC-026` | Alignment не вызывает столкновений и runtime ошибок | `VERIFIED` | Скорость и angular=0; N: PASS; runtime ошибок не выявлено |
+| `PD-ACC-027` | Предыдущие режимы не регрессировали | `VERIFIED` | J остаётся PASS; ручной режим и HUD подтверждены |
+| `PD-040` | Трёхточечные выдвижные посадочные опоры | `IMPLEMENTED` | Visual gear + три RayCast3D probes; deployment диагностируется в HUD |
+| `PD-041` | Контролируемое финальное снижение | `IMPLEMENTED` | Снижение от hover 12 м к gear clearance 1,55 м; скорость ограничена 2,8 м/с |
+| `PD-042` | Подтверждение касания по опорам | `IMPLEMENTED` | Требуются 3/3 probe contacts, position/angular tolerance и безопасная контактная скорость |
+| `PD-043` | Состояние LANDED и отключение основной физики | `IMPLEMENTED` | Transform фиксируется на опорах, velocity/angular=0, flight/atmosphere branch не выполняется |
+| `PD-044` | Контролируемый взлёт и уборка опор | `IMPLEMENTED` | Подъём по normal до 12 м, gear retract после clearance 3 м, возврат ручного управления |
+| `PD-045` | Повторяемый touchdown/takeoff acceptance test | `IMPLEMENTED` | O выполняет два полных цикла и восстанавливает baseline |
+| `PD-ACC-030` | Touchdown-редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
+| `PD-ACC-031` | Ручной M выполняет alignment, touchdown и takeoff | `IN_PROGRESS` | Три последовательных этапа; gear видим; после взлёта управление восстановлено |
+| `PD-ACC-032` | Все посадочные опоры подтверждают контакт | `IN_PROGRESS` | gear contacts=3/3, deployment=1, contact speed <=3,2 м/с |
+| `PD-ACC-033` | LANDED устойчив и основная физика отключена | `IN_PROGRESS` | physicsLocked=true, speed/angular=0, posErr<=0,4 м, angErr<=2° |
+| `PD-ACC-034` | Взлёт достигает безопасного clearance | `IN_PROGRESS` | takeoff clearance>=10 м, gear retract, state возвращается Idle |
+| `PD-ACC-035` | Автоматический O-test завершается PASS | `IN_PROGRESS` | cycles>=2, touchdowns/locks/takeoffs>=2, recoveries/collisions/errors=0 |
+| `PD-ACC-036` | Предыдущие режимы не регрессировали | `IN_PROGRESS` | После O: PASS работают J/L/N/P/F2/H и ручной полёт |
 
 ### 8.3. Оставшиеся прототипы
 
@@ -827,62 +901,47 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-046`; Прототипы A, B и C; свободный и атмосферный полёт Прототипа D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-048`; Прототипы A, B и C; свободный, атмосферный полёт и landing-point alignment Прототипа D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-048` | Выполнить runtime-приёмку landing-point alignment | Чистая сборка; ручной `M`; `N: PASS`; slope/obstacle rejection; устойчивое выравнивание |
-| 2 | `TASK-049` | Реализовать финальное снижение, опоры, `LANDED` и взлёт | Touchdown sequence, gear/support contacts, physics lock, takeoff и повторный цикл |
+| 1 | `TASK-050` | Выполнить runtime-приёмку touchdown/landed/takeoff | Чистая сборка; ручной трёхэтапный `M`; `O: PASS`; 3/3 опоры; physics lock; два цикла |
+| 2 | `TASK-051` | Добавить soak-сценарий 100 последовательных посадок | Раздел 36.4 PDF-ТЗ; отсутствие накопления ошибок, зависших states и утечек |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-045`, `TASK-046`, `PD-020`–`PD-025`, `PD-ACC-010`–`PD-ACC-018`.
-**Реализовано:** `TASK-047`, `PD-030`–`PD-035`.
-**Текущая приёмочная задача:** `TASK-048`.
+**Подтверждено в этой итерации:** `TASK-047`, `TASK-048`, `PD-030`–`PD-035`, `PD-ACC-020`–`PD-ACC-027`.
+**Реализовано:** `TASK-049`, `PD-040`–`PD-045`.
+**Текущая приёмочная задача:** `TASK-050`.
 
-## 10. Runtime-приёмка `TASK-047/TASK-048`
+## 10. Runtime-приёмка `TASK-049/TASK-050`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. HUD должен показывать `TASK-047 landing (N): READY`, а рядом с верхней частью тестовой планеты должны быть видны коричневая наклонная площадка, серое препятствие и зелёная безопасная площадка.
-3. Нажать `M`. Система должна:
-   - последовательно проверить не менее трёх surface candidates;
-   - отклонить наклонную площадку (`slopeReject >= 1`);
-   - отклонить точку с препятствием (`obstacleReject >= 1`);
-   - зарезервировать зелёную точку и показать cyan marker;
-   - перейти `Searching → Reserved → Aligning → Aligned`;
-   - остановить корабль примерно в `12 м` над normal поверхности без столкновения.
-4. Повторное `M` должно отменить assist и восстановить исходный baseline.
-5. Нажать `N` и не вмешиваться. Обычная продолжительность — `5–9 секунд`, timeout — `14 секунд`.
-6. Критерий автоматического `PASS`:
+2. Запустить стартовую сцену. HUD должен показывать `TASK-049 touchdown (O): READY`; опоры в обычном полёте сложены.
+3. Выполнить ручной цикл клавишей `M`:
+   - первое нажатие: `Searching → Reserved → Aligning → Aligned`;
+   - второе нажатие после `Aligned`: `Descending → GearContact → Landed`;
+   - в `Landed` должны быть `gear contacts=3/3`, deployment≈1, speed/angular=0 и `physics locked=true`;
+   - третье нажатие: `TakingOff → Idle`, clearance не менее `10 м`, опоры складываются, ручное управление возвращается.
+4. Нажать `O` и не использовать управление. Тест выполняет два полных landing/takeoff цикла, затем восстанавливает baseline.
+5. Ожидаемый HUD:
 
 ```text
-TASK-047 landing (N): PASS
-checks >= 3
-hits >= 3
-slopeReject >= 1
-obstacleReject >= 1
-reservations >= 1
-alignments >= 1
-reserved slope <= 12°
-reserved clearance >= 5,5 м
-positionError <= 0,75 м
-angularError <= 2,5°
-final speed <= 0,8 м/с
-final angular <= 1,0°/с
-collisions=0
-errors=0
+TASK-049 touchdown (O): PASS cycles=2, touchdowns=2, takeoffs=2,
+gear=3, vTouch<=3.20 м/с, posErr<=0.40 м, angErr<=2.00°, takeoff>=10 м
 ```
 
-7. В Godot Output должна появиться строка с префиксом:
+6. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-047 landing-point acceptance PASS
+TASK-049 touchdown/takeoff acceptance PASS: cycles=2; attempts=2;
+touchdowns=2; locks=2; takeoffs=2; gear=3; touchdownSpeed=...;
+positionError=...; angularError=...; takeoffClearance=...;
+recoveries=0; collisions=0; errors=0
 ```
 
-8. После теста корабль должен восстановить исходное состояние. Повторно проверить `J: PASS`, `L: PASS`, `P`, `F2`, ручное управление и режимы HUD.
-9. Передать результат сборки, screenshot compact HUD после `N: PASS`, полную итоговую строку Output и краткое подтверждение ручного сценария по `M`.
-10. При `FAIL` передать screenshot, полную строку `FAIL` и последние 20–30 строк Output.
-
-Критерий `PASS`: воспроизводимый поиск поверхности с фактическим отклонением уклона и препятствия, резервирование безопасной точки, устойчивое автоматическое выравнивание без collision/runtime errors и отсутствие регрессии принятого полёта.
+7. После `O: PASS` повторно проверить `J`, `L`, `N`, `P`, `F2`, `H` и ручное управление.
+8. В качестве доказательства прислать результат сборки, screenshot `Landed`, screenshot `O: PASS`, полную строку Output и краткое подтверждение ручного взлёта.
+9. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: state, gear contacts, clearance, touchdown speed и physics lock.
 
 ## 11. Журнал проверок
 

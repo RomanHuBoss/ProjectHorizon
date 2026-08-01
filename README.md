@@ -110,20 +110,21 @@ Detailed mode прокручивается колёсиком мыши. Разм
 
 ### Прототип D. Базовый корабль — `IN_PROGRESS`
 
-Свободный космический и упрощённый атмосферный полёт подтверждены runtime-тестами.
-Текущая ступень реализует первую половину посадочной последовательности раздела
+Свободный полёт, атмосферный режим и поиск посадочной точки подтверждены
+runtime-тестами. Текущая ступень завершает посадочную последовательность раздела
 14.4 PDF-ТЗ:
 
-- surface ray probes к физической поверхности планеты;
-- проверка уклона по normal относительно радиального Up;
-- проверка препятствий и минимального clearance;
-- последовательный поиск кандидатов и резервирование допустимой точки;
-- визуальный cyan marker зарезервированной площадки;
-- автоматическое согласование локального Up корабля с normal поверхности;
-- плавный подход к безопасной hover-точке `12 м`;
-- временное отключение ручной основной физики на этапе alignment;
-- ручной assist по `M` и автономный landing-point test по `N`;
-- детерминированный тестовый участок: наклонная площадка, препятствие и безопасная площадка.
+- surface ray probes, slope/obstacle checks и резервирование safe point;
+- автоматическое выравнивание на высоте `12 м`;
+- выдвижные трёхточечные посадочные опоры;
+- три физических gear-probe контакта с поверхностью;
+- ограниченное финальное снижение со скоростью до `2,8 м/с`;
+- состояние `LANDED` с нулевыми скоростями и фиксацией transform на опорах;
+- отключение обычной полётной физики в landed-state;
+- контролируемый взлёт до clearance `12 м`;
+- автоматическое складывание опор после безопасного отрыва;
+- ручной трёхэтапный цикл по `M`;
+- автономный двухцикловый touchdown/takeoff test по `O`.
 
 Ранее принятый атмосферный режим сохраняет `SPACE ↔ ATMOSPHERE`, simplified
 lift/minimum speed, drag, climb limit, surface-safety и entry-guidance.
@@ -155,20 +156,21 @@ G         автоматическая стабилизация
 F2        chase/cockpit camera
 R         сброс к spawn
 P         атмосферный подход / возврат к space spawn
-M         поиск посадочной точки / отмена alignment
+M         этапы: alignment → touchdown → takeoff / отмена цикла
 H         compact/detailed/hidden HUD
 J         автоматический TASK-043 free-flight test
 L         автоматический TASK-045 atmosphere test
 N         автоматический TASK-047 landing-point test
+O         автоматический TASK-049 touchdown/takeoff test
 ```
 
 HUD показывает режим среды, высоту, atmosphere blend, радиальную скорость,
-forward airspeed, состояния `MIN-SPEED`/`SAFETY`, landing state, slope,
-clearance и ошибки position/orientation.
+forward airspeed, landing/touchdown state, deployment опор, число gear contacts,
+physics lock, clearance и ошибки position/orientation.
 
-Текущая итерация заканчивается состоянием `Aligned` над зарезервированной точкой.
-Финальное снижение, посадочные опоры, `LANDED`, фиксация корабля на опорах и взлёт
-выполняются следующей изолированной задачей.
+`M` выполняет ручной цикл тремя последовательными нажатиями: поиск и alignment,
+финальное снижение до `LANDED`, затем взлёт. Повторное нажатие во время движения
+отменяет демонстрацию и восстанавливает baseline.
 
 ## Состояние реализации ТЗ
 
@@ -348,9 +350,9 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - переход `SPACE ↔ ATMOSPHERE` — `VERIFIED`;
 - simplified lift, minimum speed, drag и climb limit — `VERIFIED`;
 - surface-safety — `VERIFIED`;
-- поиск точки, slope/obstacle checks и alignment — `IMPLEMENTED`;
-- touchdown, опоры и landed-state — `NOT_STARTED`;
-- взлёт — `NOT_STARTED`.
+- поиск точки, slope/obstacle checks и alignment — `VERIFIED`;
+- touchdown, трёхточечные опоры и landed-state — `IMPLEMENTED`;
+- контролируемый взлёт и складывание опор — `IMPLEMENTED`.
 
 ### Прототип E. Сохранение
 

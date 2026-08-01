@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Ship/ArcadeShipController.cs" id="1_ship"]
 
@@ -26,6 +26,11 @@ emission_enabled = true
 emission = Color(0.08, 0.55, 1, 1)
 emission_energy_multiplier = 3.5
 roughness = 0.25
+
+[sub_resource type="StandardMaterial3D" id="Material_gear"]
+albedo_color = Color(0.32, 0.36, 0.42, 1)
+metallic = 0.75
+roughness = 0.28
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 material = SubResource("Material_hull")
@@ -58,6 +63,18 @@ height = 1.2
 radial_segments = 24
 rings = 12
 
+[sub_resource type="BoxMesh" id="BoxMesh_gear_strut"]
+material = SubResource("Material_gear")
+size = Vector3(0.18, 1.25, 0.18)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_gear_foot"]
+material = SubResource("Material_gear")
+top_radius = 0.34
+bottom_radius = 0.34
+height = 0.12
+radial_segments = 16
+rings = 1
+
 [node name="ArcadeShip" type="CharacterBody3D"]
 collision_layer = 2
 collision_mask = 1
@@ -78,6 +95,20 @@ AngularAcceleration = 5.5
 StabilizationAcceleration = 8.0
 MouseSensitivity = 0.0035
 MouseInputDecay = 0.32
+LandingGearVisualPath = NodePath("Visuals/LandingGear")
+LandingGearProbesPath = NodePath("LandingGearProbes")
+TouchdownGearHeight = 1.55
+TouchdownMaximumDescentSpeed = 2.8
+TouchdownDescentAcceleration = 10.0
+TouchdownPositionTolerance = 0.28
+TouchdownAngularToleranceDegrees = 1.5
+TouchdownStableContactSeconds = 0.25
+TouchdownProbeContactDistance = 1.45
+LandingGearDeploymentSpeed = 3.5
+TakeoffClearanceHeight = 12.0
+TakeoffMaximumSpeed = 6.0
+TakeoffAcceleration = 14.0
+TakeoffDepartureSpeed = 3.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("BoxShape_ship")
@@ -127,6 +158,62 @@ position = Vector3(0.72, 0, 3.0)
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("CylinderMesh_engine")
 cast_shadow = 1
+
+[node name="LandingGear" type="Node3D" parent="Visuals"]
+visible = false
+
+[node name="LeftFrontStrut" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(-1.25, -0.92, -1.35)
+mesh = SubResource("BoxMesh_gear_strut")
+cast_shadow = 1
+
+[node name="LeftFrontFoot" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(-1.25, -1.55, -1.35)
+mesh = SubResource("CylinderMesh_gear_foot")
+cast_shadow = 1
+
+[node name="RightFrontStrut" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(1.25, -0.92, -1.35)
+mesh = SubResource("BoxMesh_gear_strut")
+cast_shadow = 1
+
+[node name="RightFrontFoot" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(1.25, -1.55, -1.35)
+mesh = SubResource("CylinderMesh_gear_foot")
+cast_shadow = 1
+
+[node name="RearStrut" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(0, -0.92, 1.65)
+mesh = SubResource("BoxMesh_gear_strut")
+cast_shadow = 1
+
+[node name="RearFoot" type="MeshInstance3D" parent="Visuals/LandingGear"]
+position = Vector3(0, -1.55, 1.65)
+mesh = SubResource("CylinderMesh_gear_foot")
+cast_shadow = 1
+
+[node name="LandingGearProbes" type="Node3D" parent="."]
+
+[node name="LeftFront" type="RayCast3D" parent="LandingGearProbes"]
+position = Vector3(-1.25, -0.25, -1.35)
+target_position = Vector3(0, -1.65, 0)
+collision_mask = 1
+exclude_parent = true
+enabled = true
+
+[node name="RightFront" type="RayCast3D" parent="LandingGearProbes"]
+position = Vector3(1.25, -0.25, -1.35)
+target_position = Vector3(0, -1.65, 0)
+collision_mask = 1
+exclude_parent = true
+enabled = true
+
+[node name="Rear" type="RayCast3D" parent="LandingGearProbes"]
+position = Vector3(0, -0.25, 1.65)
+target_position = Vector3(0, -1.65, 0)
+collision_mask = 1
+exclude_parent = true
+enabled = true
 
 [node name="ChaseCameraRig" type="Node3D" parent="."]
 position = Vector3(0, 1.25, 2.2)

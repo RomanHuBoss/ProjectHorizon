@@ -96,7 +96,10 @@ public partial class ShipFlightPrototype
                     $"clear={FormatLandingClearance(_ship.LandingReservedClearance)}"
                 : "точка не зарезервирована";
             return
-                $"Посадка: {_ship.LandingState}  •  {reservation}  •  " +
+                $"Посадка: {_ship.LandingState}/{_ship.TouchdownState}  •  " +
+                $"{reservation}  •  gear={_ship.LandingGearDeployment:F2}  •  " +
+                $"контакты={_ship.LandingGearContactCount}/" +
+                $"{_ship.LandingGearProbeCount}  •  " +
                 $"posErr={FormatLandingError(_ship.LandingPositionError)}  •  " +
                 $"angErr={FormatLandingAngle(_ship.LandingAngularErrorDegrees)}";
         }
@@ -124,7 +127,17 @@ public partial class ShipFlightPrototype
                 $"clearance={FormatLandingClearance(_ship.LandingReservedClearance)}\n" +
                 $"Position error={FormatLandingError(_ship.LandingPositionError)}  •  " +
                 $"angular error={FormatLandingAngle(_ship.LandingAngularErrorDegrees)}  •  " +
-                $"failure={_ship.LandingFailureReason}";
+                $"failure={_ship.LandingFailureReason}\n" +
+                $"Touchdown state={_ship.TouchdownState}  •  " +
+                $"gear={_ship.LandingGearDeployment:F2}  •  " +
+                $"contacts={_ship.LandingGearContactCount}/" +
+                $"{_ship.LandingGearProbeCount}  •  " +
+                $"physics locked={_ship.PhysicsLockedOnGear}\n" +
+                $"Touchdown clearance={_ship.TouchdownClearance:F2} m  •  " +
+                $"speed={_ship.TouchdownSpeed:F2} m/s  •  " +
+                $"attempts/completions={_ship.TouchdownAttempts}/" +
+                $"{_ship.TouchdownCompletions}  •  " +
+                $"takeoffs={_ship.TakeoffCompletions}";
         }
     }
 
@@ -173,7 +186,7 @@ public partial class ShipFlightPrototype
         if (physical == Key.N || logical == Key.N)
         {
             if (_testState == ShipFlightTestState.Running ||
-                AtmosphereTestRunning)
+                AtmosphereTestRunning || TouchdownTestRunning)
             {
                 return true;
             }
@@ -195,7 +208,8 @@ public partial class ShipFlightPrototype
         if (physical == Key.M || logical == Key.M)
         {
             if (_testState == ShipFlightTestState.Running ||
-                AtmosphereTestRunning || LandingTestRunning)
+                AtmosphereTestRunning || LandingTestRunning ||
+                TouchdownTestRunning)
             {
                 return true;
             }
@@ -214,29 +228,63 @@ public partial class ShipFlightPrototype
             return;
         }
 
-        if (_landingDemoActive)
+        if (!_landingDemoActive)
         {
-            _ship.CancelLandingAssist(false);
-            _ship.RestoreRuntimeState(_landingDemoBaseline);
-            _ship.SetManualControlEnabled(true);
-            _landingDemoActive = false;
-            GD.Print("Landing assist demo: baseline restored.");
+            if (_ship.LandingAssistActive || _ship.TouchdownSequenceActive)
+            {
+                _ship.CancelTouchdownSequence(false);
+                _ship.CancelLandingAssist(true);
+                GD.Print("Landing sequence: cancelled.");
+                return;
+            }
+
+            _landingDemoBaseline = _ship.CaptureRuntimeState();
+            PositionShipForLandingApproach();
+            _ship.SetManualControlEnabled(false);
+            _ship.RequestLandingAssist(true);
+            _landingDemoActive = true;
+            _landingDemoTouchdownStarted = false;
+            _landingDemoTakeoffStarted = false;
+            GD.Print(
+                "Landing demo stage 1/3: search and alignment started. " +
+                "Press M again after Aligned for touchdown.");
             return;
         }
 
-        if (_ship.LandingAssistActive)
+        if (_ship.LandingState == ShipLandingAssistState.Aligned &&
+            _ship.TouchdownState == ShipTouchdownState.Idle &&
+            !_landingDemoTouchdownStarted)
         {
-            _ship.CancelLandingAssist(true);
-            GD.Print("Landing assist: cancelled.");
+            if (_ship.RequestTouchdown())
+            {
+                _landingDemoTouchdownStarted = true;
+                GD.Print(
+                    "Landing demo stage 2/3: touchdown started. " +
+                    "Press M after LANDED for takeoff.");
+            }
             return;
         }
 
-        _landingDemoBaseline = _ship.CaptureRuntimeState();
-        PositionShipForLandingApproach();
-        _ship.SetManualControlEnabled(false);
-        _ship.RequestLandingAssist(true);
-        _landingDemoActive = true;
-        GD.Print("Landing assist demo: search and alignment started.");
+        if (_ship.TouchdownState == ShipTouchdownState.Landed &&
+            !_landingDemoTakeoffStarted)
+        {
+            _landingDemoTakeoffBaseline = _ship.TakeoffCompletions;
+            if (_ship.RequestTakeoff())
+            {
+                _landingDemoTakeoffStarted = true;
+                GD.Print("Landing demo stage 3/3: takeoff started.");
+            }
+            return;
+        }
+
+        _ship.CancelTouchdownSequence(false);
+        _ship.CancelLandingAssist(false);
+        _ship.RestoreRuntimeState(_landingDemoBaseline);
+        _ship.SetManualControlEnabled(true);
+        _landingDemoActive = false;
+        _landingDemoTouchdownStarted = false;
+        _landingDemoTakeoffStarted = false;
+        GD.Print("Landing demo: baseline restored.");
     }
 
     private void BeginLandingTest()

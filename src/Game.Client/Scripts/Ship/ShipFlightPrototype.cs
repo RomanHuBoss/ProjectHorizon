@@ -141,6 +141,7 @@ public partial class ShipFlightPrototype : Node3D
         GetViewport().SizeChanged += UpdateHudLayout;
         InitializeAtmospherePrototype();
         InitializeLandingPrototype();
+        InitializeTouchdownPrototype();
         ApplyHudMode();
         UpdateHud();
         GD.Print("Prototype D flight foundation ready. Press J for acceptance test.");
@@ -158,6 +159,7 @@ public partial class ShipFlightPrototype : Node3D
     {
         UpdateAtmospherePrototype((float)delta);
         UpdateLandingPrototype((float)delta);
+        UpdateTouchdownPrototype((float)delta);
 
         if (_testState == ShipFlightTestState.Running)
         {
@@ -172,6 +174,11 @@ public partial class ShipFlightPrototype : Node3D
         if (LandingTestRunning)
         {
             UpdateLandingTest((float)delta);
+        }
+
+        if (TouchdownTestRunning)
+        {
+            UpdateTouchdownTest((float)delta);
         }
 
         UpdateHud();
@@ -198,6 +205,12 @@ public partial class ShipFlightPrototype : Node3D
             return;
         }
 
+        if (HandleTouchdownInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (HandleAtmosphereInput(physical, logical))
         {
             GetViewport().SetInputAsHandled();
@@ -213,7 +226,9 @@ public partial class ShipFlightPrototype : Node3D
         if (physical == Key.J || logical == Key.J)
         {
             if (AtmosphereTestRunning || LandingTestRunning ||
-                (_ship?.LandingAssistActive ?? false))
+                TouchdownTestRunning ||
+                (_ship?.LandingAssistActive ?? false) ||
+                (_ship?.TouchdownSequenceActive ?? false))
             {
                 GetViewport().SetInputAsHandled();
                 return;
@@ -236,7 +251,8 @@ public partial class ShipFlightPrototype : Node3D
     private void BeginFlightTest()
     {
         if (_ship is null || AtmosphereTestRunning || LandingTestRunning ||
-            _ship.LandingAssistActive)
+            TouchdownTestRunning || _ship.LandingAssistActive ||
+            _ship.TouchdownSequenceActive)
         {
             return;
         }
@@ -621,7 +637,7 @@ public partial class ShipFlightPrototype : Node3D
             "мышь — тангаж/рыскание\n" +
             "Q/E — крен  •  B — форсаж  •  X — тормоз  •  " +
             "G — стабилизация  •  F2 — камера  •  P — атмосфера  •  " +
-            "M — посадка  •  J/L/N — тесты";
+            "M — посадка/касание/взлёт  •  J/L/N/O — тесты";
 
         _detailedLabel.Text =
             "ПРОТОТИП D — АРКАДНАЯ ФИЗИКА КОРАБЛЯ\n" +

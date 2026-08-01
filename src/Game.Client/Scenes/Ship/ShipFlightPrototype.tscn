@@ -167,8 +167,15 @@ LandingTestTimeoutSeconds = 14.0
 LandingTestApproachAltitude = 48.0
 LandingTestMaximumPositionError = 0.75
 LandingTestMaximumAngularErrorDegrees = 2.5
+TouchdownTestTimeoutSeconds = 34.0
+TouchdownTestCycles = 2
+TouchdownTestLandedHoldSeconds = 0.8
+TouchdownTestMaximumContactSpeed = 3.2
+TouchdownTestMaximumPositionError = 0.4
+TouchdownTestMaximumAngularErrorDegrees = 2.0
+TouchdownTestMinimumTakeoffClearance = 10.0
 HudCompactWidth = 700.0
-HudCompactHeight = 330.0
+HudCompactHeight = 360.0
 HudDetailedWidth = 760.0
 HudDetailedHeight = 580.0
 
