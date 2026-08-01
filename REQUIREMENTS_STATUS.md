@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-resource-id-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-data-driven-starter-repair.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,77 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов и производственная persistence-ступень `TASK-060/TASK-061` имеют статус `VERIFIED`. Пользователь подтвердил `F6: PASS`, реальный periodic autosave, graceful-exit `saved=1; revision=3; pending=0` и холодное восстановление revision `3`. Ограничение на Этап 1 снято; текущая итерация реализует первый сквозной цикл вертикального среза `TASK-062`.
+**Вывод:** все пять технических прототипов, production persistence и первый сквозной цикл `TASK-062/TASK-063` имеют статус `VERIFIED`. Пользователь подтвердил сборку `0/0`, ручной прогресс `3/3`, `Objective: COMPLETE`, `Ship: REPAIRED`, autosave `QuestCompleted` и холодное восстановление отремонтированного корабля. Текущая итерация переводит правила ресурса и ремонта в первый строгий data-driven JSON-каталог (`TASK-064`).
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — первый data-driven каталог ресурса и рецепта ремонта (`TASK-064`)
+
+**Исходный снимок:** `ProjectHorizon-main(4)(2).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-starter-repair.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-062`–`TASK-065`, `CONTENT-010`–`CONTENT-016`, `CONTENT-ACC-010`–`CONTENT-ACC-015`.
+
+**Синхронизация предыдущей приёмки:**
+
+- финальная resource-ID редакция собрана пользователем с `0` предупреждений и `0` ошибок (`00:00:01.26`);
+- HUD подтвердил `rev=26`, `collected=3/3`, `Objective: COMPLETE — starter ship repaired`, `Ship: REPAIRED`;
+- production-autosave завершился с причиной `QuestCompleted`;
+- пользователь прямо подтвердил, что после полного перезапуска состояние отремонтированного корабля восстановилось из autosave;
+- ранее получен `F7: PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1`;
+- `TASK-062`, `TASK-063`, `VS-010`–`VS-016`, `VS-ACC-010`–`VS-ACC-016` → `VERIFIED`.
+
+**Реализовано в `TASK-064`:**
+
+- добавлены `Content/items.json`, `Content/resources.json`, `Content/recipes.json` со schema version `1`;
+- статические определения используют стабильные строковые ID, а не индекс массива;
+- добавлен Godot-независимый `GameContentCatalog` на `System.Text.Json` со строгим запретом неизвестных полей, trailing comma и нестрогих чисел;
+- валидируются schema version, обязательные поля, dotted IDs, дубликаты, tags, диапазоны, resource→item и recipe input/output→item references;
+- первый item-набор содержит `resource.salvage_alloy` и `component.starter_hull_patch`;
+- `resources.json` задаёт deterministic yield и визуальные параметры salvage-узла; материал больше не является gameplay-константой сцены;
+- `recipe.ship.starter_repair` задаёт input `3 × resource.salvage_alloy`, output `1 × component.starter_hull_patch`, станцию `station.field_repair` и application `RepairShip` с health `100`;
+- `StarterRepairSession` получает recipe object через конструктор, вычисляет требуемые количества, расходует inputs, формирует outputs и применяет repair effect без константы `RequiredSalvage`;
+- resource nodes хранят только instance `ResourceNodeId` и stable `ResourceDefinitionId`; quantity и material разрешаются из content catalog;
+- repair terminal имеет `StationId`, который обязан совпадать с `RequiredStation` рецепта;
+- SQLite snapshot сохраняет фактический definition ID каждого собранного узла и remaining quantity; существующие принятые сохранения совместимы;
+- `F7` теперь выполняет gameplay/persistence regression на реально загруженном рецепте и scene bindings;
+- `F9` запускает отдельную `TASK-064` acceptance: меняет копию recipe threshold `3→4` только в памяти, проверяет блокировку на `3/4`, ремонт на `4/4`, recipe outputs, stable IDs и отклонение duplicate/missing-reference catalogs; gameplay-slot и JSON не изменяются;
+- detailed/compact HUD показывает content schema, counts и активный recipe; Output содержит `TASK-064 content catalog READY` и `TASK-064 content binding PASS`.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/items.json`;
+- `src/Game.Client/Content/resources.json`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageResourceNode.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterShipRepairTerminal.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован первый реальный item/resource/recipe-набор и строгая runtime/acceptance validation. Полное автоматическое выполнение JSON schema validation как отдельного MSBuild target и расширение Этапа 1 до требуемых 10 ресурсов/10 рецептов остаются последующими задачами; текущая итерация их не заявляет.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ сверено по разделам 17.2–17.4, 23 и Этапу 1 раздела 40;
+- все три JSON-файла распарсены независимым JSON parser, schema versions и cross-references проверены;
+- изменённые C#-файлы проверены лексически, по строкам, комментариям и скобкам;
+- проверены exact C# export names `ResourceNodeId`, `ResourceDefinitionId`, `StationId`;
+- проверены `res://Content/*.json`, scene bindings, UID, project XML и отсутствие конфликта F9 в текущей main scene;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому сборка и runtime `F9` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-062`, `TASK-063`, `VS-010`–`VS-016`, `VS-ACC-010`–`VS-ACC-016` → `VERIFIED`;
+- `TASK-064`, `CONTENT-010`–`CONTENT-016` → `IMPLEMENTED`;
+- `TASK-065`, `CONTENT-ACC-010`–`CONTENT-ACC-015` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`: в ZIP отсутствует `.git` и контрольный SHA.
+
+**Следующий рекомендуемый шаг:** собрать проект `0/0`, проверить startup lines, нажать `F9` и получить `TASK-064 ... PASS`, затем повторить `F7` и короткий ручной цикл после `F8`.
 
 ### 2026-08-01 — hotfix уникальных ID ресурсных узлов (`TASK-062/TASK-063`)
 
@@ -1516,36 +1584,54 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / примечание |
 |---|---|---|---|
-| `VS-010` | Стартовая сцена объединяет персонажа, тестовую планетарную площадку, ресурсы и повреждённый корабль | `IMPLEMENTED` | `SalvageRepairSlice.tscn`; сцена назначена `run/main_scene` |
-| `VS-011` | Правило сбора и ремонта реализовано в Godot-независимой доменной модели | `IMPLEMENTED` | `StarterRepairSession`; без импорта Godot |
-| `VS-012` | Игрок собирает три физических ресурсных узла через `E`; повторный сбор запрещён | `IMPLEMENTED` | `SalvageResourceNode` + существующий `IInteractable`/raycast |
-| `VS-013` | Ремонт до трёх единиц блокируется; успешный ремонт расходует ресурс и восстанавливает корабль | `IMPLEMENTED` | `RequiredSalvage=3`; health `28→100`; визуал `red→green` |
-| `VS-014` | Завершение ремонтной цели вызывает production-autosave реальным domain event | `IMPLEMENTED` | `StarterRepairQuestCompleted` → `AutosaveTrigger.QuestCompleted` |
-| `VS-015` | SQLite round-trip восстанавливает revision, inventory, позицию и состояние корабля | `IMPLEMENTED` | `StarterRepairSnapshotFactory`; load применяет состояние к ресурсам и кораблю |
-| `VS-016` | Periodic/graceful-exit сохранения и reset доступны в gameplay-сцене | `IMPLEMENTED` | 60 s periodic, WM close flush, `F8` reset |
-| `VS-ACC-010` | Новая стартовая сцена собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
-| `VS-ACC-011` | F7 подтверждает раннюю блокировку и сбор трёх ресурсов | `IN_PROGRESS` | Ожидается `resources=3`, `repairBlocked=1` |
-| `VS-ACC-012` | F7 подтверждает ремонт и QuestCompleted autosave | `IN_PROGRESS` | Ожидается `shipRepaired=1`, `questAutosave=1` |
-| `VS-ACC-013` | F7 подтверждает exact round-trip, log и integrity | `IN_PROGRESS` | Ожидается `roundTrip=1`, `logWritten=1`, `integrity=ok` |
-| `VS-ACC-014` | Persistence остаётся однописательной | `IN_PROGRESS` | Ожидается `maxWriters=1` |
-| `VS-ACC-015` | Ручной цикл блокирует ранний ремонт и после 3/3 меняет корабль на REPAIRED | `IN_PROGRESS` | Нужны скриншоты HUD до и после ремонта |
-| `VS-ACC-016` | Штатный выход и cold restart восстанавливают завершённый или частичный цикл | `IN_PROGRESS` | Нужны exit PASS и screenshot после перезапуска |
+| `VS-010` | Стартовая сцена объединяет персонажа, тестовую планетарную площадку, ресурсы и повреждённый корабль | `VERIFIED` | `SalvageRepairSlice.tscn`; сцена назначена `run/main_scene` |
+| `VS-011` | Правило сбора и ремонта реализовано в Godot-независимой доменной модели | `VERIFIED` | `StarterRepairSession`; без импорта Godot |
+| `VS-012` | Игрок собирает три физических ресурсных узла через `E`; повторный сбор запрещён | `VERIFIED` | `SalvageResourceNode` + существующий `IInteractable`/raycast |
+| `VS-013` | Ремонт до количества из активного рецепта блокируется; успешный крафт расходует inputs и восстанавливает корабль | `VERIFIED` | `recipe.ship.starter_repair`: input `3×resource.salvage_alloy`; health `28→100`; визуал `red→green` |
+| `VS-014` | Завершение ремонтной цели вызывает production-autosave реальным domain event | `VERIFIED` | `StarterRepairQuestCompleted` → `AutosaveTrigger.QuestCompleted` |
+| `VS-015` | SQLite round-trip восстанавливает revision, inventory, позицию и состояние корабля | `VERIFIED` | `StarterRepairSnapshotFactory`; load применяет состояние к ресурсам и кораблю |
+| `VS-016` | Periodic/graceful-exit сохранения и reset доступны в gameplay-сцене | `VERIFIED` | 60 s periodic, WM close flush, `F8` reset |
+| `VS-ACC-010` | Новая стартовая сцена собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Сборка пользователя: 0 предупреждений, 0 ошибок |
+| `VS-ACC-011` | F7 подтверждает раннюю блокировку и сбор трёх ресурсов | `VERIFIED` | F7: resources=3, blocked=1; ручной цикл 3/3 |
+| `VS-ACC-012` | F7 подтверждает ремонт и QuestCompleted autosave | `VERIFIED` | F7 PASS; HUD COMPLETE/REPAIRED; QuestCompleted autosave |
+| `VS-ACC-013` | F7 подтверждает exact round-trip, log и integrity | `VERIFIED` | F7 roundTrip=1; SQLite/autosave принят ранее |
+| `VS-ACC-014` | Persistence остаётся однописательной | `VERIFIED` | F7 maxWriters=1 |
+| `VS-ACC-015` | Ручной цикл блокирует ранний ремонт и после 3/3 меняет корабль на REPAIRED | `VERIFIED` | HUD: collected=3/3, Objective COMPLETE, Ship REPAIRED |
+| `VS-ACC-016` | Штатный выход и cold restart восстанавливают завершённый или частичный цикл | `VERIFIED` | Пользователь подтвердил cold restart отремонтированного состояния |
+
+### 8.6. Этап 1 — data-driven item/resource/recipe foundation
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `CONTENT-010` | Items, resources и recipes хранятся в отдельных JSON-файлах со schema version | `IMPLEMENTED` | `Content/items.json`, `resources.json`, `recipes.json`; schema=1 |
+| `CONTENT-011` | Определения имеют стабильные строковые ID; индекс массива не используется как ID | `IMPLEMENTED` | Strict dotted-ID validator; dictionary lookup по ID |
+| `CONTENT-012` | JSON строго валидируется: unknown fields, duplicates, ranges и cross-references | `IMPLEMENTED` | `GameContentCatalog`; `JsonUnmappedMemberHandling.Disallow` и content validation |
+| `CONTENT-013` | Физический resource node получает yield и visual из resource definition | `IMPLEMENTED` | `ResourceDefinitionId`; `ConfigureDefinition`; deterministic yield/material из JSON |
+| `CONTENT-014` | Repair rule использует data-driven recipe inputs/outputs/station/application | `IMPLEMENTED` | `recipe.ship.starter_repair`; session не содержит `RequiredSalvage` constant |
+| `CONTENT-015` | Persistence сохраняет фактические definition IDs и remaining quantities | `IMPLEMENTED` | `CollectedResourceState` → `InventoryItemSaveData`; cold-save compatibility сохранена |
+| `CONTENT-016` | Изолированная acceptance доказывает data-driven threshold и rejection invalid catalogs | `IMPLEMENTED` | F9: recipe variant 4, duplicate/missing-reference rejection |
+| `CONTENT-ACC-010` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
+| `CONTENT-ACC-011` | Startup catalog и scene binding завершаются PASS | `IN_PROGRESS` | Нужны строки `content catalog READY` и `content binding PASS` |
+| `CONTENT-ACC-012` | F9 подтверждает schema/counts/stable IDs | `IN_PROGRESS` | Ожидается schema=1, items=2, resources=1, recipes=1, stableIds=1 |
+| `CONTENT-ACC-013` | F9 доказывает отсутствие hidden threshold constant | `IN_PROGRESS` | Ожидается variantRequired=4, blockedBelowVariant=1, repairedAtVariant=1 |
+| `CONTENT-ACC-014` | Duplicate ID и missing reference отклоняются | `IN_PROGRESS` | Ожидается duplicateRejected=1, missingReferenceRejected=1 |
+| `CONTENT-ACC-015` | F7 и ручной salvage/repair loop не регрессируют | `IN_PROGRESS` | Повторить F7; после F8 собрать/отремонтировать |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-061`; Прототипы A–E и production persistence foundation.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-063`; Прототипы A–E, production persistence и первый salvage/repair loop.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-063` | Выполнить runtime-приёмку первой интеграции вертикального среза | Чистая сборка; `F7: PASS`; ручной цикл `blocked → 3/3 → repaired`; QuestCompleted autosave; graceful exit и cold restart |
+| 1 | `TASK-065` | Выполнить runtime-приёмку первого data-driven каталога | Сборка 0/0; startup content PASS; `F9: PASS`; `F7: PASS`; ручная регрессия после F8 |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-064` | Расширить вертикальный срез первым data-driven набором ресурсов/рецепта | После `TASK-063: VERIFIED` добавить JSON-контент и первый реальный рецепт ремонта/крафта без дублирования domain state |
+| 3 | `TASK-066` | Расширить каталог к следующему игровому crafting-шагу | После `TASK-065: VERIFIED` добавить второй ресурс/рецепт и отдельное взаимодействие с crafting station, двигаясь к 10/10 Этапа 1 |
 
-**Подтверждено:** `TASK-060`, `TASK-061`, `PERSIST-040`–`PERSIST-046`, `PERSIST-ACC-040`–`PERSIST-ACC-047`.  
-**Реализовано:** `TASK-062`, `VS-010`–`VS-016`.  
-**Текущая приёмочная задача:** `TASK-063`.
+**Подтверждено:** `TASK-060`–`TASK-063`, persistence и `VS-010`–`VS-016`.  
+**Реализовано:** `TASK-064`, `CONTENT-010`–`CONTENT-016`.  
+**Текущая приёмочная задача:** `TASK-065`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -1584,7 +1670,34 @@ Vertical slice graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
 12. Для приёмки прислать: результат сборки; screenshot `F7: PASS`; screenshot строки `Interaction: near Salvage...`; screenshot компактного или скрытого HUD; screenshot раннего `ShipRepairBlocked`; screenshot `Ship: REPAIRED`; полные строки F7, QuestCompleted autosave и graceful-exit; screenshot после повторного запуска.
 13. При `FAIL` прислать финальный HUD, последние 80 строк Output и наличие файлов `profiles/profile_vertical_slice/save_1.db`, backup, autosave log и `save_1.vertical-slice-test.db`.
 
-## 11. Журнал проверок
+## 11. Runtime-приёмка `TASK-064/TASK-065`
+
+1. Собрать `Game.Client.csproj`: требуется `0` предупреждений и `0` ошибок.
+2. Запустить main scene и дождаться `DB: Ready`. До этого Output должен содержать:
+
+```text
+TASK-064 content catalog READY: schema=1; items=2; resources=1; recipes=1.
+TASK-064 content binding PASS: schema=1; recipe=recipe.ship.starter_repair; resource=resource.salvage_alloy; required=3; available=3; items=2; resources=1; recipes=1; station=station.field_repair.
+```
+
+3. Нажать `F9` один раз. Тест занимает менее секунды и не изменяет slot/JSON. Ожидаемый HUD:
+
+```text
+TASK-064 content (F9): PASS schema=1, items=2, resources=1, recipes=1, dataDriven=1, invalidRejected=2
+```
+
+4. Ожидаемая полная строка Output:
+
+```text
+TASK-064 data-driven content acceptance PASS: schema=1; items=2; resources=1; recipes=1; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1; elapsedMs=<время>; result=JSON catalog validated; recipe threshold changed in memory and domain behavior followed the data
+```
+
+5. Нажать `F7`: gameplay/persistence regression должна остаться `PASS`.
+6. Нажать `F8`, вручную собрать три узла и отремонтировать корабль. Detailed HUD должен показывать recipe `3×resource.salvage_alloy → 1×component.starter_hull_patch`; после ремонта — `Objective: COMPLETE`, `Ship: REPAIRED`, autosave `QuestCompleted`.
+7. Для приёмки прислать: лог сборки, screenshot `F9: PASS`, полную строку F9, screenshot recipe line и результат F7.
+8. При `FAIL` прислать полный HUD, последние 100 строк Output и содержимое трёх JSON-файлов без изменений.
+
+## 12. Журнал проверок
 
 ### 2026-08-01 — hotfix ручного `E` и переключения `H`
 
@@ -2603,7 +2716,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 12. Шаблон новой записи
+## 13. Шаблон новой записи
 
 ```markdown
 ### YYYY-MM-DD — <название проверки>
@@ -2639,7 +2752,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 13. Правило коммита
+## 14. Правило коммита
 
 Каждый функциональный коммит должен содержать обновление этого файла либо явно не изменять статус требований.
 
@@ -2654,7 +2767,7 @@ Verification: dotnet build; manual interaction smoke test
 
 ---
 
-## 14. Регламент последующих итераций
+## 15. Регламент последующих итераций
 
 Все последующие итерации разработки выполняются в соответствии с:
 

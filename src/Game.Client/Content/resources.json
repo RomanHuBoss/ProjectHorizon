@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "resourceId": "resource.salvage_alloy",
+      "itemDefinitionId": "resource.salvage_alloy",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "visual": {
+        "albedoR": 0.12,
+        "albedoG": 0.82,
+        "albedoB": 0.86,
+        "emissionR": 0.04,
+        "emissionG": 0.38,
+        "emissionB": 0.42,
+        "emissionEnergy": 1.8,
+        "metallic": 0.55,
+        "roughness": 0.28
+      },
+      "tags": ["surface", "salvage", "starter"]
+    }
+  ]
+}

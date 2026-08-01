@@ -3,6 +3,9 @@ using Godot;
 
 public partial class StarterShipRepairTerminal : StaticBody3D, IInteractable
 {
+    [Export]
+    public string StationId { get; set; } = "station.unassigned";
+
     private MeshInstance3D? _mesh;
     private bool _repaired;
 
@@ -10,6 +13,16 @@ public partial class StarterShipRepairTerminal : StaticBody3D, IInteractable
 
     public override void _Ready()
     {
+        if (!GameContentCatalog.IsStableId(StationId) ||
+            string.Equals(
+                StationId,
+                "station.unassigned",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Starter ship repair terminal has no valid StationId.");
+        }
+
         _mesh = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
         if (_mesh is null)
         {

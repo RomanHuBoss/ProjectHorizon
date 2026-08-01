@@ -41,7 +41,9 @@ public partial class SalvageRepairSlice : Node3D
     private readonly List<SalvageResourceNode> _resourceNodes = new();
     private SaveDatabase? _database;
     private SaveAutosaveCoordinator? _autosave;
-    private StarterRepairSession _session = new();
+    private GameContentCatalog? _contentCatalog;
+    private CraftingRecipeDefinition? _repairRecipe;
+    private StarterRepairSession? _session;
     private StarterShipRepairTerminal? _shipTerminal;
     private PlayerController? _player;
     private MarginContainer? _hudMargin;
@@ -51,9 +53,11 @@ public partial class SalvageRepairSlice : Node3D
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
     private Task<VerticalSliceAcceptanceReport>? _acceptanceTask;
+    private Task<DataDrivenContentAcceptanceReport>? _contentAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
+    private DataDrivenContentAcceptanceReport? _contentAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -66,7 +70,17 @@ public partial class SalvageRepairSlice : Node3D
     private bool _previousAutoAcceptQuit = true;
     private string _status = "initializing SQLite";
     private string _acceptanceHud = "READY";
+    private string _contentAcceptanceHud = "READY";
     private string _lastDomainEvent = "none";
+
+    private StarterRepairSession Session => _session ??
+        throw new InvalidOperationException("Starter repair session is unavailable.");
+
+    private GameContentCatalog ContentCatalog => _contentCatalog ??
+        throw new InvalidOperationException("Game content catalog is unavailable.");
+
+    private CraftingRecipeDefinition RepairRecipe => _repairRecipe ??
+        throw new InvalidOperationException("Starter repair recipe is unavailable.");
 
     public override void _Ready()
     {
@@ -86,6 +100,13 @@ public partial class SalvageRepairSlice : Node3D
             throw new InvalidOperationException(
                 "Vertical slice scene is missing HUD, player or ship.");
         }
+
+        GameContentCatalog catalog = LoadContentCatalog();
+        CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
+            StarterRepairContentIds.RecipeId);
+        _contentCatalog = catalog;
+        _repairRecipe = repairRecipe;
+        _session = new StarterRepairSession(repairRecipe);
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -121,9 +142,10 @@ public partial class SalvageRepairSlice : Node3D
         ApplyHudMode();
         UpdateHud();
         GD.Print(
-            "TASK-062 vertical slice initializing. " +
-            "Collect three cyan salvage nodes with E, then repair the red ship. " +
-            "Press F7 for isolated acceptance or F8 to reset the gameplay slot.");
+            "TASK-064 data-driven vertical slice initializing. " +
+            $"Recipe={RepairRecipe.RecipeId}; " +
+            $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}. " +
+            "Press F7 for gameplay regression, F8 to reset or F9 for content acceptance.");
     }
 
     public override void _Notification(int what)
@@ -150,6 +172,7 @@ public partial class SalvageRepairSlice : Node3D
         PollLoadTask();
         PollResetTask();
         PollAcceptanceTask();
+        PollContentAcceptanceTask();
         PollAutosave();
         PollGracefulExitTask();
         UpdatePeriodicAutosave(delta);
@@ -187,11 +210,17 @@ public partial class SalvageRepairSlice : Node3D
             BeginReset();
             GetViewport().SetInputAsHandled();
         }
+        else if (Matches(physical, logical, Key.F9) && CanStartCommand())
+        {
+            BeginContentAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     public bool TryCollectResource(
         SalvageResourceNode source,
         string resourceNodeId,
+        string definitionId,
         int quantity,
         Node3D interactor)
     {
@@ -204,19 +233,24 @@ public partial class SalvageRepairSlice : Node3D
             return false;
         }
 
-        if (!_session.TryCollect(resourceNodeId, quantity, out string result))
+        if (!Session.TryCollect(
+            resourceNodeId,
+            definitionId,
+            quantity,
+            out string result))
         {
             _status = result;
             return false;
         }
 
         _lastDomainEvent =
-            $"ResourceCollected({resourceNodeId}, quantity={quantity})";
+            $"ResourceCollected({resourceNodeId}, definition={definitionId}, " +
+            $"quantity={quantity})";
         _status = result;
         GD.Print(
             $"Vertical slice domain event: {_lastDomainEvent}; " +
-            $"salvage={_session.SalvageQuantity}/" +
-            $"{StarterRepairSession.RequiredSalvage}; " +
+            $"salvage={Session.SalvageQuantity}/" +
+            $"{Session.RequiredSalvage}; " +
             $"interactor={interactor.Name}");
         return true;
     }
@@ -231,15 +265,15 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        StarterRepairResult repairResult = _session.TryRepair(out string result);
+        StarterRepairResult repairResult = Session.TryRepair(out string result);
         _status = result;
         if (repairResult == StarterRepairResult.InsufficientSalvage)
         {
             _lastDomainEvent = "ShipRepairBlocked";
             GD.Print(
                 $"Vertical slice domain event: ShipRepairBlocked; " +
-                $"salvage={_session.SalvageQuantity}/" +
-                $"{StarterRepairSession.RequiredSalvage}");
+                $"salvage={Session.SalvageQuantity}/" +
+                $"{Session.RequiredSalvage}");
             return;
         }
 
@@ -259,20 +293,23 @@ public partial class SalvageRepairSlice : Node3D
 
     private void ValidateResourceNodeBindings()
     {
-        if (_resourceNodes.Count != StarterRepairSession.RequiredSalvage)
+        if (_shipTerminal is null || !string.Equals(
+            _shipTerminal.StationId,
+            RepairRecipe.RequiredStation,
+            StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"Vertical slice requires exactly " +
-                $"{StarterRepairSession.RequiredSalvage} salvage nodes, " +
-                $"but found {_resourceNodes.Count}.");
+                $"Recipe {RepairRecipe.RecipeId} requires station " +
+                $"{RepairRecipe.RequiredStation}, but scene terminal is " +
+                $"{_shipTerminal?.StationId ?? "missing"}.");
         }
 
-        string[] expectedIds =
+        if (_resourceNodes.Count == 0)
         {
-            "salvage.alpha",
-            "salvage.beta",
-            "salvage.gamma"
-        };
+            throw new InvalidOperationException(
+                "Vertical slice has no resource nodes.");
+        }
+
         string[] actualIds = _resourceNodes
             .Select(node => node.ResourceNodeId)
             .OrderBy(id => id, StringComparer.Ordinal)
@@ -280,21 +317,99 @@ public partial class SalvageRepairSlice : Node3D
         bool unique = actualIds
             .Distinct(StringComparer.Ordinal)
             .Count() == actualIds.Length;
-        if (!unique || !actualIds.SequenceEqual(
-            expectedIds,
-            StringComparer.Ordinal))
+        if (!unique)
         {
             throw new InvalidOperationException(
-                "Vertical-slice salvage ResourceNodeId bindings are invalid. " +
-                $"Expected [{string.Join(", ", expectedIds)}], " +
-                $"actual [{string.Join(", ", actualIds)}]. " +
-                "Use the exact PascalCase C# export name ResourceNodeId " +
-                "inside SalvageRepairSlice.tscn.");
+                "Vertical-slice ResourceNodeId bindings contain duplicates: " +
+                $"[{string.Join(", ", actualIds)}].");
         }
 
+        Dictionary<string, int> availableByDefinition =
+            new(StringComparer.Ordinal);
+        foreach (SalvageResourceNode node in _resourceNodes)
+        {
+            GameResourceDefinition definition =
+                ContentCatalog.GetResource(node.ResourceDefinitionId);
+            node.ConfigureDefinition(definition);
+            int quantity = node.Quantity;
+            availableByDefinition.TryGetValue(
+                definition.ItemDefinitionId,
+                out int current);
+            availableByDefinition[definition.ItemDefinitionId] =
+                current + quantity;
+        }
+
+        foreach (CraftingStackDefinition input in RepairRecipe.Inputs)
+        {
+            availableByDefinition.TryGetValue(
+                input.DefinitionId,
+                out int available);
+            if (available < input.Quantity)
+            {
+                throw new InvalidOperationException(
+                    $"Recipe {RepairRecipe.RecipeId} requires " +
+                    $"{input.Quantity} x {input.DefinitionId}, but scene " +
+                    $"provides only {available}.");
+            }
+        }
+
+        int primaryAvailable = availableByDefinition.TryGetValue(
+            Session.SalvageDefinitionId,
+            out int quantityAvailable)
+            ? quantityAvailable
+            : 0;
         GD.Print(
             "TASK-062 scene binding PASS: " +
             $"resourceIds={string.Join(",", actualIds)}; unique=1.");
+        GD.Print(
+            "TASK-064 content binding PASS: " +
+            $"schema={ContentCatalog.SchemaVersion}; " +
+            $"recipe={RepairRecipe.RecipeId}; " +
+            $"resource={Session.SalvageDefinitionId}; " +
+            $"required={Session.RequiredSalvage}; " +
+            $"available={primaryAvailable}; " +
+            $"items={ContentCatalog.Items.Count}; " +
+            $"resources={ContentCatalog.Resources.Count}; " +
+            $"recipes={ContentCatalog.Recipes.Count}; " +
+            $"station={RepairRecipe.RequiredStation}.");
+    }
+
+    private static GameContentCatalog LoadContentCatalog()
+    {
+        const string itemsPath = "res://Content/items.json";
+        const string resourcesPath = "res://Content/resources.json";
+        const string recipesPath = "res://Content/recipes.json";
+        string itemsJson = Godot.FileAccess.GetFileAsString(itemsPath);
+        string resourcesJson = Godot.FileAccess.GetFileAsString(resourcesPath);
+        string recipesJson = Godot.FileAccess.GetFileAsString(recipesPath);
+        GameContentCatalog catalog = GameContentCatalog.LoadFromJson(
+            itemsJson,
+            resourcesJson,
+            recipesJson);
+        GD.Print(
+            "TASK-064 content catalog READY: " +
+            $"schema={catalog.SchemaVersion}; " +
+            $"items={catalog.Items.Count}; " +
+            $"resources={catalog.Resources.Count}; " +
+            $"recipes={catalog.Recipes.Count}.");
+        return catalog;
+    }
+
+    private IReadOnlyDictionary<string, ResourceNodeBinding>
+        BuildResourceBindings()
+    {
+        return _resourceNodes.ToDictionary(
+            node => node.ResourceNodeId,
+            node =>
+            {
+                GameResourceDefinition definition =
+                    ContentCatalog.GetResource(node.ResourceDefinitionId);
+                return new ResourceNodeBinding(
+                    node.ResourceNodeId,
+                    definition.ItemDefinitionId,
+                    node.Quantity);
+            },
+            StringComparer.Ordinal);
     }
 
     private bool CanStartCommand()
@@ -305,6 +420,7 @@ public partial class SalvageRepairSlice : Node3D
             _loadTask is null &&
             _resetTask is null &&
             _acceptanceTask is null &&
+            _contentAcceptanceTask is null &&
             _gracefulExitTask is null &&
             !_autosave.IsBusy &&
             !_closeRequested;
@@ -330,6 +446,21 @@ public partial class SalvageRepairSlice : Node3D
         _acceptanceTask = VerticalSliceAcceptanceRunner.RunAsync(
             testPath,
             SlotId,
+            RepairRecipe,
+            BuildResourceBindings().Values
+                .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
+                .ToArray(),
+            _lifetimeCancellation.Token);
+    }
+
+    private void BeginContentAcceptance()
+    {
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-064 content acceptance running";
+        _contentAcceptanceHud = "RUNNING";
+        _contentAcceptanceReport = null;
+        _contentAcceptanceTask = Task.Run(
+            () => DataDrivenContentAcceptanceRunner.Run(ContentCatalog),
             _lifetimeCancellation.Token);
     }
 
@@ -358,7 +489,7 @@ public partial class SalvageRepairSlice : Node3D
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
-            _session,
+            Session,
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
             _player.GlobalPosition.Z);
@@ -394,6 +525,7 @@ public partial class SalvageRepairSlice : Node3D
             _loadTask is not null ||
             _resetTask is not null ||
             _acceptanceTask is not null ||
+            _contentAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -407,7 +539,7 @@ public partial class SalvageRepairSlice : Node3D
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
-            _session,
+            Session,
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
             _player.GlobalPosition.Z);
@@ -416,8 +548,8 @@ public partial class SalvageRepairSlice : Node3D
         GD.Print(
             "Vertical slice graceful-exit flush started: " +
             $"revision={snapshot.Revision}; " +
-            $"salvage={_session.SalvageQuantity}; " +
-            $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}.");
+            $"salvage={Session.SalvageQuantity}; " +
+            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -457,12 +589,10 @@ public partial class SalvageRepairSlice : Node3D
         try
         {
             SaveGameSnapshot? snapshot = task.GetAwaiter().GetResult();
-            IReadOnlyList<string> resourceIds = _resourceNodes
-                .Select(node => node.ResourceNodeId)
-                .ToArray();
             _session = StarterRepairSession.FromSnapshot(
                 snapshot,
-                resourceIds);
+                BuildResourceBindings(),
+                RepairRecipe);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -480,8 +610,8 @@ public partial class SalvageRepairSlice : Node3D
             GD.Print(
                 "TASK-062 vertical slice READY: " +
                 $"revision={_revision}; " +
-                $"salvage={_session.SalvageQuantity}; " +
-                $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}.");
+                $"salvage={Session.SalvageQuantity}; " +
+                $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}.");
         }
         catch (Exception exception)
         {
@@ -501,7 +631,7 @@ public partial class SalvageRepairSlice : Node3D
         try
         {
             task.GetAwaiter().GetResult();
-            _session = new StarterRepairSession();
+            _session = new StarterRepairSession(RepairRecipe);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             _lastDomainEvent = "GameplaySlotReset";
@@ -514,7 +644,9 @@ public partial class SalvageRepairSlice : Node3D
 
             ApplySessionToScene();
             _state = SalvageRepairSliceState.Ready;
-            _status = "slot reset; collect three salvage nodes";
+            _status =
+                $"slot reset; collect {Session.RequiredSalvage} x " +
+                Session.SalvageDefinitionId;
             GD.Print("TASK-062 vertical slice slot reset PASS.");
         }
         catch (Exception exception)
@@ -562,6 +694,48 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollContentAcceptanceTask()
+    {
+        if (_contentAcceptanceTask is null ||
+            !_contentAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<DataDrivenContentAcceptanceReport> task =
+            _contentAcceptanceTask;
+        _contentAcceptanceTask = null;
+        try
+        {
+            _contentAcceptanceReport = task.GetAwaiter().GetResult();
+            _contentAcceptanceHud = _contentAcceptanceReport.Passed
+                ? $"PASS schema={_contentAcceptanceReport.SchemaVersion}, " +
+                  $"items={_contentAcceptanceReport.ItemCount}, " +
+                  $"resources={_contentAcceptanceReport.ResourceCount}, " +
+                  $"recipes={_contentAcceptanceReport.RecipeCount}, " +
+                  "dataDriven=1, invalidRejected=2"
+                : $"FAIL {_contentAcceptanceReport.Result}";
+            _state = _contentAcceptanceReport.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = _contentAcceptanceReport.Result;
+            string output = BuildContentAcceptanceOutput(
+                _contentAcceptanceReport);
+            if (_contentAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("content acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -594,8 +768,8 @@ public partial class SalvageRepairSlice : Node3D
             "Vertical slice autosave PASS: " +
             $"revision={_autosave.LastSavedRevision}; " +
             $"triggers={_autosave.LastCompletedTriggerSummary}; " +
-            $"salvage={_session.SalvageQuantity}; " +
-            $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}; pending=0");
+            $"salvage={Session.SalvageQuantity}; " +
+            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; pending=0");
     }
 
     private void PollGracefulExitTask()
@@ -645,10 +819,10 @@ public partial class SalvageRepairSlice : Node3D
         foreach (SalvageResourceNode node in _resourceNodes)
         {
             node.SetCollected(
-                _session.CollectedNodeIds.Contains(node.ResourceNodeId));
+                Session.CollectedNodeIds.Contains(node.ResourceNodeId));
         }
 
-        _shipTerminal?.SetRepaired(_session.ShipRepaired);
+        _shipTerminal?.SetRepaired(Session.ShipRepaired);
     }
 
     private void ApplyHudMode()
@@ -666,14 +840,14 @@ public partial class SalvageRepairSlice : Node3D
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudMargin.OffsetRight = 610.0f;
-            _hudMargin.OffsetBottom = 238.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(560.0f, 185.0f);
+            _hudMargin.OffsetBottom = 270.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(560.0f, 215.0f);
         }
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
             _hudMargin.OffsetRight = 800.0f;
-            _hudMargin.OffsetBottom = 385.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(750.0f, 330.0f);
+            _hudMargin.OffsetBottom = 455.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(750.0f, 400.0f);
         }
     }
 
@@ -689,14 +863,26 @@ public partial class SalvageRepairSlice : Node3D
             : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
               $"integrity={_diagnostics.IntegrityResult} • " +
               $"writes={_database?.CompletedWrites ?? 0}";
-        string objective = _session.ShipRepaired
+        string objective = Session.ShipRepaired
             ? "Objective: COMPLETE — starter ship repaired"
             : $"Objective: collect salvage " +
-              $"{_session.SalvageQuantity}/" +
-              $"{StarterRepairSession.RequiredSalvage}, then interact with ship";
-        string ship = _session.ShipRepaired
+              $"{Session.SalvageQuantity}/" +
+              $"{Session.RequiredSalvage}, then interact with ship";
+        string ship = Session.ShipRepaired
             ? "Ship: REPAIRED • launch systems online"
-            : "Ship: DAMAGED • repair requires 3 salvage";
+            : $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
+              Session.SalvageDefinitionId;
+        CraftingStackDefinition primaryInput = RepairRecipe.Inputs[0];
+        CraftingStackDefinition primaryOutput = RepairRecipe.Outputs[0];
+        string contentLine =
+            $"Content: schema={ContentCatalog.SchemaVersion} • " +
+            $"items={ContentCatalog.Items.Count} • " +
+            $"resources={ContentCatalog.Resources.Count} • " +
+            $"recipes={ContentCatalog.Recipes.Count}";
+        string recipeLine =
+            $"Recipe: {RepairRecipe.RecipeId} • " +
+            $"{primaryInput.Quantity}×{primaryInput.DefinitionId} → " +
+            $"{primaryOutput.Quantity}×{primaryOutput.DefinitionId}";
         double nextAutosave = Math.Max(
             0.0,
             AutosaveIntervalSeconds - _autosaveElapsedSeconds);
@@ -712,30 +898,37 @@ public partial class SalvageRepairSlice : Node3D
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • H — HUD\n" +
+                "VERTICAL SLICE 1 • DATA-DRIVEN • H — HUD\n" +
                 $"{databaseLine}\n" +
-                $"Progress: salvage {_session.SalvageQuantity}/3 • " +
-                $"ship={(_session.ShipRepaired ? "REPAIRED" : "DAMAGED")} • " +
+                $"Progress: {Session.SalvageDefinitionId} " +
+                $"{Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
+                $"ship={(Session.ShipRepaired ? "REPAIRED" : "DAMAGED")} • " +
                 $"rev={_revision}\n" +
+                $"Content: schema={ContentCatalog.SchemaVersion} • " +
+                $"recipe={RepairRecipe.RecipeId}\n" +
                 $"Interaction: {interaction}\n" +
                 $"Status: {_status}\n" +
-                "E — interact • F7 — acceptance • F8 — reset";
+                "E — interact • F7 — gameplay • F8 — reset • F9 — content";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 — SALVAGE → REPAIR → AUTOSAVE • H — HUD\n" +
+            "VERTICAL SLICE 1 — DATA-DRIVEN SALVAGE → REPAIR → AUTOSAVE • H — HUD\n" +
             databaseLine + "\n" +
-            $"Snapshot: rev={_revision} • collected={_session.CollectedNodeCount}/3\n" +
+            contentLine + "\n" +
+            recipeLine + "\n" +
+            $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
+            $"{_resourceNodes.Count}\n" +
             objective + "\n" +
             ship + "\n" +
             $"Interaction: {interaction}\n" +
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
-            $"TASK-062 acceptance (F7): {_acceptanceHud}\n" +
+            $"TASK-062 gameplay (F7): {_acceptanceHud}\n" +
+            $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space — move • E — collect/repair • H — HUD • " +
-            "F7 — acceptance • F8 — reset loop • Esc — release mouse";
+            "F7 — gameplay • F8 — reset • F9 — content • Esc — release mouse";
     }
 
     private static string BuildAcceptanceOutput(
@@ -753,6 +946,31 @@ public partial class SalvageRepairSlice : Node3D
             $"revision={report.Revision}; " +
             $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
             $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildContentAcceptanceOutput(
+        DataDrivenContentAcceptanceReport report)
+    {
+        return "TASK-064 data-driven content acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"schema={report.SchemaVersion}; " +
+            $"items={report.ItemCount}; " +
+            $"resources={report.ResourceCount}; " +
+            $"recipes={report.RecipeCount}; " +
+            $"recipe={report.RecipeId}; " +
+            $"required={report.ActualRequiredQuantity}; " +
+            $"variantRequired={report.VariantRequiredQuantity}; " +
+            $"blockedBelowVariant=" +
+            $"{(report.BlockedBelowVariantThreshold ? 1 : 0)}; " +
+            $"repairedAtVariant=" +
+            $"{(report.RepairedAtVariantThreshold ? 1 : 0)}; " +
+            $"outputs={report.ProducedOutputQuantity}; " +
+            $"duplicateRejected={(report.DuplicateIdRejected ? 1 : 0)}; " +
+            $"missingReferenceRejected=" +
+            $"{(report.MissingReferenceRejected ? 1 : 0)}; " +
+            $"stableIds={(report.StableIdsValidated ? 1 : 0)}; " +
             $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
             $"result={report.Result}";
     }

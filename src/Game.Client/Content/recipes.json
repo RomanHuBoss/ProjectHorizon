@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "recipeId": "recipe.ship.starter_repair",
+      "inputs": [
+        {
+          "definitionId": "resource.salvage_alloy",
+          "quantity": 3
+        }
+      ],
+      "outputs": [
+        {
+          "definitionId": "component.starter_hull_patch",
+          "quantity": 1
+        }
+      ],
+      "requiredTechnology": "",
+      "requiredStation": "station.field_repair",
+      "craftTimeSeconds": 0.0,
+      "application": {
+        "type": "RepairShip",
+        "targetId": "ship.starter.repairable",
+        "resultHealth": 100.0
+      },
+      "tags": ["repair", "starter_quest"]
+    }
+  ]
+}

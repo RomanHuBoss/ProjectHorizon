@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "definitions": [
+    {
+      "definitionId": "resource.salvage_alloy",
+      "localizationKey": "item.resource.salvage_alloy",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 18.0,
+      "mass": 1.2,
+      "rarity": "Common",
+      "icon": "",
+      "worldModel": "",
+      "tags": ["salvage", "metal", "repair"]
+    },
+    {
+      "definitionId": "component.starter_hull_patch",
+      "localizationKey": "item.component.starter_hull_patch",
+      "category": "Component",
+      "maxStack": 5,
+      "basePrice": 90.0,
+      "mass": 2.4,
+      "rarity": "Common",
+      "icon": "",
+      "worldModel": "",
+      "tags": ["component", "hull", "repair"]
+    }
+  ]
+}

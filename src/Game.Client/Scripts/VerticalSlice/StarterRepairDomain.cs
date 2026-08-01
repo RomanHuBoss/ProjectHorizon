@@ -13,24 +13,104 @@ public enum StarterRepairResult
     InsufficientSalvage = 2
 }
 
+public sealed record ResourceNodeBinding(
+    string ResourceNodeId,
+    string ItemDefinitionId,
+    int Quantity);
+
+public sealed record CollectedResourceState(
+    string ResourceNodeId,
+    string DefinitionId,
+    int CollectedQuantity,
+    int RemainingQuantity);
+
 public sealed class StarterRepairSession
 {
-    public const string SalvageDefinitionId = "resource.salvage_alloy";
-    public const int RequiredSalvage = 3;
+    private sealed class MutableCollectedResourceState
+    {
+        public MutableCollectedResourceState(
+            string resourceNodeId,
+            string definitionId,
+            int collectedQuantity,
+            int remainingQuantity)
+        {
+            ResourceNodeId = resourceNodeId;
+            DefinitionId = definitionId;
+            CollectedQuantity = collectedQuantity;
+            RemainingQuantity = remainingQuantity;
+        }
 
-    private readonly HashSet<string> _collectedNodeIds =
-        new(StringComparer.Ordinal);
+        public string ResourceNodeId { get; }
 
-    public int SalvageQuantity { get; private set; }
+        public string DefinitionId { get; }
+
+        public int CollectedQuantity { get; }
+
+        public int RemainingQuantity { get; set; }
+    }
+
+    private readonly Dictionary<string, MutableCollectedResourceState>
+        _collectedResources = new(StringComparer.Ordinal);
+    private readonly CraftingRecipeDefinition _repairRecipe;
+    private IReadOnlyList<CraftingStackDefinition> _lastCraftedOutputs =
+        Array.Empty<CraftingStackDefinition>();
+
+    public StarterRepairSession(CraftingRecipeDefinition repairRecipe)
+    {
+        ArgumentNullException.ThrowIfNull(repairRecipe);
+        if (repairRecipe.Inputs.Count == 0)
+        {
+            throw new ArgumentException(
+                "Starter repair recipe must contain at least one input.",
+                nameof(repairRecipe));
+        }
+
+        if (!string.Equals(
+            repairRecipe.Application.Type,
+            "RepairShip",
+            StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Starter repair recipe must use RepairShip application.",
+                nameof(repairRecipe));
+        }
+
+        _repairRecipe = repairRecipe;
+    }
+
+    public CraftingRecipeDefinition RepairRecipe => _repairRecipe;
+
+    public string SalvageDefinitionId => _repairRecipe.Inputs[0].DefinitionId;
+
+    public int RequiredSalvage => _repairRecipe.Inputs[0].Quantity;
+
+    public int SalvageQuantity => GetAvailableQuantity(SalvageDefinitionId);
 
     public bool ShipRepaired { get; private set; }
 
-    public int CollectedNodeCount => _collectedNodeIds.Count;
+    public int CollectedNodeCount => _collectedResources.Count;
 
-    public IReadOnlyCollection<string> CollectedNodeIds => _collectedNodeIds;
+    public IReadOnlyCollection<string> CollectedNodeIds =>
+        _collectedResources.Keys;
+
+    public IReadOnlyList<CollectedResourceState> CollectedResources =>
+        _collectedResources.Values
+            .OrderBy(state => state.ResourceNodeId, StringComparer.Ordinal)
+            .Select(state => new CollectedResourceState(
+                state.ResourceNodeId,
+                state.DefinitionId,
+                state.CollectedQuantity,
+                state.RemainingQuantity))
+            .ToArray();
+
+    public IReadOnlyList<CraftingStackDefinition> LastCraftedOutputs =>
+        _lastCraftedOutputs;
+
+    public double RepairedHealth => _repairRecipe.Application.ResultHealth;
 
     public bool TryCollect(
         string resourceNodeId,
+        string definitionId,
         int quantity,
         out string result)
     {
@@ -39,6 +119,13 @@ public sealed class StarterRepairSession
             throw new ArgumentException(
                 "Resource node ID must not be empty.",
                 nameof(resourceNodeId));
+        }
+
+        if (!GameContentCatalog.IsStableId(definitionId))
+        {
+            throw new ArgumentException(
+                "Resource definition ID must be a stable dotted string ID.",
+                nameof(definitionId));
         }
 
         if (quantity <= 0)
@@ -54,14 +141,25 @@ public sealed class StarterRepairSession
             return false;
         }
 
-        if (!_collectedNodeIds.Add(resourceNodeId))
+        if (_collectedResources.ContainsKey(resourceNodeId))
         {
             result = $"resource node {resourceNodeId} was already collected";
             return false;
         }
 
-        SalvageQuantity += quantity;
-        result = $"salvage {SalvageQuantity}/{RequiredSalvage}";
+        _collectedResources.Add(
+            resourceNodeId,
+            new MutableCollectedResourceState(
+                resourceNodeId,
+                definitionId,
+                quantity,
+                quantity));
+        result = string.Equals(
+            definitionId,
+            SalvageDefinitionId,
+            StringComparison.Ordinal)
+            ? $"salvage {SalvageQuantity}/{RequiredSalvage}"
+            : $"collected {quantity} x {definitionId}";
         return true;
     }
 
@@ -73,43 +171,59 @@ public sealed class StarterRepairSession
             return StarterRepairResult.AlreadyRepaired;
         }
 
-        if (SalvageQuantity < RequiredSalvage)
+        IReadOnlyList<CraftingStackDefinition> missing =
+            GetMissingRecipeInputs();
+        if (missing.Count > 0)
         {
-            result =
-                $"need {RequiredSalvage - SalvageQuantity} more salvage";
+            result = "missing " + string.Join(
+                ", ",
+                missing.Select(input =>
+                    $"{input.Quantity} x {input.DefinitionId}"));
             return StarterRepairResult.InsufficientSalvage;
         }
 
-        SalvageQuantity -= RequiredSalvage;
+        foreach (CraftingStackDefinition input in _repairRecipe.Inputs)
+        {
+            Consume(input.DefinitionId, input.Quantity);
+        }
+
+        _lastCraftedOutputs = _repairRecipe.Outputs
+            .Select(output => new CraftingStackDefinition(
+                output.DefinitionId,
+                output.Quantity))
+            .ToArray();
         ShipRepaired = true;
-        result = "starter ship repaired; objective completed";
+        result =
+            $"recipe {_repairRecipe.RecipeId} crafted and applied; " +
+            $"ship health={RepairedHealth.ToString("0.0", CultureInfo.InvariantCulture)}";
         return StarterRepairResult.Repaired;
+    }
+
+    public int GetAvailableQuantity(string definitionId)
+    {
+        return _collectedResources.Values
+            .Where(state => string.Equals(
+                state.DefinitionId,
+                definitionId,
+                StringComparison.Ordinal))
+            .Sum(state => state.RemainingQuantity);
     }
 
     public static StarterRepairSession FromSnapshot(
         SaveGameSnapshot? snapshot,
-        IReadOnlyList<string> orderedResourceNodeIds)
+        IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
+        CraftingRecipeDefinition repairRecipe)
     {
-        ArgumentNullException.ThrowIfNull(orderedResourceNodeIds);
-        StarterRepairSession session = new();
+        ArgumentNullException.ThrowIfNull(resourceBindings);
+        ArgumentNullException.ThrowIfNull(repairRecipe);
+        StarterRepairSession session = new(repairRecipe);
         if (snapshot is null)
         {
             return session;
         }
 
-        HashSet<string> knownNodeIds = new(
-            orderedResourceNodeIds,
-            StringComparer.Ordinal);
         foreach (InventoryItemSaveData item in snapshot.Inventory)
         {
-            if (!string.Equals(
-                item.DefinitionId,
-                SalvageDefinitionId,
-                StringComparison.Ordinal))
-            {
-                continue;
-            }
-
             const string itemPrefix = "item.";
             if (!item.ItemId.StartsWith(itemPrefix, StringComparison.Ordinal))
             {
@@ -117,28 +231,98 @@ public sealed class StarterRepairSession
             }
 
             string nodeId = item.ItemId[itemPrefix.Length..];
-            if (!knownNodeIds.Contains(nodeId))
+            if (!resourceBindings.TryGetValue(
+                nodeId,
+                out ResourceNodeBinding binding))
             {
-                // Ignore stale scene-binding artifacts such as the former
-                // salvage.unassigned ID. Only a resource node that exists in
-                // the current scene may contribute to this objective.
                 continue;
             }
 
-            session._collectedNodeIds.Add(nodeId);
-            session.SalvageQuantity += Math.Max(0, item.Quantity);
+            if (!string.Equals(
+                item.DefinitionId,
+                binding.ItemDefinitionId,
+                StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            int remainingQuantity = Math.Clamp(
+                item.Quantity,
+                0,
+                binding.Quantity);
+            session._collectedResources.Add(
+                nodeId,
+                new MutableCollectedResourceState(
+                    nodeId,
+                    binding.ItemDefinitionId,
+                    binding.Quantity,
+                    remainingQuantity));
         }
 
-        session.ShipRepaired = snapshot.Ship.Health >= 99.0;
-        if (session.ShipRepaired && session._collectedNodeIds.Count == 0)
+        session.ShipRepaired = snapshot.Ship.Health >=
+            repairRecipe.Application.ResultHealth - 0.001;
+        if (session.ShipRepaired && session._collectedResources.Count == 0)
         {
-            foreach (string nodeId in orderedResourceNodeIds)
+            foreach (ResourceNodeBinding binding in resourceBindings.Values)
             {
-                session._collectedNodeIds.Add(nodeId);
+                session._collectedResources.Add(
+                    binding.ResourceNodeId,
+                    new MutableCollectedResourceState(
+                        binding.ResourceNodeId,
+                        binding.ItemDefinitionId,
+                        binding.Quantity,
+                        0));
             }
         }
 
         return session;
+    }
+
+    private IReadOnlyList<CraftingStackDefinition> GetMissingRecipeInputs()
+    {
+        List<CraftingStackDefinition> missing = new();
+        foreach (CraftingStackDefinition input in _repairRecipe.Inputs)
+        {
+            int available = GetAvailableQuantity(input.DefinitionId);
+            if (available < input.Quantity)
+            {
+                missing.Add(input with
+                {
+                    Quantity = input.Quantity - available
+                });
+            }
+        }
+
+        return missing;
+    }
+
+    private void Consume(string definitionId, int quantity)
+    {
+        int remaining = quantity;
+        foreach (MutableCollectedResourceState state in
+            _collectedResources.Values
+                .Where(state => string.Equals(
+                    state.DefinitionId,
+                    definitionId,
+                    StringComparison.Ordinal))
+                .OrderBy(state => state.ResourceNodeId, StringComparer.Ordinal))
+        {
+            if (remaining == 0)
+            {
+                break;
+            }
+
+            int consumed = Math.Min(state.RemainingQuantity, remaining);
+            state.RemainingQuantity -= consumed;
+            remaining -= consumed;
+        }
+
+        if (remaining != 0)
+        {
+            throw new InvalidOperationException(
+                $"Recipe consumption underflow for {definitionId}: " +
+                $"remaining={remaining}.");
+        }
     }
 }
 
@@ -188,19 +372,18 @@ public static class StarterRepairSnapshotFactory
                 PlanetId),
             new ShipSaveData(
                 "ship.starter",
-                "ship.starter.repairable",
+                session.RepairRecipe.Application.TargetId,
                 "Horizon Starter",
-                session.ShipRepaired ? 100.0 : 28.0,
+                session.ShipRepaired ? session.RepairedHealth : 28.0,
                 35.0,
                 0.0,
                 1.0,
                 -10.0),
-            session.CollectedNodeIds
-                .OrderBy(nodeId => nodeId, StringComparer.Ordinal)
-                .Select(nodeId => new InventoryItemSaveData(
-                    $"item.{nodeId}",
-                    StarterRepairSession.SalvageDefinitionId,
-                    session.ShipRepaired ? 0 : 1,
+            session.CollectedResources
+                .Select(resource => new InventoryItemSaveData(
+                    $"item.{resource.ResourceNodeId}",
+                    resource.DefinitionId,
+                    resource.RemainingQuantity,
                     1.0))
                 .ToArray(),
             new VisitedPlanetSaveData(
@@ -229,6 +412,8 @@ public static class VerticalSliceAcceptanceRunner
     public static async Task<VerticalSliceAcceptanceReport> RunAsync(
         string databasePath,
         string slotId,
+        CraftingRecipeDefinition repairRecipe,
+        IReadOnlyList<ResourceNodeBinding> resourceBindings,
         CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(databasePath))
@@ -238,6 +423,8 @@ public static class VerticalSliceAcceptanceRunner
                 nameof(databasePath));
         }
 
+        ArgumentNullException.ThrowIfNull(repairRecipe);
+        ArgumentNullException.ThrowIfNull(resourceBindings);
         System.Diagnostics.Stopwatch stopwatch =
             System.Diagnostics.Stopwatch.StartNew();
         try
@@ -253,20 +440,18 @@ public static class VerticalSliceAcceptanceRunner
             await database.ResetSlotAsync(slotId, cancellationToken)
                 .ConfigureAwait(false);
 
-            StarterRepairSession session = new();
+            StarterRepairSession session = new(repairRecipe);
             StarterRepairResult blockedResult = session.TryRepair(out _);
             bool repairBlocked =
                 blockedResult == StarterRepairResult.InsufficientSalvage;
 
-            string[] nodeIds =
+            foreach (ResourceNodeBinding binding in resourceBindings)
             {
-                "salvage.alpha",
-                "salvage.beta",
-                "salvage.gamma"
-            };
-            foreach (string nodeId in nodeIds)
-            {
-                if (!session.TryCollect(nodeId, 1, out string collectResult))
+                if (!session.TryCollect(
+                    binding.ResourceNodeId,
+                    binding.ItemDefinitionId,
+                    binding.Quantity,
+                    out string collectResult))
                 {
                     throw new InvalidOperationException(collectResult);
                 }
@@ -318,17 +503,22 @@ public static class VerticalSliceAcceptanceRunner
                 diagnostics.IntegrityResult,
                 "ok",
                 StringComparison.OrdinalIgnoreCase);
+            bool allRecipeInputsConsumed = repairRecipe.Inputs.All(input =>
+                session.GetAvailableQuantity(input.DefinitionId) == 0);
+            bool outputsProduced =
+                session.LastCraftedOutputs.SequenceEqual(repairRecipe.Outputs);
             bool passed =
                 repairBlocked &&
-                session.CollectedNodeCount == 3 &&
-                session.SalvageQuantity == 0 &&
+                session.CollectedNodeCount == resourceBindings.Count &&
+                allRecipeInputsConsumed &&
+                outputsProduced &&
                 shipRepaired &&
                 questAutosaveObserved &&
                 exactRoundTrip &&
                 logWritten &&
                 diagnostics.MaximumConcurrentWriters == 1 &&
                 integrityOk &&
-                loaded?.Ship.Health == 100.0;
+                loaded?.Ship.Health == repairRecipe.Application.ResultHealth;
 
             List<string> failedCriteria = new();
             if (!repairBlocked)
@@ -336,10 +526,20 @@ public static class VerticalSliceAcceptanceRunner
                 failedCriteria.Add("repairBlocked=0");
             }
 
-            if (session.CollectedNodeCount != 3)
+            if (session.CollectedNodeCount != resourceBindings.Count)
             {
                 failedCriteria.Add(
                     $"resources={session.CollectedNodeCount}");
+            }
+
+            if (!allRecipeInputsConsumed)
+            {
+                failedCriteria.Add("inputsConsumed=0");
+            }
+
+            if (!outputsProduced)
+            {
+                failedCriteria.Add("outputsProduced=0");
             }
 
             if (!shipRepaired)
@@ -377,7 +577,7 @@ public static class VerticalSliceAcceptanceRunner
             return new VerticalSliceAcceptanceReport(
                 passed,
                 passed
-                    ? "resource collection completed the starter repair objective and persisted the repaired ship"
+                    ? "data-driven resource collection crafted the starter repair recipe and persisted the repaired ship"
                     : $"vertical-slice criteria failed: {string.Join(", ", failedCriteria)}",
                 session.CollectedNodeCount,
                 repairBlocked,

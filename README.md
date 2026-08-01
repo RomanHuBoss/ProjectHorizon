@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Первая интеграция вертикального среза — `IMPLEMENTED`
+### Data-driven salvage/repair вертикального среза — `IMPLEMENTED`
 
 Текущая стартовая сцена:
 
@@ -38,20 +38,37 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Реализован минимальный сквозной цикл начала игры из разделов 2.2 и 40 PDF-ТЗ:
+Реализован минимальный сквозной цикл начала игры из разделов 2.2 и 40 PDF-ТЗ.
+После приёмки `TASK-062/TASK-063` правила ресурсов и ремонта вынесены из C#
+в строгий статический контент:
+
+```text
+src/Game.Client/Content/items.json
+src/Game.Client/Content/resources.json
+src/Game.Client/Content/recipes.json
+```
+
+Каталог загружается один раз при старте сцены. Неизвестные поля JSON запрещены,
+стабильные строковые ID, дубликаты, диапазоны, ссылки resource→item и
+recipe input/output→item валидируются до перехода сцены в `DB: Ready`.
+Текущий игровой цикл:
 
 1. игрок появляется на тестовой планетарной площадке;
-2. собирает три узла ресурса `resource.salvage_alloy` взаимодействием по `E`;
+2. собирает три узла JSON-ресурса `resource.salvage_alloy` взаимодействием по `E`;
    точное наведение лучом остаётся приоритетным, но на близкой дистанции действует
    безопасный proximity-fallback, поэтому низкий ресурсный узел можно подобрать
    без пиксельного наведения перекрестия;
-3. попытка ремонта до сбора трёх единиц блокируется доменным правилом;
-4. после сбора ресурс расходуется, повреждённый корабль ремонтируется;
-5. завершение стартовой ремонтной цели создаёт реальное доменное событие и
+3. терминал `station.field_repair` читает рецепт
+   `recipe.ship.starter_repair`: `3 × resource.salvage_alloy` →
+   `1 × component.starter_hull_patch`;
+4. попытка ремонта до выполнения JSON-рецепта блокируется доменным правилом;
+5. после крафта входы расходуются, выход рецепта применяется к кораблю и
+   восстанавливает здоровье до значения из JSON;
+6. завершение стартовой ремонтной цели создаёт реальное доменное событие и
    вызывает production-autosave с причиной `QuestCompleted`;
-6. inventory, состояние корабля, позиция игрока и revision восстанавливаются из
+7. inventory, состояние корабля, позиция игрока и revision восстанавливаются из
    SQLite при следующем запуске;
-7. periodic и graceful-exit сохранения используют тот же coordinator.
+8. periodic и graceful-exit сохранения используют тот же coordinator.
 
 Управление стартовой сценой:
 
@@ -61,6 +78,7 @@ E              собрать ближайший доступный ресурс
 H              detailed / compact / hidden HUD
 F7             изолированная приёмка TASK-062
 F8             очистить gameplay-slot и начать цикл заново
+F9             TASK-064: strict JSON и data-driven recipe acceptance
 Esc            освободить курсор
 ```
 
@@ -76,11 +94,27 @@ C#-export ID `salvage.alpha`, `salvage.beta`, `salvage.gamma`; при запус
 переключает `DETAILED → COMPACT → HIDDEN`; в скрытом режиме остаётся hint для
 возврата HUD.
 
-Ожидаемый автоматический результат по `F7`:
+При старте ожидаются строки `TASK-064 content catalog READY` и
+`TASK-064 content binding PASS`. В detailed HUD отображаются версия content schema,
+число item/resource/recipe definitions и фактически выбранный рецепт.
+
+Ожидаемый регрессионный результат по `F7`:
 
 ```text
 TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
 ```
+
+Ожидаемый результат проверки data-driven контента по `F9`:
+
+```text
+TASK-064 data-driven content acceptance PASS: schema=1; items=2; resources=1; recipes=1; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
+```
+
+`F9` временно изменяет требование копии рецепта с 3 до 4 единиц только в памяти.
+Доменная модель должна блокировать ремонт на 3/4 и разрешить его на 4/4. Это
+доказывает, что порог берётся из рецепта, а не остаётся скрытой константой C#.
+Невалидные каталоги с дублирующимся ID и отсутствующей ссылкой должны быть
+отклонены. Gameplay-slot и JSON-файлы тестом не изменяются.
 
 
 ### Прототип A. Персонаж — `VERIFIED`
