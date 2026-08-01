@@ -47,6 +47,22 @@ public partial class TerrainChunkManager : Node3D
     public int NoiseSeed { get; set; } = 20260801;
 
     [Export]
+    public TerrainDebugViewMode DebugViewMode { get; set; } =
+        TerrainDebugViewMode.HeightAndSlope;
+
+    [Export]
+    public bool ShowWorldGrid { get; set; } = true;
+
+    [Export]
+    public bool ShowWireframe { get; set; } = true;
+
+    [Export]
+    public bool ShowChunkBorders { get; set; } = true;
+
+    [Export(PropertyHint.Range, "1.0,32.0,1.0")]
+    public float DebugGridSpacing { get; set; } = 4.0f;
+
+    [Export]
     public NodePath PlayerPath { get; set; } = new("../Player");
 
     [Export]
@@ -88,6 +104,62 @@ public partial class TerrainChunkManager : Node3D
 
         PlanRefresh(executeImmediately: true);
         UpdateHud();
+    }
+
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventKey eventKey ||
+            !eventKey.Pressed ||
+            eventKey.IsEcho())
+        {
+            return;
+        }
+
+        bool changed = true;
+
+        switch (eventKey.Keycode)
+        {
+            case Key.F1:
+                DebugViewMode = DebugViewMode switch
+                {
+                    TerrainDebugViewMode.HeightAndSlope =>
+                        TerrainDebugViewMode.Lod,
+                    TerrainDebugViewMode.Lod =>
+                        TerrainDebugViewMode.Normals,
+                    _ => TerrainDebugViewMode.HeightAndSlope
+                };
+                break;
+
+            case Key.F2:
+                ShowWorldGrid = !ShowWorldGrid;
+                break;
+
+            case Key.F3:
+                ShowWireframe = !ShowWireframe;
+                break;
+
+            case Key.F4:
+                ShowChunkBorders = !ShowChunkBorders;
+                break;
+
+            default:
+                changed = false;
+                break;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        ApplyDebugVisualization();
+        UpdateHud();
+
+        GD.Print(
+            $"Terrain diagnostics: mode={DebugViewMode}; " +
+            $"grid={ShowWorldGrid}; wireframe={ShowWireframe}; " +
+            $"borders={ShowChunkBorders}; spacing={DebugGridSpacing:F1} m");
     }
 
     public override void _PhysicsProcess(double delta)
@@ -526,7 +598,12 @@ public partial class TerrainChunkManager : Node3D
             SkirtDepth,
             spec.GenerateCollision,
             spec.StitchMask,
-            spec.SkirtMask);
+            spec.SkirtMask,
+            DebugViewMode,
+            ShowWorldGrid,
+            ShowWireframe,
+            ShowChunkBorders,
+            DebugGridSpacing);
 
         chunk.AddChild(new MeshInstance3D
         {
@@ -645,6 +722,36 @@ public partial class TerrainChunkManager : Node3D
         }
     }
 
+
+    private void ApplyDebugVisualization()
+    {
+        foreach (TerrainChunk chunk in _activeChunks.Values)
+        {
+            chunk.SetDebugVisualization(
+                DebugViewMode,
+                ShowWorldGrid,
+                ShowWireframe,
+                ShowChunkBorders,
+                DebugGridSpacing);
+        }
+    }
+
+    private static string GetDebugViewName(
+        TerrainDebugViewMode debugViewMode)
+    {
+        return debugViewMode switch
+        {
+            TerrainDebugViewMode.Lod => "LOD",
+            TerrainDebugViewMode.Normals => "нормали",
+            _ => "высота/уклон"
+        };
+    }
+
+    private static string GetToggleState(bool enabled)
+    {
+        return enabled ? "вкл" : "выкл";
+    }
+
     private void UpdateHud()
     {
         if (_statusLabel is null || _player is null)
@@ -659,14 +766,21 @@ public partial class TerrainChunkManager : Node3D
             : "стабильно";
 
         _statusLabel.Text =
-            "ПРОТОТИП B — БЕСШОВНЫЙ СТРИМИНГ И LOD\n" +
-            $"Чанк игрока: ({_currentChunk.X}, {_currentChunk.Y})  •  " +
-            $"активно: {_activeChunks.Count}/{sideLength * sideLength}  •  " +
-            $"LOD0: {highDetailCount}  •  LOD1: {lowDetailCount}\n" +
-            $"Переход: {transitionState}  •  очередь: {_pendingOperations.Count}  •  " +
-            $"операций за шаг: {_operationsCompletedLastStep}\n" +
-            $"Stitching кромок + глобальные нормали  •  " +
+            "ПРОТОТИП B — ДИАГНОСТИКА РЕЛЬЕФА, СТРИМИНГА И LOD\n" +
+            $"Позиция: X={_player.GlobalPosition.X:F1}, " +
+            $"Z={_player.GlobalPosition.Z:F1}  •  " +
+            $"чанк: ({_currentChunk.X}, {_currentChunk.Y})\n" +
+            $"Активно: {_activeChunks.Count}/{sideLength * sideLength}  •  " +
+            $"LOD0: {highDetailCount}  •  LOD1: {lowDetailCount}  •  " +
+            $"переход: {transitionState}  •  очередь: {_pendingOperations.Count}\n" +
+            $"Вид: {GetDebugViewName(DebugViewMode)}  •  " +
+            $"сетка: {GetToggleState(ShowWorldGrid)}  •  " +
+            $"wireframe: {GetToggleState(ShowWireframe)}  •  " +
+            $"границы: {GetToggleState(ShowChunkBorders)}\n" +
+            $"Глобальные нормали  •  stitching  •  " +
             $"гистерезис: {ChunkSwitchHysteresis:F1} м  •  seed: {NoiseSeed}\n" +
+            "F1 — режим цвета, F2 — мировая сетка, F3 — wireframe, " +
+            "F4 — границы чанков\n" +
             "WASD — движение, Space — прыжок, мышь — обзор, " +
             "Esc — освободить курсор";
     }

@@ -7,8 +7,8 @@
 background_mode = 1
 background_color = Color(0.31, 0.47, 0.68, 1)
 ambient_light_source = 3
-ambient_light_color = Color(0.58, 0.66, 0.78, 1)
-ambient_light_energy = 0.55
+ambient_light_color = Color(0.68, 0.74, 0.84, 1)
+ambient_light_energy = 0.82
 
 [sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
 bg_color = Color(0.02, 0.03, 0.05, 0.78)
@@ -28,7 +28,10 @@ environment = SubResource("Environment_terrain")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
+light_color = Color(1, 0.94, 0.84, 1)
+light_energy = 1.35
 shadow_enabled = true
+directional_shadow_max_distance = 140.0
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 8)
@@ -41,11 +44,12 @@ script = ExtResource("1_manager")
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 760.0
-offset_bottom = 184.0
+offset_right = 910.0
+offset_bottom = 252.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
-text = "ПРОТОТИП B — БЕСШОВНЫЙ СТРИМИНГ И LOD\nИнициализация согласованных кромок и очереди чанков..."
+theme_override_font_sizes/font_size = 16
+text = "ПРОТОТИП B — ДИАГНОСТИКА РЕЛЬЕФА, СТРИМИНГА И LOD\nИнициализация цветового режима, сетки и границ чанков..."
