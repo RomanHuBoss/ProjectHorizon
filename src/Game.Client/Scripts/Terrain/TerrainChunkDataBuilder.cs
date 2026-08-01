@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Threading;
+using CancellationToken = System.Threading.CancellationToken;
 using Godot;
 
 public sealed class TerrainChunkBuildRequest

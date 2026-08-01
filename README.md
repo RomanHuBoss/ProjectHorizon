@@ -65,6 +65,7 @@ src/Game.Client/Scenes/DebugWorld.tscn
 - `TerrainChunkDataBuilder` вычисляет noise-высоты, глобальные нормали, UV и индексы в `Task.Run`;
 - число параллельных worker-задач ограничено формулой `max(1, min(4, logical_processor_count - 2))`;
 - каждый план стриминга имеет `CancellationTokenSource`, каждый job — `jobId` и revision;
+- тип узла планировщика явно задан как `Godot.Timer`, а threading-типы подключены точечными alias без конфликта с Godot API;
 - при смене плана устаревшие задачи отменяются, а stale-результаты отбрасываются до применения;
 - worker возвращает только контейнеры данных, а `Node`, `ArrayMesh`, material и collision создаются в main thread;
 - `ConcurrentQueue` передаёт результаты worker в дозированный main-thread apply;
@@ -78,7 +79,7 @@ src/Game.Client/Scenes/DebugWorld.tscn
 src/Game.Client/Scenes/Terrain/TerrainChunkPrototype.tscn
 ```
 
-Пользователь подтвердил предыдущие исправления геометрии и диагностических режимов. Текущая итерация реализует отменяемую фоновую генерацию; перед следующим функциональным шагом требуется локально проверить сборку, возврат HUD к `9/9`, отсутствие применения stale-revision, стабильность collision и значения `worker/main` в Output.
+Пользователь подтвердил предыдущие исправления геометрии и диагностических режимов. После внедрения фоновой генерации локальная сборка выявила конфликт `Timer`; он устранён явным использованием `Godot.Timer` и точечными alias для threading-типов. Перед следующим функциональным шагом требуется повторить сборку, затем проверить возврат HUD к `9/9`, отсутствие применения stale-revision, стабильность collision и значения `worker/main` в Output.
 
 ## Состояние реализации ТЗ
 

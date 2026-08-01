@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Threading;
+using CancellationToken = System.Threading.CancellationToken;
+using CancellationTokenSource = System.Threading.CancellationTokenSource;
 using System.Threading.Tasks;
 using Godot;
 
@@ -83,7 +84,7 @@ public partial class TerrainChunkManager : Node3D
     private Label? _statusLabel;
     private Vector2I _currentChunk = new(int.MinValue, int.MinValue);
     private double _hudUpdateAccumulator;
-    private Timer? _operationTimer;
+    private Godot.Timer? _operationTimer;
     private int _planRevision;
     private int _completedRevision;
     private int _operationsCompletedLastStep;
@@ -108,7 +109,7 @@ public partial class TerrainChunkManager : Node3D
         _workerLimit = Math.Max(
             1,
             Math.Min(4, System.Environment.ProcessorCount - 2));
-        _operationTimer = new Timer
+        _operationTimer = new Godot.Timer
         {
             Name = "TerrainOperationTimer",
             OneShot = false,
