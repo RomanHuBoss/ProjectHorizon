@@ -82,6 +82,7 @@ public partial class PlanetaryPlayerController : CharacterBody3D
     private Transform3D _spawnTransform;
     private Vector3 _spawnCameraPitchRotation;
     private bool _controlEnabled = true;
+    private bool _externalMovementLocked;
     private bool _probeGrounded;
     private Vector3 _probeGroundNormal = Vector3.Up;
     private float _nearestProbeDistance = float.PositiveInfinity;
@@ -117,6 +118,7 @@ public partial class PlanetaryPlayerController : CharacterBody3D
     public bool ProbeGrounded => _probeGrounded;
     public float NearestProbeDistance => _nearestProbeDistance;
     public bool ControlEnabled => _controlEnabled;
+    public bool ExternalMovementLocked => _externalMovementLocked;
     public Camera3D? PlayerCamera => _camera;
     public CubeSphereFaceId CurrentFace => _currentFace;
     public string CurrentFaceName => GetFaceDisplayName(_currentFace);
@@ -213,7 +215,8 @@ public partial class PlanetaryPlayerController : CharacterBody3D
             keyEvent.Pressed &&
             !keyEvent.Echo &&
             (keyEvent.Keycode == Key.R ||
-             keyEvent.PhysicalKeycode == Key.R))
+             keyEvent.PhysicalKeycode == Key.R) &&
+            !_externalMovementLocked)
         {
             CancelSeamTraversalTest(false);
             ResetToSpawn();
@@ -221,7 +224,7 @@ public partial class PlanetaryPlayerController : CharacterBody3D
             return;
         }
 
-        if (!_controlEnabled || SeamTestRunning)
+        if (!_controlEnabled || _externalMovementLocked || SeamTestRunning)
         {
             return;
         }
@@ -298,6 +301,7 @@ public partial class PlanetaryPlayerController : CharacterBody3D
 
         bool jumpRequested =
             _controlEnabled &&
+            !_externalMovementLocked &&
             !SeamTestRunning &&
             Input.IsActionJustPressed("jump") &&
             IsGrounded;
@@ -339,7 +343,7 @@ public partial class PlanetaryPlayerController : CharacterBody3D
         }
         else
         {
-            Vector2 movementInput = _controlEnabled
+            Vector2 movementInput = _controlEnabled && !_externalMovementLocked
                 ? Input.GetVector(
                     "move_left",
                     "move_right",
@@ -406,6 +410,35 @@ public partial class PlanetaryPlayerController : CharacterBody3D
             : Input.MouseModeEnum.Visible;
     }
 
+
+    public void SetExternalMovementLocked(bool locked)
+    {
+        if (locked && SeamTestRunning)
+        {
+            CancelSeamTraversalTest(true);
+        }
+
+        _externalMovementLocked = locked;
+        if (locked)
+        {
+            Velocity = Vector3.Zero;
+        }
+    }
+
+    public void NotifyWorldTranslated(Vector3 translation)
+    {
+        _spawnTransform = TranslateStoredTransform(
+            _spawnTransform,
+            translation);
+
+        if (SeamTestRunning)
+        {
+            _seamTestStartTransform = TranslateStoredTransform(
+                _seamTestStartTransform,
+                translation);
+        }
+    }
+
     public void ResetToSpawn()
     {
         GlobalTransform = _spawnTransform;
@@ -425,7 +458,8 @@ public partial class PlanetaryPlayerController : CharacterBody3D
 
     public bool BeginSeamTraversalTest()
     {
-        if (SeamTestRunning || !_controlEnabled || _cameraPitch is null)
+        if (SeamTestRunning || !_controlEnabled || _externalMovementLocked ||
+            _cameraPitch is null)
         {
             return false;
         }
@@ -779,6 +813,15 @@ public partial class PlanetaryPlayerController : CharacterBody3D
             1.0f);
         UpAlignmentErrorDegrees = Mathf.RadToDeg(Mathf.Acos(upDot));
         TangentialSpeed = Velocity.Slide(RadialUp).Length();
+    }
+
+
+    private static Transform3D TranslateStoredTransform(
+        Transform3D transform,
+        Vector3 translation)
+    {
+        transform.Origin += translation;
+        return transform;
     }
 
     private static CubeSphereFaceId GetDominantFace(Vector3 direction)

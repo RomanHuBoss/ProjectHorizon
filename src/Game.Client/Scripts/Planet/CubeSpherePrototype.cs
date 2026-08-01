@@ -44,6 +44,7 @@ public partial class CubeSpherePrototype : Node3D
     private Node3D? _cameraRig;
     private Camera3D? _overviewCamera;
     private PlanetaryPlayerController? _planetaryPlayer;
+    private FloatingOriginController? _floatingOrigin;
     private Label? _hudLabel;
     private CubeSphereBuildData? _buildData;
     private CubeSphereDebugMode _debugMode = CubeSphereDebugMode.FaceIds;
@@ -60,6 +61,8 @@ public partial class CubeSpherePrototype : Node3D
         _overviewCamera = GetNode<Camera3D>("CameraRig/Camera3D");
         _planetaryPlayer = GetNode<PlanetaryPlayerController>(
             "PlanetaryPlayer");
+        _floatingOrigin = GetNode<FloatingOriginController>(
+            "FloatingOriginController");
         _hudLabel = GetNode<Label>(
             "Hud/MarginContainer/PanelContainer/Label");
 
@@ -106,6 +109,11 @@ public partial class CubeSpherePrototype : Node3D
         }
         else if (keyEvent.Keycode == Key.F2)
         {
+            if (_floatingOrigin?.TestRunning == true)
+            {
+                _floatingOrigin.CancelAcceptanceTest(true);
+            }
+
             if (_planetaryPlayer?.SeamTestRunning == true)
             {
                 _planetaryPlayer.CancelSeamTraversalTest(true);
@@ -121,6 +129,14 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.T ||
             keyEvent.PhysicalKeycode == Key.T)
         {
+            if (_floatingOrigin?.TestRunning == true)
+            {
+                _floatingOrigin.CancelAcceptanceTest(true);
+                UpdateHud();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (_planetaryPlayer is not null &&
                 _cameraMode == CubeSphereCameraMode.PlanetaryPlayer)
             {
@@ -142,6 +158,39 @@ public partial class CubeSpherePrototype : Node3D
             }
 
             GetViewport().SetInputAsHandled();
+        }
+        else if (keyEvent.Keycode == Key.Y ||
+            keyEvent.PhysicalKeycode == Key.Y)
+        {
+            if (_floatingOrigin is not null &&
+                _cameraMode == CubeSphereCameraMode.PlanetaryPlayer)
+            {
+                if (_floatingOrigin.TestRunning)
+                {
+                    _floatingOrigin.CancelAcceptanceTest(true);
+                }
+                else
+                {
+                    _planetaryPlayer?.CancelSeamTraversalTest(true);
+                    _floatingOrigin.BeginAcceptanceTest();
+                }
+
+                UpdateHud();
+            }
+            else
+            {
+                GD.Print(
+                    "TASK-032 floating-origin acceptance requires planetary player camera mode.");
+            }
+
+            GetViewport().SetInputAsHandled();
+        }
+        else if ((keyEvent.Keycode == Key.R ||
+            keyEvent.PhysicalKeycode == Key.R) &&
+            _floatingOrigin?.TestRunning == true)
+        {
+            _floatingOrigin.CancelAcceptanceTest(true);
+            UpdateHud();
         }
         else if (keyEvent.Keycode == Key.Space &&
             _cameraMode == CubeSphereCameraMode.OverviewOrbit)
@@ -317,7 +366,7 @@ public partial class CubeSpherePrototype : Node3D
         if (_buildData is null)
         {
             _hudLabel.Text =
-                "ПРОТОТИП C — ХОДЬБА ЧЕРЕЗ ШВЫ\n" +
+                "ПРОТОТИП C — FLOATING ORIGIN\n" +
                 "Построение геометрии...";
             return;
         }
@@ -352,6 +401,22 @@ public partial class CubeSpherePrototype : Node3D
             seamTestStatus = _planetaryPlayer.SeamTestStatusText;
         }
 
+        string originStatus = "TASK-032 origin (Y): N/A";
+        string coordinateStatus = "Floating origin: N/A";
+        if (_floatingOrigin is not null)
+        {
+            Vector3 local = _floatingOrigin.LocalPosition;
+            coordinateStatus =
+                $"Floating origin: cell=({_floatingOrigin.CellX}," +
+                $"{_floatingOrigin.CellY},{_floatingOrigin.CellZ})  •  " +
+                $"local=({local.X:F1},{local.Y:F1},{local.Z:F1}) м
+" +
+                $"Логические: ({_floatingOrigin.LogicalX:F1}," +
+                $"{_floatingOrigin.LogicalY:F1},{_floatingOrigin.LogicalZ:F1}) м  •  " +
+                $"shifts={_floatingOrigin.ShiftEvents}";
+            originStatus = _floatingOrigin.TestStatusText;
+        }
+
         bool playerCamera =
             _cameraMode == CubeSphereCameraMode.PlanetaryPlayer;
         string cameraState = playerCamera
@@ -362,7 +427,7 @@ public partial class CubeSpherePrototype : Node3D
             : "Space — пауза обзора";
 
         _hudLabel.Text =
-            "ПРОТОТИП C — ХОДЬБА ЧЕРЕЗ ШВЫ\n" +
+            "ПРОТОТИП C — FLOATING ORIGIN\n" +
             $"Грани: {_faceMeshes.Count}/6  •  collision: {_collisionShapes.Count}/" +
             $"{(GenerateCollision ? 6 : 0)}  •  швы: {seamStatus} " +
             $"({_buildData.SeamComparisons}/{_buildData.ExpectedSeamComparisons})\n" +
@@ -370,11 +435,14 @@ public partial class CubeSpherePrototype : Node3D
             $"{contactStatus}\n" +
             $"Радиальная система: {radialStatus}  •  камера: {cameraState}  •  " +
             $"режим: {debugMode}\n" +
+            $"{coordinateStatus}\n" +
+            $"{originStatus}\n" +
             $"{seamTestStatus}\n" +
             $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
             $"seed: {NoiseSeed}  •  сетка: {_buildData.Resolution}×{_buildData.Resolution}\n" +
             "WASD — касательное движение  •  мышь — обзор  •  " +
             $"{contextualSpace}  •  R — сброс\n" +
-            "F1 — цвета/нормали  •  F2 — игрок/обзор  •  T — seam-test/stop";
+            "F1 — цвета/нормали  •  F2 — игрок/обзор  •  " +
+            "T — seam-test  •  Y — floating-origin-test";
     }
 }
