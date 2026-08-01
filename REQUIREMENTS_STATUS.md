@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-100-landing-soak.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-100-landing-soak-timeout-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,38 @@
 | D. Корабль | `IN_PROGRESS` | Полёт, атмосфера, landing-point alignment и полный touchdown/takeoff цикл приняты runtime; реализован soak 100 последовательных посадок, ожидающий `TASK-052` |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-043`–`TASK-050` подтверждены: свободный полёт, атмосфера, landing-point alignment, touchdown, `LANDED` physics lock и взлёт приняты. Текущая итерация реализует `TASK-051` — физический soak 100 последовательных посадок с контролем counters, зависших states, node delta и managed-memory growth; runtime-приёмка вынесена в `TASK-052`.
+**Вывод:** `TASK-043`–`TASK-050` подтверждены. Первый runtime-прогон `TASK-051` подтвердил стабильность 97 завершённых посадок, но формально завершился `FAIL` из-за противоречивого общего лимита `240 с`, который был короче суммы допустимых per-cycle бюджетов. Подготовлен timeout-hotfix; `TASK-051` остаётся `IMPLEMENTED`, `TASK-052` — `IN_PROGRESS` до повторного `V: PASS 100/100`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — runtime `TASK-051: FAIL total timeout` и масштабируемый timeout-hotfix
+
+**Runtime-доказательство пользователя:**
+
+- локальная сборка завершена: `0` предупреждений, `0` ошибок;
+- soak дошёл до `cycle=98`, завершив `97` полных физических посадок;
+- `attempts=98`, `touchdowns=97`, `locks=97`, `gearMin=3`;
+- `touchdownSpeed=2,667 м/с`, `positionError=0,000 м`, `angularError=0,040°`;
+- `managedGrowthMiB=0,013`, `managedPeakGrowthMiB=4,512`, `nodeDelta=0`;
+- `recoveries=0`, `collisions=0`, `errors=0`;
+- единственная причина `FAIL`: `total timeout phase=Descending, cycle=98`.
+
+**Диагноз:** общий лимит `240 с` противоречил локальному per-cycle лимиту `4,5 с`: для 100 допустимых циклов сумма только циклов могла достигать `450 с`, не считая первоначального поиска и alignment. Поэтому корректный прогон мог быть остановлен общим timeout при отсутствии функциональных дефектов.
+
+**Исправлено:**
+
+- effective total timeout теперь вычисляется как максимум между настроенным floor и `setupAllowance + cycles × cycleTimeout`;
+- при стандартных параметрах: `max(240, 30 + 100 × 4,5) = 480 с`;
+- per-cycle timeout `4,5 с` сохранён без ослабления и по-прежнему немедленно выявляет зависший отдельный цикл;
+- HUD показывает `elapsed/effective budget`;
+- стартовая и итоговая строки Output содержат configured/effective timeout, elapsed и budget;
+- критерии counters, gear contacts, touchdown errors, SceneTree и memory не изменялись.
+
+**Статусы:**
+
+- `PD-ACC-040` → `VERIFIED` по чистой локальной сборке;
+- `TASK-051`, `PD-050`–`PD-053` остаются `IMPLEMENTED`;
+- `TASK-052`, `PD-ACC-041`–`PD-ACC-045` остаются `IN_PROGRESS` до `V: PASS 100/100`.
 
 ### 2026-08-01 — приёмка `TASK-049/TASK-050` и реализация 100-landing soak `TASK-051`
 
@@ -949,7 +978,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-051` | Контроль целостности touchdown state и counters | `IMPLEMENTED` | attempts=touchdowns=locks=cycles; per-cycle timeout; stuck state завершает тест FAIL |
 | `PD-052` | Контроль накопления узлов и managed memory | `IMPLEMENTED` | SceneTree node delta=0; final managed growth ≤8 MiB; peak growth ≤32 MiB |
 | `PD-053` | Диагностика soak и исправленный touchdown HUD | `IMPLEMENTED` | O/V статусы видны в compact/detailed HUD; прогресс V каждые 10 циклов дублируется в Output |
-| `PD-ACC-040` | Soak-редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
+| `PD-ACC-040` | Soak-редакция собирается 0/0 | `VERIFIED` | Локальная сборка: 0 предупреждений, 0 ошибок |
 | `PD-ACC-041` | V-test завершает ровно 100 посадок | `IN_PROGRESS` | HUD/Output: PASS cycles=100, attempts=100, touchdowns=100, locks=100 |
 | `PD-ACC-042` | Все циклы подтверждают 3/3 опоры и допустимые ошибки | `IN_PROGRESS` | gearMin=3, touchdownSpeed≤3,20, posErr≤0,40 м, angErr≤2,00° |
 | `PD-ACC-043` | Нет recovery, collision, runtime error и зависших state | `IN_PROGRESS` | recoveries=0, collisions=0, errors=0; queue/state восстановлены |
@@ -986,7 +1015,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
 2. Запустить стартовую сцену. Compact HUD должен показывать обе строки: `TASK-049 touchdown (O): READY/PASS` и `TASK-051 soak (V): READY`.
 3. Нажать `V` и не использовать управление. Повторное `V` безопасно отменяет soak и восстанавливает baseline.
-4. Тест выполняет один обычный search/alignment, затем 100 физических touchdown-циклов с короткого clearance `3,8 м`. Ожидаемая длительность: 2–4 минуты; timeout: 240 секунд.
+4. Тест выполняет один обычный search/alignment, затем 100 физических touchdown-циклов с короткого clearance `3,8 м`. Ожидаемая длительность на подтверждённой машине — около 4–5 минут. Effective timeout вычисляется как `max(configuredTimeout, setupAllowance + cycles × cycleTimeout)`; при стандартных параметрах это `480 с`.
 5. Каждые 10 циклов в Godot Output выводится progress. HUD должен показывать `RUNNING n/100`.
 6. Ожидаемый HUD:
 
@@ -1008,7 +1037,7 @@ collisions=0; errors=0; result=...
 8. Критерии: counters точно `100/100/100/100`; `gearMin=3`; touchdown speed ≤`3,20 м/с`; position error ≤`0,40 м`; angular error ≤`2,00°`; node delta `0`; final managed growth ≤`8 MiB`; peak growth ≤`32 MiB`; recoveries/collisions/errors `0`.
 9. После `V: PASS` проверить, что работают `J`, `L`, `N`, `O`, `P`, ручной `M`, `F2` и `H`.
 10. В качестве доказательства прислать результат сборки, screenshot `V: PASS`, полную итоговую строку Output и краткое подтверждение регрессии.
-11. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: cycle/phase, counter mismatch, gearMin, memory growth, nodeDelta и errors.
+11. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: cycle/phase, elapsed/budget, counter mismatch, gearMin, memory growth, nodeDelta и errors.
 
 ## 11. Журнал проверок
 

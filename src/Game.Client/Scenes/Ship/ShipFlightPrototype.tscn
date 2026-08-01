@@ -176,6 +176,7 @@ TouchdownTestMaximumAngularErrorDegrees = 2.0
 TouchdownTestMinimumTakeoffClearance = 10.0
 LandingSoakCycles = 100
 LandingSoakTimeoutSeconds = 240.0
+LandingSoakSetupAllowanceSeconds = 30.0
 LandingSoakCycleTimeoutSeconds = 4.5
 LandingSoakStartClearance = 3.8
 LandingSoakLandedHoldSeconds = 0.05

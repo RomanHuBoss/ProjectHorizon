@@ -23,8 +23,11 @@ public partial class ShipFlightPrototype
     [Export(PropertyHint.Range, "10,500,1")]
     public int LandingSoakCycles { get; set; } = 100;
 
-    [Export(PropertyHint.Range, "60.0,600.0,5.0")]
+    [Export(PropertyHint.Range, "60.0,1200.0,5.0")]
     public float LandingSoakTimeoutSeconds { get; set; } = 240.0f;
+
+    [Export(PropertyHint.Range, "10.0,120.0,5.0")]
+    public float LandingSoakSetupAllowanceSeconds { get; set; } = 30.0f;
 
     [Export(PropertyHint.Range, "2.0,12.0,0.25")]
     public float LandingSoakCycleTimeoutSeconds { get; set; } = 4.5f;
@@ -46,6 +49,7 @@ public partial class ShipFlightPrototype
     private LandingSoakPhase _landingSoakPhase = LandingSoakPhase.None;
     private ArcadeShipRuntimeState _landingSoakBaseline;
     private float _landingSoakElapsed;
+    private float _landingSoakEffectiveTimeoutSeconds;
     private float _landingSoakCycleElapsed;
     private float _landingSoakHoldElapsed;
     private int _landingSoakCyclesCompleted;
@@ -90,7 +94,8 @@ public partial class ShipFlightPrototype
                     $"TASK-051 soak (V): RUNNING " +
                     $"{_landingSoakCyclesCompleted}/{LandingSoakCycles}, " +
                     $"phase={_landingSoakPhase}, " +
-                    $"t={_landingSoakElapsed:F0} с, " +
+                    $"t={_landingSoakElapsed:F0}/" +
+                    $"{_landingSoakEffectiveTimeoutSeconds:F0} с, " +
                     $"vTouch={_landingSoakMaximumTouchdownSpeed:F2}",
                 ShipLandingSoakState.Passed =>
                     $"TASK-051 soak (V): PASS " +
@@ -166,6 +171,8 @@ public partial class ShipFlightPrototype
         _landingSoakCollisionBaseline = _ship.CollisionEvents;
         _landingSoakErrorBaseline = _ship.RuntimeErrorCount;
         _landingSoakElapsed = 0.0f;
+        _landingSoakEffectiveTimeoutSeconds =
+            CalculateLandingSoakEffectiveTimeoutSeconds();
         _landingSoakCycleElapsed = 0.0f;
         _landingSoakHoldElapsed = 0.0f;
         _landingSoakCyclesCompleted = 0;
@@ -199,7 +206,8 @@ public partial class ShipFlightPrototype
             "TASK-051 landing soak started: " +
             $"cycles={LandingSoakCycles}; " +
             $"startClearance={LandingSoakStartClearance:F1} m; " +
-            $"timeout={LandingSoakTimeoutSeconds:F0} s");
+            $"configuredTimeout={LandingSoakTimeoutSeconds:F0} s; " +
+            $"effectiveTimeout={_landingSoakEffectiveTimeoutSeconds:F0} s");
     }
 
     private void UpdateLandingSoak(float deltaSeconds)
@@ -213,12 +221,14 @@ public partial class ShipFlightPrototype
         _landingSoakCycleElapsed += deltaSeconds;
         CaptureLandingSoakRuntimeMetrics();
 
-        if (_landingSoakElapsed > LandingSoakTimeoutSeconds)
+        if (_landingSoakElapsed > _landingSoakEffectiveTimeoutSeconds)
         {
             FinishLandingSoak(
                 ShipLandingSoakState.Failed,
                 $"total timeout phase={_landingSoakPhase}, " +
-                $"cycle={_landingSoakCyclesCompleted + 1}");
+                $"cycle={_landingSoakCyclesCompleted + 1}, " +
+                $"elapsed={_landingSoakElapsed:F1} s, " +
+                $"budget={_landingSoakEffectiveTimeoutSeconds:F1} s");
             return;
         }
 
@@ -345,6 +355,21 @@ public partial class ShipFlightPrototype
         }
 
         SetLandingSoakPhase(LandingSoakPhase.Descending);
+    }
+
+
+    private float CalculateLandingSoakEffectiveTimeoutSeconds()
+    {
+        int requiredCycles = Math.Max(1, LandingSoakCycles);
+        float setupAllowance = Math.Max(
+            0.0f,
+            LandingSoakSetupAllowanceSeconds);
+        float cycleBudget = requiredCycles * Math.Max(
+            0.1f,
+            LandingSoakCycleTimeoutSeconds);
+        return Math.Max(
+            Math.Max(1.0f, LandingSoakTimeoutSeconds),
+            setupAllowance + cycleBudget);
     }
 
     private void EvaluateLandingSoak()
@@ -551,6 +576,8 @@ public partial class ShipFlightPrototype
             $"angularError={_landingSoakMaximumAngularError:F3}; " +
             $"managedGrowthMiB={finalGrowthMiB:F3}; " +
             $"managedPeakGrowthMiB={peakGrowthMiB:F3}; " +
+            $"elapsedSeconds={_landingSoakElapsed:F3}; " +
+            $"timeoutBudgetSeconds={_landingSoakEffectiveTimeoutSeconds:F3}; " +
             $"nodeDelta={_landingSoakNodeFinal - _landingSoakNodeBaseline}; " +
             $"recoveries={_landingSoakRecoveries}; " +
             $"collisions={_landingSoakCollisions}; " +

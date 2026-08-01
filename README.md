@@ -130,7 +130,8 @@ touchdown/takeoff цикл подтверждены runtime-тестами. Те
 - строка `TASK-049 touchdown (O)` теперь выводится и в compact, и в detailed HUD;
 - ускоренный, но физический soak-test 100 последовательных touchdown по `V`;
 - каждый soak-цикл выполняет реальное снижение, контакт 3/3 опор и `LANDED` lock;
-- soak контролирует counters, зависшие states, node delta и managed-memory growth.
+- soak контролирует counters, зависшие states, node delta и managed-memory growth;
+- общий timeout масштабируется по числу циклов и per-cycle budget, поэтому валидный 100-cycle прогон не обрывается раньше собственного допустимого времени.
 
 Ранее принятый атмосферный режим сохраняет `SPACE ↔ ATMOSPHERE`, simplified
 lift/minimum speed, drag, climb limit, surface-safety и entry-guidance.
@@ -303,8 +304,9 @@ src/Game.Client/project.godot
    `M` восстанавливает baseline.
 9. Нажать `N` и дождаться `TASK-047 landing (N): PASS`.
 10. Нажать `O` и убедиться, что `TASK-049 touchdown (O): PASS` виден в HUD.
-11. Нажать `V` для soak-теста 100 последовательных посадок; ожидаемая
-    продолжительность — около 2–4 минут.
+11. Нажать `V` для soak-теста 100 последовательных посадок; на подтверждённой
+    машине ожидаемая продолжительность — около 4–5 минут. Hard timeout рассчитывается
+    автоматически; при стандартных параметрах он равен 480 секундам.
 12. Клавиша `H` переключает compact, detailed и hidden HUD корабля.
 13. Для регрессии Прототипа C открыть
    `Scenes/Planet/CubeSpherePrototype.tscn` через `F6`; compact mode теперь явно
