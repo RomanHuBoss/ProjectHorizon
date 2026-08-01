@@ -1,0 +1,263 @@
+using System;
+using System.Collections.Generic;
+using Godot;
+
+public enum CubeSphereDebugMode
+{
+    FaceIds = 0,
+    RadialNormals = 1
+}
+
+public partial class CubeSpherePrototype : Node3D
+{
+    [Export(PropertyHint.Range, "3,257,2")]
+    public int FaceResolution { get; set; } = 33;
+
+    [Export(PropertyHint.Range, "8.0,100000.0,1.0")]
+    public float PlanetRadius { get; set; } = 96.0f;
+
+    [Export(PropertyHint.Range, "0.0,1000.0,0.1")]
+    public float HeightAmplitude { get; set; } = 6.0f;
+
+    [Export(PropertyHint.Range, "0.0001,1.0,0.0001")]
+    public float NoiseFrequency { get; set; } = 0.0125f;
+
+    [Export]
+    public int NoiseSeed { get; set; } = 20260801;
+
+    [Export]
+    public bool GenerateCollision { get; set; } = true;
+
+    [Export(PropertyHint.Range, "0.0,45.0,0.1")]
+    public float OrbitDegreesPerSecond { get; set; } = 5.0f;
+
+    private readonly List<MeshInstance3D> _faceMeshes = new();
+    private readonly List<CollisionShape3D> _collisionShapes = new();
+    private Node3D? _facesRoot;
+    private StaticBody3D? _collisionBody;
+    private Node3D? _cameraRig;
+    private Label? _hudLabel;
+    private CubeSphereBuildData? _buildData;
+    private CubeSphereDebugMode _debugMode = CubeSphereDebugMode.FaceIds;
+    private bool _orbitPaused;
+
+    public override void _Ready()
+    {
+        _facesRoot = GetNode<Node3D>("Planet/Faces");
+        _collisionBody = GetNode<StaticBody3D>("Planet/CollisionBody");
+        _cameraRig = GetNode<Node3D>("CameraRig");
+        _hudLabel = GetNode<Label>("Hud/MarginContainer/PanelContainer/Label");
+
+        BuildPlanet();
+        UpdateHud();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!_orbitPaused && _cameraRig is not null)
+        {
+            _cameraRig.RotateY(
+                Mathf.DegToRad(OrbitDegreesPerSecond) * (float)delta);
+        }
+    }
+
+    public override void _UnhandledInput(InputEvent @event)
+    {
+        if (@event is not InputEventKey keyEvent ||
+            !keyEvent.Pressed ||
+            keyEvent.Echo)
+        {
+            return;
+        }
+
+        if (keyEvent.Keycode == Key.F1)
+        {
+            _debugMode = _debugMode == CubeSphereDebugMode.FaceIds
+                ? CubeSphereDebugMode.RadialNormals
+                : CubeSphereDebugMode.FaceIds;
+            RebuildVisualMeshes();
+            UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (keyEvent.Keycode == Key.Space)
+        {
+            _orbitPaused = !_orbitPaused;
+            UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    private void BuildPlanet()
+    {
+        if (_facesRoot is null || _collisionBody is null)
+        {
+            throw new InvalidOperationException(
+                "CubeSpherePrototype scene is missing Planet/Faces or CollisionBody.");
+        }
+
+        ClearGeneratedChildren();
+        ulong startedAtMicroseconds = Time.GetTicksUsec();
+        _buildData = CubeSphereMeshBuilder.Build(
+            FaceResolution,
+            PlanetRadius,
+            HeightAmplitude,
+            NoiseFrequency,
+            NoiseSeed);
+
+        foreach (CubeSphereFaceData faceData in _buildData.Faces)
+        {
+            ArrayMesh faceMesh = CreateFaceMesh(faceData);
+            MeshInstance3D meshInstance = new()
+            {
+                Name = $"Face_{faceData.DisplayName.Replace('+', 'P').Replace('-', 'N')}",
+                Mesh = faceMesh
+            };
+            _facesRoot.AddChild(meshInstance);
+            _faceMeshes.Add(meshInstance);
+
+            if (GenerateCollision)
+            {
+                ConcavePolygonShape3D shape = faceMesh.CreateTrimeshShape();
+                shape.BackfaceCollision = true;
+                CollisionShape3D collisionShape = new()
+                {
+                    Name = $"Collision_{faceData.DisplayName.Replace('+', 'P').Replace('-', 'N')}",
+                    Shape = shape
+                };
+                _collisionBody.AddChild(collisionShape);
+                _collisionShapes.Add(collisionShape);
+            }
+        }
+
+        double elapsedMilliseconds =
+            (Time.GetTicksUsec() - startedAtMicroseconds) / 1000.0;
+        GD.Print(
+            "CubeSphere foundation: " +
+            $"faces={_faceMeshes.Count}/6; " +
+            $"resolution={_buildData.Resolution}x{_buildData.Resolution}; " +
+            $"vertices={_buildData.TotalVertices}; " +
+            $"triangles={_buildData.TotalTriangles}; " +
+            $"collision={_collisionShapes.Count}; " +
+            $"seamPairs={_buildData.SeamComparisons}/" +
+            $"{_buildData.ExpectedSeamComparisons}; " +
+            $"maxSeamPositionError={_buildData.MaximumSeamPositionError:E3}; " +
+            $"maxSeamNormalError={_buildData.MaximumSeamNormalError:E3}; " +
+            $"build={elapsedMilliseconds:F2} ms");
+    }
+
+    private void RebuildVisualMeshes()
+    {
+        if (_buildData is null || _faceMeshes.Count != _buildData.Faces.Count)
+        {
+            return;
+        }
+
+        for (int i = 0; i < _faceMeshes.Count; i++)
+        {
+            _faceMeshes[i].Mesh = CreateFaceMesh(_buildData.Faces[i]);
+        }
+    }
+
+    private ArrayMesh CreateFaceMesh(CubeSphereFaceData faceData)
+    {
+        SurfaceTool surfaceTool = new();
+        surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+
+        for (int i = 0; i < faceData.Vertices.Count; i++)
+        {
+            Vector3 normal = faceData.Normals[i];
+            surfaceTool.SetNormal(normal);
+            surfaceTool.SetUV(faceData.Uvs[i]);
+            surfaceTool.SetColor(_debugMode == CubeSphereDebugMode.FaceIds
+                ? faceData.DebugColor
+                : new Color(
+                    (normal.X * 0.5f) + 0.5f,
+                    (normal.Y * 0.5f) + 0.5f,
+                    (normal.Z * 0.5f) + 0.5f,
+                    1.0f));
+            surfaceTool.AddVertex(faceData.Vertices[i]);
+        }
+
+        foreach (int index in faceData.Indices)
+        {
+            surfaceTool.AddIndex(index);
+        }
+
+        ArrayMesh mesh = surfaceTool.Commit();
+        mesh.SurfaceSetMaterial(0, CreatePlanetMaterial());
+        return mesh;
+    }
+
+    private StandardMaterial3D CreatePlanetMaterial()
+    {
+        return new StandardMaterial3D
+        {
+            AlbedoColor = Colors.White,
+            Roughness = 0.88f,
+            MetallicSpecular = 0.0f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            VertexColorUseAsAlbedo = true,
+            VertexColorIsSrgb = false,
+            ShadingMode = _debugMode == CubeSphereDebugMode.RadialNormals
+                ? BaseMaterial3D.ShadingModeEnum.Unshaded
+                : BaseMaterial3D.ShadingModeEnum.PerPixel
+        };
+    }
+
+    private void ClearGeneratedChildren()
+    {
+        foreach (MeshInstance3D meshInstance in _faceMeshes)
+        {
+            meshInstance.QueueFree();
+        }
+
+        foreach (CollisionShape3D collisionShape in _collisionShapes)
+        {
+            collisionShape.QueueFree();
+        }
+
+        _faceMeshes.Clear();
+        _collisionShapes.Clear();
+    }
+
+    private void UpdateHud()
+    {
+        if (_hudLabel is null)
+        {
+            return;
+        }
+
+        string orbitState = _orbitPaused ? "пауза" : "вращение";
+        string debugMode = _debugMode == CubeSphereDebugMode.FaceIds
+            ? "цвета граней"
+            : "радиальные нормали";
+
+        if (_buildData is null)
+        {
+            _hudLabel.Text =
+                "ПРОТОТИП C — CUBE SPHERE\n" +
+                "Построение геометрии...";
+            return;
+        }
+
+        bool seamPass =
+            _buildData.SeamComparisons == _buildData.ExpectedSeamComparisons &&
+            _buildData.MaximumSeamPositionError <= 0.001f &&
+            _buildData.MaximumSeamNormalError <= 0.0001f;
+        string seamStatus = seamPass ? "PASS" : "FAIL";
+
+        _hudLabel.Text =
+            "ПРОТОТИП C — ОСНОВА CUBE SPHERE\n" +
+            $"Грани: {_faceMeshes.Count}/6  •  collision: {_collisionShapes.Count}/" +
+            $"{(GenerateCollision ? 6 : 0)}  •  режим: {debugMode}\n" +
+            $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
+            $"seed: {NoiseSeed}\n" +
+            $"Сетка грани: {_buildData.Resolution}×{_buildData.Resolution}  •  " +
+            $"вершины: {_buildData.TotalVertices}  •  треугольники: {_buildData.TotalTriangles}\n" +
+            $"Швы: {seamStatus}  •  пары: {_buildData.SeamComparisons}/" +
+            $"{_buildData.ExpectedSeamComparisons}  •  " +
+            $"Δpos max: {_buildData.MaximumSeamPositionError:E2}  •  " +
+            $"Δnormal max: {_buildData.MaximumSeamNormalError:E2}\n" +
+            $"Камера: {orbitState}  •  F1 — цвета/нормали  •  Space — пауза вращения";
+    }
+}
