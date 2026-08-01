@@ -108,77 +108,67 @@ Detailed mode прокручивается колёсиком мыши. Разм
 Каждое переключение дублируется в Output строкой `Prototype HUD mode: ...`.
 
 
-### Прототип D. Базовый корабль — `IN_PROGRESS`
+### Прототип D. Базовый корабль — `VERIFIED`
 
-> Build hotfix от 2026-08-01: устранены дублирующие поля `_testCollisions` и `_testErrors` в partial-файле touchdown acceptance, вызывавшие `CS0102` и ошибки Godot source generator.
+Свободный полёт, атмосферный переход, поиск площадки, touchdown/takeoff и
+нагрузочный тест 100 последовательных физических посадок приняты runtime.
 
-Свободный полёт, атмосферный режим, поиск посадочной точки и полный
-touchdown/takeoff цикл подтверждены runtime-тестами. Текущая ступень реализует
-нагрузочный сценарий `100 последовательных посадок` из раздела 36.4 PDF-ТЗ:
+Финальная soak-приёмка:
 
-- surface ray probes, slope/obstacle checks и резервирование safe point;
-- автоматическое выравнивание на высоте `12 м`;
-- выдвижные трёхточечные посадочные опоры;
-- три физических gear-probe контакта с поверхностью;
-- ограниченное финальное снижение со скоростью до `2,8 м/с`;
-- состояние `LANDED` с нулевыми скоростями и фиксацией transform на опорах;
-- отключение обычной полётной физики в landed-state;
-- контролируемый взлёт до clearance `12 м`;
-- автоматическое складывание опор после безопасного отрыва;
-- ручной трёхэтапный цикл по `M`;
-- автономный двухцикловый touchdown/takeoff test по `O` — `VERIFIED`;
-- строка `TASK-049 touchdown (O)` теперь выводится и в compact, и в detailed HUD;
-- ускоренный, но физический soak-test 100 последовательных touchdown по `V`;
-- каждый soak-цикл выполняет реальное снижение, контакт 3/3 опор и `LANDED` lock;
-- soak контролирует counters, зависшие states, node delta и managed-memory growth;
-- общий timeout масштабируется по числу циклов и per-cycle budget, поэтому валидный 100-cycle прогон не обрывается раньше собственного допустимого времени.
+```text
+TASK-051 soak (V): PASS 100/100
+gear=3
+vTouch=2,67 м/с
+managedDelta=0,02 MiB
+nodeDelta=0
+build: 0 warnings, 0 errors
+```
 
-Ранее принятый атмосферный режим сохраняет `SPACE ↔ ATMOSPHERE`, simplified
-lift/minimum speed, drag, climb limit, surface-safety и entry-guidance.
-
-Активная стартовая сцена:
+Регрессионная сцена корабля сохранена в:
 
 ```text
 src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 ```
 
-Корабль и его повторно используемая сцена:
+### Прототип E. SQLite save foundation — `IN_PROGRESS`
+
+Текущая стартовая сцена:
 
 ```text
-src/Game.Client/Scenes/Ship/ArcadeShip.tscn
+src/Game.Client/Scenes/Persistence/SavePrototype.tscn
 ```
+
+Реализована первая ступень локального сохранения по разделу 22 PDF-ТЗ:
+
+- `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
+- один slot — одна БД: `user://profiles/profile_prototype/save_1.db`;
+- явная migration `1`;
+- `journal_mode=WAL`;
+- `foreign_keys=ON`;
+- `synchronous=NORMAL`;
+- `busy_timeout=5000`;
+- единственная последовательная очередь записи;
+- SQL и файловые операции выполняются вне Godot main thread;
+- транзакционный snapshot позиции игрока, корабля, inventory и посещённой планеты;
+- точная загрузка и проверка round-trip;
+- параметризованные SQL-запросы;
+- `integrity_check`;
+- compact/detailed/hidden HUD.
 
 Управление:
 
 ```text
-W/S       тяга вперёд/назад
-A/D       боковые импульсные двигатели
-Space/C   движение вверх/вниз
-мышь      тангаж и рыскание
-стрелки   резервное управление тангажом/рысканием
-Q/E       крен
-B         форсаж
-X         торможение
-G         автоматическая стабилизация
-F2        chase/cockpit camera
-R         сброс к spawn
-P         атмосферный подход / возврат к space spawn
-M         этапы: alignment → touchdown → takeoff / отмена цикла
-H         compact/detailed/hidden HUD
-J         автоматический TASK-043 free-flight test
-L         автоматический TASK-045 atmosphere test
-N         автоматический TASK-047 landing-point test
-O         автоматический TASK-049 touchdown/takeoff test
-V         TASK-051 soak: 100 последовательных физических посадок
+S    сохранить изменённый snapshot
+L    загрузить snapshot
+R    очистить slot транзакцией
+Z    TASK-054 SQLite acceptance test
+H    compact / detailed / hidden HUD
 ```
 
-HUD показывает режим среды, высоту, atmosphere blend, радиальную скорость,
-forward airspeed, landing/touchdown state, deployment опор, число gear contacts,
-physics lock, clearance, ошибки position/orientation и результаты `O/V`.
-
-`M` выполняет ручной цикл тремя последовательными нажатиями: поиск и alignment,
-финальное снижение до `LANDED`, затем взлёт. Повторное нажатие во время движения
-отменяет демонстрацию и восстанавливает baseline.
+Автоматический `Z`-тест выполняет migration, baseline save/load, восемь
+одновременных submissions через один writer gate, final exact load и
+`PRAGMA integrity_check`. Backup и recovery будут реализованы следующей
+изолированной итерацией.
 
 ## Состояние реализации ТЗ
 
@@ -354,7 +344,7 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - floating origin;
 - устранение швов LOD.
 
-### Прототип D. Корабль — `IN_PROGRESS`
+### Прототип D. Корабль — `VERIFIED`
 
 - свободный аркадный полёт — `VERIFIED`;
 - тяга, импульсные двигатели, тангаж/рыскание/крен — `VERIFIED`;
@@ -365,17 +355,15 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - поиск точки, slope/obstacle checks и alignment — `VERIFIED`;
 - touchdown, трёхточечные опоры и landed-state — `VERIFIED`;
 - контролируемый взлёт и складывание опор — `VERIFIED`;
-- soak-test 100 последовательных посадок — `IMPLEMENTED`.
+- soak-test 100 последовательных посадок — `VERIFIED`.
 
-### Прототип E. Сохранение
+### Прототип E. Сохранение — `IN_PROGRESS`
 
-- SQLite;
-- инвентарь;
-- позиция игрока;
-- состояние корабля;
-- посещённая планета;
-- резервное копирование;
-- восстановление.
+- SQLite foundation и migration — `IMPLEMENTED`;
+- инвентарь, позиция игрока, корабль и посещённая планета — `IMPLEMENTED`;
+- последовательная очередь записи и exact round-trip — `IMPLEMENTED`;
+- резервное копирование — `NOT_STARTED`;
+- восстановление — `NOT_STARTED`.
 
 Переход к основной разработке допускается после принятия всех пяти прототипов.
 

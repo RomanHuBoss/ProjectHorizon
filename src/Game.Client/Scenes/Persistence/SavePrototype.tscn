@@ -1,0 +1,242 @@
+[gd_scene load_steps=18 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Persistence/SavePrototype.cs" id="1_save"]
+
+[sub_resource type="Environment" id="Environment_save"]
+background_mode = 1
+background_color = Color(0.008, 0.012, 0.028, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.2, 0.28, 0.48, 1)
+ambient_light_energy = 0.72
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
+bg_color = Color(0.015, 0.026, 0.055, 0.9)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StandardMaterial3D" id="Material_platform"]
+albedo_color = Color(0.055, 0.085, 0.16, 1)
+metallic = 0.42
+roughness = 0.45
+
+[sub_resource type="BoxMesh" id="BoxMesh_platform"]
+material = SubResource("Material_platform")
+size = Vector3(18, 0.4, 10)
+
+[sub_resource type="StandardMaterial3D" id="Material_player"]
+albedo_color = Color(0.12, 0.88, 0.74, 1)
+emission_enabled = true
+emission = Color(0.04, 0.72, 0.58, 1)
+emission_energy_multiplier = 2.0
+roughness = 0.28
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_player"]
+material = SubResource("Material_player")
+radius = 0.55
+height = 2.1
+radial_segments = 20
+rings = 8
+
+[sub_resource type="StandardMaterial3D" id="Material_ship"]
+albedo_color = Color(0.18, 0.42, 0.95, 1)
+metallic = 0.62
+roughness = 0.25
+emission_enabled = true
+emission = Color(0.04, 0.18, 0.75, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="BoxMesh" id="BoxMesh_ship"]
+material = SubResource("Material_ship")
+size = Vector3(4.4, 0.8, 2.4)
+
+[sub_resource type="StandardMaterial3D" id="Material_planet"]
+albedo_color = Color(0.72, 0.34, 0.08, 1)
+emission_enabled = true
+emission = Color(0.42, 0.12, 0.02, 1)
+emission_energy_multiplier = 1.5
+roughness = 0.75
+
+[sub_resource type="SphereMesh" id="SphereMesh_planet"]
+material = SubResource("Material_planet")
+radius = 1.35
+height = 2.7
+radial_segments = 32
+rings = 16
+
+[sub_resource type="StandardMaterial3D" id="Material_crate"]
+albedo_color = Color(0.88, 0.65, 0.12, 1)
+metallic = 0.15
+roughness = 0.62
+
+[sub_resource type="BoxMesh" id="BoxMesh_crate"]
+material = SubResource("Material_crate")
+size = Vector3(1.0, 1.0, 1.0)
+
+[sub_resource type="StandardMaterial3D" id="Material_database"]
+albedo_color = Color(0.38, 0.22, 0.78, 1)
+metallic = 0.55
+roughness = 0.3
+emission_enabled = true
+emission = Color(0.22, 0.08, 0.7, 1)
+emission_energy_multiplier = 2.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_database"]
+material = SubResource("Material_database")
+top_radius = 1.45
+bottom_radius = 1.45
+height = 0.65
+radial_segments = 40
+rings = 2
+
+[sub_resource type="StandardMaterial3D" id="Material_line"]
+albedo_color = Color(0.1, 0.7, 0.95, 1)
+emission_enabled = true
+emission = Color(0.04, 0.5, 1, 1)
+emission_energy_multiplier = 2.0
+roughness = 0.2
+
+[sub_resource type="BoxMesh" id="BoxMesh_line"]
+material = SubResource("Material_line")
+size = Vector3(0.08, 0.08, 5.0)
+
+[node name="SavePrototype" type="Node3D"]
+script = ExtResource("1_save")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_save")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.65, -0.72, 0.0)
+light_color = Color(0.72, 0.84, 1, 1)
+light_energy = 1.55
+shadow_enabled = true
+
+[node name="FillLight" type="OmniLight3D" parent="."]
+position = Vector3(-6, 8, 6)
+light_color = Color(0.32, 0.5, 1, 1)
+light_energy = 8.0
+omni_range = 28.0
+
+[node name="Camera3D" type="Camera3D" parent="."]
+position = Vector3(0, 8.2, 17.5)
+rotation = Vector3(-0.38, 0, 0)
+current = true
+fov = 58.0
+
+[node name="SaveVisualization" type="Node3D" parent="."]
+
+[node name="Platform" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(0, -0.4, 0)
+mesh = SubResource("BoxMesh_platform")
+
+[node name="Database" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(0, 0.35, 0)
+mesh = SubResource("CylinderMesh_database")
+
+[node name="PlayerMarker" type="Node3D" parent="SaveVisualization"]
+position = Vector3(-4.8, 0.7, 0.4)
+
+[node name="Mesh" type="MeshInstance3D" parent="SaveVisualization/PlayerMarker"]
+mesh = SubResource("CapsuleMesh_player")
+
+[node name="PlayerLink" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(-2.45, 0.45, 0.2)
+rotation = Vector3(0, 1.5708, 0)
+mesh = SubResource("BoxMesh_line")
+
+[node name="ShipMarker" type="Node3D" parent="SaveVisualization"]
+position = Vector3(4.7, 1.2, -0.8)
+
+[node name="Hull" type="MeshInstance3D" parent="SaveVisualization/ShipMarker"]
+mesh = SubResource("BoxMesh_ship")
+
+[node name="ShipLink" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(2.45, 0.55, -0.4)
+rotation = Vector3(0, 1.5708, 0)
+mesh = SubResource("BoxMesh_line")
+
+[node name="VisitedPlanetMarker" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(0, 1.6, -3.2)
+mesh = SubResource("SphereMesh_planet")
+visible = false
+
+[node name="Crate1" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(-1.5, 0.35, 3.0)
+mesh = SubResource("BoxMesh_crate")
+
+[node name="Crate2" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(0, 0.35, 3.0)
+mesh = SubResource("BoxMesh_crate")
+
+[node name="Crate3" type="MeshInstance3D" parent="SaveVisualization"]
+position = Vector3(1.5, 0.35, 3.0)
+mesh = SubResource("BoxMesh_crate")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+
+[node name="CompactMargin" type="MarginContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 12.0
+mouse_filter = 2
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="PanelContainer" type="PanelContainer" parent="Hud/CompactMargin"]
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Label" type="Label" parent="Hud/CompactMargin/PanelContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 16
+text = "ПРОТОТИП E — SQLITE SAVE FOUNDATION"
+autowrap_mode = 2
+
+[node name="DetailedMargin" type="MarginContainer" parent="Hud"]
+visible = false
+offset_left = 12.0
+offset_top = 12.0
+theme_override_constants/margin_left = 4
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 4
+theme_override_constants/margin_bottom = 4
+
+[node name="PanelContainer" type="PanelContainer" parent="Hud/DetailedMargin"]
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Hud/DetailedMargin/PanelContainer"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="Label" type="Label" parent="Hud/DetailedMargin/PanelContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "ПРОТОТИП E — SQLITE"
+autowrap_mode = 2
+
+[node name="HiddenHint" type="PanelContainer" parent="Hud"]
+visible = false
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -190.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 55.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Label" type="Label" parent="Hud/HiddenHint"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "HUD скрыт • H"
+horizontal_alignment = 1
+vertical_alignment = 1

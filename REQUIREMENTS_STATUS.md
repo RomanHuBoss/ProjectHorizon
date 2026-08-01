@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-100-landing-soak-timeout-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-sqlite-foundation.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,60 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Полёт, атмосфера, landing-point alignment и полный touchdown/takeoff цикл приняты runtime; реализован soak 100 последовательных посадок, ожидающий `TASK-052` |
-| E. Сохранение | `NOT_STARTED` | Не начинался |
+| D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
+| E. Сохранение | `IN_PROGRESS` | Реализован SQLite-фундамент: явная миграция, WAL/foreign keys/NORMAL/busy timeout, последовательная очередь записи и транзакционный round-trip игрока, корабля, инвентаря и посещённой планеты |
 
-**Вывод:** `TASK-043`–`TASK-050` подтверждены. Первый runtime-прогон `TASK-051` подтвердил стабильность 97 завершённых посадок, но формально завершился `FAIL` из-за противоречивого общего лимита `240 с`, который был короче суммы допустимых per-cycle бюджетов. Подготовлен timeout-hotfix; `TASK-051` остаётся `IMPLEMENTED`, `TASK-052` — `IN_PROGRESS` до повторного `V: PASS 100/100`.
+**Вывод:** `TASK-043`–`TASK-053` подтверждены; Прототип D полностью `VERIFIED`. Повторный soak завершился `V: PASS 100/100` при `gear=3`, `vTouch=2,67 м/с`, `memΔ=0,02 MiB`, `nodesΔ=0` и чистой сборке. Текущая итерация начинает Прототип E задачей `TASK-054`; runtime-приёмка SQLite round-trip назначена как `TASK-055`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — закрытие Прототипа D и SQLite-фундамент Прототипа E (`TASK-053/TASK-054`)
+
+**Исходный снимок:** `ProjectHorizon-main(9).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-sqlite-foundation.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 22.1–22.5, 36.3 и Прототип E раздела 39 PDF-ТЗ; `TASK-051`–`TASK-056`, `PD-050`–`PD-053`, `PD-ACC-040`–`PD-ACC-045`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006`.
+
+**Runtime-доказательство предыдущей итерации:**
+
+- локальная сборка: `0` предупреждений, `0` ошибок;
+- `TASK-051 soak (V): PASS 100/100`;
+- все 100 физических touchdown-циклов завершены;
+- `gear=3`, максимальная скорость касания `2,67 м/с`;
+- managed-memory delta `0,02 MiB`;
+- `nodeDelta=0`;
+- baseline восстановлен, посадочная точка освобождена, опоры сложены;
+- пользователь предоставил screenshot финального `PASS`.
+
+**Закрытие Прототипа D:**
+
+- `TASK-051`, `TASK-052`, `PD-050`–`PD-053`, `PD-ACC-040`–`PD-ACC-045` → `VERIFIED`;
+- `TASK-053` → `VERIFIED`;
+- Прототип D → `VERIFIED`.
+
+**Реализовано в `TASK-054`:**
+
+- добавлена отдельная стартовая сцена `Scenes/Persistence/SavePrototype.tscn`;
+- подключён `Microsoft.Data.Sqlite` `8.0.29` без Entity Framework;
+- игровой slot хранится по структуре `user://profiles/profile_prototype/save_1.db`;
+- реализована явная migration `1` и таблицы `schema_migrations`, `save_meta`, `save_settings`, `player_state`, `ships`, `containers`, `inventory_items`, `visited_planets`;
+- каждое подключение устанавливает `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`, `busy_timeout=5000`;
+- запись выполняется через единственный `SemaphoreSlim` writer gate и полностью уходит с main thread;
+- snapshot транзакционно сохраняет позицию игрока, состояние корабля, три inventory item и посещённую планету;
+- загрузка восстанавливает snapshot и сравнивается с исходными данными без сериализации Godot-объектов;
+- все SQL-запросы параметризованы;
+- `Z` запускает acceptance route: migration → baseline save/load → восемь конкурентных submit через единственный writer → final exact load → `integrity_check`;
+- `S/L/R` обеспечивают ручное сохранение, загрузку и очистку slot;
+- compact/detailed/hidden HUD показывает PRAGMA, schema, queue, snapshot и результат `TASK-054`;
+- SQL и файловые операции не обращаются к Godot API и выполняются вне main thread.
+
+**Граница итерации:** backup, атомарная замена, повреждение основной БД и recovery относятся к следующей `TASK-056`.
+
+**Статусы:**
+
+- `TASK-054`, `PE-001`, `PE-010`–`PE-015` → `IMPLEMENTED`;
+- `TASK-055`, `PE-ACC-001`–`PE-ACC-006` → `IN_PROGRESS`;
+- Прототип E → `IN_PROGRESS`.
 
 ### 2026-08-01 — runtime `TASK-051: FAIL total timeout` и масштабируемый timeout-hotfix
 
@@ -974,23 +1022,43 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-ACC-034` | Взлёт достигает безопасного clearance | `VERIFIED` | clearance=12,00 м; gear=0; state Idle; ручное управление восстановлено |
 | `PD-ACC-035` | Автоматический O-test завершается PASS | `VERIFIED` | cycles/touchdowns/locks/takeoffs=2; recoveries/collisions/errors=0 |
 | `PD-ACC-036` | Предыдущие режимы не регрессировали | `VERIFIED` | Ручной цикл, камеры и HUD сохранены; предыдущие J/L/N результаты остаются PASS |
-| `PD-050` | Soak 100 последовательных физических посадок | `IMPLEMENTED` | V выполняет 100 реальных descent/contact/LANDED циклов после единственного search/alignment |
-| `PD-051` | Контроль целостности touchdown state и counters | `IMPLEMENTED` | attempts=touchdowns=locks=cycles; per-cycle timeout; stuck state завершает тест FAIL |
-| `PD-052` | Контроль накопления узлов и managed memory | `IMPLEMENTED` | SceneTree node delta=0; final managed growth ≤8 MiB; peak growth ≤32 MiB |
-| `PD-053` | Диагностика soak и исправленный touchdown HUD | `IMPLEMENTED` | O/V статусы видны в compact/detailed HUD; прогресс V каждые 10 циклов дублируется в Output |
+| `PD-050` | Soak 100 последовательных физических посадок | `VERIFIED` | `V: PASS 100/100`; все физические descent/contact/LANDED циклы завершены |
+| `PD-051` | Контроль целостности touchdown state и counters | `VERIFIED` | counters достигли 100/100; stuck state и ошибки отсутствуют |
+| `PD-052` | Контроль накопления узлов и managed memory | `VERIFIED` | `nodeDelta=0`, `memΔ=0,02 MiB`; пределы соблюдены |
+| `PD-053` | Диагностика soak и исправленный touchdown HUD | `VERIFIED` | HUD показал RUNNING и финальный `PASS 100/100`; O/V строки видимы |
 | `PD-ACC-040` | Soak-редакция собирается 0/0 | `VERIFIED` | Локальная сборка: 0 предупреждений, 0 ошибок |
-| `PD-ACC-041` | V-test завершает ровно 100 посадок | `IN_PROGRESS` | HUD/Output: PASS cycles=100, attempts=100, touchdowns=100, locks=100 |
-| `PD-ACC-042` | Все циклы подтверждают 3/3 опоры и допустимые ошибки | `IN_PROGRESS` | gearMin=3, touchdownSpeed≤3,20, posErr≤0,40 м, angErr≤2,00° |
-| `PD-ACC-043` | Нет recovery, collision, runtime error и зависших state | `IN_PROGRESS` | recoveries=0, collisions=0, errors=0; queue/state восстановлены |
-| `PD-ACC-044` | Нет накопления SceneTree/managed memory | `IN_PROGRESS` | nodeDelta=0; managedGrowth≤8 MiB; peakGrowth≤32 MiB |
-| `PD-ACC-045` | HUD показывает O/V, предыдущие режимы не регрессировали | `IN_PROGRESS` | O: PASS виден в HUD; после V работают J/L/N/O/P/M/F2/H |
+| `PD-ACC-041` | V-test завершает ровно 100 посадок | `VERIFIED` | HUD: `TASK-051 soak (V): PASS 100/100` |
+| `PD-ACC-042` | Все циклы подтверждают 3/3 опоры и допустимые ошибки | `VERIFIED` | `gear=3`, `vTouch=2,67 м/с`; пределы соблюдены |
+| `PD-ACC-043` | Нет recovery, collision, runtime error и зависших state | `VERIFIED` | Финальный PASS и восстановленный baseline; явных ошибок нет |
+| `PD-ACC-044` | Нет накопления SceneTree/managed memory | `VERIFIED` | `nodesΔ=0`, `memΔ=0,02 MiB` |
+| `PD-ACC-045` | HUD показывает O/V, предыдущие режимы не регрессировали | `VERIFIED` | O/V строки присутствуют; soak восстановил исходное состояние |
 
-### 8.3. Оставшиеся прототипы
+### 8.3. Прототип E — SQLite save foundation
 
-| Прототип | Требования | Статус |
-|---|---|---|
-| D. Корабль | полёт, посадка, взлёт, переход к поверхности, камеры | `IN_PROGRESS` |
-| E. Сохранение | SQLite, инвентарь, позиция, корабль, планета, backup, recovery | `NOT_STARTED` |
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `PE-001` | Отдельная тестовая сцена сохранений | `IMPLEMENTED` | `Scenes/Persistence/SavePrototype.tscn`; назначена стартовой сценой |
+| `PE-010` | SQLite через `Microsoft.Data.Sqlite`, один slot — одна БД | `IMPLEMENTED` | PackageReference `8.0.29`; `user://profiles/profile_prototype/save_1.db` |
+| `PE-011` | Явные migrations и обязательные PRAGMA | `IMPLEMENTED` | schema migration 1; WAL, foreign keys, synchronous NORMAL, busy timeout 5000 |
+| `PE-012` | Последовательная очередь записи вне main thread | `IMPLEMENTED` | Единственный writer gate; SQL выполняется в `Task.Run`; Godot API в worker не используется |
+| `PE-013` | Транзакционное сохранение минимального snapshot | `IMPLEMENTED` | player position, ship, inventory и visited planet сохраняются одной transaction |
+| `PE-014` | Загрузка и точный round-trip snapshot | `IMPLEMENTED` | Параметризованные SELECT; exact comparison baseline/final snapshot |
+| `PE-015` | Диагностика и автоматический save acceptance | `IMPLEMENTED` | `S/L/R`; `Z` проверяет migration, PRAGMA, 8 queued writes, integrity и exact load |
+| `PE-ACC-001` | SQLite-редакция собирается 0/0 | `IN_PROGRESS` | Локальная `dotnet build` |
+| `PE-ACC-002` | Сцена запускается и создаёт БД по ожидаемому пути | `IN_PROGRESS` | HUD state READY; database path существует |
+| `PE-ACC-003` | Migration и PRAGMA подтверждены | `IN_PROGRESS` | schema=1, journal=wal, foreignKeys=1, synchronous=1, busyTimeout=5000 |
+| `PE-ACC-004` | Игрок, корабль, inventory и planet проходят exact round-trip | `IN_PROGRESS` | `exactComparisons=2`, revision=2, inventoryRows=3, visitedRows=1 |
+| `PE-ACC-005` | Параллельные submissions сериализуются | `IN_PROGRESS` | queuedWrites=8, maxConcurrentWriters=1 |
+| `PE-ACC-006` | Integrity check и автоматический тест завершаются PASS | `IN_PROGRESS` | `integrity=ok`; `TASK-054 save (Z): PASS` |
+
+### 8.4. Оставшаяся часть Прототипа E
+
+| Подсистема | Статус |
+|---|---|
+| Backup и атомарная замена | `NOT_STARTED` |
+| Проверка повреждённой основной БД | `NOT_STARTED` |
+| Recovery из последней корректной backup | `NOT_STARTED` |
+| Миграция старой версии и unknown content | `NOT_STARTED` |
 
 Основная разработка вертикального среза не начинается до приёмки всех пяти прототипов.
 
@@ -998,46 +1066,45 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-050`; Прототипы A, B и C; свободный/атмосферный полёт, landing-point alignment и touchdown/takeoff Прототипа D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-053`; Прототипы A, B, C и D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-052` | Выполнить runtime-приёмку 100-landing soak | Чистая сборка; `V: PASS 100/100`; counters exact; gearMin=3; nodeDelta=0; memory bounds; errors=0 |
-| 2 | `TASK-053` | После soak закрыть Прототип D либо устранить выявленный дефект | Все требования Прототипа D VERIFIED; регрессии J/L/N/O/P/M/F2/H отсутствуют |
+| 1 | `TASK-055` | Выполнить runtime-приёмку SQLite foundation | Чистая сборка; `Z: PASS`; schema/PRAGMA/integrity; exact round-trip; max writer concurrency=1 |
+| 2 | `TASK-056` | Реализовать backup и recovery | Корректная backup-копия, атомарная замена, corruption detection и восстановление без потери единственной исправной БД |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-049`, `TASK-050`, `PD-040`–`PD-045`, `PD-ACC-030`–`PD-ACC-036`.
-**Реализовано:** `TASK-051`, `PD-050`–`PD-053`.
-**Текущая приёмочная задача:** `TASK-052`.
+**Подтверждено в этой итерации:** `TASK-051`, `TASK-052`, `TASK-053`, `PD-050`–`PD-053`, `PD-ACC-040`–`PD-ACC-045`; Прототип D полностью `VERIFIED`.  
+**Реализовано:** `TASK-054`, `PE-001`, `PE-010`–`PE-015`.  
+**Текущая приёмочная задача:** `TASK-055`.
 
-## 10. Runtime-приёмка `TASK-051/TASK-052`
+## 10. Runtime-приёмка `TASK-054/TASK-055`
 
-1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. Compact HUD должен показывать обе строки: `TASK-049 touchdown (O): READY/PASS` и `TASK-051 soak (V): READY`.
-3. Нажать `V` и не использовать управление. Повторное `V` безопасно отменяет soak и восстанавливает baseline.
-4. Тест выполняет один обычный search/alignment, затем 100 физических touchdown-циклов с короткого clearance `3,8 м`. Ожидаемая длительность на подтверждённой машине — около 4–5 минут. Effective timeout вычисляется как `max(configuredTimeout, setupAllowance + cycles × cycleTimeout)`; при стандартных параметрах это `480 с`.
-5. Каждые 10 циклов в Godot Output выводится progress. HUD должен показывать `RUNNING n/100`.
+1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений. При первом restore NuGet должен загрузить `Microsoft.Data.Sqlite 8.0.29`.
+2. Запустить стартовую сцену. Compact HUD должен показать `DB: Ready`, `schema=1`, `WAL=wal`, `FK=ON` и `TASK-054 save (Z): READY`.
+3. Нажать `S`, затем `L`. Snapshot должен загрузиться с revision `1`, inventory `3` и посещённой планетой. Повторный `S` увеличивает revision и изменяет тестовые данные без дублирования inventory rows.
+4. Нажать `R`; slot очищается транзакцией. После `L` HUD сообщает, что slot пуст.
+5. Нажать `Z` и не использовать управление. Тест обычно занимает менее 5 секунд.
 6. Ожидаемый HUD:
 
 ```text
-TASK-051 soak (V): PASS 100/100, gear=3, vTouch<=3.20,
-memΔ<=8.00 MiB, nodesΔ=0
+TASK-054 save (Z): PASS rev=2, items=3, writes=8,
+maxWriters=1, integrity=ok
 ```
 
 7. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-051 100-landing soak PASS: cycles=100; attempts=100;
-touchdowns=100; locks=100; gearMin=3; touchdownSpeed=...;
-positionError=...; angularError=...; managedGrowthMiB=...;
-managedPeakGrowthMiB=...; nodeDelta=0; recoveries=0;
-collisions=0; errors=0; result=...
+TASK-054 SQLite save foundation acceptance PASS:
+schema=1; journal=wal; foreignKeys=1; synchronous=1;
+busyTimeout=5000; integrity=ok; revision=2;
+inventoryRows=3; visitedRows=1; queuedWrites=8;
+maxConcurrentWriters=1; exactComparisons=2; result=...
 ```
 
-8. Критерии: counters точно `100/100/100/100`; `gearMin=3`; touchdown speed ≤`3,20 м/с`; position error ≤`0,40 м`; angular error ≤`2,00°`; node delta `0`; final managed growth ≤`8 MiB`; peak growth ≤`32 MiB`; recoveries/collisions/errors `0`.
-9. После `V: PASS` проверить, что работают `J`, `L`, `N`, `O`, `P`, ручной `M`, `F2` и `H`.
-10. В качестве доказательства прислать результат сборки, screenshot `V: PASS`, полную итоговую строку Output и краткое подтверждение регрессии.
-11. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: cycle/phase, elapsed/budget, counter mismatch, gearMin, memory growth, nodeDelta и errors.
+8. Критерии: чистая сборка; database file создан в `user://profiles/profile_prototype/save_1.db`; schema `1`; WAL; FK `1`; synchronous `1`; busy timeout `5000`; revision `2`; inventory rows `3`; visited rows `1`; восемь submissions; max concurrent writer `1`; exact comparisons `2`; integrity `ok`.
+9. В качестве доказательства прислать результат сборки, screenshot `Z: PASS`, полную итоговую строку Output и краткое подтверждение ручных `S/L/R`.
+10. При `FAIL` прислать финальный HUD и последние 30 строк Output; дополнительно указать, появился ли файл БД и прошёл ли NuGet restore.
 
 ## 11. Журнал проверок
 
