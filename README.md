@@ -74,7 +74,15 @@ TASK-033 LOD (U): PASS split=17, merge=16, Δlod=1, open=0, seam=0
 patches=36, L1=20, L2=16, atomic=112, nonManifold=0
 ```
 
-Текущая итерация `TASK-036` развивает визуальный quadtree-стриминг:
+`TASK-036/TASK-037` приняты по runtime-проверке:
+
+```text
+build: 0 errors, 0 warnings
+TASK-036 stream (I): PASS revisions=10, L3=12, resident=44/45,
+unloaded=93, queue=0, workers=0, stale=24, errors=0
+```
+
+Текущая итерация `TASK-038` добавляет динамический collision LOD поверх принятого визуального quadtree:
 
 - дерево использует три рабочих уровня `L1/L2/L3`;
 - узлы рекурсивно делятся по угловым порогам с hysteresis;
@@ -93,11 +101,18 @@ patches=36, L1=20, L2=16, atomic=112, nonManifold=0
   revision, queue, workers, ready, cancel, stale, errors и число выгрузок;
 - `F1` показывает: синий `L1`, оранжевый `L2`, розовый `L3`;
 - `I` запускает автоматический stress/acceptance test фонового стриминга;
-- ранее принятые тесты `T`, `Y` и `U` сохранены.
+- ранее принятые тесты `T`, `Y`, `U` и `I` сохранены.
 
-Collision пока остаётся шестью стабильными поверхностями `129 × 129`. Динамический
-collision LOD выделен в следующую отдельную задачу, чтобы не смешивать проверку
-фонового визуального стриминга с изменением физической поверхности.
+- локальный collision resident-set выбирается из текущих `L1/L2/L3` leaves около игрока;
+- collision patches используют отдельные top-surface trimesh без visual skirts;
+- шесть полногранных поверхностей `129 × 129` сохранены как safety fallback;
+- новый collision-набор сначала создаётся disabled, затем включается deferred;
+- старый и новый наборы перекрываются несколько physics-кадров;
+- после безопасного commit fallback и устаревшие patches отключаются и выгружаются;
+- HUD показывает collision plan, active/target/staged, `L1/L2/L3`, commits,
+  fallback activations, created/unloaded и errors;
+- `K` запускает автоматический collision acceptance test с реальным межгранным
+  маршрутом игрока.
 
 Активная стартовая сцена:
 
@@ -108,8 +123,9 @@ src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn
 Ожидаемый результат новой приёмки:
 
 ```text
-TASK-036 stream (I): PASS revisions>=4, L3>0, resident<logical,
-unloaded>0, queue=0, workers=0, errors=0
+TASK-038 collision (K): PASS plans>=3, commits>=3,
+created>0, unloaded>0, fallback>0, active>0, L3>0,
+gap<=0.12 s, errors=0
 ```
 
 ## Состояние реализации ТЗ
@@ -214,38 +230,38 @@ src/Game.Client/project.godot
 
 2. Дождаться импорта ресурсов и выполнить сборку C#.
 3. Нажать `F5`; после завершения фоновой загрузки HUD должен показывать:
-   - `queue=0`, `workers=0`, `errors=0`;
-   - `Applied = resident`, при этом `resident < logical`;
-   - ненулевое число patches `L3`;
+   - visual `Applied = resident`, `queue=0`, `workers=0`, `errors=0`;
+   - collision `active=target>0`, `staged=0`, `queue=0`, `state=Idle`;
+   - collision `L3>0`, `fallback=off`, `errors=0`;
    - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
-   - `collision: 6/6 (129×129)`;
-   - `ground=да`, `probe=да`, радиальную систему `PASS`.
-4. Нажать `I` и не использовать управление до окончания теста. Быстрая часть
-   создаёт серию новых plan revisions, затем тест ожидает полного опустошения
-   очередей. Обычная длительность — до 15 секунд.
+   - `ground=да`, `floor=да`, `probe=да`, радиальную систему `PASS`.
+4. Нажать `K` и не использовать управление до окончания теста. Тест запускает
+   принятый межгранный маршрут и проверяет, что локальный collision resident-set
+   перестраивается без потери контакта. Максимальное время — `75 с`.
 5. Ожидаемый итог HUD:
 
 ```text
-TASK-036 stream (I): PASS revisions=..., L3=..., resident=.../...,
-unloaded=..., queue=0, workers=0, cancel=..., stale=..., errors=0
+TASK-038 collision (K): PASS plans=..., commits=...,
+created=..., unloaded=..., fallback=..., active=...,
+L3=..., gap<=0.12 s, errors=0
 ```
 
-6. В Godot Output должна появиться строка:
+6. В Godot Output должна появиться строка с префиксом:
 
 ```text
-TASK-036 async patch streaming acceptance PASS
+TASK-038 dynamic collision LOD acceptance PASS
 ```
 
 7. Ручная проверка после теста:
-   - в режиме `F1` розовые `L3` находятся около игрока, оранжевые `L2` образуют
-     промежуточное кольцо, синие `L1` остаются вдали;
-   - при движении детальная область следует за игроком;
-   - на горизонте и между уровнями нет видимых отверстий;
-   - после стабилизации `Applied = resident`, `queue=0`, `workers=0`;
-   - collision не исчезает, работают WASD, `Space`, `R`, `F1`, `F2`, `T`, `Y`,
-     `U`.
-8. Повторное `I`, а также `F2`, `R`, `T`, `Y` или `U`, безопасно останавливает
-   тест.
+   - игрок не проваливается и не подпрыгивает при переходах между гранями;
+   - в режиме `Debug → Visible Collision Shapes` около игрока видны локальные
+     collision patches, а устаревшие участки исчезают после commit;
+   - после стабилизации `active=target`, `staged=0`, collision queue `0`,
+     `state=Idle`, `fallback=off`;
+   - работают WASD, `Space`, `R`, `F1`, `F2`, `T`, `Y`, `U` и `I`.
+8. Повторное `K`, а также `F2`, `R`, `T`, `Y`, `U` или `I`, безопасно
+   останавливает collision acceptance test. Клавиша `I` остаётся отдельной
+   регрессией async visual streaming.
 9. Для регрессии Прототипа B открыть
    `Scenes/Terrain/TerrainChunkPrototype.tscn` через `F6`; `F10` запускает
    stress-test, `P` — soak-test.

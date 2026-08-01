@@ -283,12 +283,14 @@ public partial class CubeSpherePrototype : Node3D
                 Math.Max(1, System.Environment.ProcessorCount - 2)));
 
         BuildPlanet();
+        InitializeCollisionLod();
         ApplyCameraMode();
         UpdateHud();
     }
 
     public override void _ExitTree()
     {
+        ShutdownCollisionLod();
         _patchPlanCancellation?.Cancel();
         _patchPlanCancellation?.Dispose();
         _patchPlanCancellation = null;
@@ -314,6 +316,11 @@ public partial class CubeSpherePrototype : Node3D
             UpdateStreamingAcceptanceTest((float)delta);
         }
 
+        if (CollisionTestRunning)
+        {
+            UpdateCollisionAcceptanceTest((float)delta);
+        }
+
         _lodUpdateAccumulator += delta;
         if (_lodUpdateAccumulator >= Math.Max(0.05f, LodUpdateIntervalSeconds))
         {
@@ -322,6 +329,7 @@ public partial class CubeSpherePrototype : Node3D
         }
 
         ProcessPatchStreamingPipeline();
+        ProcessCollisionLod(delta);
 
         _hudRefreshAccumulator += delta;
         if (_hudRefreshAccumulator >= 0.1)
@@ -329,6 +337,11 @@ public partial class CubeSpherePrototype : Node3D
             _hudRefreshAccumulator = 0.0;
             UpdateHud();
         }
+    }
+
+    public override void _PhysicsProcess(double delta)
+    {
+        ProcessCollisionPhysicsTransition();
     }
 
     public override void _UnhandledInput(InputEvent @event)
@@ -360,6 +373,14 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.T ||
             keyEvent.PhysicalKeycode == Key.T)
         {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+                UpdateHud();
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
             if (StreamingTestRunning)
             {
                 CancelStreamingAcceptanceTest();
@@ -403,6 +424,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.Y ||
             keyEvent.PhysicalKeycode == Key.Y)
         {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+            }
+
             if (StreamingTestRunning)
             {
                 CancelStreamingAcceptanceTest();
@@ -439,6 +465,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.U ||
             keyEvent.PhysicalKeycode == Key.U)
         {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+            }
+
             if (StreamingTestRunning)
             {
                 CancelStreamingAcceptanceTest();
@@ -461,6 +492,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.I ||
             keyEvent.PhysicalKeycode == Key.I)
         {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+            }
+
             if (StreamingTestRunning)
             {
                 CancelStreamingAcceptanceTest();
@@ -480,9 +516,31 @@ public partial class CubeSpherePrototype : Node3D
             UpdateHud();
             GetViewport().SetInputAsHandled();
         }
+        else if (keyEvent.Keycode == Key.K ||
+            keyEvent.PhysicalKeycode == Key.K)
+        {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+            }
+            else
+            {
+                CancelAllAcceptanceTests();
+                BeginCollisionAcceptanceTest();
+            }
+
+            UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
         else if (keyEvent.Keycode == Key.R ||
             keyEvent.PhysicalKeycode == Key.R)
         {
+            if (CollisionTestRunning)
+            {
+                CancelCollisionAcceptanceTest();
+                UpdateHud();
+            }
+
             if (StreamingTestRunning)
             {
                 CancelStreamingAcceptanceTest();
@@ -1630,6 +1688,11 @@ public partial class CubeSpherePrototype : Node3D
 
     private void CancelAllAcceptanceTests()
     {
+        if (CollisionTestRunning)
+        {
+            CancelCollisionAcceptanceTest();
+        }
+
         if (StreamingTestRunning)
         {
             CancelStreamingAcceptanceTest();
@@ -1753,6 +1816,7 @@ public partial class CubeSpherePrototype : Node3D
 
     private void ClearGeneratedChildren()
     {
+        ClearDynamicCollisionLod();
         _patchPlanCancellation?.Cancel();
         _patchPlanCancellation?.Dispose();
         _patchPlanCancellation = null;
@@ -1854,7 +1918,7 @@ public partial class CubeSpherePrototype : Node3D
         if (_buildData is null)
         {
             _hudLabel.Text =
-                "ПРОТОТИП C — ASYNC QUADTREE STREAMING\n" +
+                "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
                 "Построение collision и планирование patches...";
             return;
         }
@@ -1913,7 +1977,7 @@ public partial class CubeSpherePrototype : Node3D
             : "Space — пауза обзора";
 
         _hudLabel.Text =
-            "ПРОТОТИП C — ASYNC QUADTREE STREAMING\n" +
+            "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
             $"Applied/resident/logical: {_patches.Count}/" +
             $"{_targetResidentLeaves.Count}/{_logicalLeaves.Count}  •  " +
             $"L{GetBaseLevel()}: {_lodLevelBasePatchCount}/{_logicalBasePatchCount}  •  " +
@@ -1926,6 +1990,17 @@ public partial class CubeSpherePrototype : Node3D
             $"Jobs: cancel={_patchJobsCancelled}  •  stale={_patchJobsStale}  •  " +
             $"errors={_patchJobsFailed}  •  lastBuild={_lastPatchBuildMilliseconds:F2} мс  •  " +
             $"cull={LodResidentAngleDegrees:F0}°+extent\n" +
+            $"Collision LOD: active={_collisionPatches.Count}/" +
+            $"{_targetCollisionLeaves.Count}  •  staged={_stagedCollisionPatches.Count}  •  " +
+            $"queue={_pendingCollisionBuilds.Count}  •  plan={_collisionPlanRevision}  •  " +
+            $"commits={_collisionCommits}  •  state={_collisionTransitionState}\n" +
+            $"Collision jobs: L{GetBaseLevel()}={_collisionBasePatchCount}  •  " +
+            $"L{GetMiddleLevel()}={_collisionMidPatchCount}  •  " +
+            $"L{GetMaximumLevel()}={_collisionFinePatchCount}  •  " +
+            $"created={_collisionPatchesCreated}  •  unloaded={_collisionPatchesUnloaded}  •  " +
+            $"fallback={(_fallbackCollisionEnabled ? "on" : "off")}  •  " +
+            $"activations={_collisionFallbackActivations}  •  errors={_collisionErrors}  •  " +
+            $"lastBuild={_lastCollisionBuildMilliseconds:F2} мс\n" +
             $"LOD-швы: {lodSeamStatus}  •  atomic={_lodValidation?.AtomicSegments ?? 0}  •  " +
             $"open={_lodValidation?.OpenSegments ?? -1}  •  " +
             $"nonManifold={_lodValidation?.NonManifoldSegments ?? -1}  •  " +
@@ -1933,7 +2008,7 @@ public partial class CubeSpherePrototype : Node3D
             $"Δpos={(_lodValidation?.MaximumSeamPositionError ?? -1.0f):E2}\n" +
             $"Skirts: {_lodSkirtTriangles}  •  topology={_lodTopologyRevision}  •  " +
             $"validation={_lastLodUpdateMilliseconds:F2} мс  •  " +
-            $"collision={_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
+            $"fallbackCollision={_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
             $"({_collisionResolution}×{_collisionResolution})  •  " +
             $"грани={faceSeamStatus} ({_buildData.SeamComparisons}/" +
             $"{_buildData.ExpectedSeamComparisons})\n" +
@@ -1946,12 +2021,14 @@ public partial class CubeSpherePrototype : Node3D
             $"{seamTestStatus}\n" +
             $"{LodTestStatusText}\n" +
             $"{StreamingTestStatusText}\n" +
+            $"{CollisionTestStatusText}\n" +
             $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
             $"seed: {NoiseSeed}  •  patch: {FaceResolution}×{FaceResolution}\n" +
             "WASD — касательное движение  •  мышь — обзор  •  " +
             $"{contextualSpace}  •  R — сброс\n" +
             "F1 — грань/LOD/нормали  •  F2 — игрок/обзор  •  " +
-            "T — seam  •  Y — origin  •  U — LOD  •  I — async-stream";
+            "T — seam  •  Y — origin  •  U — LOD  •  I — async-stream  •  " +
+            "K — collision-LOD";
     }
 
 }

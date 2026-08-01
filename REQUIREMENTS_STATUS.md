@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-async-quadtree-streaming.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-dynamic-collision-lod.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -34,13 +34,55 @@
 |---|---|---|
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
-| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы, floating origin и `L1/L2` quadtree подтверждены runtime; `L1/L2/L3` async visual streaming реализован и ожидает `TASK-037` |
+| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы, floating origin и `L1/L2/L3` async visual streaming подтверждены runtime; динамический collision LOD реализован и ожидает `TASK-039` |
 | D. Корабль | `NOT_STARTED` | Не начинался |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-033/TASK-035` подтверждены чистой сборкой и runtime-результатом `U: PASS`. В текущей итерации реализована `TASK-036`: рекурсивный `L1/L2/L3` quadtree, отменяемые фоновые jobs построения массивов, resident-set с выгрузкой patches за горизонтом и автоматический streaming acceptance test по `I`. Динамический collision LOD осознанно выделен в следующую задачу `TASK-038`; текущая стабильная collision-поверхность `6 × 129×129` сохранена без регрессии.
+**Вывод:** `TASK-036/TASK-037` подтверждены чистой сборкой и runtime-результатом `I: PASS`: 10 revisions, `L3=12`, resident `44/45`, unloaded `93`, stale `24`, errors `0`, очереди и workers вернулись к нулю. В текущей итерации реализована `TASK-038`: локальные collision patches по quadtree-листьям, страховочная полногранная поверхность и двухфазная замена с overlap по physics-кадрам. Runtime-приёмка вынесена в `TASK-039`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка `TASK-036/TASK-037` и динамический collision LOD `TASK-038`
+
+**Runtime-доказательство принятой async visual streaming итерации:**
+
+- локальная сборка `Game.Client.csproj`: `0` ошибок, `0` предупреждений;
+- стабильное состояние: applied/resident/logical `41/41/42`, `L3=8`, queue `0`, workers `0`, errors `0`;
+- acceptance test: `TASK-036 stream (I): PASS revisions=10, L3=12, resident=44/45, unloaded=93, queue=0, workers=0, cancel=0, stale=24, errors=0`;
+- topology после теста: `open=0`, `nonManifold=0`, `Δlod=1`, `Δpos=0`;
+- collision `6/6 (129×129)`, ground/floor/probe и радиальная система остались `PASS`.
+
+**Реализовано в `TASK-038`:**
+
+- collision больше не ограничивается постоянно активными шестью полногранными сетками;
+- рядом с игроком выбирается отдельный набор collision patches из текущих quadtree-листьев `L1/L2/L3`;
+- collision patch создаётся только из верхней поверхности `33×33`, без визуальных skirts;
+- `ArrayMesh`, `ConcavePolygonShape3D`, `CollisionShape3D` и `SceneTree` применяются только в main thread;
+- неизменяемые шесть полногранных collision-форм `129×129` сохранены как safety fallback;
+- при каждом новом collision plan fallback включается до готовности целевого набора;
+- новые collision shapes сначала создаются disabled, затем включаются deferred;
+- старый набор и fallback остаются активными ещё `CollisionOverlapPhysicsFrames` physics-кадров;
+- только после подтверждения включения нового набора и фактического deferred-отключения fallback/устаревших shapes выполняется commit и освобождение;
+- при быстром удалении игрока от collision anchor fallback включается автоматически;
+- HUD показывает active/target/staged collision patches, queue, plan, commits, состояние перехода, распределение `L1/L2/L3`, created/unloaded, fallback activations и errors;
+- `K` запускает acceptance test: после подготовки динамического набора автоматически выполняется принятый межгранный seam traversal, а collision LOD сопровождает реальное движение игрока;
+- тест требует несколько collision plans/commits, создание и выгрузку patches, фактические fallback activations, наличие `L3`, нулевые ошибки и ground gap не более `0,12 с`;
+- повторное `K`, `F2`, `R`, `T`, `Y`, `U` или `I` безопасно останавливает collision acceptance test.
+
+**Статические проверки:**
+
+- геометрическая симуляция принятого четырёхшовного great-circle маршрута: collision target содержит `27–47` patches, меняется многократно, создаёт и выгружает локальные участки; во всех выборках присутствуют рабочие `L1/L2/L3`;
+- проверены C#-строки, комментарии, скобки, nullable-out, scene/resource paths и ZIP hygiene;
+- deferred-состояние проверяется фактически: commit ожидает `Disabled=true` у fallback и всех устаревших shapes; `ConcavePolygonShape3D` используется только под `StaticBody3D`;
+- Godot/.NET SDK в текущей среде отсутствуют, поэтому сборка и runtime новой collision-итерации не заявляются.
+
+**Изменения статусов:**
+
+- `TASK-036`, `TASK-037`, `PC-080`–`PC-086`, `PC-ACC-050`–`PC-ACC-057` → `VERIFIED`;
+- `TASK-038`, `PC-090`–`PC-096` → `IMPLEMENTED`;
+- `TASK-039`, `PC-ACC-060`–`PC-ACC-068` → `IN_PROGRESS`.
+
+**Следующая задача:** выполнить runtime-приёмку `TASK-039` по клавише `K`; после `PASS` определить завершённость Прототипа C и переход к Прототипу D.
 
 ### 2026-08-01 — приёмка `TASK-033/TASK-035` и реализация async visual streaming `TASK-036`
 
@@ -424,13 +466,20 @@
 | `PC-072` | Устранение щелей между соседними LOD | `VERIFIED` | Runtime: `Δlod=1`, `open=0`, seam=0 |
 | `PC-073` | Диагностика покрытия и соседства LOD | `VERIFIED` | Runtime: atomic=112, nonManifold=0, open=0 |
 | `PC-074` | Автоматический quadtree LOD acceptance test | `VERIFIED` | `TASK-033 LOD (U): PASS split=17, merge=16` |
-| `PC-080` | Не менее трёх рабочих уровней quadtree | `IMPLEMENTED` | Рекурсивные `L1/L2/L3`; HUD показывает applied/logical counts каждого уровня |
-| `PC-081` | 2:1 balancing соседних листьев | `IMPLEMENTED` | Atomic-edge balancing принудительно делит грубые листья при разнице > 1 |
-| `PC-082` | Фоновая генерация patch arrays | `IMPLEMENTED` | `CubeSpherePatchDataBuilder`, до 4 worker jobs, `CancellationToken` |
-| `PC-083` | Revision/cancellation/stale protection | `IMPLEMENTED` | Новый plan отменяет старый; stale результаты отбрасываются до main-thread apply |
-| `PC-084` | Выгрузка невидимых patches | `IMPLEMENTED` | Resident-set использует угол 108° с консервативным запасом на угловой размер patch; obsolete patches удаляются после settle |
-| `PC-085` | Main-thread применение ресурсов Godot | `IMPLEMENTED` | `ArrayMesh`, `MeshInstance3D`, `SceneTree` и `QueueFree` выполняются только в прототипе на main thread |
-| `PC-086` | Автоматический async streaming acceptance test | `IMPLEMENTED` | Клавиша `I`: 9 направлений, rapid revisions, settle и `PASS/FAIL` |
+| `PC-080` | Не менее трёх рабочих уровней quadtree | `VERIFIED` | Рекурсивные `L1/L2/L3`; HUD показывает applied/logical counts каждого уровня |
+| `PC-081` | 2:1 balancing соседних листьев | `VERIFIED` | Atomic-edge balancing принудительно делит грубые листья при разнице > 1 |
+| `PC-082` | Фоновая генерация patch arrays | `VERIFIED` | `CubeSpherePatchDataBuilder`, до 4 worker jobs, `CancellationToken` |
+| `PC-083` | Revision/cancellation/stale protection | `VERIFIED` | Новый plan отменяет старый; stale результаты отбрасываются до main-thread apply |
+| `PC-084` | Выгрузка невидимых patches | `VERIFIED` | Resident-set использует угол 108° с консервативным запасом на угловой размер patch; obsolete patches удаляются после settle |
+| `PC-085` | Main-thread применение ресурсов Godot | `VERIFIED` | `ArrayMesh`, `MeshInstance3D`, `SceneTree` и `QueueFree` выполняются только в прототипе на main thread |
+| `PC-086` | Автоматический async streaming acceptance test | `VERIFIED` | Клавиша `I`: 9 направлений, rapid revisions, settle и `PASS/FAIL` |
+| `PC-090` | Локальный collision resident-set следует за игроком | `IMPLEMENTED` | Target выбирается из resident quadtree-листьев по углу `42°` с учётом углового размера patch |
+| `PC-091` | Collision использует рабочие уровни `L1/L2/L3` | `IMPLEMENTED` | HUD считает динамические collision patches каждого уровня; ближайшая область включает `L3` |
+| `PC-092` | Collision создаётся отдельно от visual mesh | `IMPLEMENTED` | Отдельный `ConcavePolygonShape3D` строится только по top surface patch; visual skirts не входят в physics |
+| `PC-093` | Двухфазная безопасная замена collision-набора | `IMPLEMENTED` | New shapes создаются disabled, включаются deferred, затем перекрываются со старым набором заданное число physics-кадров |
+| `PC-094` | Полногранная collision-поверхность используется как fallback | `IMPLEMENTED` | `6 × 129×129` сохраняются, включаются при build/смене collision plan и отключаются после commit |
+| `PC-095` | Collision patches выгружаются после безопасного commit | `IMPLEMENTED` | Устаревшие shapes сначала disabled deferred, затем `QueueFree`; created/unloaded диагностируются |
+| `PC-096` | Автоматический dynamic collision acceptance test | `IMPLEMENTED` | `K`: подготовка, межгранный traversal, несколько collision plan/commit и финальный `PASS/FAIL` |
 | `PC-ACC-001` | Проект собирается без ошибок | `VERIFIED` | Основа cube sphere запущена; последующая радиальная редакция принята пользователем |
 | `PC-ACC-002` | Сцена запускается и показывает планету | `VERIFIED` | Предоставлен screenshot текущей сцены |
 | `PC-ACC-003` | HUD показывает `6/6` и collision `6/6` | `VERIFIED` | Прямое runtime-доказательство пользователя |
@@ -460,16 +509,25 @@
 | `PC-ACC-043` | Автоматический тест выполняет split и merge | `VERIFIED` | U: PASS split=17, merge=16 |
 | `PC-ACC-044` | Визуально отсутствуют отверстия на LOD-переходах | `VERIFIED` | Пользователь подтвердил нормальный визуальный результат |
 | `PC-ACC-045` | Collision и предыдущие тесты не регрессировали | `VERIFIED` | ground/floor/probe и collision 6/6 сохранены |
-| `PC-ACC-050` | Новая редакция собирается без ошибок и предупреждений | `IN_PROGRESS` | Требуется локальный `dotnet build` 0/0 |
-| `PC-ACC-051` | После settle applied совпадает с resident | `IN_PROGRESS` | `Applied = resident`, `queue=0`, `workers=0` |
-| `PC-ACC-052` | Третий уровень реально загружен | `IN_PROGRESS` | HUD и `I: PASS` содержат `L3>0` |
-| `PC-ACC-053` | Невидимые patches выгружаются | `IN_PROGRESS` | `resident < logical`, `unloaded>0` |
-| `PC-ACC-054` | Worker pipeline не содержит ошибок | `IN_PROGRESS` | `errors=0`; cancel/stale допустимы и диагностируются |
-| `PC-ACC-055` | Логическая топология остаётся корректной | `IN_PROGRESS` | `open=0`, `nonManifold=0`, `Δlod<=1`, seam<=1E-03 |
-| `PC-ACC-056` | Автоматический streaming test завершается PASS | `IN_PROGRESS` | `TASK-036 stream (I): PASS` и Output prefix |
-| `PC-ACC-057` | Предыдущие физические и диагностические тесты не регрессировали | `IN_PROGRESS` | Проверить WASD, Space, R, F1/F2, T, Y, U |
+| `PC-ACC-050` | Новая редакция собирается без ошибок и предупреждений | `VERIFIED` | Локальная сборка пользователя: `0` ошибок, `0` предупреждений |
+| `PC-ACC-051` | После settle applied совпадает с resident | `VERIFIED` | Стабильно `41/41/42`; после теста `44/44/45`, queue/workers `0` |
+| `PC-ACC-052` | Третий уровень реально загружен | `VERIFIED` | До теста `L3=8`; итог `I: PASS` содержит `L3=12` |
+| `PC-ACC-053` | Невидимые patches выгружаются | `VERIFIED` | Итог `resident=44/45`, `unloaded=93` |
+| `PC-ACC-054` | Worker pipeline не содержит ошибок | `VERIFIED` | `errors=0`, `stale=24`, queue/workers вернулись к `0` |
+| `PC-ACC-055` | Логическая топология остаётся корректной | `VERIFIED` | Runtime: `open=0`, `nonManifold=0`, `Δlod=1`, `Δpos=0` |
+| `PC-ACC-056` | Автоматический streaming test завершается PASS | `VERIFIED` | `TASK-036 stream (I): PASS revisions=10, L3=12, unloaded=93, stale=24, errors=0` |
+| `PC-ACC-057` | Предыдущие физические и диагностические тесты не регрессировали | `VERIFIED` | HUD после теста: collision `6/6`, ground/floor/probe и радиальная система `PASS` |
+| `PC-ACC-060` | Редакция dynamic collision LOD собирается 0/0 | `IN_PROGRESS` | Требуется локальный `dotnet build` без ошибок и предупреждений |
+| `PC-ACC-061` | После settle активен локальный collision-набор | `IN_PROGRESS` | `active=target>0`, staged/queue `0`, state `Idle`, fallback `off` |
+| `PC-ACC-062` | Collision resident-set содержит `L3` | `IN_PROGRESS` | HUD после settle и `K: PASS` показывает `L3>0` |
+| `PC-ACC-063` | Collision plan выполняет безопасные commits | `IN_PROGRESS` | `plans>=3`, `commits>=3`, created>0, unloaded>0, fallback activations>0 |
+| `PC-ACC-064` | Во время замены отсутствует потеря контакта | `IN_PROGRESS` | `gap<=0,12 с`, ground/floor/probe сохраняются |
+| `PC-ACC-065` | Collision pipeline не содержит ошибок | `IN_PROGRESS` | collision errors `0`, visual queue/workers после settle `0` |
+| `PC-ACC-066` | Автоматический collision test завершается PASS | `IN_PROGRESS` | `TASK-038 collision (K): PASS` и Output prefix |
+| `PC-ACC-067` | Старые collision patches реально выгружаются | `IN_PROGRESS` | `unloaded>0`, active final совпадает с target |
+| `PC-ACC-068` | Предыдущие тесты и управление не регрессировали | `IN_PROGRESS` | Проверить WASD, Space, R, F1/F2, T, Y, U, I |
 
-Ходьба, floating origin и начальная `L1/L2` quadtree LOD-ступень приняты по runtime-доказательствам. `L1/L2/L3` async visual streaming реализован и ожидает локальную приёмку `TASK-037`.
+Ходьба, floating origin и `L1/L2/L3` async visual streaming приняты по runtime-доказательствам. Dynamic collision LOD реализован и ожидает локальную приёмку `TASK-039`.
 
 ### 8.2. Оставшиеся прототипы
 
@@ -484,48 +542,71 @@
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-035`; Прототипы A и B; геометрия, радиальная система, collision-швы, floating origin и начальная quadtree LOD Прототипа C.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-037`; Прототипы A и B; геометрия, радиальная система, collision-швы, floating origin и async visual quadtree Прототипа C.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-037` | Выполнить runtime-приёмку `TASK-036` | Чистая сборка и `TASK-036 stream (I): PASS` |
-| 2 | `TASK-038` | Добавить отдельный collision LOD | Локальные collision patches, безопасная двухфазная замена, отсутствие провалов |
+| 1 | `TASK-039` | Выполнить runtime-приёмку `TASK-038` | Чистая сборка и `TASK-038 collision (K): PASS` без потери ground contact |
+| 2 | `TASK-040` | Подвести итог Прототипа C | Сверить все критерии cube sphere, gravity, walking, floating origin, visual/collision LOD и принять либо определить остаточный шаг |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Реализовано в этой итерации:** `TASK-036`, `PC-080`–`PC-086`.
-**Текущая приёмочная задача:** `TASK-037`.
+**Реализовано в этой итерации:** `TASK-038`, `PC-090`–`PC-096`.
+**Текущая приёмочная задача:** `TASK-039`.
 
-## 10. Runtime-приёмка `TASK-036/TASK-037`
+## 10. Runtime-приёмка `TASK-038/TASK-039`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену и дождаться стабильного состояния:
-   - `Applied = resident`;
-   - `resident < logical`;
-   - `queue=0`, `workers=0`, `errors=0`;
-   - `L3 > 0`;
+2. Запустить сцену и дождаться стабильного состояния:
+   - visual `Applied = resident`, queue `0`, workers `0`, errors `0`;
+   - collision `active=target>0`, staged `0`, queue `0`, state `Idle`;
+   - collision `L3>0`, fallback `off`, collision errors `0`;
    - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
-   - `collision=6/6 (129×129)`, `ground=да`, `probe=да`.
-3. Нажать `I` и не использовать управление до завершения. Обычная длительность — до 15 секунд.
+   - `ground=да`, `floor=да`, `probe=да`.
+3. Нажать `K` и не использовать управление до завершения. Тест использует межгранный маршрут и может занимать до `75 с`.
 4. Ожидаемый итог HUD:
 
 ```text
-TASK-036 stream (I): PASS revisions>=4, L3>0, resident<logical,
-unloaded>0, queue=0, workers=0, errors=0
+TASK-038 collision (K): PASS plans>=3, commits>=3,
+created>0, unloaded>0, fallback>0, active>0, L3>0,
+gap<=0,12 с, errors=0
 ```
 
 5. В Godot Output требуется строка с префиксом:
 
 ```text
-TASK-036 async patch streaming acceptance PASS
+TASK-038 dynamic collision LOD acceptance PASS
 ```
 
-6. Передать screenshot HUD после `PASS`, итоговую строку Output и результат сборки.
-7. Ручная проверка: розовые `L3` следуют за игроком, оранжевые `L2` образуют промежуточную зону, синие `L1` остаются вдали; отверстий на горизонте и LOD-переходах нет; collision и WASD/Space/R/F1/F2/T/Y/U работают.
-8. При `FAIL` передать screenshot HUD, итоговую строку Output и последние 20–30 строк лога.
+6. После `PASS` collision HUD должен показывать `active=target`, staged/queue `0`, state `Idle`, fallback `off`.
+7. Передать screenshot HUD после `PASS`, итоговую строку Output и результат сборки.
+8. Ручная проверка: игрок не проваливается и не подпрыгивает при движении и переходах граней; visible collision shapes показывают локальные patches около игрока; старые patches исчезают после commit; работают WASD, Space, R, F1/F2, T, Y, U и I.
+9. При `FAIL` передать screenshot HUD, итоговую строку Output и последние 20–30 строк лога.
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-038`, dynamic collision LOD
+
+**Исходный снимок:** `ProjectHorizon-main(7).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-dynamic-collision-lod.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** разделы 9.3 и 10.2 PDF-ТЗ; `TASK-036`–`TASK-040`, `PC-080`–`PC-096`, `PC-ACC-050`–`PC-ACC-068`.
+
+**Runtime-доказательство предыдущей итерации:** сборка 0/0; `TASK-036 stream (I): PASS revisions=10, L3=12, resident=44/45, unloaded=93, queue=0, workers=0, cancel=0, stale=24, errors=0`; topology open/nonManifold 0, `Δlod=1`, `Δpos=0`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/Planet/CubeSphereCollisionLod.cs`;
+- `src/Game.Client/Scripts/Planet/CubeSphereCollisionLod.cs.uid`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePrototype.cs`;
+- `src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Краткий результат:** добавлены локальные collision patches по quadtree-листьям, safety fallback `6 × 129×129`, deferred enable/disable, overlap по physics-кадрам, commit/unload lifecycle, HUD-метрики и acceptance test `K`, использующий реальное межгранное движение игрока.
+
+**Проверки текущей среды:** лексический C#-контроль 17 файлов, scene/resource paths, проверка `load_steps`, симуляция 275 выборок принятого четырёхшовного маршрута (`target=27–47`, `changes=121`, `created=294`, `unloaded=252`, topology `open=0`, `maxDelta=1`) и ZIP hygiene. Сборка и Godot runtime новой функции недоступны.
 
 ### 2026-08-01 — `TASK-036`, L1/L2/L3 async visual patch streaming
 

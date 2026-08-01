@@ -45,6 +45,14 @@ MaxPatchWorkers = 4
 MaxPatchAppliesPerFrame = 2
 StreamingTestStepSeconds = 0.08
 StreamingTestSettleTimeoutSeconds = 12.0
+EnableDynamicCollisionLod = true
+CollisionResidentAngleDegrees = 42.0
+CollisionUpdateIntervalSeconds = 0.15
+MaxCollisionAppliesPerFrame = 2
+CollisionOverlapPhysicsFrames = 2
+CollisionSafetyFallbackAngleDegrees = 14.0
+CollisionTestTimeoutSeconds = 75.0
+CollisionTestAllowedGroundGapSeconds = 0.12
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_planet")
@@ -91,11 +99,11 @@ TestAllowedGroundGapSeconds = 0.12
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 1130.0
-offset_bottom = 665.0
+offset_bottom = 760.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП C — ASYNC QUADTREE STREAMING\nПостроение геометрии..."
+text = "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\nПостроение геометрии..."
