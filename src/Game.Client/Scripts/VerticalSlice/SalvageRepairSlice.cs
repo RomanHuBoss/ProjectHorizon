@@ -1,0 +1,667 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Godot;
+
+public enum SalvageRepairSliceState
+{
+    Initializing = 0,
+    Loading = 1,
+    Ready = 2,
+    Saving = 3,
+    Testing = 4,
+    Passed = 5,
+    Failed = 6,
+    Exiting = 7
+}
+
+public partial class SalvageRepairSlice : Node3D
+{
+    private sealed record GracefulExitResult(
+        bool Saved,
+        int Revision);
+
+    private const string SlotId = StarterRepairSnapshotFactory.SlotId;
+
+    [Export(PropertyHint.Range, "5.0,600.0,5.0")]
+    public double AutosaveIntervalSeconds { get; set; } = 60.0;
+
+    private readonly CancellationTokenSource _lifetimeCancellation = new();
+    private readonly List<SalvageResourceNode> _resourceNodes = new();
+    private SaveDatabase? _database;
+    private SaveAutosaveCoordinator? _autosave;
+    private StarterRepairSession _session = new();
+    private StarterShipRepairTerminal? _shipTerminal;
+    private CharacterBody3D? _player;
+    private Label? _hudLabel;
+    private Task<SaveDatabaseDiagnostics>? _initializeTask;
+    private Task<SaveGameSnapshot?>? _loadTask;
+    private Task? _resetTask;
+    private Task<VerticalSliceAcceptanceReport>? _acceptanceTask;
+    private Task<GracefulExitResult>? _gracefulExitTask;
+    private SaveDatabaseDiagnostics? _diagnostics;
+    private VerticalSliceAcceptanceReport? _acceptanceReport;
+    private SalvageRepairSliceState _state =
+        SalvageRepairSliceState.Initializing;
+    private int _revision;
+    private int _observedAutosaveBatches;
+    private int _observedAutosaveFailures;
+    private double _autosaveElapsedSeconds;
+    private bool _closeRequested;
+    private bool _previousAutoAcceptQuit = true;
+    private string _status = "initializing SQLite";
+    private string _acceptanceHud = "READY";
+    private string _lastDomainEvent = "none";
+
+    public override void _Ready()
+    {
+        _hudLabel = GetNodeOrNull<Label>(
+            "Hud/MarginContainer/PanelContainer/Label");
+        _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
+            "Gameplay/DamagedShip");
+        _player = GetNodeOrNull<CharacterBody3D>("Player");
+        if (_hudLabel is null || _shipTerminal is null || _player is null)
+        {
+            throw new InvalidOperationException(
+                "Vertical slice scene is missing HUD, player or ship.");
+        }
+
+        foreach (Node node in GetTree().GetNodesInGroup(
+            "vertical_slice_resource"))
+        {
+            if (node is SalvageResourceNode resourceNode)
+            {
+                _resourceNodes.Add(resourceNode);
+            }
+        }
+
+        _resourceNodes.Sort(
+            (left, right) => string.Compare(
+                left.ResourceNodeId,
+                right.ResourceNodeId,
+                StringComparison.Ordinal));
+        if (_resourceNodes.Count != StarterRepairSession.RequiredSalvage)
+        {
+            throw new InvalidOperationException(
+                $"Vertical slice requires exactly " +
+                $"{StarterRepairSession.RequiredSalvage} salvage nodes.");
+        }
+
+        string userDirectory = ProjectSettings.GlobalizePath("user://");
+        string databasePath = Path.Combine(
+            userDirectory,
+            "profiles",
+            "profile_vertical_slice",
+            "save_1.db");
+        SaveDatabase database = new(databasePath);
+        _database = database;
+        _autosave = new SaveAutosaveCoordinator(database);
+        _initializeTask = database.InitializeAsync(
+            _lifetimeCancellation.Token);
+
+        SceneTree tree = GetTree();
+        _previousAutoAcceptQuit = tree.AutoAcceptQuit;
+        tree.AutoAcceptQuit = false;
+        UpdateHud();
+        GD.Print(
+            "TASK-062 vertical slice initializing. " +
+            "Collect three cyan salvage nodes with E, then repair the red ship. " +
+            "Press F7 for isolated acceptance or F8 to reset the gameplay slot.");
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest)
+        {
+            _closeRequested = true;
+            TryBeginGracefulExit();
+        }
+    }
+
+    public override void _ExitTree()
+    {
+        GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
+        _lifetimeCancellation.Cancel();
+        _autosave?.Dispose();
+        _database?.Dispose();
+        _lifetimeCancellation.Dispose();
+    }
+
+    public override void _Process(double delta)
+    {
+        PollInitializeTask();
+        PollLoadTask();
+        PollResetTask();
+        PollAcceptanceTask();
+        PollAutosave();
+        PollGracefulExitTask();
+        UpdatePeriodicAutosave(delta);
+        TryBeginGracefulExit();
+        UpdateHud();
+    }
+
+    public override void _UnhandledInput(InputEvent inputEvent)
+    {
+        if (inputEvent is not InputEventKey keyEvent ||
+            !keyEvent.Pressed ||
+            keyEvent.Echo)
+        {
+            return;
+        }
+
+        Key physical = keyEvent.PhysicalKeycode;
+        Key logical = keyEvent.Keycode;
+        if (Matches(physical, logical, Key.F7) && CanStartCommand())
+        {
+            BeginAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F8) && CanStartCommand())
+        {
+            BeginReset();
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    public bool TryCollectResource(
+        SalvageResourceNode source,
+        string resourceNodeId,
+        int quantity,
+        Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(interactor);
+        if (_state != SalvageRepairSliceState.Ready &&
+            _state != SalvageRepairSliceState.Passed)
+        {
+            _status = "wait until the current persistence operation completes";
+            return false;
+        }
+
+        if (!_session.TryCollect(resourceNodeId, quantity, out string result))
+        {
+            _status = result;
+            return false;
+        }
+
+        _lastDomainEvent =
+            $"ResourceCollected({resourceNodeId}, quantity={quantity})";
+        _status = result;
+        GD.Print(
+            $"Vertical slice domain event: {_lastDomainEvent}; " +
+            $"salvage={_session.SalvageQuantity}/" +
+            $"{StarterRepairSession.RequiredSalvage}; " +
+            $"interactor={interactor.Name}");
+        return true;
+    }
+
+    public void TryRepairShip(Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(interactor);
+        if (_state != SalvageRepairSliceState.Ready &&
+            _state != SalvageRepairSliceState.Passed)
+        {
+            _status = "wait until the current persistence operation completes";
+            return;
+        }
+
+        StarterRepairResult repairResult = _session.TryRepair(out string result);
+        _status = result;
+        if (repairResult == StarterRepairResult.InsufficientSalvage)
+        {
+            _lastDomainEvent = "ShipRepairBlocked";
+            GD.Print(
+                $"Vertical slice domain event: ShipRepairBlocked; " +
+                $"salvage={_session.SalvageQuantity}/" +
+                $"{StarterRepairSession.RequiredSalvage}");
+            return;
+        }
+
+        if (repairResult == StarterRepairResult.AlreadyRepaired)
+        {
+            return;
+        }
+
+        _shipTerminal?.SetRepaired(true);
+        _lastDomainEvent = "StarterRepairQuestCompleted";
+        QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+        GD.Print(
+            "Vertical slice domain event: StarterRepairQuestCompleted; " +
+            $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
+            $"revision={_revision}; interactor={interactor.Name}");
+    }
+
+    private bool CanStartCommand()
+    {
+        return _database is not null &&
+            _autosave is not null &&
+            _initializeTask is null &&
+            _loadTask is null &&
+            _resetTask is null &&
+            _acceptanceTask is null &&
+            _gracefulExitTask is null &&
+            !_autosave.IsBusy &&
+            !_closeRequested;
+    }
+
+    private void BeginAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.vertical-slice-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-062 acceptance running";
+        _acceptanceHud = "RUNNING";
+        _acceptanceReport = null;
+        _acceptanceTask = VerticalSliceAcceptanceRunner.RunAsync(
+            testPath,
+            SlotId,
+            _lifetimeCancellation.Token);
+    }
+
+    private void BeginReset()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SalvageRepairSliceState.Saving;
+        _status = "resetting vertical-slice slot";
+        _resetTask = _database.ResetSlotAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+    }
+
+    private void QueueCurrentSnapshot(AutosaveTrigger trigger)
+    {
+        if (_autosave is null || _player is null)
+        {
+            return;
+        }
+
+        _revision++;
+        SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
+            SlotId,
+            _revision,
+            _session,
+            _player.GlobalPosition.X,
+            _player.GlobalPosition.Y,
+            _player.GlobalPosition.Z);
+        _autosave.Request(trigger, snapshot);
+        _autosaveElapsedSeconds = 0.0;
+        _state = SalvageRepairSliceState.Saving;
+        _status = $"autosave queued: {trigger}, rev={_revision}";
+    }
+
+    private async Task<GracefulExitResult> FlushGracefulExitAsync(
+        SaveGameSnapshot snapshot)
+    {
+        if (_autosave is null)
+        {
+            return new GracefulExitResult(false, 0);
+        }
+
+        await _autosave.FlushAsync(
+            AutosaveTrigger.GracefulExit,
+            snapshot,
+            _lifetimeCancellation.Token).ConfigureAwait(false);
+        return new GracefulExitResult(true, snapshot.Revision);
+    }
+
+    private void TryBeginGracefulExit()
+    {
+        if (!_closeRequested || _gracefulExitTask is not null)
+        {
+            return;
+        }
+
+        if (_initializeTask is not null ||
+            _loadTask is not null ||
+            _resetTask is not null ||
+            _acceptanceTask is not null ||
+            (_autosave?.IsBusy ?? false) ||
+            _player is null ||
+            _autosave is null)
+        {
+            _state = SalvageRepairSliceState.Exiting;
+            _status = "waiting for persistence before exit";
+            return;
+        }
+
+        _revision++;
+        SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
+            SlotId,
+            _revision,
+            _session,
+            _player.GlobalPosition.X,
+            _player.GlobalPosition.Y,
+            _player.GlobalPosition.Z);
+        _state = SalvageRepairSliceState.Exiting;
+        _status = $"graceful-exit flush rev={snapshot.Revision}";
+        GD.Print(
+            "Vertical slice graceful-exit flush started: " +
+            $"revision={snapshot.Revision}; " +
+            $"salvage={_session.SalvageQuantity}; " +
+            $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}.");
+        _gracefulExitTask = FlushGracefulExitAsync(snapshot);
+    }
+
+    private void PollInitializeTask()
+    {
+        if (_initializeTask is null || !_initializeTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveDatabaseDiagnostics> task = _initializeTask;
+        _initializeTask = null;
+        try
+        {
+            _diagnostics = task.GetAwaiter().GetResult();
+            _state = SalvageRepairSliceState.Loading;
+            _status = "loading starter repair state";
+            _loadTask = _database?.LoadAsync(
+                SlotId,
+                _lifetimeCancellation.Token);
+        }
+        catch (Exception exception)
+        {
+            Fail("initialization", exception);
+        }
+    }
+
+    private void PollLoadTask()
+    {
+        if (_loadTask is null || !_loadTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveGameSnapshot?> task = _loadTask;
+        _loadTask = null;
+        try
+        {
+            SaveGameSnapshot? snapshot = task.GetAwaiter().GetResult();
+            IReadOnlyList<string> resourceIds = _resourceNodes
+                .Select(node => node.ResourceNodeId)
+                .ToArray();
+            _session = StarterRepairSession.FromSnapshot(
+                snapshot,
+                resourceIds);
+            _revision = snapshot?.Revision ?? 0;
+            if (snapshot is not null && _player is not null)
+            {
+                _player.GlobalPosition = new Vector3(
+                    (float)snapshot.Player.PositionX,
+                    (float)snapshot.Player.PositionY,
+                    (float)snapshot.Player.PositionZ);
+            }
+
+            ApplySessionToScene();
+            _state = SalvageRepairSliceState.Ready;
+            _status = snapshot is null
+                ? "new starter repair objective"
+                : $"restored revision {_revision}";
+            GD.Print(
+                "TASK-062 vertical slice READY: " +
+                $"revision={_revision}; " +
+                $"salvage={_session.SalvageQuantity}; " +
+                $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}.");
+        }
+        catch (Exception exception)
+        {
+            Fail("load", exception);
+        }
+    }
+
+    private void PollResetTask()
+    {
+        if (_resetTask is null || !_resetTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task task = _resetTask;
+        _resetTask = null;
+        try
+        {
+            task.GetAwaiter().GetResult();
+            _session = new StarterRepairSession();
+            _revision = 0;
+            _autosaveElapsedSeconds = 0.0;
+            _lastDomainEvent = "GameplaySlotReset";
+            if (_player is not null)
+            {
+                _player.GlobalPosition = new Vector3(0.0f, 1.05f, 5.5f);
+                _player.Rotation = Vector3.Zero;
+                _player.Velocity = Vector3.Zero;
+            }
+
+            ApplySessionToScene();
+            _state = SalvageRepairSliceState.Ready;
+            _status = "slot reset; collect three salvage nodes";
+            GD.Print("TASK-062 vertical slice slot reset PASS.");
+        }
+        catch (Exception exception)
+        {
+            Fail("reset", exception);
+        }
+    }
+
+    private void PollAcceptanceTask()
+    {
+        if (_acceptanceTask is null || !_acceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<VerticalSliceAcceptanceReport> task = _acceptanceTask;
+        _acceptanceTask = null;
+        try
+        {
+            _acceptanceReport = task.GetAwaiter().GetResult();
+            _acceptanceHud = _acceptanceReport.Passed
+                ? $"PASS resources={_acceptanceReport.ResourcesCollected}, " +
+                  $"blocked={(_acceptanceReport.RepairBlockedBeforeResources ? 1 : 0)}, " +
+                  $"repaired={(_acceptanceReport.ShipRepaired ? 1 : 0)}, " +
+                  $"autosave={(_acceptanceReport.QuestAutosaveObserved ? 1 : 0)}, " +
+                  $"roundTrip={(_acceptanceReport.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {_acceptanceReport.Result}";
+            _state = _acceptanceReport.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = _acceptanceReport.Result;
+            string output = BuildAcceptanceOutput(_acceptanceReport);
+            if (_acceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("acceptance", exception);
+        }
+    }
+
+    private void PollAutosave()
+    {
+        if (_autosave is null)
+        {
+            return;
+        }
+
+        if (_autosave.FailedBatches > _observedAutosaveFailures)
+        {
+            _observedAutosaveFailures = _autosave.FailedBatches;
+            _state = SalvageRepairSliceState.Failed;
+            _status = $"autosave FAIL: {_autosave.LastErrorMessage}";
+            GD.PushError(
+                $"TASK-062 vertical slice autosave failed: " +
+                $"{_autosave.LastErrorMessage}");
+            return;
+        }
+
+        if (_autosave.CompletedBatches <= _observedAutosaveBatches)
+        {
+            return;
+        }
+
+        _observedAutosaveBatches = _autosave.CompletedBatches;
+        _state = SalvageRepairSliceState.Ready;
+        _status =
+            $"autosave PASS rev={_autosave.LastSavedRevision}, " +
+            $"trigger={_autosave.LastCompletedTriggerSummary}";
+        GD.Print(
+            "Vertical slice autosave PASS: " +
+            $"revision={_autosave.LastSavedRevision}; " +
+            $"triggers={_autosave.LastCompletedTriggerSummary}; " +
+            $"salvage={_session.SalvageQuantity}; " +
+            $"shipRepaired={(_session.ShipRepaired ? 1 : 0)}; pending=0");
+    }
+
+    private void PollGracefulExitTask()
+    {
+        if (_gracefulExitTask is null || !_gracefulExitTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<GracefulExitResult> task = _gracefulExitTask;
+        _gracefulExitTask = null;
+        try
+        {
+            GracefulExitResult result = task.GetAwaiter().GetResult();
+            GD.Print(
+                "Vertical slice graceful-exit autosave PASS: " +
+                $"saved={(result.Saved ? 1 : 0)}; " +
+                $"revision={result.Revision}; pending=0");
+            GetTree().Quit();
+        }
+        catch (Exception exception)
+        {
+            _closeRequested = false;
+            Fail("graceful exit", exception);
+        }
+    }
+
+    private void UpdatePeriodicAutosave(double delta)
+    {
+        if ((_state != SalvageRepairSliceState.Ready &&
+             _state != SalvageRepairSliceState.Passed) ||
+            _closeRequested ||
+            (_autosave?.IsBusy ?? true))
+        {
+            return;
+        }
+
+        _autosaveElapsedSeconds += delta;
+        if (_autosaveElapsedSeconds >= AutosaveIntervalSeconds)
+        {
+            QueueCurrentSnapshot(AutosaveTrigger.Periodic);
+        }
+    }
+
+    private void ApplySessionToScene()
+    {
+        foreach (SalvageResourceNode node in _resourceNodes)
+        {
+            node.SetCollected(
+                _session.CollectedNodeIds.Contains(node.ResourceNodeId));
+        }
+
+        _shipTerminal?.SetRepaired(_session.ShipRepaired);
+    }
+
+    private void UpdateHud()
+    {
+        if (_hudLabel is null)
+        {
+            return;
+        }
+
+        string databaseLine = _diagnostics is null
+            ? "DB: initializing"
+            : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
+              $"integrity={_diagnostics.IntegrityResult} • " +
+              $"writes={_database?.CompletedWrites ?? 0}";
+        string objective = _session.ShipRepaired
+            ? "Objective: COMPLETE — starter ship repaired"
+            : $"Objective: collect salvage " +
+              $"{_session.SalvageQuantity}/" +
+              $"{StarterRepairSession.RequiredSalvage}, then interact with ship";
+        string ship = _session.ShipRepaired
+            ? "Ship: REPAIRED • launch systems online"
+            : "Ship: DAMAGED • repair requires 3 salvage";
+        double nextAutosave = Math.Max(
+            0.0,
+            AutosaveIntervalSeconds - _autosaveElapsedSeconds);
+        string autosave = _autosave is null
+            ? "Autosave: unavailable"
+            : $"Autosave: {(_autosave.IsBusy ? "RUNNING" : "idle")} • " +
+              $"lastRev={_autosave.LastSavedRevision} • " +
+              $"last={_autosave.LastCompletedTriggerSummary} • " +
+              $"next={nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)}s";
+
+        _hudLabel.Text =
+            "VERTICAL SLICE 1 — SALVAGE → REPAIR → AUTOSAVE\n" +
+            databaseLine + "\n" +
+            $"Snapshot: rev={_revision} • collected={_session.CollectedNodeCount}/3\n" +
+            objective + "\n" +
+            ship + "\n" +
+            autosave + "\n" +
+            $"Last domain event: {_lastDomainEvent}\n" +
+            $"TASK-062 acceptance (F7): {_acceptanceHud}\n" +
+            $"Status: {_status}\n" +
+            "WASD/Space — move • E — collect/repair • F7 — acceptance • " +
+            "F8 — reset loop • Esc — release mouse";
+    }
+
+    private static string BuildAcceptanceOutput(
+        VerticalSliceAcceptanceReport report)
+    {
+        return "TASK-062 vertical slice integration acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"resources={report.ResourcesCollected}; " +
+            $"repairBlocked=" +
+            $"{(report.RepairBlockedBeforeResources ? 1 : 0)}; " +
+            $"shipRepaired={(report.ShipRepaired ? 1 : 0)}; " +
+            $"questAutosave={(report.QuestAutosaveObserved ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+            $"revision={report.Revision}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private void Fail(string operation, Exception exception)
+    {
+        _state = SalvageRepairSliceState.Failed;
+        _status = $"{operation} failed: {exception.Message}";
+        GD.PushError(
+            $"TASK-062 vertical slice {operation} failed: {exception}");
+    }
+
+    private static bool Matches(Key physical, Key logical, Key expected)
+    {
+        return physical == expected || logical == expected;
+    }
+}

@@ -17,6 +17,7 @@ public sealed partial class SaveDatabase
         StringComparer.Ordinal)
     {
         "resource.iron_ore",
+        "resource.salvage_alloy",
         "component.energy_cell",
         "consumable.repair_kit"
     };
@@ -30,7 +31,8 @@ public sealed partial class SaveDatabase
     private static readonly HashSet<string> KnownShipTemplates = new(
         StringComparer.Ordinal)
     {
-        "ship.arcade.prototype"
+        "ship.arcade.prototype",
+        "ship.starter.repairable"
     };
 
     private readonly object _schemaPreparationGate = new();

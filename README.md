@@ -28,7 +28,44 @@
 
 ## Текущее состояние
 
-Текущий этап — **Этап 0: независимые технические прототипы**.
+Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
+
+### Первая интеграция вертикального среза — `IMPLEMENTED`
+
+Текущая стартовая сцена:
+
+```text
+src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
+```
+
+Реализован минимальный сквозной цикл начала игры из разделов 2.2 и 40 PDF-ТЗ:
+
+1. игрок появляется на тестовой планетарной площадке;
+2. собирает три узла ресурса `resource.salvage_alloy` взаимодействием по `E`;
+3. попытка ремонта до сбора трёх единиц блокируется доменным правилом;
+4. после сбора ресурс расходуется, повреждённый корабль ремонтируется;
+5. завершение стартовой ремонтной цели создаёт реальное доменное событие и
+   вызывает production-autosave с причиной `QuestCompleted`;
+6. inventory, состояние корабля, позиция игрока и revision восстанавливаются из
+   SQLite при следующем запуске;
+7. periodic и graceful-exit сохранения используют тот же coordinator.
+
+Управление стартовой сценой:
+
+```text
+WASD / Space   движение и прыжок
+E              собрать голубой ресурс или взаимодействовать с кораблём
+F7             изолированная приёмка TASK-062
+F8             очистить gameplay-slot и начать цикл заново
+Esc            освободить курсор
+```
+
+Ожидаемый автоматический результат по `F7`:
+
+```text
+TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
+```
+
 
 ### Прототип A. Персонаж — `VERIFIED`
 
@@ -132,7 +169,7 @@ src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 
 ### Прототип E. SQLite save, backup, recovery и migration — `VERIFIED`
 
-Текущая стартовая сцена:
+Регрессионная сцена persistence-прототипа:
 
 ```text
 src/Game.Client/Scenes/Persistence/SavePrototype.tscn

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-persistence-autosave-graceful-exit.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,71 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов имеют статус `VERIFIED`; ограничение на начало вертикального среза снято. `TASK-058/TASK-059` закрыты по сборке `0/0` и runtime-проверкам `C: PASS`, `X: PASS`, `Z: PASS`. Текущая итерация реализует производственный autosave/graceful-exit foundation `TASK-060`; runtime-приёмка выделена в `TASK-061`.
+**Вывод:** все пять технических прототипов и производственная persistence-ступень `TASK-060/TASK-061` имеют статус `VERIFIED`. Пользователь подтвердил `F6: PASS`, реальный periodic autosave, graceful-exit `saved=1; revision=3; pending=0` и холодное восстановление revision `3`. Ограничение на Этап 1 снято; текущая итерация реализует первый сквозной цикл вертикального среза `TASK-062`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — первый сквозной цикл: сбор ресурса, ремонт корабля и domain autosave (`TASK-062`)
+
+**Исходный снимок:** `ProjectHorizon-main(3)(3).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 2.2, 17.1–17.3, 19.1–19.3, 22.3, 22.8, 36.3, Этап 1 раздела 40 и критерии 6, 10, 14 раздела 41 PDF-ТЗ; `TASK-060`–`TASK-063`, `VS-010`–`VS-016`, `VS-ACC-010`–`VS-ACC-016`.
+
+**Синхронизация предыдущей приёмки:**
+
+- локальная сборка autosave-редакции завершилась с `0` предупреждений и `0` ошибок;
+- `TASK-060 autosave (F6): PASS triggers=8, requests=8, batches=2, coalesced=6, exit=1`;
+- реальный periodic autosave подтвердил `triggers=Periodic`;
+- регрессионные `C`, `X`, `Z` одновременно остались `PASS`;
+- при закрытии получено `Prototype E graceful-exit flush started: activeTasks=0; inMemoryRevision=2`;
+- финальная строка: `Prototype E graceful-exit autosave PASS: saved=1; revision=3; pending=0`;
+- пользователь прямо подтвердил, что после перезапуска revision `3` восстановилась;
+- `TASK-060`, `TASK-061`, `PERSIST-040`–`PERSIST-046`, `PERSIST-ACC-040`–`PERSIST-ACC-047` → `VERIFIED`.
+
+**Реализовано в `TASK-062`:**
+
+- стартовая сцена переключена на `Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- сцена объединяет принятого персонажа, физическое взаимодействие, три ресурсных узла, повреждённый корабль, SQLite и autosave coordinator;
+- добавлена Godot-независимая доменная модель `StarterRepairSession`; она запрещает повторный сбор одного узла и ремонт при наличии менее трёх единиц salvage;
+- сбор выполняется реальным взаимодействием `E` через существующий `IInteractable` и raycast игрока;
+- успешный ремонт расходует три единицы `resource.salvage_alloy`, переводит здоровье корабля с `28` до `100` и завершает стартовую ремонтную цель;
+- завершение цели формирует реальное доменное событие `StarterRepairQuestCompleted` и вызывает production-autosave с типизированной причиной `QuestCompleted`;
+- `resource.salvage_alloy` и `ship.starter.repairable` добавлены в известный content registry persistence, поэтому не превращаются в unknown placeholders;
+- gameplay snapshot хранит позицию игрока, salvage inventory, состояние корабля и посещённую планету; при холодной загрузке восстанавливаются revision, количество собранных узлов и визуальное состояние корабля;
+- periodic autosave и graceful-exit flush подключены к новой стартовой сцене; незавершённый сбор также сохраняется при штатном выходе;
+- `F8` очищает отдельный gameplay-slot и позволяет повторить цикл; persistence-прототип сохранён отдельной регрессионной сценой;
+- `F7` запускает изолированную acceptance route: ранний ремонт должен быть заблокирован, три ресурса собраны, корабль отремонтирован, `QuestCompleted` autosave завершён, snapshot точно прочитан обратно, журнал записан и `integrity_check=ok`.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageResourceNode.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterShipRepairTerminal.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs`;
+- соответствующие `.uid`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/project.godot`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ визуально и текстово сверено по базовому циклу, inventory/quest-модели и составу Этапа 1;
+- проверены все новые `res://`-ссылки, UID, NodePath, группы и отсутствие конфликта `F7/F8`;
+- доменная и acceptance-инфраструктура не обращаются к Godot API;
+- выполнена лексическая проверка C#-файлов, строк, комментариев и скобок;
+- проверено, что новый профиль и изолированная test-БД не затрагивают persistence-прототип;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому сборка и runtime `F7` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-060`, `TASK-061`, `PERSIST-040`–`PERSIST-046`, `PERSIST-ACC-040`–`PERSIST-ACC-047` → `VERIFIED`;
+- `TASK-062`, `VS-010`–`VS-016` → `IMPLEMENTED`;
+- `TASK-063`, `VS-ACC-010`–`VS-ACC-016` → `IN_PROGRESS`.
+
+**Следующий рекомендуемый шаг:** собрать проект, выполнить `F7: PASS`, затем вручную проверить блокировку раннего ремонта, сбор трёх узлов, зелёное состояние корабля, строку `QuestCompleted`, штатный выход и холодное восстановление отремонтированного состояния.
 
 ### 2026-08-01 — autosave coordinator и безопасный штатный выход (`TASK-060`)
 
@@ -1353,83 +1415,105 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `PERSIST-040` | Autosave coordinator не зависит от Godot API и получает immutable snapshot | `IMPLEMENTED` | `SaveAutosaveCoordinator`; вход — `SaveGameSnapshot`; файл не импортирует Godot |
-| `PERSIST-041` | Периодический autosave выполняется каждые 60 секунд после появления snapshot | `IMPLEMENTED` | `AutosaveIntervalSeconds=60`; countdown и результат выводятся в HUD |
-| `PERSIST-042` | Поддержаны причины landing/takeoff/hyperspace/quest/ship/base/exit | `IMPLEMENTED` | Типизированный `AutosaveTrigger`; application integration подключается к соответствующим событиям вертикального среза |
-| `PERSIST-043` | Burst событий coalesce-ится с сохранением самого нового snapshot | `IMPLEMENTED` | Один worker, coalescing-window, агрегированный набор причин и latest snapshot |
-| `PERSIST-044` | Штатный выход ждёт активные persistence-операции и полный autosave flush | `IMPLEMENTED` | `NotificationWMCloseRequest`; `AutoAcceptQuit=false`; пустой slot не создаётся заново; `Quit()` вызывается только после завершения |
-| `PERSIST-045` | Autosave использует существующую сериализованную транзакционную запись и backup | `IMPLEMENTED` | Coordinator вызывает `SaveDatabase.SaveAsync`; сохраняются one-writer gate, transaction и previous-copy protection |
-| `PERSIST-046` | Autosave имеет журнал, HUD и изолированную acceptance route | `IMPLEMENTED` | `logs/save_1.autosave.log`; F6; отдельная `save_1.autosave-test.db` |
-| `PERSIST-ACC-040` | Autosave-редакция собирается 0/0 | `IN_PROGRESS` | Требуется локальная сборка подготовленного архива |
-| `PERSIST-ACC-041` | F6 охватывает все 8 trigger types и 8 запросов | `IN_PROGRESS` | Ожидается `triggerTypes=8`, `requested=8` |
-| `PERSIST-ACC-042` | Burst превращается в 2 batch и 6 coalesced requests | `IN_PROGRESS` | Ожидается `batches=2`, `coalesced=6` |
-| `PERSIST-ACC-043` | Periodic route и реальный 60-секундный autosave срабатывают | `IN_PROGRESS` | F6: `periodic=1`; затем отдельное ожидание 60–65 секунд в основной сцене |
-| `PERSIST-ACC-044` | Закрытие окна ждёт graceful-exit flush | `IN_PROGRESS` | Ожидается `gracefulExit=1`; при реальном закрытии строка PASS должна появиться до завершения процесса |
-| `PERSIST-ACC-045` | Последний snapshot проходит exact round-trip и integrity check | `IN_PROGRESS` | F6 ожидает revision `27`, `roundTrip=1`, `integrity=ok` |
-| `PERSIST-ACC-046` | Autosave остаётся однописательным и пишет журнал | `IN_PROGRESS` | Ожидается `maxWriters=1`, `logWritten=1` |
-| `PERSIST-ACC-047` | Migration/recovery/foundation не регрессируют | `IN_PROGRESS` | После F6 повторить `C`, `X`, `Z` и получить PASS |
+| `PERSIST-040` | Autosave coordinator не зависит от Godot API и получает immutable snapshot | `VERIFIED` | `SaveAutosaveCoordinator`; вход — `SaveGameSnapshot`; файл не импортирует Godot |
+| `PERSIST-041` | Периодический autosave выполняется каждые 60 секунд после появления snapshot | `VERIFIED` | `AutosaveIntervalSeconds=60`; countdown и результат выводятся в HUD |
+| `PERSIST-042` | Поддержаны причины landing/takeoff/hyperspace/quest/ship/base/exit | `VERIFIED` | Типизированный `AutosaveTrigger`; application integration подключается к соответствующим событиям вертикального среза |
+| `PERSIST-043` | Burst событий coalesce-ится с сохранением самого нового snapshot | `VERIFIED` | Один worker, coalescing-window, агрегированный набор причин и latest snapshot |
+| `PERSIST-044` | Штатный выход ждёт активные persistence-операции и полный autosave flush | `VERIFIED` | `NotificationWMCloseRequest`; `AutoAcceptQuit=false`; пустой slot не создаётся заново; `Quit()` вызывается только после завершения |
+| `PERSIST-045` | Autosave использует существующую сериализованную транзакционную запись и backup | `VERIFIED` | Coordinator вызывает `SaveDatabase.SaveAsync`; сохраняются one-writer gate, transaction и previous-copy protection |
+| `PERSIST-046` | Autosave имеет журнал, HUD и изолированную acceptance route | `VERIFIED` | `logs/save_1.autosave.log`; F6; отдельная `save_1.autosave-test.db` |
+| `PERSIST-ACC-040` | Autosave-редакция собирается 0/0 | `VERIFIED` | Сборка пользователя: 0 предупреждений, 0 ошибок |
+| `PERSIST-ACC-041` | F6 охватывает все 8 trigger types и 8 запросов | `VERIFIED` | Подтверждено F6: `triggerTypes=8`, `requested=8` |
+| `PERSIST-ACC-042` | Burst превращается в 2 batch и 6 coalesced requests | `VERIFIED` | Подтверждено F6: `batches=2`, `coalesced=6` |
+| `PERSIST-ACC-043` | Periodic route и реальный 60-секундный autosave срабатывают | `VERIFIED` | Подтверждены F6 `periodic=1` и реальный `triggers=Periodic` |
+| `PERSIST-ACC-044` | Закрытие окна ждёт graceful-exit flush | `VERIFIED` | Подтверждены `gracefulExit=1`, `saved=1`, revision `3`, `pending=0` и холодная загрузка revision `3` |
+| `PERSIST-ACC-045` | Последний snapshot проходит exact round-trip и integrity check | `VERIFIED` | Подтверждены F6 `roundTrip=1`, `integrity=ok` и cold restart |
+| `PERSIST-ACC-046` | Autosave остаётся однописательным и пишет журнал | `VERIFIED` | Подтверждены `maxWriters=1`, `logWritten=1` |
+| `PERSIST-ACC-047` | Migration/recovery/foundation не регрессируют | `VERIFIED` | Пользователь предоставил одновременные `C/X/Z: PASS` |
 
 Все пять технических прототипов приняты; начало вертикального среза разрешено. `TASK-060` является первой производственной persistence-ступенью, а не незакрытой частью Прототипа E.
+
+
+### 8.5. Этап 1 — первая интеграция salvage/repair
+
+| ID | Требование | Статус | Доказательство / примечание |
+|---|---|---|---|
+| `VS-010` | Стартовая сцена объединяет персонажа, тестовую планетарную площадку, ресурсы и повреждённый корабль | `IMPLEMENTED` | `SalvageRepairSlice.tscn`; сцена назначена `run/main_scene` |
+| `VS-011` | Правило сбора и ремонта реализовано в Godot-независимой доменной модели | `IMPLEMENTED` | `StarterRepairSession`; без импорта Godot |
+| `VS-012` | Игрок собирает три физических ресурсных узла через `E`; повторный сбор запрещён | `IMPLEMENTED` | `SalvageResourceNode` + существующий `IInteractable`/raycast |
+| `VS-013` | Ремонт до трёх единиц блокируется; успешный ремонт расходует ресурс и восстанавливает корабль | `IMPLEMENTED` | `RequiredSalvage=3`; health `28→100`; визуал `red→green` |
+| `VS-014` | Завершение ремонтной цели вызывает production-autosave реальным domain event | `IMPLEMENTED` | `StarterRepairQuestCompleted` → `AutosaveTrigger.QuestCompleted` |
+| `VS-015` | SQLite round-trip восстанавливает revision, inventory, позицию и состояние корабля | `IMPLEMENTED` | `StarterRepairSnapshotFactory`; load применяет состояние к ресурсам и кораблю |
+| `VS-016` | Periodic/graceful-exit сохранения и reset доступны в gameplay-сцене | `IMPLEMENTED` | 60 s periodic, WM close flush, `F8` reset |
+| `VS-ACC-010` | Новая стартовая сцена собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
+| `VS-ACC-011` | F7 подтверждает раннюю блокировку и сбор трёх ресурсов | `IN_PROGRESS` | Ожидается `resources=3`, `repairBlocked=1` |
+| `VS-ACC-012` | F7 подтверждает ремонт и QuestCompleted autosave | `IN_PROGRESS` | Ожидается `shipRepaired=1`, `questAutosave=1` |
+| `VS-ACC-013` | F7 подтверждает exact round-trip, log и integrity | `IN_PROGRESS` | Ожидается `roundTrip=1`, `logWritten=1`, `integrity=ok` |
+| `VS-ACC-014` | Persistence остаётся однописательной | `IN_PROGRESS` | Ожидается `maxWriters=1` |
+| `VS-ACC-015` | Ручной цикл блокирует ранний ремонт и после 3/3 меняет корабль на REPAIRED | `IN_PROGRESS` | Нужны скриншоты HUD до и после ремонта |
+| `VS-ACC-016` | Штатный выход и cold restart восстанавливают завершённый или частичный цикл | `IN_PROGRESS` | Нужны exit PASS и screenshot после перезапуска |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-059`; Прототипы A, B, C, D и E.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-061`; Прототипы A–E и production persistence foundation.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-061` | Выполнить runtime-приёмку autosave и graceful exit | Чистая сборка; `F6: PASS`; реальный periodic через 60 секунд; закрытие окна только после flush; повторный запуск загружает последнюю revision; `C/X/Z` остаются PASS |
+| 1 | `TASK-063` | Выполнить runtime-приёмку первой интеграции вертикального среза | Чистая сборка; `F7: PASS`; ручной цикл `blocked → 3/3 → repaired`; QuestCompleted autosave; graceful exit и cold restart |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-062` | Начать первую интеграционную итерацию вертикального среза | После `TASK-061: VERIFIED` выбрать минимальный end-to-end gameplay loop и подключить autosave trigger к реальному domain event |
+| 3 | `TASK-064` | Расширить вертикальный срез первым data-driven набором ресурсов/рецепта | После `TASK-063: VERIFIED` добавить JSON-контент и первый реальный рецепт ремонта/крафта без дублирования domain state |
 
-**Подтверждено в этой итерации:** `TASK-058`, `TASK-059`, `PE-030`–`PE-035`, `PE-ACC-020`–`PE-ACC-026`.
-**Реализовано:** `TASK-060`, `PERSIST-040`–`PERSIST-046`.
-**Текущая приёмочная задача:** `TASK-061`.
+**Подтверждено:** `TASK-060`, `TASK-061`, `PERSIST-040`–`PERSIST-046`, `PERSIST-ACC-040`–`PERSIST-ACC-047`.  
+**Реализовано:** `TASK-062`, `VS-010`–`VS-016`.  
+**Текущая приёмочная задача:** `TASK-063`.
 
-## 10. Runtime-приёмка `TASK-060/TASK-061`
+## 10. Runtime-приёмка `TASK-062/TASK-063`
 
-1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену, дождаться `DB: Ready` и убедиться, что slot содержит snapshot. Если он пуст, один раз нажать `S` и дождаться `Slot S/L/R: PASS save`.
-3. Нажать `F6` один раз и не использовать другие команды до завершения. Тест работает с отдельной `save_1.autosave-test.db` и не меняет основной slot.
-4. Ожидаемый compact HUD:
+1. Собрать `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
+2. Запустить проект. Стартовая сцена должна показать `VERTICAL SLICE 1 — SALVAGE → REPAIR → AUTOSAVE` и перейти в `DB: Ready`.
+3. Нажать `F7` один раз и не выполнять другие действия до завершения. Изолированная БД не изменяет gameplay-slot.
+4. Ожидаемый HUD:
 
 ```text
-TASK-060 autosave (F6): PASS triggers=8, requests=8, batches=2, coalesced=6, exit=1
+TASK-062 acceptance (F7): PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1
 ```
 
 5. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-060 SQLite autosave/graceful-exit acceptance PASS: triggerTypes=8; requested=8; batches=2; coalesced=6; periodic=1; gracefulExit=1; roundTrip=1; logWritten=1; revision=27; maxWriters=1; integrity=ok; elapsedMs=<время>; result=periodic and gameplay-event autosaves coalesced; graceful exit flushed the latest snapshot
+TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=resource collection completed the starter repair objective and persisted the repaired ship
 ```
 
-6. Для реального periodic autosave оставить сцену без других операций на 60–65 секунд. Ожидается строка:
+6. Нажать `F8`, дождаться `slot reset PASS`. Подойти к красному кораблю и нажать `E` до сбора ресурсов. HUD должен остаться `Ship: DAMAGED`, Output — показать `ShipRepairBlocked`.
+7. Собрать три голубых узла по `E`. После каждого узел исчезает, а HUD проходит `1/3 → 2/3 → 3/3`.
+8. Снова взаимодействовать с кораблём. Корабль должен стать зелёным, HUD — `Ship: REPAIRED`, а Output должен содержать:
 
 ```text
-Prototype E autosave PASS: revision=<N+1>; triggers=Periodic; requests=<...>; batches=<...>; coalesced=<...>
+Vertical slice domain event: StarterRepairQuestCompleted; autosaveTrigger=QuestCompleted
+Vertical slice autosave PASS: revision=<N>; triggers=QuestCompleted; salvage=0; shipRepaired=1; pending=0
 ```
 
-7. Зафиксировать текущую revision, затем закрыть окно кнопкой заголовка или `Alt+F4`. Процесс должен завершиться только после строки:
+9. Закрыть окно через `Alt+F4`. До завершения процесса ожидается:
 
 ```text
-Prototype E graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
+Vertical slice graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
 ```
 
-   Для намеренно пустого slot допустима строка `saved=0; revision=0; pending=0`; закрытие не должно создавать новый snapshot.
-8. Повторно запустить сцену. HUD должен загрузить revision, записанную graceful-exit, при `integrity=ok` и `pending=0`.
-9. После этого повторить `C`, `X` и `Z`; все три ранее принятые acceptance route должны остаться PASS.
-10. В качестве доказательства прислать результат сборки, screenshot F6 PASS, строки periodic и graceful-exit PASS, screenshot после повторного запуска и результаты `C/X/Z`.
-11. При `FAIL` прислать финальный HUD и последние 60 строк Godot Output. Дополнительно указать наличие файлов:
-
-```text
-save_1.db
-save_1.backup.db
-save_1.autosave-test.db
-logs/save_1.autosave.log
-```
+10. Повторно запустить проект. Должны восстановиться `Ship: REPAIRED`, `salvage=0`, исчезнувшие ресурсные узлы и revision из graceful-exit.
+11. Для приёмки прислать: результат сборки; screenshot `F7: PASS`; screenshot раннего `ShipRepairBlocked`; screenshot `Ship: REPAIRED`; полные строки F7, QuestCompleted autosave и graceful-exit; screenshot после повторного запуска.
+12. При `FAIL` прислать финальный HUD, последние 80 строк Output и наличие файлов `profiles/profile_vertical_slice/save_1.db`, backup, autosave log и `save_1.vertical-slice-test.db`.
 
 ## 11. Журнал проверок
+
+### 2026-08-01 — `TASK-062`, первая интеграция вертикального среза
+
+**Синхронизированная приёмка:** `TASK-060/TASK-061` закрыты по сборке `0/0`, F6, periodic, C/X/Z, graceful-exit `saved=1; revision=3; pending=0` и прямому подтверждению холодного восстановления revision `3`.
+
+**Реализация:** добавлены Godot-независимое правило starter repair, три интерактивных salvage-узла, повреждённый корабль, новый gameplay controller, отдельный SQLite profile, реальный `QuestCompleted` autosave, periodic/graceful-exit и изолированная F7 acceptance route.
+
+**Статическая проверка:** код, сцена, UID, `res://`, NodePath, hotkeys и состав архива проверены; .NET/Godot в среде подготовки отсутствуют, поэтому `TASK-062` остаётся `IMPLEMENTED`, `TASK-063` — `IN_PROGRESS`.
 
 Новые записи добавляются сверху.
 
