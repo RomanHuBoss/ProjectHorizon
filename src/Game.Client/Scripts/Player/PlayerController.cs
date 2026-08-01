@@ -12,11 +12,15 @@ public partial class PlayerController : CharacterBody3D
     public float MouseSensitivity { get; set; } = 0.0025f;
 
     private Node3D _head = null!;
+    private RayCast3D _interactionRay = null!;
     private float _gravity;
 
     public override void _Ready()
     {
         _head = GetNode<Node3D>("Head");
+        _interactionRay = GetNode<RayCast3D>("Head/Camera3D/InteractionRay");
+        _interactionRay.AddException(this);
+
         _gravity = ProjectSettings
             .GetSetting("physics/3d/default_gravity")
             .AsSingle();
@@ -44,6 +48,11 @@ public partial class PlayerController : CharacterBody3D
             _head.Rotation = headRotation;
         }
 
+        if (inputEvent.IsActionPressed("interact"))
+        {
+            TryInteract();
+        }
+
         // Escape освобождает курсор.
         if (inputEvent.IsActionPressed("ui_cancel"))
         {
@@ -56,6 +65,21 @@ public partial class PlayerController : CharacterBody3D
             mouseButton.ButtonIndex == MouseButton.Left)
         {
             Input.MouseMode = Input.MouseModeEnum.Captured;
+        }
+    }
+
+    private void TryInteract()
+    {
+        _interactionRay.ForceRaycastUpdate();
+
+        if (!_interactionRay.IsColliding())
+        {
+            return;
+        }
+
+        if (_interactionRay.GetCollider() is IInteractable interactable)
+        {
+            interactable.Interact(this);
         }
     }
 

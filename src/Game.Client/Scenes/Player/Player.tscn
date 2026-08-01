@@ -25,3 +25,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.65, 0)
 
 [node name="Camera3D" type="Camera3D" parent="Head" unique_id=1102488927]
 current = true
+
+[node name="InteractionRay" type="RayCast3D" parent="Head/Camera3D"]
+target_position = Vector3(0, 0, -4)
+collision_mask = 1
+collide_with_areas = false
+collide_with_bodies = true
+enabled = true
