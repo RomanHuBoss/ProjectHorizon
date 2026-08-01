@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://dg4e7visk71oc"]
 
 [ext_resource type="Script" uid="uid://8so46n86t7lb" path="res://Scripts/Player/PlayerController.cs" id="1_s0eop"]
+[ext_resource type="Script" uid="uid://d1r7w9x4p2k6a" path="res://Scripts/Combat/HitscanWeapon.cs" id="2_weapon"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_dfegk"]
 radius = 0.4
@@ -28,6 +29,16 @@ current = true
 
 [node name="InteractionRay" type="RayCast3D" parent="Head/Camera3D"]
 target_position = Vector3(0, 0, -4)
+collision_mask = 1
+collide_with_areas = false
+collide_with_bodies = true
+enabled = true
+
+[node name="HitscanWeapon" type="Node3D" parent="Head/Camera3D"]
+script = ExtResource("2_weapon")
+
+[node name="FireRay" type="RayCast3D" parent="Head/Camera3D/HitscanWeapon"]
+target_position = Vector3(0, 0, -50)
 collision_mask = 1
 collide_with_areas = false
 collide_with_bodies = true

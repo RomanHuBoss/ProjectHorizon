@@ -59,12 +59,15 @@ public partial class PlayerController : CharacterBody3D
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
 
-        // Щелчок левой кнопкой снова захватывает курсор.
+        // Щелчок, выполненный при свободном курсоре, только возвращает захват
+        // и не должен одновременно считаться выстрелом.
         if (inputEvent is InputEventMouseButton mouseButton &&
             mouseButton.Pressed &&
-            mouseButton.ButtonIndex == MouseButton.Left)
+            mouseButton.ButtonIndex == MouseButton.Left &&
+            Input.MouseMode == Input.MouseModeEnum.Visible)
         {
             Input.MouseMode = Input.MouseModeEnum.Captured;
+            GetViewport().SetInputAsHandled();
         }
     }
 
