@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-sqlite-build-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -36,11 +36,76 @@
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
-| E. Сохранение | `IN_PROGRESS` | Реализован SQLite-фундамент: явная миграция, WAL/foreign keys/NORMAL/busy timeout, последовательная очередь записи и транзакционный round-trip игрока, корабля, инвентаря и посещённой планеты |
+| E. Сохранение | `IN_PROGRESS` | SQLite foundation и round-trip подтверждены; реализованы валидированная предыдущая backup, атомарная замена, corruption detection, quarantine, error log и recovery; требуется runtime-приёмка `TASK-057` |
 
-**Вывод:** `TASK-043`–`TASK-053` подтверждены; Прототип D полностью `VERIFIED`. Повторный soak завершился `V: PASS 100/100` при `gear=3`, `vTouch=2,67 м/с`, `memΔ=0,02 MiB`, `nodesΔ=0` и чистой сборке. Текущая итерация начинает Прототип E задачей `TASK-054`; runtime-приёмка SQLite round-trip назначена как `TASK-055`.
+**Вывод:** `TASK-054` и приёмочная `TASK-055` переведены в `VERIFIED` по прямому подтверждению пользователя: чистая сборка, `Z: PASS`, schema `1`, WAL, FK, `synchronous=1`, `busy_timeout=5000`, exact round-trip, `writes=8`, `maxWriters=1`, `integrity=ok`. Текущая итерация реализует `TASK-056`; runtime-приёмка backup/recovery назначена как `TASK-057`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — валидированная backup и атомарное recovery (`TASK-056`)
+
+**Исходный снимок:** `ProjectHorizon-main(11).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 22.2, 22.3, 22.9, 36.3, Прототип E раздела 39 и пункты 10, 14, 15 раздела 41 PDF-ТЗ; `TASK-054`–`TASK-057`, `PE-001`, `PE-010`–`PE-025`, `PE-ACC-001`–`PE-ACC-016`.
+
+**Синхронизация runtime-приёмки предыдущей ступени:**
+
+- пользователь прямо разрешил перевести `TASK-054` и `TASK-055` в `VERIFIED`;
+- приняты критерии foundation acceptance: сборка `0` предупреждений / `0` ошибок;
+- `TASK-054 save (Z): PASS`;
+- schema `1`, `journal=wal`, `foreignKeys=1`, `synchronous=1`, `busyTimeout=5000`;
+- revision `2`, inventory rows `3`, visited rows `1`;
+- queued submissions `8`, maximum concurrent writer `1`;
+- exact comparisons `2`, `integrity=ok`;
+- `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006` → `VERIFIED`.
+
+**Реализовано в `TASK-056`:**
+
+- добавлен отдельный infrastructure-файл `SaveDatabase.Recovery.cs`; SQL и файловые операции не обращаются к Godot API;
+- путь предыдущей копии соответствует ТЗ: `save_1.backup.db` рядом с основной БД;
+- перед изменением существующего slot текущая исправная ревизия копируется SQLite online-backup API;
+- первая успешно записанная ревизия получает backup после exact validation;
+- очистка slot предварительно сохраняет предыдущую копию;
+- backup-кандидат проверяется по наличию, размеру, schema, `PRAGMA integrity_check` и наличию snapshot до установки;
+- существующая backup заменяется через `File.Replace`; до валидации кандидата исправная backup не изменяется;
+- при неуспешной установке предусмотрен возврат предыдущей backup;
+- основная БД проверяется при инициализации; повреждение вызывает автоматическое recovery из валидной backup;
+- recovery-кандидат проверяется до подмены; основная БД заменяется атомарно, прежний файл и sidecar-файлы сохраняются как `save_1.quarantine.last.db`;
+- backup при recovery не изменяется; её SHA-256 проверяется до и после теста;
+- corruption/recovery события записываются в `logs/save_1.recovery.log`;
+- `B` создаёт валидированную backup, `Y` вручную загружает предыдущую копию, `X` запускает изолированную acceptance route;
+- `X` использует отдельную временную БД, поэтому намеренное повреждение не затрагивает основной slot;
+- acceptance route создаёт protected revision `10`, более новую primary revision `11`, отклоняет повреждённый backup-кандидат, проверяет неизменность исправной backup, повреждает primary, выполняет атомарный rollback к revision `10`, проверяет обе БД, quarantine и recovery-log;
+- HUD и Output расширены измеримыми признаками backup/recovery.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Recovery.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SavePrototype.cs`;
+- `src/Game.Client/Scenes/Persistence/SavePrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ извлечено и сверено по разделам 22.2, 22.9, 36.3, 39 и 41;
+- проверена структура сцены и существующие NodePath;
+- проверены новые горячие клавиши `B`, `Y`, `X` на отсутствие конфликтов в стартовой сцене;
+- выполнена лексическая проверка C#-файлов: сбалансированы строки, комментарии, скобки и блоки;
+- проверено отсутствие незавершённых строковых констант;
+- `.NET SDK` и Godot в среде подготовки отсутствуют, поэтому фактическая сборка и runtime-тест здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-054`, `TASK-055`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006` → `VERIFIED`;
+- `TASK-056`, `PE-020`–`PE-025` → `IMPLEMENTED`;
+- `TASK-057`, `PE-ACC-010`–`PE-ACC-016` → `IN_PROGRESS`;
+- Прототип E остаётся `IN_PROGRESS` до локальной сборки и `X: PASS`.
+
+**Следующий рекомендуемый шаг:** выполнить локальную runtime-приёмку `TASK-057`; после `PASS` закрыть backup/recovery и определить отдельную итерацию миграции старой версии/unknown content.
 
 ### 2026-08-01 — build-hotfix SQLite HUD (`TASK-054/TASK-055`)
 
@@ -1051,31 +1116,46 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-ACC-044` | Нет накопления SceneTree/managed memory | `VERIFIED` | `nodesΔ=0`, `memΔ=0,02 MiB` |
 | `PD-ACC-045` | HUD показывает O/V, предыдущие режимы не регрессировали | `VERIFIED` | O/V строки присутствуют; soak восстановил исходное состояние |
 
-### 8.3. Прототип E — SQLite save foundation
+### 8.3. Прототип E — SQLite save, backup и recovery
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `PE-001` | Отдельная тестовая сцена сохранений | `IMPLEMENTED` | `Scenes/Persistence/SavePrototype.tscn`; назначена стартовой сценой |
-| `PE-010` | SQLite через `Microsoft.Data.Sqlite`, один slot — одна БД | `IMPLEMENTED` | PackageReference `8.0.29`; `user://profiles/profile_prototype/save_1.db` |
-| `PE-011` | Явные migrations и обязательные PRAGMA | `IMPLEMENTED` | schema migration 1; WAL, foreign keys, synchronous NORMAL, busy timeout 5000 |
-| `PE-012` | Последовательная очередь записи вне main thread | `IMPLEMENTED` | Единственный writer gate; SQL выполняется в `Task.Run`; Godot API в worker не используется |
-| `PE-013` | Транзакционное сохранение минимального snapshot | `IMPLEMENTED` | player position, ship, inventory и visited planet сохраняются одной transaction |
-| `PE-014` | Загрузка и точный round-trip snapshot | `IMPLEMENTED` | Параметризованные SELECT; exact comparison baseline/final snapshot |
-| `PE-015` | Диагностика и автоматический save acceptance | `IMPLEMENTED` | `S/L/R`; `Z` проверяет migration, PRAGMA, 8 queued writes, integrity и exact load |
-| `PE-ACC-001` | SQLite-редакция собирается 0/0 | `IN_PROGRESS` | Локальная `dotnet build` |
-| `PE-ACC-002` | Сцена запускается и создаёт БД по ожидаемому пути | `IN_PROGRESS` | HUD state READY; database path существует |
-| `PE-ACC-003` | Migration и PRAGMA подтверждены | `IN_PROGRESS` | schema=1, journal=wal, foreignKeys=1, synchronous=1, busyTimeout=5000 |
-| `PE-ACC-004` | Игрок, корабль, inventory и planet проходят exact round-trip | `IN_PROGRESS` | `exactComparisons=2`, revision=2, inventoryRows=3, visitedRows=1 |
-| `PE-ACC-005` | Параллельные submissions сериализуются | `IN_PROGRESS` | queuedWrites=8, maxConcurrentWriters=1 |
-| `PE-ACC-006` | Integrity check и автоматический тест завершаются PASS | `IN_PROGRESS` | `integrity=ok`; `TASK-054 save (Z): PASS` |
+| `PE-001` | Отдельная тестовая сцена сохранений | `VERIFIED` | `Scenes/Persistence/SavePrototype.tscn`; сцена и HUD приняты в `TASK-055` |
+| `PE-010` | SQLite через `Microsoft.Data.Sqlite`, один slot — одна БД | `VERIFIED` | PackageReference `8.0.29`; `user://profiles/profile_prototype/save_1.db` |
+| `PE-011` | Явные migrations и обязательные PRAGMA | `VERIFIED` | schema `1`; WAL, foreign keys, synchronous NORMAL, busy timeout `5000` подтверждены `Z: PASS` |
+| `PE-012` | Последовательная очередь записи вне main thread | `VERIFIED` | `writes=8`, `maxConcurrentWriters=1`; Godot API в worker не используется |
+| `PE-013` | Транзакционное сохранение минимального snapshot | `VERIFIED` | player, ship, inventory и visited planet прошли runtime round-trip |
+| `PE-014` | Загрузка и точный round-trip snapshot | `VERIFIED` | revision `2`, inventory `3`, visited `1`, exact comparisons `2` |
+| `PE-015` | Диагностика и автоматический save acceptance | `VERIFIED` | `TASK-054 save (Z): PASS`; `integrity=ok` |
+| `PE-ACC-001` | SQLite-редакция собирается 0/0 | `VERIFIED` | Пользователь разрешил закрыть `TASK-055`; чистая локальная сборка принята |
+| `PE-ACC-002` | Сцена запускается и создаёт БД по ожидаемому пути | `VERIFIED` | Runtime-приёмка `TASK-055` подтверждена пользователем |
+| `PE-ACC-003` | Migration и PRAGMA подтверждены | `VERIFIED` | schema=1, journal=wal, foreignKeys=1, synchronous=1, busyTimeout=5000 |
+| `PE-ACC-004` | Игрок, корабль, inventory и planet проходят exact round-trip | `VERIFIED` | exactComparisons=2, revision=2, inventoryRows=3, visitedRows=1 |
+| `PE-ACC-005` | Параллельные submissions сериализуются | `VERIFIED` | queuedWrites=8, maxConcurrentWriters=1 |
+| `PE-ACC-006` | Integrity check и автоматический тест завершаются PASS | `VERIFIED` | `integrity=ok`; `TASK-054 save (Z): PASS` |
+| `PE-020` | Предыдущая корректная копия хранится рядом с slot | `IMPLEMENTED` | `save_1.backup.db`; первая ревизия защищается после записи, последующие — до изменения primary |
+| `PE-021` | Backup-кандидат валидируется до атомарной установки | `IMPLEMENTED` | SQLite online backup, schema/snapshot/integrity validation; `File.Replace`; rollback previous backup |
+| `PE-022` | Единственная исправная backup не уничтожается | `IMPLEMENTED` | Invalid candidate отклоняется до замены; SHA-256 backup сравнивается до/после acceptance route |
+| `PE-023` | Повреждение primary определяется и запускает recovery | `IMPLEMENTED` | Read-only inspection, schema и `PRAGMA integrity_check`; автоматическая проверка при initialize |
+| `PE-024` | Recovery сохраняет заменяемую primary и журналирует событие | `IMPLEMENTED` | Atomic replace, `save_1.quarantine.last.db`, sidecar quarantine, `logs/save_1.recovery.log` |
+| `PE-025` | Ручная диагностика и изолированный recovery acceptance | `IMPLEMENTED` | `B` backup, `Y` restore, `X` isolated corruption/recovery test; основной slot не повреждается |
+| `PE-ACC-010` | Backup/recovery редакция собирается 0/0 | `IN_PROGRESS` | Локальная `dotnet build`; в среде подготовки .NET SDK отсутствует |
+| `PE-ACC-011` | Первая и последующая записи создают корректную предыдущую копию | `IN_PROGRESS` | `B` Output PASS; после двух `S` primary rev=2, backup rev=1 |
+| `PE-ACC-012` | Повреждённый backup-кандидат отклоняется без изменения исправной backup | `IN_PROGRESS` | `candidateRejected=1`, `backupPreserved=1` |
+| `PE-ACC-013` | Повреждение основной БД определяется | `IN_PROGRESS` | `corruptionDetected=1`; test повреждает только isolated database |
+| `PE-ACC-014` | Валидная backup атомарно восстанавливает предыдущую ревизию | `IN_PROGRESS` | protected=10, newer=11, recovered=10, `atomicReplace=1`, exactComparisons=2 |
+| `PE-ACC-015` | Backup остаётся исправной, primary помещается в quarantine, log записан | `IN_PROGRESS` | primaryIntegrity=ok, backupIntegrity=ok, `quarantinePreserved=1`, `logWritten=1`; backup SHA неизменна |
+| `PE-ACC-016` | Автоматический `X`-тест завершается PASS и foundation не регрессирует | `IN_PROGRESS` | `TASK-056 recovery (X): PASS`; после теста основной slot и `Z` остаются работоспособны |
 
 ### 8.4. Оставшаяся часть Прототипа E
 
 | Подсистема | Статус |
 |---|---|
-| Backup и атомарная замена | `NOT_STARTED` |
-| Проверка повреждённой основной БД | `NOT_STARTED` |
-| Recovery из последней корректной backup | `NOT_STARTED` |
+| SQLite foundation и exact round-trip | `VERIFIED` |
+| Backup и атомарная замена | `IMPLEMENTED` |
+| Проверка повреждённой основной БД | `IMPLEMENTED` |
+| Recovery из последней корректной backup | `IMPLEMENTED` |
+| Runtime-приёмка backup/recovery | `IN_PROGRESS` |
 | Миграция старой версии и unknown content | `NOT_STARTED` |
 
 Основная разработка вертикального среза не начинается до приёмки всех пяти прототипов.
@@ -1084,49 +1164,66 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-053`; Прототипы A, B, C и D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-055`; Прототипы A, B, C и D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-055` | Выполнить runtime-приёмку SQLite foundation | Чистая сборка; `Z: PASS`; schema/PRAGMA/integrity; exact round-trip; max writer concurrency=1 |
-| 2 | `TASK-056` | Реализовать backup и recovery | Корректная backup-копия, атомарная замена, corruption detection и восстановление без потери единственной исправной БД |
+| 1 | `TASK-057` | Выполнить runtime-приёмку backup/recovery | Чистая сборка; `X: PASS`; candidate rejection; unchanged backup SHA; corruption detection; atomic rollback 11→10; quarantine/log |
+| 2 | `TASK-058` | Реализовать migration старой версии и unknown content | Миграция копии без разрушения исходника; безопасная обработка неизвестных item/content ID |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-051`, `TASK-052`, `TASK-053`, `PD-050`–`PD-053`, `PD-ACC-040`–`PD-ACC-045`; Прототип D полностью `VERIFIED`.  
-**Реализовано:** `TASK-054`, `PE-001`, `PE-010`–`PE-015`.  
-**Текущая приёмочная задача:** `TASK-055`.
+**Подтверждено в этой итерации:** `TASK-054`, `TASK-055`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006`.  
+**Реализовано:** `TASK-056`, `PE-020`–`PE-025`.  
+**Текущая приёмочная задача:** `TASK-057`.
 
-## 10. Runtime-приёмка `TASK-054/TASK-055`
+## 10. Runtime-приёмка `TASK-056/TASK-057`
 
-1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений. При первом restore NuGet должен загрузить `Microsoft.Data.Sqlite 8.0.29`.
-2. Запустить стартовую сцену. Compact HUD должен показать `DB: Ready`, `schema=1`, `WAL=wal`, `FK=ON` и `TASK-054 save (Z): READY`.
-3. Нажать `S`, затем `L`. Snapshot должен загрузиться с revision `1`, inventory `3` и посещённой планетой. Повторный `S` увеличивает revision и изменяет тестовые данные без дублирования inventory rows.
-4. Нажать `R`; slot очищается транзакцией. После `L` HUD сообщает, что slot пуст.
-5. Нажать `Z` и не использовать управление. Тест обычно занимает менее 5 секунд.
+1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
+2. Запустить стартовую сцену. Compact HUD должен показать `DB: Ready`, schema `1`, `WAL=wal`, `FK=ON`, строки `TASK-054 save (Z): READY` и `TASK-056 recovery (X): READY`.
+3. Для детерминированного ручного сценария сначала нажать `R`, дождаться `Ready`, затем `L` и убедиться, что slot пуст. Нажать `S`, дождаться `Ready`, затем `B`. В Output ожидается `Prototype E validated backup PASS` с revision `1`, `integrity=ok` и непустым SHA-256.
+4. Нажать `S` второй раз. Primary должна иметь revision `2`, а previous-copy backup — revision `1`. Нажать `Y`: HUD/Output должны показать восстановленную revision `1`, `primaryIntegrity=ok`, `backupIntegrity=ok`, `atomicReplace=1` и существующий путь quarantine.
+5. Нажать `X` и не использовать управление. Тест работает в отдельной `save_1.recovery-test.db`, намеренно повреждает только её и обычно завершается за несколько секунд.
 6. Ожидаемый HUD:
 
 ```text
-TASK-054 save (Z): PASS rev=2, items=3, writes=8,
-maxWriters=1, integrity=ok
+TASK-056 recovery (X): PASS rev=10,
+candidateRejected=1, backupPreserved=1, atomic=1, quarantine=1
 ```
 
 7. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-054 SQLite save foundation acceptance PASS:
-schema=1; journal=wal; foreignKeys=1; synchronous=1;
-busyTimeout=5000; integrity=ok; revision=2;
-inventoryRows=3; visitedRows=1; queuedWrites=8;
-maxConcurrentWriters=1; exactComparisons=2; result=...
+TASK-056 SQLite backup/recovery acceptance PASS:
+protectedRevision=10; newerRevision=11; recoveredRevision=10;
+primaryIntegrity=ok; backupIntegrity=ok;
+candidateRejected=1; backupPreserved=1; corruptionDetected=1;
+atomicReplace=1; quarantinePreserved=1; logWritten=1; exactComparisons=2;
+elapsedMs=<время>; result=previous-copy backup survived rejection and restored the corrupted primary
 ```
 
-8. Критерии: чистая сборка; database file создан в `user://profiles/profile_prototype/save_1.db`; schema `1`; WAL; FK `1`; synchronous `1`; busy timeout `5000`; revision `2`; inventory rows `3`; visited rows `1`; восемь submissions; max concurrent writer `1`; exact comparisons `2`; integrity `ok`.
-9. В качестве доказательства прислать результат сборки, screenshot `Z: PASS`, полную итоговую строку Output и краткое подтверждение ручных `S/L/R`.
-10. При `FAIL` прислать финальный HUD и последние 30 строк Output; дополнительно указать, появился ли файл БД и прошёл ли NuGet restore.
+8. Обязательные критерии `PASS`: локальная сборка 0/0; invalid candidate отклонён; SHA-256 исправной backup не изменился; intentional corruption обнаружена; recovery использует `File.Replace`; заменяемая primary физически сохранена в quarantine; revision `11` откатывается к защищённой revision `10`; обе БД проходят `integrity_check`; exact comparisons `2`; recovery-log записан; основной пользовательский slot не затронут тестовым повреждением.
+9. После `X: PASS` повторно нажать `Z`. Foundation acceptance должна остаться `PASS`, что подтверждает отсутствие регрессии migration, writer queue и round-trip.
+10. В качестве доказательства прислать результат сборки, screenshot компактного HUD с `X: PASS`, полную итоговую строку `TASK-056 ... PASS`, строку ручного `B: PASS`, строку ручного `Y: PASS` и результат повторного `Z: PASS`.
+11. При `FAIL` прислать финальный HUD, полную строку `TASK-056 ... FAIL`, последние 40 строк Output и указать, существуют ли `save_1.backup.db`, `save_1.quarantine.last.db` и recovery-log.
+
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-056`, валидированная backup и атомарное recovery
+
+**Исходный снимок:** `ProjectHorizon-main(11).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
+**Git SHA:** отсутствует в архиве
+
+**Принятое runtime-доказательство:** по прямому подтверждению пользователя `TASK-054/TASK-055` и `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006` переведены в `VERIFIED`; зафиксированы сборка 0/0, `Z: PASS`, schema `1`, WAL/FK/NORMAL/busy_timeout, exact round-trip, `writes=8`, `maxWriters=1`, `integrity=ok`.
+
+**Изменения:** реализованы SQLite online backup в `save_1.backup.db`, validation candidate до установки, атомарная замена, rollback предыдущей backup, startup corruption detection, quarantine повреждённой primary, recovery-log, ручные команды `B/Y` и изолированный acceptance-тест `X`. `X` проверяет protected revision `10`, newer revision `11`, invalid candidate rejection, неизменность SHA-256 backup, intentional corruption, rollback `11→10`, обе `integrity_check`, физическое наличие quarantine, recovery-log и exact comparison.
+
+**Проверки:** изменённые C#-файлы прошли лексический контроль; сцена, NodePath, `res://` и горячие клавиши проверены; сигнатура `SqliteConnection.BackupDatabase(SqliteConnection)` сверена с документацией Microsoft.Data.Sqlite 8.x. .NET SDK и Godot в среде подготовки отсутствуют, поэтому сборка и runtime новой редакции не заявляются.
+
+**Статусы:** `TASK-056`, `PE-020`–`PE-025` → `IMPLEMENTED`; `TASK-057`, `PE-ACC-010`–`PE-ACC-016` → `IN_PROGRESS`.
 
 ### 2026-08-01 — hotfix `TASK-045`, детерминированный вход в атмосферу
 

@@ -195,7 +195,7 @@ theme_override_styles/panel = SubResource("StyleBox_hud")
 [node name="Label" type="Label" parent="Hud/CompactMargin/PanelContainer"]
 layout_mode = 2
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП E — SQLITE SAVE FOUNDATION"
+text = "ПРОТОТИП E — SQLITE BACKUP / RECOVERY"
 autowrap_mode = 2
 
 [node name="DetailedMargin" type="MarginContainer" parent="Hud"]
@@ -219,7 +219,7 @@ vertical_scroll_mode = 1
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП E — SQLITE"
+text = "ПРОТОТИП E — SQLITE BACKUP / RECOVERY"
 autowrap_mode = 2
 
 [node name="HiddenHint" type="PanelContainer" parent="Hud"]

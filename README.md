@@ -130,7 +130,7 @@ build: 0 warnings, 0 errors
 src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 ```
 
-### Прототип E. SQLite save foundation — `IN_PROGRESS`
+### Прототип E. SQLite save, backup и recovery — `IN_PROGRESS`
 
 Текущая стартовая сцена:
 
@@ -138,41 +138,58 @@ src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 src/Game.Client/Scenes/Persistence/SavePrototype.tscn
 ```
 
-Реализована первая ступень локального сохранения по разделу 22 PDF-ТЗ:
-
-> Build-hotfix: HUD получает размер окна через
-> `GetViewport().GetVisibleRect().Size`; предыдущий вызов `GetViewportRect()`
-> был недоступен для `Node3D` и приводил к `CS0103`.
+SQLite foundation (`TASK-054/TASK-055`) подтверждён пользователем и переведён в
+`VERIFIED`:
 
 - `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
 - один slot — одна БД: `user://profiles/profile_prototype/save_1.db`;
 - явная migration `1`;
-- `journal_mode=WAL`;
-- `foreign_keys=ON`;
-- `synchronous=NORMAL`;
-- `busy_timeout=5000`;
-- единственная последовательная очередь записи;
-- SQL и файловые операции выполняются вне Godot main thread;
+- `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`,
+  `busy_timeout=5000`;
+- единственная последовательная очередь записи вне Godot main thread;
 - транзакционный snapshot позиции игрока, корабля, inventory и посещённой планеты;
-- точная загрузка и проверка round-trip;
-- параметризованные SQL-запросы;
-- `integrity_check`;
+- exact round-trip, параметризованный SQL и `PRAGMA integrity_check`;
 - compact/detailed/hidden HUD.
+
+В `TASK-056` реализована следующая ступень раздела 22.9 PDF-ТЗ:
+
+- предыдущая корректная копия хранится в
+  `user://profiles/profile_prototype/save_1.backup.db`;
+- backup создаётся SQLite online-backup API и проверяется до установки;
+- существующая backup заменяется только после валидации кандидата через
+  `File.Replace`; некорректный кандидат не уничтожает исправную копию;
+- перед изменением существующего slot автоматически защищается предыдущая
+  ревизия; первая ревизия получает backup после успешной записи;
+- очистка slot сохраняет предыдущую копию;
+- повреждение основной БД определяется по открытию, версии schema и
+  `PRAGMA integrity_check`;
+- при старте повреждённая основная БД автоматически восстанавливается из
+  валидной backup;
+- ручное восстановление сохраняет заменённую основную БД как
+  `save_1.quarantine.last.db`;
+- события corruption/recovery записываются в
+  `user://profiles/profile_prototype/logs/save_1.recovery.log`;
+- тест намеренного повреждения выполняется в изолированной временной БД и не
+  затрагивает основной slot.
 
 Управление:
 
 ```text
-S    сохранить изменённый snapshot
+S    сохранить изменённый snapshot; предыдущая копия защищается автоматически
 L    загрузить snapshot
-R    очистить slot транзакцией
-Z    TASK-054 SQLite acceptance test
+R    очистить slot, сохранив предыдущую копию
+B    создать или обновить валидированный backup
+Y    восстановить предыдущую копию с quarantine текущей БД
+Z    TASK-054 SQLite foundation acceptance test
+X    TASK-056 backup/recovery acceptance test в изолированной БД
 H    compact / detailed / hidden HUD
 ```
 
-Автоматический `Z`-тест выполняет migration, baseline save/load, восемь
-одновременных submissions через один writer gate, final exact load и
-`PRAGMA integrity_check`. Backup и recovery будут реализованы следующей
-изолированной итерацией.
+`X` создаёт защищённую revision `10`, записывает более новую revision `11`,
+отклоняет намеренно повреждённый backup-кандидат, проверяет неизменность
+исправной backup, повреждает только изолированную основную БД, атомарно
+восстанавливает revision `10`, проверяет обе базы, физическое сохранение заменённой primary в quarantine и наличие recovery-log.
+Runtime-приёмка этой ступени выделена в `TASK-057`.
 
 ## Состояние реализации ТЗ
 
@@ -363,11 +380,12 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 
 ### Прототип E. Сохранение — `IN_PROGRESS`
 
-- SQLite foundation и migration — `IMPLEMENTED`;
-- инвентарь, позиция игрока, корабль и посещённая планета — `IMPLEMENTED`;
-- последовательная очередь записи и exact round-trip — `IMPLEMENTED`;
-- резервное копирование — `NOT_STARTED`;
-- восстановление — `NOT_STARTED`.
+- SQLite foundation и migration — `VERIFIED`;
+- инвентарь, позиция игрока, корабль и посещённая планета — `VERIFIED`;
+- последовательная очередь записи и exact round-trip — `VERIFIED`;
+- валидированная предыдущая backup и атомарная замена — `IMPLEMENTED`;
+- corruption detection, quarantine, error log и recovery — `IMPLEMENTED`;
+- runtime-приёмка backup/recovery — `IN_PROGRESS`.
 
 Переход к основной разработке допускается после принятия всех пяти прототипов.
 

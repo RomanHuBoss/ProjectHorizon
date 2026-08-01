@@ -11,9 +11,11 @@ public enum SavePrototypeState
     Saving = 2,
     Loading = 3,
     Resetting = 4,
-    Testing = 5,
-    Passed = 6,
-    Failed = 7
+    BackingUp = 5,
+    Recovering = 6,
+    Testing = 7,
+    Passed = 8,
+    Failed = 9
 }
 
 public enum SavePrototypeHudMode
@@ -31,7 +33,7 @@ public partial class SavePrototype : Node3D
     public float HudCompactWidth { get; set; } = 720.0f;
 
     [Export(PropertyHint.Range, "180.0,500.0,10.0")]
-    public float HudCompactHeight { get; set; } = 280.0f;
+    public float HudCompactHeight { get; set; } = 360.0f;
 
     [Export(PropertyHint.Range, "520.0,1200.0,10.0")]
     public float HudDetailedWidth { get; set; } = 820.0f;
@@ -45,11 +47,17 @@ public partial class SavePrototype : Node3D
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _writeTask;
     private Task<SavePrototypeAcceptanceReport>? _acceptanceTask;
+    private Task<SaveBackupReport>? _backupTask;
+    private Task<SaveRecoveryReport>? _recoveryTask;
+    private Task<SaveRecoveryAcceptanceReport>? _recoveryAcceptanceTask;
     private SavePrototypeState _state = SavePrototypeState.Initializing;
     private SavePrototypeHudMode _hudMode = SavePrototypeHudMode.Compact;
     private SaveGameSnapshot? _loadedSnapshot;
     private SaveDatabaseDiagnostics? _diagnostics;
     private SavePrototypeAcceptanceReport? _acceptanceReport;
+    private SaveBackupReport? _backupReport;
+    private SaveRecoveryReport? _recoveryReport;
+    private SaveRecoveryAcceptanceReport? _recoveryAcceptanceReport;
     private int _manualRevision;
     private string _statusMessage = "инициализация SQLite";
     private string _databaseDisplayPath = string.Empty;
@@ -100,8 +108,8 @@ public partial class SavePrototype : Node3D
         ApplyHudMode();
         UpdateHud();
         GD.Print(
-            "Prototype E SQLite foundation initializing. " +
-            "Press Z for the acceptance test after READY.");
+            "Prototype E SQLite backup/recovery initializing. " +
+            "Press Z for foundation acceptance or X for recovery acceptance after READY.");
     }
 
     public override void _ExitTree()
@@ -123,6 +131,9 @@ public partial class SavePrototype : Node3D
         PollWriteTask();
         PollLoadTask();
         PollAcceptanceTask();
+        PollBackupTask();
+        PollRecoveryTask();
+        PollRecoveryAcceptanceTask();
         UpdateHud();
     }
 
@@ -167,6 +178,21 @@ public partial class SavePrototype : Node3D
             BeginReset();
             GetViewport().SetInputAsHandled();
         }
+        else if (Matches(physical, logical, Key.B))
+        {
+            BeginBackup();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.Y))
+        {
+            BeginRestoreBackup();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.X))
+        {
+            BeginRecoveryAcceptanceTest();
+            GetViewport().SetInputAsHandled();
+        }
         else if (Matches(physical, logical, Key.Z))
         {
             BeginAcceptanceTest();
@@ -180,7 +206,10 @@ public partial class SavePrototype : Node3D
             _initializeTask is null &&
             _writeTask is null &&
             _loadTask is null &&
-            _acceptanceTask is null;
+            _acceptanceTask is null &&
+            _backupTask is null &&
+            _recoveryTask is null &&
+            _recoveryAcceptanceTask is null;
     }
 
     private void BeginManualSave()
@@ -251,6 +280,55 @@ public partial class SavePrototype : Node3D
             SlotId,
             _lifetimeCancellation.Token);
         GD.Print("TASK-054 SQLite save foundation acceptance started.");
+    }
+
+    private void BeginBackup()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SavePrototypeState.BackingUp;
+        _statusMessage = "создание и валидация предыдущей копии";
+        _backupReport = null;
+        _backupTask = _database.CreateBackupAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+        GD.Print("Prototype E validated backup creation started.");
+    }
+
+    private void BeginRestoreBackup()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SavePrototypeState.Recovering;
+        _statusMessage = "атомарное восстановление предыдущей копии";
+        _recoveryReport = null;
+        _recoveryTask = _database.RestoreBackupAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+        GD.Print("Prototype E previous-copy restore started.");
+    }
+
+    private void BeginRecoveryAcceptanceTest()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SavePrototypeState.Testing;
+        _statusMessage =
+            "isolated backup → reject invalid candidate → corrupt → atomic recovery";
+        _recoveryAcceptanceReport = null;
+        _recoveryAcceptanceTask = _database.RunRecoveryAcceptanceAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+        GD.Print("TASK-056 SQLite backup/recovery acceptance started.");
     }
 
     private void PollInitializeTask()
@@ -381,10 +459,118 @@ public partial class SavePrototype : Node3D
         }
     }
 
+    private void PollBackupTask()
+    {
+        if (_backupTask is null || !_backupTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveBackupReport> task = _backupTask;
+        _backupTask = null;
+        try
+        {
+            _backupReport = task.GetAwaiter().GetResult();
+            _state = _backupReport.Succeeded
+                ? SavePrototypeState.Ready
+                : SavePrototypeState.Failed;
+            _statusMessage = _backupReport.Result;
+            GD.Print(BuildBackupOutput(_backupReport));
+            RefreshDiagnostics();
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"backup failed: {exception.Message}";
+            GD.PushError($"Prototype E backup failed: {exception}");
+        }
+    }
+
+    private void PollRecoveryTask()
+    {
+        if (_recoveryTask is null || !_recoveryTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveRecoveryReport> task = _recoveryTask;
+        _recoveryTask = null;
+        try
+        {
+            _recoveryReport = task.GetAwaiter().GetResult();
+            _loadedSnapshot = _recoveryReport.Snapshot;
+            if (_loadedSnapshot is not null)
+            {
+                _manualRevision = _loadedSnapshot.Revision;
+                ApplySnapshotToVisualization(_loadedSnapshot);
+            }
+
+            _state = _recoveryReport.Recovered
+                ? SavePrototypeState.Ready
+                : SavePrototypeState.Failed;
+            _statusMessage = _recoveryReport.Result;
+            string output = BuildRecoveryOutput(_recoveryReport);
+            if (_recoveryReport.Recovered)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+
+            RefreshDiagnostics();
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"recovery failed: {exception.Message}";
+            GD.PushError($"Prototype E recovery failed: {exception}");
+        }
+    }
+
+    private void PollRecoveryAcceptanceTask()
+    {
+        if (_recoveryAcceptanceTask is null ||
+            !_recoveryAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveRecoveryAcceptanceReport> task = _recoveryAcceptanceTask;
+        _recoveryAcceptanceTask = null;
+        try
+        {
+            _recoveryAcceptanceReport = task.GetAwaiter().GetResult();
+            _state = _recoveryAcceptanceReport.Passed
+                ? SavePrototypeState.Passed
+                : SavePrototypeState.Failed;
+            _statusMessage = _recoveryAcceptanceReport.Result;
+            string output = BuildRecoveryAcceptanceOutput(
+                _recoveryAcceptanceReport);
+            if (_recoveryAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"recovery test failed: {exception.Message}";
+            GD.PushError($"TASK-056 SQLite recovery acceptance failed: {exception}");
+        }
+    }
+
     private void RefreshDiagnostics()
     {
         if (_database is null || _loadTask is not null ||
-            _writeTask is not null || _acceptanceTask is not null)
+            _writeTask is not null || _acceptanceTask is not null ||
+            _backupTask is not null || _recoveryTask is not null ||
+            _recoveryAcceptanceTask is not null)
         {
             return;
         }
@@ -462,9 +648,10 @@ public partial class SavePrototype : Node3D
               $"ore={FindOreQuantity(_loadedSnapshot)} • " +
               $"planet visits={_loadedSnapshot.VisitedPlanet.VisitCount}";
         string acceptanceLine = BuildAcceptanceHudLine();
+        string recoveryAcceptanceLine = BuildRecoveryAcceptanceHudLine();
 
         _compactLabel.Text =
-            "ПРОТОТИП E — SQLITE SAVE FOUNDATION • H — HUD\n" +
+            "ПРОТОТИП E — SQLITE BACKUP / RECOVERY • H — HUD\n" +
             $"DB: {_state} • schema={diagnostics.SchemaVersion} • " +
             $"WAL={diagnostics.JournalMode} • FK={(diagnostics.ForeignKeysEnabled ? "ON" : "OFF")}\n" +
             $"Queue: pending={_database?.QueuedWrites ?? 0} • " +
@@ -472,10 +659,14 @@ public partial class SavePrototype : Node3D
             $"maxConcurrent={_database?.MaximumConcurrentWriters ?? 0}\n" +
             snapshotLine + "\n" +
             acceptanceLine + "\n" +
-            "S — сохранить • L — загрузить • R — очистить slot • Z — тест";
+            recoveryAcceptanceLine + "\n" +
+            $"Backup: {(diagnostics.BackupExists ? "есть" : "нет")} • " +
+            $"integrity={diagnostics.BackupIntegrityResult} • " +
+            $"bytes={diagnostics.BackupBytes}\n" +
+            "S/L/R — slot • B — backup • Y — restore • Z — save test • X — recovery test";
 
         _detailedLabel.Text =
-            "ПРОТОТИП E — SQLITE / МИГРАЦИЯ / TRANSACTION ROUND-TRIP\n" +
+            "ПРОТОТИП E — SQLITE / BACKUP / ATOMIC RECOVERY\n" +
             "HUD: подробный • H — compact/hidden • колесо — прокрутка\n\n" +
             $"State: {_state}\n" +
             $"Message: {_statusMessage}\n" +
@@ -487,6 +678,11 @@ public partial class SavePrototype : Node3D
             $"PRAGMA synchronous: {diagnostics.SynchronousMode}\n" +
             $"PRAGMA busy_timeout: {diagnostics.BusyTimeoutMilliseconds}\n" +
             $"PRAGMA integrity_check: {diagnostics.IntegrityResult}\n" +
+            $"Backup path: {_database?.BackupPath ?? "—"}\n" +
+            $"Backup exists: {(diagnostics.BackupExists ? 1 : 0)}\n" +
+            $"Backup bytes: {diagnostics.BackupBytes}\n" +
+            $"Backup integrity: {diagnostics.BackupIntegrityResult}\n" +
+            $"Recovery log: {_database?.RecoveryLogPath ?? "—"}\n" +
             $"Inventory rows: {diagnostics.InventoryRows}\n" +
             $"Visited planet rows: {diagnostics.VisitedPlanetRows}\n" +
             $"Queued writes: {_database?.QueuedWrites ?? 0}\n" +
@@ -495,13 +691,20 @@ public partial class SavePrototype : Node3D
             snapshotLine + "\n" +
             BuildSnapshotDetails() + "\n\n" +
             acceptanceLine + "\n" +
-            "Acceptance: explicit migration, WAL/FK/NORMAL/busy_timeout, " +
+            recoveryAcceptanceLine + "\n" +
+            "Foundation acceptance: explicit migration, WAL/FK/NORMAL/busy_timeout, " +
             "transactional player/ship/inventory/planet save, exact load comparison, " +
-            "8 concurrent submissions through a single writer gate, integrity_check.\n\n" +
-            "S — сохранить изменённый snapshot\n" +
+            "8 concurrent submissions through a single writer gate, integrity_check.\n" +
+            "Recovery acceptance uses an isolated database: protected revision 10, " +
+            "newer primary revision 11, rejected invalid backup candidate, intentional " +
+            "primary corruption, atomic replacement, quarantine and exact rollback.\n\n" +
+            "S — сохранить snapshot; предыдущая копия защищается автоматически\n" +
             "L — загрузить snapshot\n" +
-            "R — очистить игровой slot транзакцией\n" +
-            "Z — TASK-054 automatic acceptance\n" +
+            "R — очистить slot, сохранив предыдущую копию\n" +
+            "B — создать/обновить валидированный backup\n" +
+            "Y — восстановить предыдущую копию с quarantine текущей БД\n" +
+            "Z — TASK-054 foundation acceptance\n" +
+            "X — TASK-056 backup/recovery acceptance\n" +
             "H — compact / detailed / hidden";
     }
 
@@ -523,6 +726,75 @@ public partial class SavePrototype : Node3D
               $"items={diagnostics.InventoryRows}, writes={_acceptanceReport.ConcurrentWritesSubmitted}, " +
               $"maxWriters={diagnostics.MaximumConcurrentWriters}, integrity={diagnostics.IntegrityResult}"
             : $"TASK-054 save (Z): FAIL — {_acceptanceReport.Result}";
+    }
+
+    private string BuildRecoveryAcceptanceHudLine()
+    {
+        if (_recoveryAcceptanceTask is not null)
+        {
+            return "TASK-056 recovery (X): RUNNING isolated corruption/recovery";
+        }
+
+        if (_recoveryAcceptanceReport is null)
+        {
+            return "TASK-056 recovery (X): READY";
+        }
+
+        return _recoveryAcceptanceReport.Passed
+            ? $"TASK-056 recovery (X): PASS rev={_recoveryAcceptanceReport.RecoveredSnapshot?.Revision ?? 0}, " +
+              $"candidateRejected={(_recoveryAcceptanceReport.CandidateRejected ? 1 : 0)}, " +
+              $"backupPreserved={(_recoveryAcceptanceReport.BackupPreserved ? 1 : 0)}, " +
+              $"atomic={(_recoveryAcceptanceReport.AtomicReplacementUsed ? 1 : 0)}, " +
+              $"quarantine={(_recoveryAcceptanceReport.QuarantinePreserved ? 1 : 0)}"
+            : $"TASK-056 recovery (X): FAIL — {_recoveryAcceptanceReport.Result}";
+    }
+
+    private static string BuildBackupOutput(SaveBackupReport report)
+    {
+        return "Prototype E validated backup " +
+            (report.Succeeded ? "PASS" : "FAIL") +
+            $": revision={report.Snapshot?.Revision ?? 0}; " +
+            $"integrity={report.IntegrityResult}; bytes={report.BackupBytes}; " +
+            $"atomicReplace={(report.AtomicReplacementUsed ? 1 : 0)}; " +
+            $"sha256={report.Sha256}; elapsedMs=" +
+            report.ElapsedMilliseconds.ToString("F2", CultureInfo.InvariantCulture) +
+            $"; result={report.Result}";
+    }
+
+    private static string BuildRecoveryOutput(SaveRecoveryReport report)
+    {
+        return "Prototype E previous-copy recovery " +
+            (report.Recovered ? "PASS" : "FAIL") +
+            $": revision={report.Snapshot?.Revision ?? 0}; " +
+            $"primaryIntegrity={report.PrimaryIntegrityResult}; " +
+            $"backupIntegrity={report.BackupIntegrityResult}; " +
+            $"atomicReplace={(report.AtomicReplacementUsed ? 1 : 0)}; " +
+            $"quarantine={report.QuarantinePath}; elapsedMs=" +
+            report.ElapsedMilliseconds.ToString("F2", CultureInfo.InvariantCulture) +
+            $"; result={report.Result}";
+    }
+
+    private static string BuildRecoveryAcceptanceOutput(
+        SaveRecoveryAcceptanceReport report)
+    {
+        string prefix = report.Passed
+            ? "TASK-056 SQLite backup/recovery acceptance PASS"
+            : "TASK-056 SQLite backup/recovery acceptance FAIL";
+        return prefix +
+            $": protectedRevision={report.ProtectedRevision}; " +
+            $"newerRevision={report.NewerRevision}; " +
+            $"recoveredRevision={report.RecoveredSnapshot?.Revision ?? 0}; " +
+            $"primaryIntegrity={report.Diagnostics.IntegrityResult}; " +
+            $"backupIntegrity={report.Diagnostics.BackupIntegrityResult}; " +
+            $"candidateRejected={(report.CandidateRejected ? 1 : 0)}; " +
+            $"backupPreserved={(report.BackupPreserved ? 1 : 0)}; " +
+            $"corruptionDetected={(report.CorruptionDetected ? 1 : 0)}; " +
+            $"atomicReplace={(report.AtomicReplacementUsed ? 1 : 0)}; " +
+            $"quarantinePreserved={(report.QuarantinePreserved ? 1 : 0)}; " +
+            $"logWritten={(report.RecoveryLogWritten ? 1 : 0)}; " +
+            $"exactComparisons={report.ExactComparisons}; elapsedMs=" +
+            report.ElapsedMilliseconds.ToString("F2", CultureInfo.InvariantCulture) +
+            $"; result={report.Result}";
     }
 
     private string BuildSnapshotDetails()

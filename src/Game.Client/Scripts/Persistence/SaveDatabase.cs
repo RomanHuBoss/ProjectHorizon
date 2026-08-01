@@ -8,7 +8,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.Sqlite;
 
-public sealed class SaveDatabase : IDisposable
+public sealed partial class SaveDatabase : IDisposable
 {
     public const int CurrentSchemaVersion = 1;
     public const int BusyTimeoutMilliseconds = 5000;
@@ -49,6 +49,7 @@ public sealed class SaveDatabase : IDisposable
             () =>
             {
                 EnsureParentDirectory();
+                RecoverPrimaryIfCorruptCore(slotId: null);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
                 return ReadDiagnosticsCore(connection, string.Empty);
@@ -65,9 +66,27 @@ public sealed class SaveDatabase : IDisposable
             () =>
             {
                 EnsureParentDirectory();
+                RecoverPrimaryIfCorruptCore(snapshot.SlotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
+
+                bool hadPreviousSnapshot = TryLoadSnapshotCore(
+                    connection,
+                    snapshot.SlotId,
+                    out _);
+                if (hadPreviousSnapshot)
+                {
+                    CreateValidatedBackupCore(connection, snapshot.SlotId);
+                }
+
                 SaveSnapshotCore(connection, snapshot);
+                ValidateExpectedSnapshotCore(connection, snapshot);
+
+                if (!hadPreviousSnapshot)
+                {
+                    CreateValidatedBackupCore(connection, snapshot.SlotId);
+                }
+
                 return true;
             },
             cancellationToken);
@@ -111,8 +130,15 @@ public sealed class SaveDatabase : IDisposable
             () =>
             {
                 EnsureParentDirectory();
+                RecoverPrimaryIfCorruptCore(slotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
+
+                if (TryLoadSnapshotCore(connection, slotId, out _))
+                {
+                    CreateValidatedBackupCore(connection, slotId);
+                }
+
                 using SqliteTransaction transaction = connection.BeginTransaction();
                 using SqliteCommand command = connection.CreateCommand();
                 command.Transaction = transaction;
@@ -846,6 +872,11 @@ public sealed class SaveDatabase : IDisposable
             ? new FileInfo(_databasePath).Length
             : 0L;
 
+        SaveFileInspection backupInspection = InspectDatabaseFileCore(
+            BackupPath,
+            slotId,
+            requireSnapshot: false);
+
         return new SaveDatabaseDiagnostics(
             schemaVersion,
             journalMode,
@@ -858,7 +889,10 @@ public sealed class SaveDatabase : IDisposable
             visitedRows,
             QueuedWrites,
             CompletedWrites,
-            MaximumConcurrentWriters);
+            MaximumConcurrentWriters,
+            backupInspection.Exists,
+            backupInspection.Bytes,
+            backupInspection.IntegrityResult);
     }
 
     private SavePrototypeAcceptanceReport BuildFailure(
