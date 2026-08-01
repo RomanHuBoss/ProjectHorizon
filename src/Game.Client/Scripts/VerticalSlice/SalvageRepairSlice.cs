@@ -101,12 +101,7 @@ public partial class SalvageRepairSlice : Node3D
                 left.ResourceNodeId,
                 right.ResourceNodeId,
                 StringComparison.Ordinal));
-        if (_resourceNodes.Count != StarterRepairSession.RequiredSalvage)
-        {
-            throw new InvalidOperationException(
-                $"Vertical slice requires exactly " +
-                $"{StarterRepairSession.RequiredSalvage} salvage nodes.");
-        }
+        ValidateResourceNodeBindings();
 
         string userDirectory = ProjectSettings.GlobalizePath("user://");
         string databasePath = Path.Combine(
@@ -260,6 +255,46 @@ public partial class SalvageRepairSlice : Node3D
             "Vertical slice domain event: StarterRepairQuestCompleted; " +
             $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
             $"revision={_revision}; interactor={interactor.Name}");
+    }
+
+    private void ValidateResourceNodeBindings()
+    {
+        if (_resourceNodes.Count != StarterRepairSession.RequiredSalvage)
+        {
+            throw new InvalidOperationException(
+                $"Vertical slice requires exactly " +
+                $"{StarterRepairSession.RequiredSalvage} salvage nodes, " +
+                $"but found {_resourceNodes.Count}.");
+        }
+
+        string[] expectedIds =
+        {
+            "salvage.alpha",
+            "salvage.beta",
+            "salvage.gamma"
+        };
+        string[] actualIds = _resourceNodes
+            .Select(node => node.ResourceNodeId)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        bool unique = actualIds
+            .Distinct(StringComparer.Ordinal)
+            .Count() == actualIds.Length;
+        if (!unique || !actualIds.SequenceEqual(
+            expectedIds,
+            StringComparer.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Vertical-slice salvage ResourceNodeId bindings are invalid. " +
+                $"Expected [{string.Join(", ", expectedIds)}], " +
+                $"actual [{string.Join(", ", actualIds)}]. " +
+                "Use the exact PascalCase C# export name ResourceNodeId " +
+                "inside SalvageRepairSlice.tscn.");
+        }
+
+        GD.Print(
+            "TASK-062 scene binding PASS: " +
+            $"resourceIds={string.Join(",", actualIds)}; unique=1.");
     }
 
     private bool CanStartCommand()

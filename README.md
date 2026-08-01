@@ -66,8 +66,15 @@ Esc            освободить курсор
 
 HUD показывает текущую цель взаимодействия. Перед нажатием `E` должна
 появиться строка вида `Interaction: near SalvageAlpha (...) — press E` либо
-`Interaction: aimed at ... — press E`. Клавиша `H` циклически переключает
-`DETAILED → COMPACT → HIDDEN`; в скрытом режиме остаётся hint для возврата HUD.
+`Interaction: aimed at ... — press E`. Три узла имеют обязательные уникальные
+C#-export ID `salvage.alpha`, `salvage.beta`, `salvage.gamma`; при запуске сцена
+проверяет точное PascalCase-связывание `ResourceNodeId` и не переходит в READY
+при пустом или дублирующемся ID. При успешном старте в Output появляется
+`TASK-062 scene binding PASS: resourceIds=salvage.alpha,salvage.beta,salvage.gamma; unique=1`.
+Старый ошибочный `salvage.unassigned` из локального тестового snapshot игнорируется;
+для полностью чистого ручного прогона используйте `F8`. Клавиша `H` циклически
+переключает `DETAILED → COMPACT → HIDDEN`; в скрытом режиме остаётся hint для
+возврата HUD.
 
 Ожидаемый автоматический результат по `F7`:
 

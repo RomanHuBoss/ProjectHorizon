@@ -110,16 +110,23 @@ public sealed class StarterRepairSession
                 continue;
             }
 
-            session.SalvageQuantity += Math.Max(0, item.Quantity);
             const string itemPrefix = "item.";
-            if (item.ItemId.StartsWith(itemPrefix, StringComparison.Ordinal))
+            if (!item.ItemId.StartsWith(itemPrefix, StringComparison.Ordinal))
             {
-                string nodeId = item.ItemId[itemPrefix.Length..];
-                if (knownNodeIds.Contains(nodeId))
-                {
-                    session._collectedNodeIds.Add(nodeId);
-                }
+                continue;
             }
+
+            string nodeId = item.ItemId[itemPrefix.Length..];
+            if (!knownNodeIds.Contains(nodeId))
+            {
+                // Ignore stale scene-binding artifacts such as the former
+                // salvage.unassigned ID. Only a resource node that exists in
+                // the current scene may contribute to this objective.
+                continue;
+            }
+
+            session._collectedNodeIds.Add(nodeId);
+            session.SalvageQuantity += Math.Max(0, item.Quantity);
         }
 
         session.ShipRepaired = snapshot.Ship.Health >= 99.0;

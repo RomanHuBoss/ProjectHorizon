@@ -17,6 +17,18 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
 
     public override void _Ready()
     {
+        if (string.IsNullOrWhiteSpace(ResourceNodeId) ||
+            string.Equals(
+                ResourceNodeId,
+                "salvage.unassigned",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Resource node {Name} has no serialized ResourceNodeId. " +
+                "The C# export name must be written exactly as " +
+                "ResourceNodeId in the .tscn file.");
+        }
+
         _mesh = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
         _collisionShape = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
         if (_mesh is null || _collisionShape is null)

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-resource-id-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -41,6 +41,45 @@
 **Вывод:** все пять технических прототипов и производственная persistence-ступень `TASK-060/TASK-061` имеют статус `VERIFIED`. Пользователь подтвердил `F6: PASS`, реальный periodic autosave, graceful-exit `saved=1; revision=3; pending=0` и холодное восстановление revision `3`. Ограничение на Этап 1 снято; текущая итерация реализует первый сквозной цикл вертикального среза `TASK-062`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — hotfix уникальных ID ресурсных узлов (`TASK-062/TASK-063`)
+
+**Исходный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-resource-id-hotfix.zip`  
+**Git SHA:** отсутствует в архиве  
+**Причина hotfix:** после исправления proximity-взаимодействия первый конус собирался, но второй и третий не изменяли прогресс, хотя HUD корректно показывал ближайшую цель.
+
+**Полученное runtime-доказательство дефекта:**
+
+- локальная сборка: `0` предупреждений, `0` ошибок;
+- `F7`: `PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1`;
+- production-сцена после первого ручного сбора показывала `collected=1/3`;
+- HUD находил следующую цель: `Interaction: near SalvageGamma (1,4 m) — press E`;
+- повторные нажатия `E` не увеличивали счётчик.
+
+**Корневая причина:** экспортируемое C#-свойство называется `ResourceNodeId`, но в `SalvageRepairSlice.tscn` было записано GDScript-подобное имя `resource_node_id`. В этом проекте C# exports сериализуются с точным PascalCase-именем. Значения сцены не применялись, поэтому все три узла сохраняли default `salvage.unassigned`. Первый узел добавлял этот ID, а два остальных корректно отклонялись доменной моделью как повторный сбор того же ID. Автоматический `F7` не обнаруживал дефект, поскольку создавал уникальные ID непосредственно в Godot-независимом тесте.
+
+**Исправлено:**
+
+- свойства сцены заменены на точные `ResourceNodeId = "salvage.alpha|beta|gamma"`;
+- каждый `SalvageResourceNode` при `_Ready()` запрещает пустой/default ID и выдаёт явную ошибку сериализации;
+- корневой контроллер проверяет количество, уникальность и точный canonical-набор ID до запуска persistence;
+- при успешном старте Output содержит `TASK-062 scene binding PASS: resourceIds=salvage.alpha,salvage.beta,salvage.gamma; unique=1`;
+- старый ошибочный `item.salvage.unassigned` из локального snapshot больше не засчитывается как реальный salvage-узел;
+- дефект больше не может быть скрыт доменной `F7`-приёмкой: сцена с неправильными или дублирующимися ID останавливается до READY.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageResourceNode.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:** `TASK-062` и `VS-010`–`VS-016` остаются `IMPLEMENTED`; `TASK-063` и `VS-ACC-010`–`VS-ACC-016` остаются `IN_PROGRESS` до полного ручного цикла `0/3 → 1/3 → 2/3 → 3/3 → REPAIRED` и cold restart.
+
+**Повторная приёмка:** нажать `F8`, проверить строку scene-binding PASS, собрать три разных узла и убедиться, что Output содержит три разных ID `salvage.alpha`, `salvage.beta`, `salvage.gamma`; затем отремонтировать корабль, проверить `H`, graceful exit и холодное восстановление.
 
 ### 2026-08-01 — hotfix ручного взаимодействия и HUD (`TASK-062/TASK-063`)
 
