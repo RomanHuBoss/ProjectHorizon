@@ -39,6 +39,7 @@ public partial class SalvageRepairSlice : Node3D
 
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly List<SalvageResourceNode> _resourceNodes = new();
+    private readonly DataDrivenCraftTimer _craftTimer = new();
     private SaveDatabase? _database;
     private SaveAutosaveCoordinator? _autosave;
     private GameContentCatalog? _contentCatalog;
@@ -57,11 +58,13 @@ public partial class SalvageRepairSlice : Node3D
     private Task<VerticalSliceAcceptanceReport>? _acceptanceTask;
     private Task<DataDrivenContentAcceptanceReport>? _contentAcceptanceTask;
     private Task<CraftingExpansionAcceptanceReport>? _craftingAcceptanceTask;
+    private Task<CraftTimeAcceptanceReport>? _craftTimeAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
     private DataDrivenContentAcceptanceReport? _contentAcceptanceReport;
     private CraftingExpansionAcceptanceReport? _craftingAcceptanceReport;
+    private CraftTimeAcceptanceReport? _craftTimeAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -76,6 +79,8 @@ public partial class SalvageRepairSlice : Node3D
     private string _acceptanceHud = "READY";
     private string _contentAcceptanceHud = "READY";
     private string _craftingAcceptanceHud = "READY";
+    private string _craftTimeAcceptanceHud = "READY";
+    private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
     private StarterRepairSession Session => _session ??
@@ -162,14 +167,16 @@ public partial class SalvageRepairSlice : Node3D
             "TASK-064 data-driven vertical slice initializing. " +
             $"Recipe={RepairRecipe.RecipeId}; " +
             $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
-            $"secondRecipe={LaunchCapacitorRecipe.RecipeId}. " +
-            "Press F7/F9/F10 for acceptance or F8 to reset.");
+            $"secondRecipe={LaunchCapacitorRecipe.RecipeId}; " +
+            $"craftTime={LaunchCapacitorRecipe.CraftTimeSeconds:0.0}s. " +
+            "Press F7/F9/F10/F11 for acceptance or F8 to reset.");
     }
 
     public override void _Notification(int what)
     {
         if (what == NotificationWMCloseRequest)
         {
+            CancelTimedCraft("graceful exit requested");
             _closeRequested = true;
             TryBeginGracefulExit();
         }
@@ -192,6 +199,8 @@ public partial class SalvageRepairSlice : Node3D
         PollAcceptanceTask();
         PollContentAcceptanceTask();
         PollCraftingAcceptanceTask();
+        PollCraftTimeAcceptanceTask();
+        UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
         UpdatePeriodicAutosave(delta);
@@ -237,6 +246,11 @@ public partial class SalvageRepairSlice : Node3D
         else if (Matches(physical, logical, Key.F10) && CanStartCommand())
         {
             BeginCraftingAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F11) && CanStartCommand())
+        {
+            BeginCraftTimeAcceptance();
             GetViewport().SetInputAsHandled();
         }
     }
@@ -338,36 +352,182 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        if (_craftTimer.IsRunning)
+        {
+            _lastDomainEvent = "LaunchCapacitorCraftRunning";
+            _status = $"recipe {_craftTimer.RecipeId} is already processing; " +
+                $"remaining={_craftTimer.RemainingSeconds:0.0}s";
+            return;
+        }
+
+        StationCraftResult validation = Session.ValidateSecondaryCraft(
+            stationId,
+            out string validationResult);
+        _status = validationResult;
+        if (validation != StationCraftResult.Ready)
+        {
+            if (validation != StationCraftResult.AlreadyCrafted)
+            {
+                _lastDomainEvent = "LaunchCapacitorCraftBlocked";
+                GD.Print(
+                    "Vertical slice domain event: LaunchCapacitorCraftBlocked; " +
+                    $"result={validation}; station={stationId}; " +
+                    $"crystal={Session.GetAvailableQuantity(VerticalSliceContentIds.ConductiveCrystalResourceId)}");
+            }
+
+            return;
+        }
+
+        if (LaunchCapacitorRecipe.CraftTimeSeconds <= 0.0)
+        {
+            CompleteLaunchCapacitorCraft(
+                source,
+                recipeId,
+                stationId,
+                interactor.Name.ToString(),
+                timed: false);
+            return;
+        }
+
+        if (!_craftTimer.TryStart(
+            LaunchCapacitorRecipe,
+            stationId,
+            out string startResult))
+        {
+            _status = startResult;
+            _lastDomainEvent = "LaunchCapacitorCraftBlocked";
+            return;
+        }
+
+        _craftingInteractorName = interactor.Name.ToString();
+        source.SetCrafting(true);
+        _lastDomainEvent = "LaunchCapacitorCraftStarted";
+        _status = $"crafting {recipeId}: 0.0/" +
+            $"{_craftTimer.DurationSeconds:0.0}s";
+        GD.Print(
+            "TASK-068 timed craft started: " +
+            $"recipe={recipeId}; station={stationId}; " +
+            $"duration={_craftTimer.DurationSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            "inputsHeld=1; output=0.");
+    }
+
+    private void UpdateTimedCraft(double delta)
+    {
+        if (!_craftTimer.IsRunning)
+        {
+            return;
+        }
+
+        CraftTimerAdvanceResult advanceResult = _craftTimer.Advance(
+            delta,
+            out _);
+        _status = $"crafting {_craftTimer.RecipeId}: " +
+            $"{_craftTimer.ElapsedSeconds:0.0}/" +
+            $"{_craftTimer.DurationSeconds:0.0}s";
+        if (advanceResult != CraftTimerAdvanceResult.Completed)
+        {
+            return;
+        }
+
+        if (_craftingStation is null)
+        {
+            string recipeId = _craftTimer.RecipeId;
+            double elapsed = _craftTimer.ElapsedSeconds;
+            double duration = _craftTimer.DurationSeconds;
+            _craftTimer.Reset();
+            _craftingInteractorName = "unknown";
+            _lastDomainEvent = "LaunchCapacitorCraftCancelled";
+            _state = SalvageRepairSliceState.Failed;
+            _status = "timed craft failed: crafting station became unavailable";
+            GD.PushError(
+                "TASK-068 timed craft cancelled safely: " +
+                $"recipe={recipeId}; " +
+                $"elapsed={elapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"duration={duration.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                "inputsConsumed=0; reason=crafting station became unavailable.");
+            return;
+        }
+
+        string recipeId = _craftTimer.RecipeId;
+        string stationId = _craftTimer.StationId;
+        double configuredDuration = _craftTimer.DurationSeconds;
+        double elapsed = _craftTimer.ElapsedSeconds;
+        _craftTimer.Reset();
+        CompleteLaunchCapacitorCraft(
+            _craftingStation,
+            recipeId,
+            stationId,
+            _craftingInteractorName,
+            timed: true,
+            configuredDuration: configuredDuration,
+            elapsed: elapsed);
+    }
+
+    private void CompleteLaunchCapacitorCraft(
+        PortableCraftingStation source,
+        string recipeId,
+        string stationId,
+        string interactorName,
+        bool timed,
+        double configuredDuration = 0.0,
+        double elapsed = 0.0)
+    {
         StationCraftResult craftResult = Session.TryCraftSecondary(
             stationId,
             out string result);
         _status = result;
-        if (craftResult == StationCraftResult.ShipNotRepaired ||
-            craftResult == StationCraftResult.WrongStation ||
-            craftResult == StationCraftResult.InsufficientInputs ||
-            craftResult == StationCraftResult.RecipeUnavailable)
+        source.SetCrafting(false);
+        if (craftResult != StationCraftResult.Crafted)
         {
             _lastDomainEvent = "LaunchCapacitorCraftBlocked";
-            GD.Print(
-                "Vertical slice domain event: LaunchCapacitorCraftBlocked; " +
-                $"result={craftResult}; station={stationId}; " +
-                $"crystal={Session.GetAvailableQuantity(VerticalSliceContentIds.ConductiveCrystalResourceId)}");
-            return;
-        }
-
-        if (craftResult == StationCraftResult.AlreadyCrafted)
-        {
+            GD.PushWarning(
+                "TASK-068 timed craft completion blocked: " +
+                $"result={craftResult}; recipe={recipeId}; station={stationId}.");
             return;
         }
 
         source.SetCrafted(true);
         _lastDomainEvent = "LaunchCapacitorCrafted";
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+        if (timed)
+        {
+            GD.Print(
+                "TASK-068 timed craft completion PASS: " +
+                $"recipe={recipeId}; station={stationId}; " +
+                $"configured={configuredDuration.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"elapsed={elapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                "inputsHeldUntilCompletion=1; completedOnce=1; output=1; " +
+                $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
+                $"revision={_revision}; interactor={interactorName}");
+            return;
+        }
+
         GD.Print(
             "Vertical slice domain event: LaunchCapacitorCrafted; " +
             $"recipe={recipeId}; output={VerticalSliceContentIds.LaunchCapacitorItemId}; " +
             $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
-            $"revision={_revision}; interactor={interactor.Name}");
+            $"revision={_revision}; interactor={interactorName}");
+    }
+
+    private void CancelTimedCraft(string reason)
+    {
+        if (!_craftTimer.IsRunning)
+        {
+            return;
+        }
+
+        string recipeId = _craftTimer.RecipeId;
+        double elapsed = _craftTimer.ElapsedSeconds;
+        double duration = _craftTimer.DurationSeconds;
+        _craftTimer.Reset();
+        _craftingStation?.SetCrafting(false);
+        _lastDomainEvent = "LaunchCapacitorCraftCancelled";
+        _status = $"timed craft cancelled: {reason}";
+        GD.Print(
+            "TASK-068 timed craft cancelled safely: " +
+            $"recipe={recipeId}; elapsed={elapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"duration={duration.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"inputsConsumed=0; reason={reason}.");
     }
 
     private void ValidateResourceNodeBindings()
@@ -398,6 +558,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"{LaunchCapacitorRecipe.RequiredStation}, but scene station is " +
                 $"{_craftingStation?.StationId ?? "missing"}/" +
                 $"{_craftingStation?.RecipeId ?? "missing"}.");
+        }
+
+        if (!double.IsFinite(LaunchCapacitorRecipe.CraftTimeSeconds) ||
+            LaunchCapacitorRecipe.CraftTimeSeconds <= 0.0)
+        {
+            throw new InvalidOperationException(
+                $"Recipe {LaunchCapacitorRecipe.RecipeId} must define a " +
+                "positive CraftTimeSeconds for TASK-068.");
         }
 
         if (_resourceNodes.Count == 0)
@@ -494,9 +662,15 @@ public partial class SalvageRepairSlice : Node3D
             $"required={craftingInput.Quantity}; " +
             $"available={craftingAvailable}; " +
             $"station={LaunchCapacitorRecipe.RequiredStation}; " +
+            $"craftTime={LaunchCapacitorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
             $"items={ContentCatalog.Items.Count}; " +
             $"resources={ContentCatalog.Resources.Count}; " +
             $"recipes={ContentCatalog.Recipes.Count}.");
+        GD.Print(
+            "TASK-068 craft-time binding PASS: " +
+            $"recipe={LaunchCapacitorRecipe.RecipeId}; " +
+            $"duration={LaunchCapacitorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"station={LaunchCapacitorRecipe.RequiredStation}; timer=DataDrivenCraftTimer.");
     }
 
     private static GameContentCatalog LoadContentCatalog()
@@ -547,7 +721,9 @@ public partial class SalvageRepairSlice : Node3D
             _acceptanceTask is null &&
             _contentAcceptanceTask is null &&
             _craftingAcceptanceTask is null &&
+            _craftTimeAcceptanceTask is null &&
             _gracefulExitTask is null &&
+            !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
             !_closeRequested;
     }
@@ -618,6 +794,25 @@ public partial class SalvageRepairSlice : Node3D
             _lifetimeCancellation.Token);
     }
 
+    private void BeginCraftTimeAcceptance()
+    {
+        CraftingRecipeDefinition repairRecipe = RepairRecipe;
+        CraftingRecipeDefinition craftingRecipe = LaunchCapacitorRecipe;
+        ResourceNodeBinding[] bindings = BuildResourceBindings().Values
+            .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
+            .ToArray();
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-068 craft-time acceptance running";
+        _craftTimeAcceptanceHud = "RUNNING";
+        _craftTimeAcceptanceReport = null;
+        _craftTimeAcceptanceTask = Task.Run(
+            () => CraftTimeAcceptanceRunner.Run(
+                repairRecipe,
+                craftingRecipe,
+                bindings),
+            _lifetimeCancellation.Token);
+    }
+
     private void BeginReset()
     {
         if (_database is null)
@@ -681,6 +876,7 @@ public partial class SalvageRepairSlice : Node3D
             _acceptanceTask is not null ||
             _contentAcceptanceTask is not null ||
             _craftingAcceptanceTask is not null ||
+            _craftTimeAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -759,6 +955,8 @@ public partial class SalvageRepairSlice : Node3D
                     (float)snapshot.Player.PositionZ);
             }
 
+            _craftTimer.Reset();
+            _craftingInteractorName = "unknown";
             ApplySessionToScene();
             _state = SalvageRepairSliceState.Ready;
             _status = snapshot is null
@@ -794,6 +992,8 @@ public partial class SalvageRepairSlice : Node3D
                 LaunchCapacitorRecipe);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
+            _craftTimer.Reset();
+            _craftingInteractorName = "unknown";
             _lastDomainEvent = "GameplaySlotReset";
             if (_player is not null)
             {
@@ -939,6 +1139,49 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollCraftTimeAcceptanceTask()
+    {
+        if (_craftTimeAcceptanceTask is null ||
+            !_craftTimeAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<CraftTimeAcceptanceReport> task = _craftTimeAcceptanceTask;
+        _craftTimeAcceptanceTask = null;
+        try
+        {
+            _craftTimeAcceptanceReport = task.GetAwaiter().GetResult();
+            _craftTimeAcceptanceHud = _craftTimeAcceptanceReport.Passed
+                ? $"PASS duration={_craftTimeAcceptanceReport.DurationSeconds:0.0}, " +
+                  $"started={(_craftTimeAcceptanceReport.Started ? 1 : 0)}, " +
+                  $"duplicate={(_craftTimeAcceptanceReport.DuplicateStartRejected ? 1 : 0)}, " +
+                  $"inputsHeld={(_craftTimeAcceptanceReport.InputsHeldUntilCompletion ? 1 : 0)}, " +
+                  $"completed={(_craftTimeAcceptanceReport.CompletedAtConfiguredDuration ? 1 : 0)}, " +
+                  $"single={(_craftTimeAcceptanceReport.SingleCompletion ? 1 : 0)}, " +
+                  $"output={_craftTimeAcceptanceReport.ProducedOutputQuantity}"
+                : $"FAIL {_craftTimeAcceptanceReport.Result}";
+            _state = _craftTimeAcceptanceReport.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = _craftTimeAcceptanceReport.Result;
+            string output = BuildCraftTimeAcceptanceOutput(
+                _craftTimeAcceptanceReport);
+            if (_craftTimeAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("craft-time acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -1027,6 +1270,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _shipTerminal?.SetRepaired(Session.ShipRepaired);
+        _craftingStation?.SetCrafting(false);
         _craftingStation?.SetCrafted(Session.SecondaryRecipeCrafted);
     }
 
@@ -1051,8 +1295,8 @@ public partial class SalvageRepairSlice : Node3D
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
             _hudMargin.OffsetRight = 900.0f;
-            _hudMargin.OffsetBottom = 565.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(850.0f, 510.0f);
+            _hudMargin.OffsetBottom = 620.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(850.0f, 565.0f);
         }
     }
 
@@ -1074,21 +1318,34 @@ public partial class SalvageRepairSlice : Node3D
         CraftingStackDefinition launchOutput = LaunchCapacitorRecipe.Outputs[0];
         int launchResourceQuantity = Session.GetAvailableQuantity(
             launchInput.DefinitionId);
+        string craftProcess = _craftTimer.IsRunning
+            ? $"RUNNING {_craftTimer.ElapsedSeconds:0.0}/" +
+              $"{_craftTimer.DurationSeconds:0.0}s " +
+              $"({_craftTimer.Progress01 * 100.0:0}%)"
+            : Session.SecondaryRecipeCrafted
+                ? "COMPLETE"
+                : "idle";
         string objective = !Session.ShipRepaired
             ? $"Objective 1/2: collect salvage " +
               $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
               "then interact with ship"
-            : !Session.SecondaryRecipeCrafted
-                ? $"Objective 2/2: collect {launchInput.DefinitionId} " +
-                  $"{launchResourceQuantity}/{launchInput.Quantity}, " +
-                  "then use PortableFabricator"
-                : "Objective: COMPLETE — ship repaired and launch capacitor crafted";
+            : _craftTimer.IsRunning
+                ? $"Objective 2/2: fabricating launch capacitor " +
+                  $"{_craftTimer.ElapsedSeconds:0.0}/" +
+                  $"{_craftTimer.DurationSeconds:0.0}s"
+                : !Session.SecondaryRecipeCrafted
+                    ? $"Objective 2/2: collect {launchInput.DefinitionId} " +
+                      $"{launchResourceQuantity}/{launchInput.Quantity}, " +
+                      "then use PortableFabricator"
+                    : "Objective: COMPLETE — ship repaired and launch capacitor crafted";
         string ship = !Session.ShipRepaired
             ? $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
               Session.SalvageDefinitionId
-            : Session.SecondaryRecipeCrafted
-                ? "Ship: REPAIRED • launch capacitor READY"
-                : "Ship: REPAIRED • launch capacitor MISSING";
+            : _craftTimer.IsRunning
+                ? "Ship: REPAIRED • launch capacitor FABRICATING"
+                : Session.SecondaryRecipeCrafted
+                    ? "Ship: REPAIRED • launch capacitor READY"
+                    : "Ship: REPAIRED • launch capacitor MISSING";
         string contentLine =
             $"Content: schema={ContentCatalog.SchemaVersion} • " +
             $"items={ContentCatalog.Items.Count} • " +
@@ -1101,7 +1358,8 @@ public partial class SalvageRepairSlice : Node3D
         string craftingRecipeLine =
             $"Craft: {LaunchCapacitorRecipe.RecipeId} • " +
             $"{launchInput.Quantity}×{launchInput.DefinitionId} → " +
-            $"{launchOutput.Quantity}×{launchOutput.DefinitionId}";
+            $"{launchOutput.Quantity}×{launchOutput.DefinitionId} • " +
+            $"time={LaunchCapacitorRecipe.CraftTimeSeconds:0.0}s";
         double nextAutosave = Math.Max(
             0.0,
             AutosaveIntervalSeconds - _autosaveElapsedSeconds);
@@ -1122,13 +1380,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"crystal={launchResourceQuantity}/{launchInput.Quantity} • " +
                 $"capacitor={(Session.SecondaryRecipeCrafted ? "READY" : "MISSING")} • " +
-                $"rev={_revision}\n" +
+                $"craft={craftProcess} • rev={_revision}\n" +
                 $"Content: schema={ContentCatalog.SchemaVersion} • " +
                 $"items={ContentCatalog.Items.Count} • resources={ContentCatalog.Resources.Count} • " +
                 $"recipes={ContentCatalog.Recipes.Count}\n" +
                 $"Interaction: {interaction}\n" +
                 $"Status: {_status}\n" +
-                "E — interact • F7 — gameplay • F8 — reset • F9 — content • F10 — crafting";
+                "E — interact • F7 — gameplay • F8 — reset • F9 — content • " +
+                "F10 — crafting • F11 — craft time";
             return;
         }
 
@@ -1138,6 +1397,7 @@ public partial class SalvageRepairSlice : Node3D
             contentLine + "\n" +
             recipeLine + "\n" +
             craftingRecipeLine + "\n" +
+            $"Craft process: {craftProcess}\n" +
             $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
             $"{_resourceNodes.Count}\n" +
             objective + "\n" +
@@ -1148,9 +1408,11 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-062 gameplay (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
             $"TASK-066 crafting (F10): {_craftingAcceptanceHud}\n" +
+            $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space — move • E — collect/repair/craft • H — HUD • " +
-            "F7 — gameplay • F8 — reset • F9 — content • F10 — crafting • Esc — release mouse";
+            "F7 — gameplay • F8 — reset • F9 — content • F10 — crafting • " +
+            "F11 — craft time • Esc — release mouse";
     }
 
     private static string BuildAcceptanceOutput(
@@ -1214,6 +1476,24 @@ public partial class SalvageRepairSlice : Node3D
             $"revision={report.Revision}; " +
             $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
             $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildCraftTimeAcceptanceOutput(
+        CraftTimeAcceptanceReport report)
+    {
+        return "TASK-068 data-driven craft-time acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"duration={report.DurationSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"positiveDuration={(report.PositiveJsonDuration ? 1 : 0)}; " +
+            $"started={(report.Started ? 1 : 0)}; " +
+            $"duplicateRejected={(report.DuplicateStartRejected ? 1 : 0)}; " +
+            $"inputsHeldUntilCompletion={(report.InputsHeldUntilCompletion ? 1 : 0)}; " +
+            $"partialRunning={(report.PartialAdvanceStayedRunning ? 1 : 0)}; " +
+            $"completedAtDuration={(report.CompletedAtConfiguredDuration ? 1 : 0)}; " +
+            $"singleCompletion={(report.SingleCompletion ? 1 : 0)}; " +
+            $"output={report.ProducedOutputQuantity}; " +
             $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
             $"result={report.Result}";
     }

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-second-resource-crafting-station.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,65 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, production persistence, первый salvage/repair loop и первый data-driven каталог имеют статус `VERIFIED`. Пользователь подтвердил сборку `0/0`, `F9: PASS`, `F7: PASS`, ручной `Objective: COMPLETE`, `Ship: REPAIRED` и production-autosave. Текущая итерация (`TASK-066`) добавляет второй ресурс, второй рецепт и отдельную crafting station с точным SQLite round-trip.
+**Вывод:** все пять технических прототипов, production persistence, salvage/repair loop и два data-driven resource/recipe path имеют статус `VERIFIED`. В текущем запросе пользователь прямо зафиксировал `TASK-066 → VERIFIED` и `TASK-067 → VERIFIED`; дополнительные числовые строки runtime-проверки к запросу не приложены и в журнале не выдумываются. Текущая итерация (`TASK-068`) реализует положительный `CraftTime` из PDF-ТЗ как воспроизводимый трёхсекундный station process с отдельной `F11`-приёмкой.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — data-driven время крафта и station process (`TASK-068`)
+
+**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** раздел 17.4, раздел 23, раздел 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-066`–`TASK-069`, `CONTENT-020`–`CONTENT-037`, `CONTENT-ACC-020`–`CONTENT-ACC-037`.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь текущим запросом явно назначил `TASK-066 → VERIFIED` и `TASK-067 → VERIFIED`;
+- `CONTENT-020`–`CONTENT-027` и `CONTENT-ACC-020`–`CONTENT-ACC-027` синхронизированы в `VERIFIED`;
+- числовой build/runtime log в текущем запросе отсутствует, поэтому журнал фиксирует только фактически полученное прямое подтверждение без реконструкции неуказанных значений.
+
+**Реализовано в `TASK-068`:**
+
+- `recipe.ship.launch_capacitor` получил положительный JSON-параметр `craftTimeSeconds=3.0`; repair recipe сохранил мгновенное применение с `0.0`;
+- добавлен Godot-независимый `DataDrivenCraftTimer`, который читает duration из immutable recipe definition, детерминированно считает elapsed/remaining/progress и завершает operation ровно один раз;
+- доменная модель получила отдельную неразрушающую проверку `ValidateSecondaryCraft`; inputs и outputs не изменяются при старте или промежуточном progress;
+- production-взаимодействие с `PortableFabricator` теперь запускает процесс, а не выдаёт output немедленно; повторное `E` не перезапускает и не дублирует operation;
+- inputs расходуются и capacitor создаётся только после достижения JSON-duration; затем вызывается существующий `QuestCompleted` autosave и сохраняется прежний exact SQLite round-trip;
+- station получила три визуальных состояния: фиолетовая `idle`, оранжевая `crafting`, зелёная `crafted`;
+- detailed и compact HUD показывают configured time, `RUNNING elapsed/3.0s`, процент и отдельную строку `TASK-068 craft time (F11)`;
+- закрытие окна во время active craft безопасно отменяет timer до graceful-exit snapshot: inputs не расходуются, незавершённый output не создаётся;
+- `F11` запускает изолированную pure-.NET acceptance: positive JSON duration, start, duplicate rejection, удержание inputs, partial RUNNING, completion exactly at configured duration, single completion и output quantity;
+- `F7`, `F9` и `F10` сохранены как регрессии прежних принятых подсистем.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/DataDrivenCraftTimer.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/CraftTimeAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/PortableCraftingStation.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован один механизм — исполнение `CraftTime` для уже принятого launch-capacitor recipe. In-progress operation намеренно не сериализуется: при штатном закрытии она отменяется без расходования inputs. Третий resource/recipe path, очередь нескольких рецептов, технологии и UI выбора рецептов остаются последующими задачами.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ текстово и визуально сверено на страницах 29 и 56–57: recipe обязан содержать `CraftTime`, определения data-driven, Этап 1 требует 10 ресурсов и 10 рецептов;
+- все JSON-файлы независимо распарсены, counts и cross-reference сохранены `items=4/resources=2/recipes=2`, launch duration равна `3.0`;
+- новые timer/acceptance/domain файлы не используют Godot API; Godot API остаётся только в main-thread controller/station;
+- проверены UID, `res://`, hotkey `F11`, отсутствие конфликта в текущей main scene, строки, комментарии и баланс скобок;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому фактическая сборка и runtime `F11` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-066`, `TASK-067`, `CONTENT-020`–`CONTENT-027`, `CONTENT-ACC-020`–`CONTENT-ACC-027` → `VERIFIED`;
+- `TASK-068`, `CONTENT-030`–`CONTENT-037` → `IMPLEMENTED`;
+- `TASK-069`, `CONTENT-ACC-030`–`CONTENT-ACC-037` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`.
+
+**Следующий рекомендуемый шаг:** собрать проект `0/0`, проверить startup `craftTime=3.0`, выполнить `F11: PASS`, повторить `F7/F9/F10`, затем вручную подтвердить оранжевое состояние station, промежуточный HUD `RUNNING`, отсутствие преждевременного output и единственный completion/autosave через 3 секунды.
 
 ### 2026-08-01 — второй ресурс, рецепт и отдельная crafting station (`TASK-066`)
 
@@ -1685,38 +1741,59 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `CONTENT-020` | Каталог содержит второй item/resource/recipe path со стабильными ID | `IMPLEMENTED` | conductive crystal → launch capacitor |
-| `CONTENT-021` | Второй resource имеет физические уникальные nodes и JSON-driven yield/visual | `IMPLEMENTED` | `crystal.alpha`, `crystal.beta`; `resource.conductive_crystal` |
-| `CONTENT-022` | Отдельная crafting station связана с RequiredStation/RecipeId | `IMPLEMENTED` | `PortableCraftingStation`, `station.portable_fabricator` |
-| `CONTENT-023` | Крафт запрещён до ремонта корабля и при неверной station | `IMPLEMENTED` | `ShipNotRepaired`, `WrongStation` |
-| `CONTENT-024` | Недостаточные inputs блокируют крафт; успешный крафт расходует inputs и создаёт output | `IMPLEMENTED` | `InsufficientInputs`; capacitor output quantity 1 |
-| `CONTENT-025` | Crafted output сохраняется как stable definition и восстанавливается после cold load | `IMPLEMENTED` | `crafted.component.ship.launch_capacitor`; `FromSnapshot` |
-| `CONTENT-026` | Успешный station craft вызывает production-autosave | `IMPLEMENTED` | domain event `LaunchCapacitorCrafted` → `QuestCompleted` |
-| `CONTENT-027` | F7/F9 остаются регрессионными и F10 изолированно проверяет новый path | `IMPLEMENTED` | отдельная crafting-expansion test-БД |
-| `CONTENT-ACC-020` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
-| `CONTENT-ACC-021` | Startup подтверждает counts 4/2/2 и crafting scene binding | `IN_PROGRESS` | Нужны READY/binding lines |
-| `CONTENT-ACC-022` | F10 подтверждает обязательность предварительного ремонта | `IN_PROGRESS` | Ожидается `repairPrerequisite=1` |
-| `CONTENT-ACC-023` | F10 отклоняет wrong station и нехватку crystal inputs | `IN_PROGRESS` | Ожидается `wrongStationRejected=1`, `blockedBeforeResources=1` |
-| `CONTENT-ACC-024` | F10 собирает два crystals и создаёт один capacitor | `IN_PROGRESS` | Ожидается `resources=2`, `crafted=1`, `output=1` |
-| `CONTENT-ACC-025` | F10 подтверждает autosave, exact round-trip, log и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `roundTrip=1`, `maxWriters=1`, `integrity=ok` |
-| `CONTENT-ACC-026` | F7/F9 не регрессируют на расширенном каталоге | `IN_PROGRESS` | Повторить F7 и F9; F9 counts 4/2/2 |
-| `CONTENT-ACC-027` | Ручной цикл и cold restart восстанавливают capacitor и station state | `IN_PROGRESS` | F8 → repair → 2 crystals → fabricator → restart |
+| `CONTENT-020` | Каталог содержит второй item/resource/recipe path со стабильными ID | `VERIFIED` | Прямое подтверждение пользователя: `TASK-066 → VERIFIED`, `TASK-067 → VERIFIED` |
+| `CONTENT-021` | Второй resource имеет физические уникальные nodes и JSON-driven yield/visual | `VERIFIED` | `crystal.alpha`, `crystal.beta`; `resource.conductive_crystal` |
+| `CONTENT-022` | Отдельная crafting station связана с RequiredStation/RecipeId | `VERIFIED` | `PortableCraftingStation`, `station.portable_fabricator` |
+| `CONTENT-023` | Крафт запрещён до ремонта корабля и при неверной station | `VERIFIED` | `ShipNotRepaired`, `WrongStation` |
+| `CONTENT-024` | Недостаточные inputs блокируют крафт; успешный крафт расходует inputs и создаёт output | `VERIFIED` | `InsufficientInputs`; capacitor output quantity 1 |
+| `CONTENT-025` | Crafted output сохраняется как stable definition и восстанавливается после cold load | `VERIFIED` | `crafted.component.ship.launch_capacitor`; `FromSnapshot` |
+| `CONTENT-026` | Успешный station craft вызывает production-autosave | `VERIFIED` | domain event `LaunchCapacitorCrafted` → `QuestCompleted` |
+| `CONTENT-027` | F7/F9 остаются регрессионными и F10 изолированно проверяет новый path | `VERIFIED` | отдельная crafting-expansion test-БД |
+| `CONTENT-ACC-020` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-021` | Startup подтверждает counts 4/2/2 и crafting scene binding | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-022` | F10 подтверждает обязательность предварительного ремонта | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-023` | F10 отклоняет wrong station и нехватку crystal inputs | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-024` | F10 собирает два crystals и создаёт один capacitor | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-025` | F10 подтверждает autosave, exact round-trip, log и integrity | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-026` | F7/F9 не регрессируют на расширенном каталоге | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+| `CONTENT-ACC-027` | Ручной цикл и cold restart восстанавливают capacitor и station state | `VERIFIED` | Подтверждено пользователем назначением `TASK-067 → VERIFIED` |
+
+### 8.8. Этап 1 — data-driven `CraftTime` и station process
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `CONTENT-030` | Launch-capacitor recipe задаёт положительный `CraftTime` в JSON | `IMPLEMENTED` | `craftTimeSeconds=3.0` в `Content/recipes.json` |
+| `CONTENT-031` | Длительность процесса читается из recipe definition без hidden gameplay-константы | `IMPLEMENTED` | Pure-.NET `DataDrivenCraftTimer.TryStart(recipe, stationId)` |
+| `CONTENT-032` | Inputs и outputs не изменяются до полного истечения configured duration | `IMPLEMENTED` | Start/partial advance не вызывают domain mutation |
+| `CONTENT-033` | Повторное взаимодействие не перезапускает и не дублирует активный process | `IMPLEMENTED` | Duplicate start rejected; controller возвращает remaining time |
+| `CONTENT-034` | По завершении inputs расходуются и output создаётся ровно один раз | `IMPLEMENTED` | Completion вызывает `TryCraftSecondary` однократно |
+| `CONTENT-035` | Station и HUD явно показывают состояние active process | `IMPLEMENTED` | Orange station; `RUNNING elapsed/duration` и progress |
+| `CONTENT-036` | Штатное закрытие отменяет незавершённый process без расходования inputs | `IMPLEMENTED` | Timer reset до graceful-exit snapshot; `inputsConsumed=0` |
+| `CONTENT-037` | F11 изолированно проверяет timing semantics; F7/F9/F10 сохранены | `IMPLEMENTED` | Pure-.NET acceptance без изменения gameplay-slot |
+| `CONTENT-ACC-030` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
+| `CONTENT-ACC-031` | Startup подтверждает `craftTime=3.0` и timer binding | `IN_PROGRESS` | Нужны `TASK-066` и `TASK-068` binding lines |
+| `CONTENT-ACC-032` | F11 подтверждает positive duration, start и duplicate rejection | `IN_PROGRESS` | Ожидается `positiveDuration=1`, `started=1`, `duplicateRejected=1` |
+| `CONTENT-ACC-033` | F11 подтверждает удержание inputs и partial RUNNING | `IN_PROGRESS` | Ожидается `inputsHeldUntilCompletion=1`, `partialRunning=1` |
+| `CONTENT-ACC-034` | F11 подтверждает точное завершение, single completion и output | `IN_PROGRESS` | Ожидается `completedAtDuration=1`, `singleCompletion=1`, `output=1` |
+| `CONTENT-ACC-035` | Ручной тест подтверждает orange station и HUD progress | `IN_PROGRESS` | Зафиксировать промежуточное состояние до 3.0 s |
+| `CONTENT-ACC-036` | Ручной тест подтверждает completion/autosave и safe close cancellation | `IN_PROGRESS` | Зафиксировать PASS completion и отдельный cancel-before-3s прогон |
+| `CONTENT-ACC-037` | F7/F9/F10 не регрессируют после ввода timed craft | `IN_PROGRESS` | Повторить все три acceptance routes |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-065`; Прототипы A–E, production persistence, salvage/repair loop и первый data-driven catalog.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-067`; Прототипы A–E, production persistence, salvage/repair loop и два data-driven resource/recipe path.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-067` | Выполнить runtime-приёмку второго resource/recipe path | Сборка 0/0; startup 4/2/2; `F10: PASS`; `F9: PASS`; `F7: PASS`; ручной cold restart |
+| 1 | `TASK-069` | Выполнить runtime-приёмку data-driven craft-time processing | Сборка 0/0; startup `3.0`; `F11: PASS`; `F7/F9/F10: PASS`; manual RUNNING/completion/cancel |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-068` | Добавить третий resource/recipe path или craft-time processing | После `TASK-067: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 без расширения итерации |
+| 3 | `TASK-070` | Добавить третий resource/recipe path | После `TASK-069: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 |
 
-**Подтверждено:** `TASK-060`–`TASK-065`, persistence, VS и первый content foundation.  
-**Реализовано:** `TASK-066`, `CONTENT-020`–`CONTENT-027`.  
-**Текущая приёмочная задача:** `TASK-067`.
+**Подтверждено:** `TASK-060`–`TASK-067`, persistence, vertical slice и два content path.  
+**Реализовано:** `TASK-068`, `CONTENT-030`–`CONTENT-037`.  
+**Текущая приёмочная задача:** `TASK-069`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -1784,15 +1861,17 @@ TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; re
 
 ## 12. Runtime-приёмка `TASK-066/TASK-067`
 
+> Эта приёмка уже закрыта прямым подтверждением пользователя. Раздел сохранён как регрессионный сценарий для текущей редакции, где launch-capacitor craft теперь завершается через `3.0` секунды.
+
 1. Собрать `Game.Client.csproj`: требуется `0` предупреждений и `0` ошибок.
 2. Запустить main scene и дождаться `DB: Ready`. Output должен содержать:
 
 ```text
 TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; items=4; resources=2; recipes=2.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
 ```
 
-3. Нажать `F10` один раз. Тест использует `save_1.crafting-expansion-test.db` и не изменяет gameplay-slot.
+3. Нажать `F10` один раз. Тест использует `save_1.crafting-expansion-test.db`, проверяет доменную/persistence-цепочку и не изменяет gameplay-slot.
 4. Ожидаемый HUD:
 
 ```text
@@ -1809,17 +1888,98 @@ TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; 
 7. Повторить `F7`; результат должен остаться `resources=3` и PASS, то есть два crystal nodes не должны ошибочно входить в repair acceptance.
 8. Нажать `F8`. До ремонта корабля подойти к фиолетовому PortableFabricator и нажать `E`: ожидается `LaunchCapacitorCraftBlocked`/сообщение о необходимости ремонта.
 9. Собрать три голубых узла, отремонтировать корабль, затем собрать два фиолетовых crystal nodes. HUD должен пройти `crystal=0/2 → 1/2 → 2/2`.
-10. Взаимодействовать с PortableFabricator. Он должен стать зелёным, HUD — показать `launch capacitor READY` и `Objective: COMPLETE`, Output:
-
-```text
-Vertical slice domain event: LaunchCapacitorCrafted; recipe=recipe.ship.launch_capacitor; output=component.ship.launch_capacitor; autosaveTrigger=QuestCompleted
-```
-
+10. Взаимодействовать с PortableFabricator. В текущей редакции он сначала становится оранжевым, затем через `3.0` секунды — зелёным; HUD показывает `launch capacitor READY` и `Objective: COMPLETE`.
 11. Закрыть окно штатно и повторно запустить проект. Должны восстановиться repaired ship, отсутствующие пять собранных nodes, зелёный fabricator, capacitor READY и последняя revision.
-12. Для приёмки прислать: лог сборки; screenshot `F10: PASS`; полную строку F10; результаты F9/F7; screenshot completed HUD до и после cold restart.
+12. Для регрессии прислать: лог сборки; screenshot `F10: PASS`; полную строку F10; результаты F9/F7; screenshot completed HUD после трёхсекундного process и после cold restart.
 13. При `FAIL` прислать полный HUD, последние 120 строк Output и сведения о `save_1.db`, autosave log и `save_1.crafting-expansion-test.db`.
 
-## 13. Журнал проверок
+## 13. Runtime-приёмка `TASK-068/TASK-069`
+
+1. Собрать `src/Game.Client/Game.Client.csproj`: требуется `0` предупреждений и `0` ошибок.
+2. Запустить main scene и дождаться `DB: Ready`. Output должен содержать все строки:
+
+```text
+TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
+TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
+```
+
+3. Нажать `F11` один раз и не выполнять другие действия до завершения. Pure-.NET тест не меняет gameplay-slot и должен завершиться менее чем за секунду.
+4. Ожидаемый HUD:
+
+```text
+TASK-068 craft time (F11): PASS duration=3.0, started=1, duplicate=1, inputsHeld=1, completed=1, single=1, output=1
+```
+
+5. Ожидаемая полная строка Output:
+
+```text
+TASK-068 data-driven craft-time acceptance PASS: duration=3.0; positiveDuration=1; started=1; duplicateRejected=1; inputsHeldUntilCompletion=1; partialRunning=1; completedAtDuration=1; singleCompletion=1; output=1; elapsedMs=<время>; result=configured craft time delayed output and completed exactly once
+```
+
+6. Выполнить регрессии `F7`, `F9` и `F10`; все три должны остаться `PASS`.
+7. Нажать `F8`, собрать три salvage-alloy узла, отремонтировать корабль и собрать два conductive-crystal узла.
+8. Нажать `E` у PortableFabricator. Сразу после старта Output должен содержать:
+
+```text
+TASK-068 timed craft started: recipe=recipe.ship.launch_capacitor; station=station.portable_fabricator; duration=3.0; inputsHeld=1; output=0.
+```
+
+9. До истечения `3.0` секунд проверить промежуточное состояние:
+   - station оранжевая;
+   - HUD содержит `Craft process: RUNNING <elapsed>/3.0s`;
+   - crystal остаётся `2/2`;
+   - capacitor остаётся `MISSING`;
+   - повторное `E` не обнуляет progress и сообщает remaining time.
+10. После достижения `3.0` секунд проверить:
+    - station стала зелёной;
+    - crystal стал `0/2`;
+    - capacitor стал `READY`;
+    - Output содержит единственную строку completion:
+
+```text
+TASK-068 timed craft completion PASS: recipe=recipe.ship.launch_capacitor; station=station.portable_fabricator; configured=3.0; elapsed=3.0; inputsHeldUntilCompletion=1; completedOnce=1; output=1; autosaveTrigger=QuestCompleted; revision=<N>; interactor=<имя>
+```
+
+11. Дождаться `Vertical slice autosave PASS`, закрыть окно штатно и повторно запустить проект. Completed output, зелёная station и consumed crystals должны восстановиться.
+12. Отдельно проверить safe cancellation: `F8` → repair → собрать два crystals → запустить craft → закрыть окно через `Alt+F4` до `3.0` секунд. До выхода ожидается:
+
+```text
+TASK-068 timed craft cancelled safely: recipe=recipe.ship.launch_capacitor; elapsed=<0.0..2.9>; duration=3.0; inputsConsumed=0; reason=graceful exit requested.
+```
+
+13. После повторного запуска cancellation-сценария crystals должны остаться `2/2`, capacitor — `MISSING`, station — не зелёная.
+14. Для приёмки прислать:
+    - лог сборки;
+    - screenshot `F11: PASS`;
+    - полную F11-строку;
+    - результаты `F7/F9/F10`;
+    - screenshot промежуточного orange/RUNNING состояния;
+    - screenshot финального green/READY состояния;
+    - completion/autosave lines;
+    - cancellation line и screenshot после cold restart.
+15. При `FAIL` прислать полный HUD, последние 120 строк Output, неизменённый `Content/recipes.json` и указать, меняла ли station цвет.
+
+## 14. Журнал проверок
+
+### 2026-08-01 — `TASK-068`, data-driven craft-time processing
+
+**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`  
+**Git SHA:** отсутствует в исходном архиве  
+**Связанные требования:** PDF-ТЗ 17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-030`–`CONTENT-037`.
+
+**Синхронизация:** по прямому указанию пользователя `TASK-066` и `TASK-067`, а также связанные `CONTENT-020`–`CONTENT-027`/`CONTENT-ACC-020`–`CONTENT-ACC-027`, переведены в `VERIFIED`.
+
+**Реализация:** JSON-duration `3.0 s`, pure-.NET timer и F11 acceptance, неразрушающая preflight-проверка домена, delayed station craft, orange/green visual state, HUD progress, единственный completion/autosave и safe cancellation при graceful exit.
+
+**Статическая проверка:** распарсены 4 JSON-файла; catalog counts `4/2/2`; cross-reference и stable IDs корректны; проверены 42 C#-файла на незавершённые строки/комментарии и баланс delimiters; 42 UID уникальны; 47 `res://` references проверены; `F11` встречается только в vertical-slice controller; build/cache/.git artefacts отсутствуют.
+
+**Ограничение среды:** `dotnet`/Godot недоступны, поэтому сборка и runtime здесь не выполнялись. `TASK-068` остаётся `IMPLEMENTED`, `TASK-069` — `IN_PROGRESS`.
+
+**Следующая задача:** локальная сборка `0/0`, `F11: PASS`, регрессии `F7/F9/F10`, ручные RUNNING/completion/cancellation сценарии раздела 13.
+
+
 
 ### 2026-08-01 — hotfix ручного `E` и переключения `H`
 
@@ -2838,7 +2998,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 13. Шаблон новой записи
+## 15. Шаблон новой записи
 
 ```markdown
 ### YYYY-MM-DD — <название проверки>
@@ -2874,7 +3034,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 14. Правило коммита
+## 16. Правило коммита
 
 Каждый функциональный коммит должен содержать обновление этого файла либо явно не изменять статус требований.
 
@@ -2889,7 +3049,7 @@ Verification: dotnet build; manual interaction smoke test
 
 ---
 
-## 15. Регламент последующих итераций
+## 17. Регламент последующих итераций
 
 Все последующие итерации разработки выполняются в соответствии с:
 

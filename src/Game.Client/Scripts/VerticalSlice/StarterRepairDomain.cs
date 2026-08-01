@@ -20,7 +20,8 @@ public enum StationCraftResult
     InsufficientInputs = 2,
     WrongStation = 3,
     RecipeUnavailable = 4,
-    ShipNotRepaired = 5
+    ShipNotRepaired = 5,
+    Ready = 6
 }
 
 public sealed record ResourceNodeBinding(
@@ -227,7 +228,7 @@ public sealed class StarterRepairSession
         return StarterRepairResult.Repaired;
     }
 
-    public StationCraftResult TryCraftSecondary(
+    public StationCraftResult ValidateSecondaryCraft(
         string stationId,
         out string result)
     {
@@ -270,15 +271,34 @@ public sealed class StarterRepairSession
             return StationCraftResult.InsufficientInputs;
         }
 
-        foreach (CraftingStackDefinition input in _secondaryRecipe.Inputs)
+        result = $"recipe {_secondaryRecipe.RecipeId} is ready at {stationId}";
+        return StationCraftResult.Ready;
+    }
+
+    public StationCraftResult TryCraftSecondary(
+        string stationId,
+        out string result)
+    {
+        StationCraftResult validation = ValidateSecondaryCraft(
+            stationId,
+            out result);
+        if (validation != StationCraftResult.Ready)
+        {
+            return validation;
+        }
+
+        CraftingRecipeDefinition recipe = _secondaryRecipe ??
+            throw new InvalidOperationException(
+                "Validated secondary recipe became unavailable.");
+        foreach (CraftingStackDefinition input in recipe.Inputs)
         {
             Consume(input.DefinitionId, input.Quantity);
         }
 
-        _lastCraftedOutputs = CopyOutputs(_secondaryRecipe.Outputs);
+        _lastCraftedOutputs = CopyOutputs(recipe.Outputs);
         AddCraftedOutputs(_lastCraftedOutputs);
-        result = $"recipe {_secondaryRecipe.RecipeId} crafted; " +
-            $"stored in {_secondaryRecipe.Application.TargetId}";
+        result = $"recipe {recipe.RecipeId} crafted; " +
+            $"stored in {recipe.Application.TargetId}";
         return StationCraftResult.Crafted;
     }
 

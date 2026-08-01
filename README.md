@@ -38,8 +38,9 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Принятый цикл `salvage → repair` расширен вторым ресурсом, отдельным рецептом
-и самостоятельной crafting station. Статические определения находятся в:
+Принятый цикл `salvage → repair` расширен вторым ресурсом, отдельным рецептом,
+самостоятельной crafting station и data-driven временем изготовления. Статические
+определения находятся в:
 
 ```text
 src/Game.Client/Content/items.json
@@ -60,6 +61,7 @@ src/Game.Client/Content/recipes.json
 2 × resource.conductive_crystal
 → 1 × component.ship.launch_capacitor
 → station.portable_fabricator
+→ CraftTime 3.0 s
 → StoreOutputs
 ```
 
@@ -69,14 +71,20 @@ src/Game.Client/Content/recipes.json
 2. отремонтировать красный стартовый корабль;
 3. собрать два фиолетовых conductive-crystal узла;
 4. использовать фиолетовый `PortableFabricator`;
-5. получить `component.ship.launch_capacitor` и production-autosave;
-6. после холодного запуска восстановить собранные узлы, repaired ship,
+5. наблюдать трёхсекундный процесс: станция становится оранжевой, HUD показывает
+   `RUNNING elapsed/3.0s`, inputs до завершения не расходуются;
+6. получить `component.ship.launch_capacitor` и production-autosave;
+7. после холодного запуска восстановить собранные узлы, repaired ship,
    crafted component, позицию и revision.
 
 Крафт launch capacitor до ремонта корабля блокируется. Неверная station ID и
 недостаточное количество inputs также отклоняются доменной моделью. Оба рецепта
-используют один Godot-независимый `StarterRepairSession`; inputs расходуются,
-outputs сохраняются как inventory definitions и проходят SQLite round-trip.
+используют один Godot-независимый `StarterRepairSession`. Положительный
+`craftTimeSeconds` исполняется Godot-независимым `DataDrivenCraftTimer`: повторный
+запуск во время работы отклоняется, inputs удерживаются до завершения, затем
+расходуются ровно один раз; outputs сохраняются как inventory definitions и
+проходят SQLite round-trip. Закрытие окна во время процесса безопасно отменяет
+таймер без расходования inputs.
 
 Управление стартовой сценой:
 
@@ -87,7 +95,8 @@ H              detailed / compact / hidden HUD
 F7             регрессия TASK-062: salvage → repair
 F8             очистить gameplay-slot
 F9             регрессия TASK-064: strict JSON/data-driven catalog
-F10            TASK-066: второй ресурс, station crafting и persistence
+F10            регрессия TASK-066: второй ресурс, crafting и persistence
+F11            TASK-068: data-driven craft-time state machine
 Esc            освободить курсор
 ```
 
@@ -98,7 +107,8 @@ Resource nodes обязаны иметь уникальные `ResourceNodeId`; 
 
 ```text
 TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; items=4; resources=2; recipes=2.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
+TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
 ```
 
 Ожидаемые acceptance-результаты:
@@ -115,8 +125,13 @@ TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; re
 TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; wrongStationRejected=1; blockedBeforeResources=1; crafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
 ```
 
+```text
+TASK-068 data-driven craft-time acceptance PASS: duration=3.0; positiveDuration=1; started=1; duplicateRejected=1; inputsHeldUntilCompletion=1; partialRunning=1; completedAtDuration=1; singleCompletion=1; output=1
+```
+
 `F7`, `F9` и `F10` используют изолированные test-БД и не изменяют gameplay-slot.
-`F8` необходим только для чистого ручного прогона.
+`F11` выполняет Godot-независимую deterministic-приёмку таймера без изменения
+slot. `F8` необходим только для чистого ручного прогона.
 
 
 ### Прототип A. Персонаж — `VERIFIED`

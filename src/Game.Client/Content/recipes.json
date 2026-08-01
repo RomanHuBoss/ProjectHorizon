@@ -44,7 +44,7 @@
       ],
       "requiredTechnology": "",
       "requiredStation": "station.portable_fabricator",
-      "craftTimeSeconds": 0.0,
+      "craftTimeSeconds": 3.0,
       "application": {
         "type": "StoreOutputs",
         "targetId": "inventory.ship",
