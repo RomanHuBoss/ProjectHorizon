@@ -12,6 +12,16 @@ public static class StarterRepairContentIds
     public const string RecipeId = "recipe.ship.starter_repair";
 }
 
+public static class VerticalSliceContentIds
+{
+    public const string LaunchCapacitorRecipeId =
+        "recipe.ship.launch_capacitor";
+    public const string ConductiveCrystalResourceId =
+        "resource.conductive_crystal";
+    public const string LaunchCapacitorItemId =
+        "component.ship.launch_capacitor";
+}
+
 public sealed class ContentValidationException : Exception
 {
     public ContentValidationException(string message)
@@ -490,10 +500,15 @@ public sealed class GameContentCatalog
         RequireFiniteNonNegative(
             recipe.CraftTimeSeconds,
             $"{recipe.RecipeId}.CraftTimeSeconds");
-        if (!string.Equals(
+        bool repairsShip = string.Equals(
             recipe.Application.Type,
             "RepairShip",
-            StringComparison.Ordinal))
+            StringComparison.Ordinal);
+        bool storesOutputs = string.Equals(
+            recipe.Application.Type,
+            "StoreOutputs",
+            StringComparison.Ordinal);
+        if (!repairsShip && !storesOutputs)
         {
             throw new ContentValidationException(
                 $"Recipe {recipe.RecipeId} uses unsupported application " +
@@ -504,10 +519,13 @@ public sealed class GameContentCatalog
             recipe.Application.TargetId,
             $"{recipe.RecipeId}.Application.TargetId");
         if (!double.IsFinite(recipe.Application.ResultHealth) ||
-            recipe.Application.ResultHealth <= 0.0)
+            (repairsShip && recipe.Application.ResultHealth <= 0.0) ||
+            (storesOutputs && recipe.Application.ResultHealth != 0.0))
         {
             throw new ContentValidationException(
-                $"{recipe.RecipeId}.Application.ResultHealth must be positive.");
+                repairsShip
+                    ? $"{recipe.RecipeId}.Application.ResultHealth must be positive."
+                    : $"{recipe.RecipeId}.Application.ResultHealth must be 0 for StoreOutputs.");
         }
 
         ValidateTags(recipe.Tags, recipe.RecipeId);

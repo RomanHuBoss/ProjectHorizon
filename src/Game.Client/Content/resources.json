@@ -17,7 +17,33 @@
         "metallic": 0.55,
         "roughness": 0.28
       },
-      "tags": ["surface", "salvage", "starter"]
+      "tags": [
+        "surface",
+        "salvage",
+        "starter"
+      ]
+    },
+    {
+      "resourceId": "resource.conductive_crystal",
+      "itemDefinitionId": "resource.conductive_crystal",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "visual": {
+        "albedoR": 0.58,
+        "albedoG": 0.2,
+        "albedoB": 0.92,
+        "emissionR": 0.26,
+        "emissionG": 0.05,
+        "emissionB": 0.52,
+        "emissionEnergy": 2.1,
+        "metallic": 0.22,
+        "roughness": 0.18
+      },
+      "tags": [
+        "surface",
+        "crystal",
+        "starter"
+      ]
     }
   ]
 }

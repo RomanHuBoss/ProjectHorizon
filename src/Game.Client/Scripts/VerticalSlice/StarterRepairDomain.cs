@@ -13,6 +13,16 @@ public enum StarterRepairResult
     InsufficientSalvage = 2
 }
 
+public enum StationCraftResult
+{
+    Crafted = 0,
+    AlreadyCrafted = 1,
+    InsufficientInputs = 2,
+    WrongStation = 3,
+    RecipeUnavailable = 4,
+    ShipNotRepaired = 5
+}
+
 public sealed record ResourceNodeBinding(
     string ResourceNodeId,
     string ItemDefinitionId,
@@ -52,10 +62,15 @@ public sealed class StarterRepairSession
     private readonly Dictionary<string, MutableCollectedResourceState>
         _collectedResources = new(StringComparer.Ordinal);
     private readonly CraftingRecipeDefinition _repairRecipe;
+    private readonly CraftingRecipeDefinition? _secondaryRecipe;
+    private readonly Dictionary<string, int> _craftedInventory =
+        new(StringComparer.Ordinal);
     private IReadOnlyList<CraftingStackDefinition> _lastCraftedOutputs =
         Array.Empty<CraftingStackDefinition>();
 
-    public StarterRepairSession(CraftingRecipeDefinition repairRecipe)
+    public StarterRepairSession(
+        CraftingRecipeDefinition repairRecipe,
+        CraftingRecipeDefinition? secondaryRecipe = null)
     {
         ArgumentNullException.ThrowIfNull(repairRecipe);
         if (repairRecipe.Inputs.Count == 0)
@@ -75,10 +90,23 @@ public sealed class StarterRepairSession
                 nameof(repairRecipe));
         }
 
+        if (secondaryRecipe is not null && !string.Equals(
+            secondaryRecipe.Application.Type,
+            "StoreOutputs",
+            StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "Secondary crafting recipe must use StoreOutputs application.",
+                nameof(secondaryRecipe));
+        }
+
         _repairRecipe = repairRecipe;
+        _secondaryRecipe = secondaryRecipe;
     }
 
     public CraftingRecipeDefinition RepairRecipe => _repairRecipe;
+
+    public CraftingRecipeDefinition? SecondaryRecipe => _secondaryRecipe;
 
     public string SalvageDefinitionId => _repairRecipe.Inputs[0].DefinitionId;
 
@@ -105,6 +133,15 @@ public sealed class StarterRepairSession
 
     public IReadOnlyList<CraftingStackDefinition> LastCraftedOutputs =>
         _lastCraftedOutputs;
+
+    public IReadOnlyList<CraftingStackDefinition> CraftedInventory =>
+        _craftedInventory
+            .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+            .Select(pair => new CraftingStackDefinition(pair.Key, pair.Value))
+            .ToArray();
+
+    public bool SecondaryRecipeCrafted =>
+        _secondaryRecipe is not null && HasRecipeOutputs(_secondaryRecipe);
 
     public double RepairedHealth => _repairRecipe.Application.ResultHealth;
 
@@ -133,12 +170,6 @@ public sealed class StarterRepairSession
             throw new ArgumentOutOfRangeException(
                 nameof(quantity),
                 "Collected quantity must be positive.");
-        }
-
-        if (ShipRepaired)
-        {
-            result = "repair objective already completed";
-            return false;
         }
 
         if (_collectedResources.ContainsKey(resourceNodeId))
@@ -172,7 +203,7 @@ public sealed class StarterRepairSession
         }
 
         IReadOnlyList<CraftingStackDefinition> missing =
-            GetMissingRecipeInputs();
+            GetMissingRecipeInputs(_repairRecipe);
         if (missing.Count > 0)
         {
             result = "missing " + string.Join(
@@ -187,11 +218,8 @@ public sealed class StarterRepairSession
             Consume(input.DefinitionId, input.Quantity);
         }
 
-        _lastCraftedOutputs = _repairRecipe.Outputs
-            .Select(output => new CraftingStackDefinition(
-                output.DefinitionId,
-                output.Quantity))
-            .ToArray();
+        _lastCraftedOutputs = CopyOutputs(_repairRecipe.Outputs);
+        AddCraftedOutputs(_lastCraftedOutputs);
         ShipRepaired = true;
         result =
             $"recipe {_repairRecipe.RecipeId} crafted and applied; " +
@@ -199,24 +227,89 @@ public sealed class StarterRepairSession
         return StarterRepairResult.Repaired;
     }
 
+    public StationCraftResult TryCraftSecondary(
+        string stationId,
+        out string result)
+    {
+        if (_secondaryRecipe is null)
+        {
+            result = "secondary recipe is unavailable";
+            return StationCraftResult.RecipeUnavailable;
+        }
+
+        if (!ShipRepaired)
+        {
+            result = "repair the starter ship before crafting launch components";
+            return StationCraftResult.ShipNotRepaired;
+        }
+
+        if (!string.Equals(
+            stationId,
+            _secondaryRecipe.RequiredStation,
+            StringComparison.Ordinal))
+        {
+            result = $"recipe {_secondaryRecipe.RecipeId} requires station " +
+                _secondaryRecipe.RequiredStation;
+            return StationCraftResult.WrongStation;
+        }
+
+        if (HasRecipeOutputs(_secondaryRecipe))
+        {
+            result = $"recipe {_secondaryRecipe.RecipeId} already crafted";
+            return StationCraftResult.AlreadyCrafted;
+        }
+
+        IReadOnlyList<CraftingStackDefinition> missing =
+            GetMissingRecipeInputs(_secondaryRecipe);
+        if (missing.Count > 0)
+        {
+            result = "missing " + string.Join(
+                ", ",
+                missing.Select(input =>
+                    $"{input.Quantity} x {input.DefinitionId}"));
+            return StationCraftResult.InsufficientInputs;
+        }
+
+        foreach (CraftingStackDefinition input in _secondaryRecipe.Inputs)
+        {
+            Consume(input.DefinitionId, input.Quantity);
+        }
+
+        _lastCraftedOutputs = CopyOutputs(_secondaryRecipe.Outputs);
+        AddCraftedOutputs(_lastCraftedOutputs);
+        result = $"recipe {_secondaryRecipe.RecipeId} crafted; " +
+            $"stored in {_secondaryRecipe.Application.TargetId}";
+        return StationCraftResult.Crafted;
+    }
+
     public int GetAvailableQuantity(string definitionId)
     {
-        return _collectedResources.Values
+        int collected = _collectedResources.Values
             .Where(state => string.Equals(
                 state.DefinitionId,
                 definitionId,
                 StringComparison.Ordinal))
             .Sum(state => state.RemainingQuantity);
+        _craftedInventory.TryGetValue(definitionId, out int crafted);
+        return collected + crafted;
+    }
+
+    public int GetCraftedQuantity(string definitionId)
+    {
+        return _craftedInventory.TryGetValue(definitionId, out int quantity)
+            ? quantity
+            : 0;
     }
 
     public static StarterRepairSession FromSnapshot(
         SaveGameSnapshot? snapshot,
         IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
-        CraftingRecipeDefinition repairRecipe)
+        CraftingRecipeDefinition repairRecipe,
+        CraftingRecipeDefinition? secondaryRecipe = null)
     {
         ArgumentNullException.ThrowIfNull(resourceBindings);
         ArgumentNullException.ThrowIfNull(repairRecipe);
-        StarterRepairSession session = new(repairRecipe);
+        StarterRepairSession session = new(repairRecipe, secondaryRecipe);
         if (snapshot is null)
         {
             return session;
@@ -259,11 +352,29 @@ public sealed class StarterRepairSession
                     remainingQuantity));
         }
 
+        HashSet<string> knownOutputs = repairRecipe.Outputs
+            .Concat(secondaryRecipe?.Outputs ?? Array.Empty<CraftingStackDefinition>())
+            .Select(output => output.DefinitionId)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (InventoryItemSaveData item in snapshot.Inventory)
+        {
+            if (item.ItemId.StartsWith("crafted.", StringComparison.Ordinal) &&
+                knownOutputs.Contains(item.DefinitionId) &&
+                item.Quantity > 0)
+            {
+                session._craftedInventory[item.DefinitionId] = item.Quantity;
+            }
+        }
+
         session.ShipRepaired = snapshot.Ship.Health >=
             repairRecipe.Application.ResultHealth - 0.001;
         if (session.ShipRepaired && session._collectedResources.Count == 0)
         {
-            foreach (ResourceNodeBinding binding in resourceBindings.Values)
+            HashSet<string> repairInputIds = repairRecipe.Inputs
+                .Select(input => input.DefinitionId)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (ResourceNodeBinding binding in resourceBindings.Values
+                .Where(binding => repairInputIds.Contains(binding.ItemDefinitionId)))
             {
                 session._collectedResources.Add(
                     binding.ResourceNodeId,
@@ -275,13 +386,19 @@ public sealed class StarterRepairSession
             }
         }
 
+        if (session.ShipRepaired && !session.HasRecipeOutputs(repairRecipe))
+        {
+            session.AddCraftedOutputs(repairRecipe.Outputs);
+        }
+
         return session;
     }
 
-    private IReadOnlyList<CraftingStackDefinition> GetMissingRecipeInputs()
+    private IReadOnlyList<CraftingStackDefinition> GetMissingRecipeInputs(
+        CraftingRecipeDefinition recipe)
     {
         List<CraftingStackDefinition> missing = new();
-        foreach (CraftingStackDefinition input in _repairRecipe.Inputs)
+        foreach (CraftingStackDefinition input in recipe.Inputs)
         {
             int available = GetAvailableQuantity(input.DefinitionId);
             if (available < input.Quantity)
@@ -317,12 +434,56 @@ public sealed class StarterRepairSession
             remaining -= consumed;
         }
 
+        if (remaining > 0 && _craftedInventory.TryGetValue(
+            definitionId,
+            out int craftedQuantity))
+        {
+            int consumed = Math.Min(craftedQuantity, remaining);
+            int newQuantity = craftedQuantity - consumed;
+            if (newQuantity == 0)
+            {
+                _craftedInventory.Remove(definitionId);
+            }
+            else
+            {
+                _craftedInventory[definitionId] = newQuantity;
+            }
+
+            remaining -= consumed;
+        }
+
         if (remaining != 0)
         {
             throw new InvalidOperationException(
                 $"Recipe consumption underflow for {definitionId}: " +
                 $"remaining={remaining}.");
         }
+    }
+
+    private bool HasRecipeOutputs(CraftingRecipeDefinition recipe)
+    {
+        return recipe.Outputs.All(output =>
+            GetCraftedQuantity(output.DefinitionId) >= output.Quantity);
+    }
+
+    private void AddCraftedOutputs(
+        IReadOnlyList<CraftingStackDefinition> outputs)
+    {
+        foreach (CraftingStackDefinition output in outputs)
+        {
+            _craftedInventory.TryGetValue(output.DefinitionId, out int current);
+            _craftedInventory[output.DefinitionId] = current + output.Quantity;
+        }
+    }
+
+    private static IReadOnlyList<CraftingStackDefinition> CopyOutputs(
+        IReadOnlyList<CraftingStackDefinition> outputs)
+    {
+        return outputs
+            .Select(output => new CraftingStackDefinition(
+                output.DefinitionId,
+                output.Quantity))
+            .ToArray();
     }
 }
 
@@ -385,6 +546,13 @@ public static class StarterRepairSnapshotFactory
                     resource.DefinitionId,
                     resource.RemainingQuantity,
                     1.0))
+                .Concat(session.CraftedInventory.Select(item =>
+                    new InventoryItemSaveData(
+                        $"crafted.{item.DefinitionId}",
+                        item.DefinitionId,
+                        item.Quantity,
+                        1.0)))
+                .OrderBy(item => item.ItemId, StringComparer.Ordinal)
                 .ToArray(),
             new VisitedPlanetSaveData(
                 PlanetId,
@@ -445,7 +613,15 @@ public static class VerticalSliceAcceptanceRunner
             bool repairBlocked =
                 blockedResult == StarterRepairResult.InsufficientSalvage;
 
-            foreach (ResourceNodeBinding binding in resourceBindings)
+            HashSet<string> repairInputDefinitions = repairRecipe.Inputs
+                .Select(input => input.DefinitionId)
+                .ToHashSet(StringComparer.Ordinal);
+            ResourceNodeBinding[] repairBindings = resourceBindings
+                .Where(binding => repairInputDefinitions.Contains(
+                    binding.ItemDefinitionId))
+                .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
+                .ToArray();
+            foreach (ResourceNodeBinding binding in repairBindings)
             {
                 if (!session.TryCollect(
                     binding.ResourceNodeId,
@@ -509,7 +685,7 @@ public static class VerticalSliceAcceptanceRunner
                 session.LastCraftedOutputs.SequenceEqual(repairRecipe.Outputs);
             bool passed =
                 repairBlocked &&
-                session.CollectedNodeCount == resourceBindings.Count &&
+                session.CollectedNodeCount == repairBindings.Length &&
                 allRecipeInputsConsumed &&
                 outputsProduced &&
                 shipRepaired &&
@@ -526,7 +702,7 @@ public static class VerticalSliceAcceptanceRunner
                 failedCriteria.Add("repairBlocked=0");
             }
 
-            if (session.CollectedNodeCount != resourceBindings.Count)
+            if (session.CollectedNodeCount != repairBindings.Length)
             {
                 failedCriteria.Add(
                     $"resources={session.CollectedNodeCount}");
@@ -579,7 +755,7 @@ public static class VerticalSliceAcceptanceRunner
                 passed
                     ? "data-driven resource collection crafted the starter repair recipe and persisted the repaired ship"
                     : $"vertical-slice criteria failed: {string.Join(", ", failedCriteria)}",
-                session.CollectedNodeCount,
+                repairBindings.Length,
                 repairBlocked,
                 shipRepaired,
                 questAutosaveObserved,

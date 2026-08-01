@@ -11,7 +11,11 @@
       "rarity": "Common",
       "icon": "",
       "worldModel": "",
-      "tags": ["salvage", "metal", "repair"]
+      "tags": [
+        "salvage",
+        "metal",
+        "repair"
+      ]
     },
     {
       "definitionId": "component.starter_hull_patch",
@@ -23,7 +27,43 @@
       "rarity": "Common",
       "icon": "",
       "worldModel": "",
-      "tags": ["component", "hull", "repair"]
+      "tags": [
+        "component",
+        "hull",
+        "repair"
+      ]
+    },
+    {
+      "definitionId": "resource.conductive_crystal",
+      "localizationKey": "item.resource.conductive_crystal",
+      "category": "Resource",
+      "maxStack": 40,
+      "basePrice": 32.0,
+      "mass": 0.7,
+      "rarity": "Uncommon",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "crystal",
+        "conductive",
+        "launch"
+      ]
+    },
+    {
+      "definitionId": "component.ship.launch_capacitor",
+      "localizationKey": "item.component.ship.launch_capacitor",
+      "category": "Component",
+      "maxStack": 5,
+      "basePrice": 160.0,
+      "mass": 1.6,
+      "rarity": "Uncommon",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "launch"
+      ]
     }
   ]
 }

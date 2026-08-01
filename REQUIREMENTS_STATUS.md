@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-data-driven-starter-repair.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-second-resource-crafting-station.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,73 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, production persistence и первый сквозной цикл `TASK-062/TASK-063` имеют статус `VERIFIED`. Пользователь подтвердил сборку `0/0`, ручной прогресс `3/3`, `Objective: COMPLETE`, `Ship: REPAIRED`, autosave `QuestCompleted` и холодное восстановление отремонтированного корабля. Текущая итерация переводит правила ресурса и ремонта в первый строгий data-driven JSON-каталог (`TASK-064`).
+**Вывод:** все пять технических прототипов, production persistence, первый salvage/repair loop и первый data-driven каталог имеют статус `VERIFIED`. Пользователь подтвердил сборку `0/0`, `F9: PASS`, `F7: PASS`, ручной `Objective: COMPLETE`, `Ship: REPAIRED` и production-autosave. Текущая итерация (`TASK-066`) добавляет второй ресурс, второй рецепт и отдельную crafting station с точным SQLite round-trip.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — второй ресурс, рецепт и отдельная crafting station (`TASK-066`)
+
+**Исходный снимок:** `ProjectHorizon-main(5)(2).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-second-resource-crafting-station.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-064`–`TASK-067`, `CONTENT-020`–`CONTENT-027`, `CONTENT-ACC-020`–`CONTENT-ACC-027`.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь собрал data-driven редакцию с `0` предупреждений и `0` ошибок (`00:00:01.38`);
+- `F9` показал `PASS schema=1, items=2, resources=1, recipes=1, dataDriven=1, invalidRejected=2`;
+- `F7` показал `PASS resources=3, blocked=1, repaired=1, autosave=1, roundTrip=1`;
+- ручной цикл завершён: `collected=3/3`, `Objective: COMPLETE`, `Ship: REPAIRED`, autosave `QuestCompleted`;
+- `TASK-064`, `TASK-065`, `CONTENT-010`–`CONTENT-016`, `CONTENT-ACC-010`–`CONTENT-ACC-015` → `VERIFIED`.
+
+**Реализовано в `TASK-066`:**
+
+- каталог расширен до `items=4`, `resources=2`, `recipes=2`;
+- добавлены stable IDs `resource.conductive_crystal`, `component.ship.launch_capacitor`, `recipe.ship.launch_capacitor`, `station.portable_fabricator`;
+- два фиолетовых физических crystal-узла получают yield и material из `resources.json`;
+- отдельный `PortableCraftingStation` реализует `IInteractable` и связывается с JSON через точные C# exports `StationId` и `RecipeId`;
+- второй рецепт расходует `2 × resource.conductive_crystal`, создаёт `1 × component.ship.launch_capacitor` и сохраняет output в `inventory.ship`;
+- `GameContentCatalog` поддерживает application `StoreOutputs` наряду с `RepairShip`, сохраняя строгую валидацию `ResultHealth`;
+- доменная модель запрещает крафт до ремонта корабля, отклоняет неверную станцию, блокирует нехватку inputs, предотвращает повторное изготовление и сохраняет crafted outputs;
+- accepted F7 regression фильтрует только inputs repair recipe и по-прежнему ожидает ровно три salvage-узла;
+- snapshot сохраняет `crafted.<definitionId>`; migration/content resolver знает новые definitions; cold load восстанавливает capacitor и визуальное состояние station;
+- production interaction после успешного крафта вызывает autosave `QuestCompleted`;
+- `F10` запускает изолированную `TASK-066` acceptance: prerequisite repair, wrong station, insufficient inputs, сбор двух crystal nodes, crafting, autosave, exact round-trip, log, single writer и integrity;
+- HUD расширен до двух последовательных целей и показывает оба recipe definitions.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/items.json`;
+- `src/Game.Client/Content/resources.json`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/PortableCraftingStation.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/CraftingExpansionAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован второй из требуемых Этапом 1 resource/recipe paths и отдельная station. Полные `10 ресурсов / 10 рецептов`, craft time, технологии, UI выбора рецептов и торговая станция остаются последующими задачами.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ сверено по item/recipe model, JSON static definitions, Этапу 1 и общим acceptance criteria;
+- JSON независимо распарсен, schema versions и все item/resource/recipe references проверены;
+- проверены C#-лексика, строки, комментарии, скобки, record-конструкторы и отсутствие Godot API в domain/acceptance model;
+- проверены project XML, `res://`, UID, scene exports/groups; `F10` не конфликтует внутри текущей main scene (в отдельной terrain-regression scene она исторически используется независимо);
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому сборка и runtime `F10` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-064`, `TASK-065`, `CONTENT-010`–`CONTENT-016`, `CONTENT-ACC-010`–`CONTENT-ACC-015` → `VERIFIED`;
+- `TASK-066`, `CONTENT-020`–`CONTENT-027` → `IMPLEMENTED`;
+- `TASK-067`, `CONTENT-ACC-020`–`CONTENT-ACC-027` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`.
+
+**Следующий рекомендуемый шаг:** собрать проект `0/0`, получить startup `TASK-066 crafting binding PASS`, выполнить `F10: PASS`, затем повторить `F9`, `F7` и ручной цикл `repair → crystals → PortableFabricator → cold restart`.
 
 ### 2026-08-01 — первый data-driven каталог ресурса и рецепта ремонта (`TASK-064`)
 
@@ -1601,37 +1665,58 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 ### 8.6. Этап 1 — data-driven item/resource/recipe foundation
 
+| ID | Требование | Статус | Доказательство / примечание |
+|---|---|---|---|
+| `CONTENT-010` | Items, resources и recipes хранятся в отдельных JSON-файлах со schema version | `VERIFIED` | `F9: PASS`; schema=1 |
+| `CONTENT-011` | Определения имеют стабильные строковые ID; индекс массива не используется как ID | `VERIFIED` | F9 `stableIds=1` |
+| `CONTENT-012` | JSON строго валидируется: unknown fields, duplicates, ranges и cross-references | `VERIFIED` | F9 `invalidRejected=2`, duplicate/missing-reference PASS |
+| `CONTENT-013` | Физический resource node получает yield и visual из resource definition | `VERIFIED` | Ручной runtime-цикл и startup binding PASS |
+| `CONTENT-014` | Repair rule использует data-driven recipe inputs/outputs/station/application | `VERIFIED` | F9 variant `3→4`; F7/manual repair PASS |
+| `CONTENT-015` | Persistence сохраняет фактические definition IDs и remaining quantities | `VERIFIED` | F7 exact round-trip и production autosave |
+| `CONTENT-016` | Изолированная acceptance доказывает data-driven threshold и rejection invalid catalogs | `VERIFIED` | F9 PASS |
+| `CONTENT-ACC-010` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Сборка пользователя `0/0`, `00:00:01.38` |
+| `CONTENT-ACC-011` | Startup catalog и scene binding завершаются PASS | `VERIFIED` | Сцена перешла в DB Ready; content/recipe HUD корректен |
+| `CONTENT-ACC-012` | F9 подтверждает schema/counts/stable IDs | `VERIFIED` | F9 schema=1, items=2, resources=1, recipes=1 |
+| `CONTENT-ACC-013` | F9 доказывает отсутствие hidden threshold constant | `VERIFIED` | `variantRequired=4`, blocked/repaired PASS |
+| `CONTENT-ACC-014` | Duplicate ID и missing reference отклоняются | `VERIFIED` | `invalidRejected=2` |
+| `CONTENT-ACC-015` | F7 и ручной salvage/repair loop не регрессируют | `VERIFIED` | F7 PASS и ручной COMPLETE/REPAIRED |
+
+### 8.7. Этап 1 — второй resource/recipe path и crafting station
+
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `CONTENT-010` | Items, resources и recipes хранятся в отдельных JSON-файлах со schema version | `IMPLEMENTED` | `Content/items.json`, `resources.json`, `recipes.json`; schema=1 |
-| `CONTENT-011` | Определения имеют стабильные строковые ID; индекс массива не используется как ID | `IMPLEMENTED` | Strict dotted-ID validator; dictionary lookup по ID |
-| `CONTENT-012` | JSON строго валидируется: unknown fields, duplicates, ranges и cross-references | `IMPLEMENTED` | `GameContentCatalog`; `JsonUnmappedMemberHandling.Disallow` и content validation |
-| `CONTENT-013` | Физический resource node получает yield и visual из resource definition | `IMPLEMENTED` | `ResourceDefinitionId`; `ConfigureDefinition`; deterministic yield/material из JSON |
-| `CONTENT-014` | Repair rule использует data-driven recipe inputs/outputs/station/application | `IMPLEMENTED` | `recipe.ship.starter_repair`; session не содержит `RequiredSalvage` constant |
-| `CONTENT-015` | Persistence сохраняет фактические definition IDs и remaining quantities | `IMPLEMENTED` | `CollectedResourceState` → `InventoryItemSaveData`; cold-save compatibility сохранена |
-| `CONTENT-016` | Изолированная acceptance доказывает data-driven threshold и rejection invalid catalogs | `IMPLEMENTED` | F9: recipe variant 4, duplicate/missing-reference rejection |
-| `CONTENT-ACC-010` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
-| `CONTENT-ACC-011` | Startup catalog и scene binding завершаются PASS | `IN_PROGRESS` | Нужны строки `content catalog READY` и `content binding PASS` |
-| `CONTENT-ACC-012` | F9 подтверждает schema/counts/stable IDs | `IN_PROGRESS` | Ожидается schema=1, items=2, resources=1, recipes=1, stableIds=1 |
-| `CONTENT-ACC-013` | F9 доказывает отсутствие hidden threshold constant | `IN_PROGRESS` | Ожидается variantRequired=4, blockedBelowVariant=1, repairedAtVariant=1 |
-| `CONTENT-ACC-014` | Duplicate ID и missing reference отклоняются | `IN_PROGRESS` | Ожидается duplicateRejected=1, missingReferenceRejected=1 |
-| `CONTENT-ACC-015` | F7 и ручной salvage/repair loop не регрессируют | `IN_PROGRESS` | Повторить F7; после F8 собрать/отремонтировать |
+| `CONTENT-020` | Каталог содержит второй item/resource/recipe path со стабильными ID | `IMPLEMENTED` | conductive crystal → launch capacitor |
+| `CONTENT-021` | Второй resource имеет физические уникальные nodes и JSON-driven yield/visual | `IMPLEMENTED` | `crystal.alpha`, `crystal.beta`; `resource.conductive_crystal` |
+| `CONTENT-022` | Отдельная crafting station связана с RequiredStation/RecipeId | `IMPLEMENTED` | `PortableCraftingStation`, `station.portable_fabricator` |
+| `CONTENT-023` | Крафт запрещён до ремонта корабля и при неверной station | `IMPLEMENTED` | `ShipNotRepaired`, `WrongStation` |
+| `CONTENT-024` | Недостаточные inputs блокируют крафт; успешный крафт расходует inputs и создаёт output | `IMPLEMENTED` | `InsufficientInputs`; capacitor output quantity 1 |
+| `CONTENT-025` | Crafted output сохраняется как stable definition и восстанавливается после cold load | `IMPLEMENTED` | `crafted.component.ship.launch_capacitor`; `FromSnapshot` |
+| `CONTENT-026` | Успешный station craft вызывает production-autosave | `IMPLEMENTED` | domain event `LaunchCapacitorCrafted` → `QuestCompleted` |
+| `CONTENT-027` | F7/F9 остаются регрессионными и F10 изолированно проверяет новый path | `IMPLEMENTED` | отдельная crafting-expansion test-БД |
+| `CONTENT-ACC-020` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
+| `CONTENT-ACC-021` | Startup подтверждает counts 4/2/2 и crafting scene binding | `IN_PROGRESS` | Нужны READY/binding lines |
+| `CONTENT-ACC-022` | F10 подтверждает обязательность предварительного ремонта | `IN_PROGRESS` | Ожидается `repairPrerequisite=1` |
+| `CONTENT-ACC-023` | F10 отклоняет wrong station и нехватку crystal inputs | `IN_PROGRESS` | Ожидается `wrongStationRejected=1`, `blockedBeforeResources=1` |
+| `CONTENT-ACC-024` | F10 собирает два crystals и создаёт один capacitor | `IN_PROGRESS` | Ожидается `resources=2`, `crafted=1`, `output=1` |
+| `CONTENT-ACC-025` | F10 подтверждает autosave, exact round-trip, log и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `roundTrip=1`, `maxWriters=1`, `integrity=ok` |
+| `CONTENT-ACC-026` | F7/F9 не регрессируют на расширенном каталоге | `IN_PROGRESS` | Повторить F7 и F9; F9 counts 4/2/2 |
+| `CONTENT-ACC-027` | Ручной цикл и cold restart восстанавливают capacitor и station state | `IN_PROGRESS` | F8 → repair → 2 crystals → fabricator → restart |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-063`; Прототипы A–E, production persistence и первый salvage/repair loop.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-065`; Прототипы A–E, production persistence, salvage/repair loop и первый data-driven catalog.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-065` | Выполнить runtime-приёмку первого data-driven каталога | Сборка 0/0; startup content PASS; `F9: PASS`; `F7: PASS`; ручная регрессия после F8 |
+| 1 | `TASK-067` | Выполнить runtime-приёмку второго resource/recipe path | Сборка 0/0; startup 4/2/2; `F10: PASS`; `F9: PASS`; `F7: PASS`; ручной cold restart |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-066` | Расширить каталог к следующему игровому crafting-шагу | После `TASK-065: VERIFIED` добавить второй ресурс/рецепт и отдельное взаимодействие с crafting station, двигаясь к 10/10 Этапа 1 |
+| 3 | `TASK-068` | Добавить третий resource/recipe path или craft-time processing | После `TASK-067: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 без расширения итерации |
 
-**Подтверждено:** `TASK-060`–`TASK-063`, persistence и `VS-010`–`VS-016`.  
-**Реализовано:** `TASK-064`, `CONTENT-010`–`CONTENT-016`.  
-**Текущая приёмочная задача:** `TASK-065`.
+**Подтверждено:** `TASK-060`–`TASK-065`, persistence, VS и первый content foundation.  
+**Реализовано:** `TASK-066`, `CONTENT-020`–`CONTENT-027`.  
+**Текущая приёмочная задача:** `TASK-067`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -1647,7 +1732,7 @@ TASK-062 acceptance (F7): PASS resources=3, blocked=1, repaired=1, autosave=1, r
 5. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=resource collection completed the starter repair objective and persisted the repaired ship
+TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=data-driven resource collection crafted the starter repair recipe and persisted the repaired ship
 ```
 
 6. Нажать `F8`, дождаться `slot reset PASS`. Подойти к красному кораблю и нажать `E` до сбора ресурсов. HUD должен остаться `Ship: DAMAGED`, Output — показать `ShipRepairBlocked`.
@@ -1676,20 +1761,20 @@ Vertical slice graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
 2. Запустить main scene и дождаться `DB: Ready`. До этого Output должен содержать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=2; resources=1; recipes=1.
-TASK-064 content binding PASS: schema=1; recipe=recipe.ship.starter_repair; resource=resource.salvage_alloy; required=3; available=3; items=2; resources=1; recipes=1; station=station.field_repair.
+TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
+TASK-064 content binding PASS: schema=1; recipe=recipe.ship.starter_repair; resource=resource.salvage_alloy; required=3; available=3; items=4; resources=2; recipes=2; station=station.field_repair.
 ```
 
 3. Нажать `F9` один раз. Тест занимает менее секунды и не изменяет slot/JSON. Ожидаемый HUD:
 
 ```text
-TASK-064 content (F9): PASS schema=1, items=2, resources=1, recipes=1, dataDriven=1, invalidRejected=2
+TASK-064 content (F9): PASS schema=1, items=4, resources=2, recipes=2, dataDriven=1, invalidRejected=2
 ```
 
 4. Ожидаемая полная строка Output:
 
 ```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=2; resources=1; recipes=1; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1; elapsedMs=<время>; result=JSON catalog validated; recipe threshold changed in memory and domain behavior followed the data
+TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; recipes=2; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1; elapsedMs=<время>; result=JSON catalog validated; recipe threshold changed in memory and domain behavior followed the data
 ```
 
 5. Нажать `F7`: gameplay/persistence regression должна остаться `PASS`.
@@ -1697,7 +1782,44 @@ TASK-064 data-driven content acceptance PASS: schema=1; items=2; resources=1; re
 7. Для приёмки прислать: лог сборки, screenshot `F9: PASS`, полную строку F9, screenshot recipe line и результат F7.
 8. При `FAIL` прислать полный HUD, последние 100 строк Output и содержимое трёх JSON-файлов без изменений.
 
-## 12. Журнал проверок
+## 12. Runtime-приёмка `TASK-066/TASK-067`
+
+1. Собрать `Game.Client.csproj`: требуется `0` предупреждений и `0` ошибок.
+2. Запустить main scene и дождаться `DB: Ready`. Output должен содержать:
+
+```text
+TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; items=4; resources=2; recipes=2.
+```
+
+3. Нажать `F10` один раз. Тест использует `save_1.crafting-expansion-test.db` и не изменяет gameplay-slot.
+4. Ожидаемый HUD:
+
+```text
+TASK-066 crafting (F10): PASS resources=2, repairFirst=1, wrongStation=1, blocked=1, crafted=1, roundTrip=1
+```
+
+5. Ожидаемая полная строка Output:
+
+```text
+TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; wrongStationRejected=1; blockedBeforeResources=1; crafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=second resource was collected, crafted at the dedicated station and persisted exactly
+```
+
+6. Повторить `F9`; counts должны быть `items=4, resources=2, recipes=2`, остальные критерии — PASS.
+7. Повторить `F7`; результат должен остаться `resources=3` и PASS, то есть два crystal nodes не должны ошибочно входить в repair acceptance.
+8. Нажать `F8`. До ремонта корабля подойти к фиолетовому PortableFabricator и нажать `E`: ожидается `LaunchCapacitorCraftBlocked`/сообщение о необходимости ремонта.
+9. Собрать три голубых узла, отремонтировать корабль, затем собрать два фиолетовых crystal nodes. HUD должен пройти `crystal=0/2 → 1/2 → 2/2`.
+10. Взаимодействовать с PortableFabricator. Он должен стать зелёным, HUD — показать `launch capacitor READY` и `Objective: COMPLETE`, Output:
+
+```text
+Vertical slice domain event: LaunchCapacitorCrafted; recipe=recipe.ship.launch_capacitor; output=component.ship.launch_capacitor; autosaveTrigger=QuestCompleted
+```
+
+11. Закрыть окно штатно и повторно запустить проект. Должны восстановиться repaired ship, отсутствующие пять собранных nodes, зелёный fabricator, capacitor READY и последняя revision.
+12. Для приёмки прислать: лог сборки; screenshot `F10: PASS`; полную строку F10; результаты F9/F7; screenshot completed HUD до и после cold restart.
+13. При `FAIL` прислать полный HUD, последние 120 строк Output и сведения о `save_1.db`, autosave log и `save_1.crafting-expansion-test.db`.
+
+## 13. Журнал проверок
 
 ### 2026-08-01 — hotfix ручного `E` и переключения `H`
 

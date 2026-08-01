@@ -23,7 +23,38 @@
         "targetId": "ship.starter.repairable",
         "resultHealth": 100.0
       },
-      "tags": ["repair", "starter_quest"]
+      "tags": [
+        "repair",
+        "starter_quest"
+      ]
+    },
+    {
+      "recipeId": "recipe.ship.launch_capacitor",
+      "inputs": [
+        {
+          "definitionId": "resource.conductive_crystal",
+          "quantity": 2
+        }
+      ],
+      "outputs": [
+        {
+          "definitionId": "component.ship.launch_capacitor",
+          "quantity": 1
+        }
+      ],
+      "requiredTechnology": "",
+      "requiredStation": "station.portable_fabricator",
+      "craftTimeSeconds": 0.0,
+      "application": {
+        "type": "StoreOutputs",
+        "targetId": "inventory.ship",
+        "resultHealth": 0.0
+      },
+      "tags": [
+        "crafting",
+        "ship",
+        "launch"
+      ]
     }
   ]
 }

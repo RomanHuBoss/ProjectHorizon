@@ -18,6 +18,9 @@ public sealed partial class SaveDatabase
     {
         "resource.iron_ore",
         "resource.salvage_alloy",
+        "component.starter_hull_patch",
+        "resource.conductive_crystal",
+        "component.ship.launch_capacitor",
         "component.energy_cell",
         "consumable.repair_kit"
     };

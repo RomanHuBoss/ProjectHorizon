@@ -43,8 +43,10 @@ public partial class SalvageRepairSlice : Node3D
     private SaveAutosaveCoordinator? _autosave;
     private GameContentCatalog? _contentCatalog;
     private CraftingRecipeDefinition? _repairRecipe;
+    private CraftingRecipeDefinition? _launchCapacitorRecipe;
     private StarterRepairSession? _session;
     private StarterShipRepairTerminal? _shipTerminal;
+    private PortableCraftingStation? _craftingStation;
     private PlayerController? _player;
     private MarginContainer? _hudMargin;
     private Label? _hudLabel;
@@ -54,10 +56,12 @@ public partial class SalvageRepairSlice : Node3D
     private Task? _resetTask;
     private Task<VerticalSliceAcceptanceReport>? _acceptanceTask;
     private Task<DataDrivenContentAcceptanceReport>? _contentAcceptanceTask;
+    private Task<CraftingExpansionAcceptanceReport>? _craftingAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
     private DataDrivenContentAcceptanceReport? _contentAcceptanceReport;
+    private CraftingExpansionAcceptanceReport? _craftingAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -71,6 +75,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _status = "initializing SQLite";
     private string _acceptanceHud = "READY";
     private string _contentAcceptanceHud = "READY";
+    private string _craftingAcceptanceHud = "READY";
     private string _lastDomainEvent = "none";
 
     private StarterRepairSession Session => _session ??
@@ -82,6 +87,11 @@ public partial class SalvageRepairSlice : Node3D
     private CraftingRecipeDefinition RepairRecipe => _repairRecipe ??
         throw new InvalidOperationException("Starter repair recipe is unavailable.");
 
+    private CraftingRecipeDefinition LaunchCapacitorRecipe =>
+        _launchCapacitorRecipe ??
+        throw new InvalidOperationException(
+            "Launch capacitor recipe is unavailable.");
+
     public override void _Ready()
     {
         _hudMargin = GetNodeOrNull<MarginContainer>(
@@ -92,10 +102,12 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/HiddenHint");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
             "Gameplay/DamagedShip");
+        _craftingStation = GetNodeOrNull<PortableCraftingStation>(
+            "Gameplay/PortableFabricator");
         _player = GetNodeOrNull<PlayerController>("Player");
         if (_hudMargin is null || _hudLabel is null ||
             _hudHiddenHint is null || _shipTerminal is null ||
-            _player is null)
+            _craftingStation is null || _player is null)
         {
             throw new InvalidOperationException(
                 "Vertical slice scene is missing HUD, player or ship.");
@@ -104,9 +116,14 @@ public partial class SalvageRepairSlice : Node3D
         GameContentCatalog catalog = LoadContentCatalog();
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
+        CraftingRecipeDefinition launchCapacitorRecipe = catalog.GetRecipe(
+            VerticalSliceContentIds.LaunchCapacitorRecipeId);
         _contentCatalog = catalog;
         _repairRecipe = repairRecipe;
-        _session = new StarterRepairSession(repairRecipe);
+        _launchCapacitorRecipe = launchCapacitorRecipe;
+        _session = new StarterRepairSession(
+            repairRecipe,
+            launchCapacitorRecipe);
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -144,8 +161,9 @@ public partial class SalvageRepairSlice : Node3D
         GD.Print(
             "TASK-064 data-driven vertical slice initializing. " +
             $"Recipe={RepairRecipe.RecipeId}; " +
-            $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}. " +
-            "Press F7 for gameplay regression, F8 to reset or F9 for content acceptance.");
+            $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
+            $"secondRecipe={LaunchCapacitorRecipe.RecipeId}. " +
+            "Press F7/F9/F10 for acceptance or F8 to reset.");
     }
 
     public override void _Notification(int what)
@@ -173,6 +191,7 @@ public partial class SalvageRepairSlice : Node3D
         PollResetTask();
         PollAcceptanceTask();
         PollContentAcceptanceTask();
+        PollCraftingAcceptanceTask();
         PollAutosave();
         PollGracefulExitTask();
         UpdatePeriodicAutosave(delta);
@@ -215,6 +234,11 @@ public partial class SalvageRepairSlice : Node3D
             BeginContentAcceptance();
             GetViewport().SetInputAsHandled();
         }
+        else if (Matches(physical, logical, Key.F10) && CanStartCommand())
+        {
+            BeginCraftingAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
     }
 
     public bool TryCollectResource(
@@ -249,8 +273,7 @@ public partial class SalvageRepairSlice : Node3D
         _status = result;
         GD.Print(
             $"Vertical slice domain event: {_lastDomainEvent}; " +
-            $"salvage={Session.SalvageQuantity}/" +
-            $"{Session.RequiredSalvage}; " +
+            $"available={Session.GetAvailableQuantity(definitionId)}; " +
             $"interactor={interactor.Name}");
         return true;
     }
@@ -291,6 +314,62 @@ public partial class SalvageRepairSlice : Node3D
             $"revision={_revision}; interactor={interactor.Name}");
     }
 
+    public void TryCraftAtStation(
+        PortableCraftingStation source,
+        string recipeId,
+        string stationId,
+        Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        ArgumentNullException.ThrowIfNull(interactor);
+        if (_state != SalvageRepairSliceState.Ready &&
+            _state != SalvageRepairSliceState.Passed)
+        {
+            _status = "wait until the current persistence operation completes";
+            return;
+        }
+
+        if (!string.Equals(
+            recipeId,
+            LaunchCapacitorRecipe.RecipeId,
+            StringComparison.Ordinal))
+        {
+            _status = $"unknown station recipe {recipeId}";
+            return;
+        }
+
+        StationCraftResult craftResult = Session.TryCraftSecondary(
+            stationId,
+            out string result);
+        _status = result;
+        if (craftResult == StationCraftResult.ShipNotRepaired ||
+            craftResult == StationCraftResult.WrongStation ||
+            craftResult == StationCraftResult.InsufficientInputs ||
+            craftResult == StationCraftResult.RecipeUnavailable)
+        {
+            _lastDomainEvent = "LaunchCapacitorCraftBlocked";
+            GD.Print(
+                "Vertical slice domain event: LaunchCapacitorCraftBlocked; " +
+                $"result={craftResult}; station={stationId}; " +
+                $"crystal={Session.GetAvailableQuantity(VerticalSliceContentIds.ConductiveCrystalResourceId)}");
+            return;
+        }
+
+        if (craftResult == StationCraftResult.AlreadyCrafted)
+        {
+            return;
+        }
+
+        source.SetCrafted(true);
+        _lastDomainEvent = "LaunchCapacitorCrafted";
+        QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+        GD.Print(
+            "Vertical slice domain event: LaunchCapacitorCrafted; " +
+            $"recipe={recipeId}; output={VerticalSliceContentIds.LaunchCapacitorItemId}; " +
+            $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
+            $"revision={_revision}; interactor={interactor.Name}");
+    }
+
     private void ValidateResourceNodeBindings()
     {
         if (_shipTerminal is null || !string.Equals(
@@ -302,6 +381,23 @@ public partial class SalvageRepairSlice : Node3D
                 $"Recipe {RepairRecipe.RecipeId} requires station " +
                 $"{RepairRecipe.RequiredStation}, but scene terminal is " +
                 $"{_shipTerminal?.StationId ?? "missing"}.");
+        }
+
+        if (_craftingStation is null ||
+            !string.Equals(
+                _craftingStation.StationId,
+                LaunchCapacitorRecipe.RequiredStation,
+                StringComparison.Ordinal) ||
+            !string.Equals(
+                _craftingStation.RecipeId,
+                LaunchCapacitorRecipe.RecipeId,
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Recipe {LaunchCapacitorRecipe.RecipeId} requires station " +
+                $"{LaunchCapacitorRecipe.RequiredStation}, but scene station is " +
+                $"{_craftingStation?.StationId ?? "missing"}/" +
+                $"{_craftingStation?.RecipeId ?? "missing"}.");
         }
 
         if (_resourceNodes.Count == 0)
@@ -339,17 +435,24 @@ public partial class SalvageRepairSlice : Node3D
                 current + quantity;
         }
 
-        foreach (CraftingStackDefinition input in RepairRecipe.Inputs)
+        foreach (CraftingRecipeDefinition recipe in new[]
         {
-            availableByDefinition.TryGetValue(
-                input.DefinitionId,
-                out int available);
-            if (available < input.Quantity)
+            RepairRecipe,
+            LaunchCapacitorRecipe
+        })
+        {
+            foreach (CraftingStackDefinition input in recipe.Inputs)
             {
-                throw new InvalidOperationException(
-                    $"Recipe {RepairRecipe.RecipeId} requires " +
-                    $"{input.Quantity} x {input.DefinitionId}, but scene " +
-                    $"provides only {available}.");
+                availableByDefinition.TryGetValue(
+                    input.DefinitionId,
+                    out int available);
+                if (available < input.Quantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Recipe {recipe.RecipeId} requires " +
+                        $"{input.Quantity} x {input.DefinitionId}, but scene " +
+                        $"provides only {available}.");
+                }
             }
         }
 
@@ -358,9 +461,17 @@ public partial class SalvageRepairSlice : Node3D
             out int quantityAvailable)
             ? quantityAvailable
             : 0;
+        string[] repairResourceIds = _resourceNodes
+            .Where(node => string.Equals(
+                ContentCatalog.GetResource(node.ResourceDefinitionId).ItemDefinitionId,
+                Session.SalvageDefinitionId,
+                StringComparison.Ordinal))
+            .Select(node => node.ResourceNodeId)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
         GD.Print(
             "TASK-062 scene binding PASS: " +
-            $"resourceIds={string.Join(",", actualIds)}; unique=1.");
+            $"resourceIds={string.Join(",", repairResourceIds)}; unique=1.");
         GD.Print(
             "TASK-064 content binding PASS: " +
             $"schema={ContentCatalog.SchemaVersion}; " +
@@ -372,6 +483,20 @@ public partial class SalvageRepairSlice : Node3D
             $"resources={ContentCatalog.Resources.Count}; " +
             $"recipes={ContentCatalog.Recipes.Count}; " +
             $"station={RepairRecipe.RequiredStation}.");
+        CraftingStackDefinition craftingInput = LaunchCapacitorRecipe.Inputs[0];
+        availableByDefinition.TryGetValue(
+            craftingInput.DefinitionId,
+            out int craftingAvailable);
+        GD.Print(
+            "TASK-066 crafting binding PASS: " +
+            $"recipe={LaunchCapacitorRecipe.RecipeId}; " +
+            $"resource={craftingInput.DefinitionId}; " +
+            $"required={craftingInput.Quantity}; " +
+            $"available={craftingAvailable}; " +
+            $"station={LaunchCapacitorRecipe.RequiredStation}; " +
+            $"items={ContentCatalog.Items.Count}; " +
+            $"resources={ContentCatalog.Resources.Count}; " +
+            $"recipes={ContentCatalog.Recipes.Count}.");
     }
 
     private static GameContentCatalog LoadContentCatalog()
@@ -421,6 +546,7 @@ public partial class SalvageRepairSlice : Node3D
             _resetTask is null &&
             _acceptanceTask is null &&
             _contentAcceptanceTask is null &&
+            _craftingAcceptanceTask is null &&
             _gracefulExitTask is null &&
             !_autosave.IsBusy &&
             !_closeRequested;
@@ -461,6 +587,34 @@ public partial class SalvageRepairSlice : Node3D
         _contentAcceptanceReport = null;
         _contentAcceptanceTask = Task.Run(
             () => DataDrivenContentAcceptanceRunner.Run(ContentCatalog),
+            _lifetimeCancellation.Token);
+    }
+
+    private void BeginCraftingAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.crafting-expansion-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-066 crafting acceptance running";
+        _craftingAcceptanceHud = "RUNNING";
+        _craftingAcceptanceReport = null;
+        _craftingAcceptanceTask = CraftingExpansionAcceptanceRunner.RunAsync(
+            testPath,
+            SlotId,
+            RepairRecipe,
+            LaunchCapacitorRecipe,
+            BuildResourceBindings().Values
+                .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
+                .ToArray(),
             _lifetimeCancellation.Token);
     }
 
@@ -526,6 +680,7 @@ public partial class SalvageRepairSlice : Node3D
             _resetTask is not null ||
             _acceptanceTask is not null ||
             _contentAcceptanceTask is not null ||
+            _craftingAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -549,7 +704,8 @@ public partial class SalvageRepairSlice : Node3D
             "Vertical slice graceful-exit flush started: " +
             $"revision={snapshot.Revision}; " +
             $"salvage={Session.SalvageQuantity}; " +
-            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}.");
+            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
+            $"launchCapacitor={(Session.SecondaryRecipeCrafted ? 1 : 0)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -592,7 +748,8 @@ public partial class SalvageRepairSlice : Node3D
             _session = StarterRepairSession.FromSnapshot(
                 snapshot,
                 BuildResourceBindings(),
-                RepairRecipe);
+                RepairRecipe,
+                LaunchCapacitorRecipe);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -611,7 +768,8 @@ public partial class SalvageRepairSlice : Node3D
                 "TASK-062 vertical slice READY: " +
                 $"revision={_revision}; " +
                 $"salvage={Session.SalvageQuantity}; " +
-                $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}.");
+                $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
+                $"launchCapacitor={(Session.SecondaryRecipeCrafted ? 1 : 0)}.");
         }
         catch (Exception exception)
         {
@@ -631,7 +789,9 @@ public partial class SalvageRepairSlice : Node3D
         try
         {
             task.GetAwaiter().GetResult();
-            _session = new StarterRepairSession(RepairRecipe);
+            _session = new StarterRepairSession(
+                RepairRecipe,
+                LaunchCapacitorRecipe);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             _lastDomainEvent = "GameplaySlotReset";
@@ -736,6 +896,49 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollCraftingAcceptanceTask()
+    {
+        if (_craftingAcceptanceTask is null ||
+            !_craftingAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<CraftingExpansionAcceptanceReport> task =
+            _craftingAcceptanceTask;
+        _craftingAcceptanceTask = null;
+        try
+        {
+            _craftingAcceptanceReport = task.GetAwaiter().GetResult();
+            _craftingAcceptanceHud = _craftingAcceptanceReport.Passed
+                ? $"PASS resources={_craftingAcceptanceReport.ResourcesCollected}, " +
+                  $"repairFirst={(_craftingAcceptanceReport.RepairPrerequisiteEnforced ? 1 : 0)}, " +
+                  $"wrongStation={(_craftingAcceptanceReport.WrongStationRejected ? 1 : 0)}, " +
+                  $"blocked={(_craftingAcceptanceReport.CraftBlockedBeforeResources ? 1 : 0)}, " +
+                  $"crafted={(_craftingAcceptanceReport.Crafted ? 1 : 0)}, " +
+                  $"roundTrip={(_craftingAcceptanceReport.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {_craftingAcceptanceReport.Result}";
+            _state = _craftingAcceptanceReport.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = _craftingAcceptanceReport.Result;
+            string output = BuildCraftingAcceptanceOutput(
+                _craftingAcceptanceReport);
+            if (_craftingAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("crafting acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -769,7 +972,8 @@ public partial class SalvageRepairSlice : Node3D
             $"revision={_autosave.LastSavedRevision}; " +
             $"triggers={_autosave.LastCompletedTriggerSummary}; " +
             $"salvage={Session.SalvageQuantity}; " +
-            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; pending=0");
+            $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
+            $"launchCapacitor={(Session.SecondaryRecipeCrafted ? 1 : 0)}; pending=0");
     }
 
     private void PollGracefulExitTask()
@@ -823,6 +1027,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _shipTerminal?.SetRepaired(Session.ShipRepaired);
+        _craftingStation?.SetCrafted(Session.SecondaryRecipeCrafted);
     }
 
     private void ApplyHudMode()
@@ -839,15 +1044,15 @@ public partial class SalvageRepairSlice : Node3D
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
-            _hudMargin.OffsetRight = 610.0f;
-            _hudMargin.OffsetBottom = 270.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(560.0f, 215.0f);
+            _hudMargin.OffsetRight = 700.0f;
+            _hudMargin.OffsetBottom = 315.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(650.0f, 260.0f);
         }
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
-            _hudMargin.OffsetRight = 800.0f;
-            _hudMargin.OffsetBottom = 455.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(750.0f, 400.0f);
+            _hudMargin.OffsetRight = 900.0f;
+            _hudMargin.OffsetBottom = 565.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(850.0f, 510.0f);
         }
     }
 
@@ -863,26 +1068,40 @@ public partial class SalvageRepairSlice : Node3D
             : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
               $"integrity={_diagnostics.IntegrityResult} • " +
               $"writes={_database?.CompletedWrites ?? 0}";
-        string objective = Session.ShipRepaired
-            ? "Objective: COMPLETE — starter ship repaired"
-            : $"Objective: collect salvage " +
-              $"{Session.SalvageQuantity}/" +
-              $"{Session.RequiredSalvage}, then interact with ship";
-        string ship = Session.ShipRepaired
-            ? "Ship: REPAIRED • launch systems online"
-            : $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
-              Session.SalvageDefinitionId;
         CraftingStackDefinition primaryInput = RepairRecipe.Inputs[0];
         CraftingStackDefinition primaryOutput = RepairRecipe.Outputs[0];
+        CraftingStackDefinition launchInput = LaunchCapacitorRecipe.Inputs[0];
+        CraftingStackDefinition launchOutput = LaunchCapacitorRecipe.Outputs[0];
+        int launchResourceQuantity = Session.GetAvailableQuantity(
+            launchInput.DefinitionId);
+        string objective = !Session.ShipRepaired
+            ? $"Objective 1/2: collect salvage " +
+              $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
+              "then interact with ship"
+            : !Session.SecondaryRecipeCrafted
+                ? $"Objective 2/2: collect {launchInput.DefinitionId} " +
+                  $"{launchResourceQuantity}/{launchInput.Quantity}, " +
+                  "then use PortableFabricator"
+                : "Objective: COMPLETE — ship repaired and launch capacitor crafted";
+        string ship = !Session.ShipRepaired
+            ? $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
+              Session.SalvageDefinitionId
+            : Session.SecondaryRecipeCrafted
+                ? "Ship: REPAIRED • launch capacitor READY"
+                : "Ship: REPAIRED • launch capacitor MISSING";
         string contentLine =
             $"Content: schema={ContentCatalog.SchemaVersion} • " +
             $"items={ContentCatalog.Items.Count} • " +
             $"resources={ContentCatalog.Resources.Count} • " +
             $"recipes={ContentCatalog.Recipes.Count}";
         string recipeLine =
-            $"Recipe: {RepairRecipe.RecipeId} • " +
+            $"Repair: {RepairRecipe.RecipeId} • " +
             $"{primaryInput.Quantity}×{primaryInput.DefinitionId} → " +
             $"{primaryOutput.Quantity}×{primaryOutput.DefinitionId}";
+        string craftingRecipeLine =
+            $"Craft: {LaunchCapacitorRecipe.RecipeId} • " +
+            $"{launchInput.Quantity}×{launchInput.DefinitionId} → " +
+            $"{launchOutput.Quantity}×{launchOutput.DefinitionId}";
         double nextAutosave = Math.Max(
             0.0,
             AutosaveIntervalSeconds - _autosaveElapsedSeconds);
@@ -900,23 +1119,25 @@ public partial class SalvageRepairSlice : Node3D
             _hudLabel.Text =
                 "VERTICAL SLICE 1 • DATA-DRIVEN • H — HUD\n" +
                 $"{databaseLine}\n" +
-                $"Progress: {Session.SalvageDefinitionId} " +
-                $"{Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
-                $"ship={(Session.ShipRepaired ? "REPAIRED" : "DAMAGED")} • " +
+                $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
+                $"crystal={launchResourceQuantity}/{launchInput.Quantity} • " +
+                $"capacitor={(Session.SecondaryRecipeCrafted ? "READY" : "MISSING")} • " +
                 $"rev={_revision}\n" +
                 $"Content: schema={ContentCatalog.SchemaVersion} • " +
-                $"recipe={RepairRecipe.RecipeId}\n" +
+                $"items={ContentCatalog.Items.Count} • resources={ContentCatalog.Resources.Count} • " +
+                $"recipes={ContentCatalog.Recipes.Count}\n" +
                 $"Interaction: {interaction}\n" +
                 $"Status: {_status}\n" +
-                "E — interact • F7 — gameplay • F8 — reset • F9 — content";
+                "E — interact • F7 — gameplay • F8 — reset • F9 — content • F10 — crafting";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 — DATA-DRIVEN SALVAGE → REPAIR → AUTOSAVE • H — HUD\n" +
+            "VERTICAL SLICE 1 — SALVAGE → REPAIR → CRAFT → AUTOSAVE • H — HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
             recipeLine + "\n" +
+            craftingRecipeLine + "\n" +
             $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
             $"{_resourceNodes.Count}\n" +
             objective + "\n" +
@@ -926,9 +1147,10 @@ public partial class SalvageRepairSlice : Node3D
             $"Last domain event: {_lastDomainEvent}\n" +
             $"TASK-062 gameplay (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
+            $"TASK-066 crafting (F10): {_craftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space — move • E — collect/repair • H — HUD • " +
-            "F7 — gameplay • F8 — reset • F9 — content • Esc — release mouse";
+            "WASD/Space — move • E — collect/repair/craft • H — HUD • " +
+            "F7 — gameplay • F8 — reset • F9 — content • F10 — crafting • Esc — release mouse";
     }
 
     private static string BuildAcceptanceOutput(
@@ -971,6 +1193,27 @@ public partial class SalvageRepairSlice : Node3D
             $"missingReferenceRejected=" +
             $"{(report.MissingReferenceRejected ? 1 : 0)}; " +
             $"stableIds={(report.StableIdsValidated ? 1 : 0)}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildCraftingAcceptanceOutput(
+        CraftingExpansionAcceptanceReport report)
+    {
+        return "TASK-066 crafting expansion acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"resources={report.ResourcesCollected}; " +
+            $"repairPrerequisite={(report.RepairPrerequisiteEnforced ? 1 : 0)}; " +
+            $"wrongStationRejected={(report.WrongStationRejected ? 1 : 0)}; " +
+            $"blockedBeforeResources={(report.CraftBlockedBeforeResources ? 1 : 0)}; " +
+            $"crafted={(report.Crafted ? 1 : 0)}; " +
+            $"output={report.ProducedOutputQuantity}; " +
+            $"questAutosave={(report.QuestAutosaveObserved ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+            $"revision={report.Revision}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; " +
             $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
             $"result={report.Result}";
     }

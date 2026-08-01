@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Data-driven salvage/repair вертикального среза — `IMPLEMENTED`
+### Data-driven salvage/repair/crafting vertical slice — `IMPLEMENTED`
 
 Текущая стартовая сцена:
 
@@ -38,9 +38,8 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Реализован минимальный сквозной цикл начала игры из разделов 2.2 и 40 PDF-ТЗ.
-После приёмки `TASK-062/TASK-063` правила ресурсов и ремонта вынесены из C#
-в строгий статический контент:
+Принятый цикл `salvage → repair` расширен вторым ресурсом, отдельным рецептом
+и самостоятельной crafting station. Статические определения находятся в:
 
 ```text
 src/Game.Client/Content/items.json
@@ -48,73 +47,76 @@ src/Game.Client/Content/resources.json
 src/Game.Client/Content/recipes.json
 ```
 
-Каталог загружается один раз при старте сцены. Неизвестные поля JSON запрещены,
-стабильные строковые ID, дубликаты, диапазоны, ссылки resource→item и
-recipe input/output→item валидируются до перехода сцены в `DB: Ready`.
-Текущий игровой цикл:
+Каталог строго проверяет schema version, стабильные dotted-ID, неизвестные поля,
+дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит четыре item,
+два resource и два recipe definitions:
 
-1. игрок появляется на тестовой планетарной площадке;
-2. собирает три узла JSON-ресурса `resource.salvage_alloy` взаимодействием по `E`;
-   точное наведение лучом остаётся приоритетным, но на близкой дистанции действует
-   безопасный proximity-fallback, поэтому низкий ресурсный узел можно подобрать
-   без пиксельного наведения перекрестия;
-3. терминал `station.field_repair` читает рецепт
-   `recipe.ship.starter_repair`: `3 × resource.salvage_alloy` →
-   `1 × component.starter_hull_patch`;
-4. попытка ремонта до выполнения JSON-рецепта блокируется доменным правилом;
-5. после крафта входы расходуются, выход рецепта применяется к кораблю и
-   восстанавливает здоровье до значения из JSON;
-6. завершение стартовой ремонтной цели создаёт реальное доменное событие и
-   вызывает production-autosave с причиной `QuestCompleted`;
-7. inventory, состояние корабля, позиция игрока и revision восстанавливаются из
-   SQLite при следующем запуске;
-8. periodic и graceful-exit сохранения используют тот же coordinator.
+```text
+3 × resource.salvage_alloy
+→ 1 × component.starter_hull_patch
+→ station.field_repair
+→ RepairShip
+
+2 × resource.conductive_crystal
+→ 1 × component.ship.launch_capacitor
+→ station.portable_fabricator
+→ StoreOutputs
+```
+
+Игровая последовательность:
+
+1. собрать три голубых salvage-узла;
+2. отремонтировать красный стартовый корабль;
+3. собрать два фиолетовых conductive-crystal узла;
+4. использовать фиолетовый `PortableFabricator`;
+5. получить `component.ship.launch_capacitor` и production-autosave;
+6. после холодного запуска восстановить собранные узлы, repaired ship,
+   crafted component, позицию и revision.
+
+Крафт launch capacitor до ремонта корабля блокируется. Неверная station ID и
+недостаточное количество inputs также отклоняются доменной моделью. Оба рецепта
+используют один Godot-независимый `StarterRepairSession`; inputs расходуются,
+outputs сохраняются как inventory definitions и проходят SQLite round-trip.
 
 Управление стартовой сценой:
 
 ```text
 WASD / Space   движение и прыжок
-E              собрать ближайший доступный ресурс или взаимодействовать с кораблём
+E              собрать ресурс / ремонтировать / крафтить
 H              detailed / compact / hidden HUD
-F7             изолированная приёмка TASK-062
-F8             очистить gameplay-slot и начать цикл заново
-F9             TASK-064: strict JSON и data-driven recipe acceptance
+F7             регрессия TASK-062: salvage → repair
+F8             очистить gameplay-slot
+F9             регрессия TASK-064: strict JSON/data-driven catalog
+F10            TASK-066: второй ресурс, station crafting и persistence
 Esc            освободить курсор
 ```
 
-HUD показывает текущую цель взаимодействия. Перед нажатием `E` должна
-появиться строка вида `Interaction: near SalvageAlpha (...) — press E` либо
-`Interaction: aimed at ... — press E`. Три узла имеют обязательные уникальные
-C#-export ID `salvage.alpha`, `salvage.beta`, `salvage.gamma`; при запуске сцена
-проверяет точное PascalCase-связывание `ResourceNodeId` и не переходит в READY
-при пустом или дублирующемся ID. При успешном старте в Output появляется
-`TASK-062 scene binding PASS: resourceIds=salvage.alpha,salvage.beta,salvage.gamma; unique=1`.
-Старый ошибочный `salvage.unassigned` из локального тестового snapshot игнорируется;
-для полностью чистого ручного прогона используйте `F8`. Клавиша `H` циклически
-переключает `DETAILED → COMPACT → HIDDEN`; в скрытом режиме остаётся hint для
-возврата HUD.
+HUD показывает текущую цель взаимодействия (`aimed at ...` или `near ...`).
+Resource nodes обязаны иметь уникальные `ResourceNodeId`; scene startup проверяет,
+что оба рецепта обеспечены физическими узлами, а `StationId`/`RecipeId` сцены
+совпадают с JSON. Успешный запуск печатает:
 
-При старте ожидаются строки `TASK-064 content catalog READY` и
-`TASK-064 content binding PASS`. В detailed HUD отображаются версия content schema,
-число item/resource/recipe definitions и фактически выбранный рецепт.
+```text
+TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; items=4; resources=2; recipes=2.
+```
 
-Ожидаемый регрессионный результат по `F7`:
+Ожидаемые acceptance-результаты:
 
 ```text
 TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
 ```
 
-Ожидаемый результат проверки data-driven контента по `F9`:
-
 ```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=2; resources=1; recipes=1; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
+TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; recipes=2; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
 ```
 
-`F9` временно изменяет требование копии рецепта с 3 до 4 единиц только в памяти.
-Доменная модель должна блокировать ремонт на 3/4 и разрешить его на 4/4. Это
-доказывает, что порог берётся из рецепта, а не остаётся скрытой константой C#.
-Невалидные каталоги с дублирующимся ID и отсутствующей ссылкой должны быть
-отклонены. Gameplay-slot и JSON-файлы тестом не изменяются.
+```text
+TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; wrongStationRejected=1; blockedBeforeResources=1; crafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
+```
+
+`F7`, `F9` и `F10` используют изолированные test-БД и не изменяют gameplay-slot.
+`F8` необходим только для чистого ручного прогона.
 
 
 ### Прототип A. Персонаж — `VERIFIED`
