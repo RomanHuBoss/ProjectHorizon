@@ -33,7 +33,7 @@ public partial class SavePrototype : Node3D
     public float HudCompactWidth { get; set; } = 720.0f;
 
     [Export(PropertyHint.Range, "180.0,500.0,10.0")]
-    public float HudCompactHeight { get; set; } = 360.0f;
+    public float HudCompactHeight { get; set; } = 400.0f;
 
     [Export(PropertyHint.Range, "520.0,1200.0,10.0")]
     public float HudDetailedWidth { get; set; } = 820.0f;
@@ -45,6 +45,7 @@ public partial class SavePrototype : Node3D
     private SaveDatabase? _database;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
+    private Task<SavePrototypeRefresh>? _refreshTask;
     private Task? _writeTask;
     private Task<SavePrototypeAcceptanceReport>? _acceptanceTask;
     private Task<SaveBackupReport>? _backupTask;
@@ -60,6 +61,13 @@ public partial class SavePrototype : Node3D
     private SaveRecoveryAcceptanceReport? _recoveryAcceptanceReport;
     private int _manualRevision;
     private string _statusMessage = "инициализация SQLite";
+    private string _slotOperationHud = "READY";
+    private string _backupOperationHud = "READY";
+    private string _recoveryOperationHud = "READY";
+    private string _writeCompletionHud = "PASS";
+    private string _refreshCompletionMessage = "SQLite READY";
+    private SavePrototypeState _refreshCompletionState =
+        SavePrototypeState.Ready;
     private string _databaseDisplayPath = string.Empty;
 
     private MarginContainer? _compactMargin;
@@ -134,6 +142,7 @@ public partial class SavePrototype : Node3D
         PollBackupTask();
         PollRecoveryTask();
         PollRecoveryAcceptanceTask();
+        PollRefreshTask();
         UpdateHud();
     }
 
@@ -206,6 +215,7 @@ public partial class SavePrototype : Node3D
             _initializeTask is null &&
             _writeTask is null &&
             _loadTask is null &&
+            _refreshTask is null &&
             _acceptanceTask is null &&
             _backupTask is null &&
             _recoveryTask is null &&
@@ -230,6 +240,8 @@ public partial class SavePrototype : Node3D
         ApplySnapshotToVisualization(snapshot);
         _state = SavePrototypeState.Saving;
         _statusMessage = $"транзакционная запись revision={snapshot.Revision}";
+        _slotOperationHud = $"RUNNING save rev={snapshot.Revision}";
+        _writeCompletionHud = $"PASS save rev={snapshot.Revision}";
         _writeTask = _database.SaveAsync(
             snapshot,
             _lifetimeCancellation.Token);
@@ -244,6 +256,7 @@ public partial class SavePrototype : Node3D
 
         _state = SavePrototypeState.Loading;
         _statusMessage = "чтение snapshot из SQLite";
+        _slotOperationHud = "RUNNING load";
         _loadTask = _database.LoadAsync(
             SlotId,
             _lifetimeCancellation.Token);
@@ -258,6 +271,8 @@ public partial class SavePrototype : Node3D
 
         _state = SavePrototypeState.Resetting;
         _statusMessage = "очистка slot save_1 транзакцией";
+        _slotOperationHud = "RUNNING reset";
+        _writeCompletionHud = "PASS reset; slot пуст";
         _writeTask = _database.ResetSlotAsync(
             SlotId,
             _lifetimeCancellation.Token);
@@ -291,6 +306,7 @@ public partial class SavePrototype : Node3D
 
         _state = SavePrototypeState.BackingUp;
         _statusMessage = "создание и валидация предыдущей копии";
+        _backupOperationHud = "RUNNING validated backup";
         _backupReport = null;
         _backupTask = _database.CreateBackupAsync(
             SlotId,
@@ -307,6 +323,7 @@ public partial class SavePrototype : Node3D
 
         _state = SavePrototypeState.Recovering;
         _statusMessage = "атомарное восстановление предыдущей копии";
+        _recoveryOperationHud = "RUNNING previous-copy restore";
         _recoveryReport = null;
         _recoveryTask = _database.RestoreBackupAsync(
             SlotId,
@@ -343,8 +360,9 @@ public partial class SavePrototype : Node3D
         try
         {
             _diagnostics = task.GetAwaiter().GetResult();
-            _state = SavePrototypeState.Ready;
-            _statusMessage = "SQLite READY";
+            BeginRefresh(
+                completionMessage: "SQLite READY",
+                completionState: SavePrototypeState.Ready);
         }
         catch (Exception exception)
         {
@@ -366,14 +384,19 @@ public partial class SavePrototype : Node3D
         try
         {
             task.GetAwaiter().GetResult();
-            _state = SavePrototypeState.Ready;
-            _statusMessage = "операция записи завершена";
-            RefreshDiagnostics();
+            _slotOperationHud = _writeCompletionHud;
+            GD.Print(
+                $"Prototype E slot operation {_slotOperationHud}; " +
+                $"completedWrites={_database?.CompletedWrites ?? 0}");
+            BeginRefresh(
+                completionMessage: _writeCompletionHud,
+                completionState: SavePrototypeState.Ready);
         }
         catch (Exception exception)
         {
             _state = SavePrototypeState.Failed;
             _statusMessage = $"write failed: {exception.Message}";
+            _slotOperationHud = $"FAIL {exception.Message}";
             GD.PushError($"Prototype E write failed: {exception}");
         }
     }
@@ -392,8 +415,8 @@ public partial class SavePrototype : Node3D
             _loadedSnapshot = task.GetAwaiter().GetResult();
             if (_loadedSnapshot is null)
             {
-                _state = SavePrototypeState.Ready;
-                _statusMessage = "slot save_1 пуст";
+                _manualRevision = 0;
+                _slotOperationHud = "PASS load; slot пуст";
             }
             else
             {
@@ -401,17 +424,20 @@ public partial class SavePrototype : Node3D
                     _manualRevision,
                     _loadedSnapshot.Revision);
                 ApplySnapshotToVisualization(_loadedSnapshot);
-                _state = SavePrototypeState.Ready;
-                _statusMessage =
-                    $"loaded revision={_loadedSnapshot.Revision}";
+                _slotOperationHud =
+                    $"PASS load rev={_loadedSnapshot.Revision}";
             }
 
-            RefreshDiagnostics();
+            GD.Print($"Prototype E slot operation {_slotOperationHud}");
+            BeginRefresh(
+                completionMessage: _slotOperationHud,
+                completionState: SavePrototypeState.Ready);
         }
         catch (Exception exception)
         {
             _state = SavePrototypeState.Failed;
             _statusMessage = $"load failed: {exception.Message}";
+            _slotOperationHud = $"FAIL {exception.Message}";
             GD.PushError($"Prototype E load failed: {exception}");
         }
     }
@@ -475,13 +501,23 @@ public partial class SavePrototype : Node3D
                 ? SavePrototypeState.Ready
                 : SavePrototypeState.Failed;
             _statusMessage = _backupReport.Result;
+            _backupOperationHud = _backupReport.Succeeded
+                ? $"PASS rev={_backupReport.Snapshot?.Revision ?? 0}, " +
+                  $"integrity={_backupReport.IntegrityResult}, " +
+                  $"atomic={(_backupReport.AtomicReplacementUsed ? 1 : 0)}"
+                : $"FAIL {_backupReport.Result}";
             GD.Print(BuildBackupOutput(_backupReport));
-            RefreshDiagnostics();
+            BeginRefresh(
+                completionMessage: _backupOperationHud,
+                completionState: _backupReport.Succeeded
+                    ? SavePrototypeState.Ready
+                    : SavePrototypeState.Failed);
         }
         catch (Exception exception)
         {
             _state = SavePrototypeState.Failed;
             _statusMessage = $"backup failed: {exception.Message}";
+            _backupOperationHud = $"FAIL {exception.Message}";
             GD.PushError($"Prototype E backup failed: {exception}");
         }
     }
@@ -509,6 +545,11 @@ public partial class SavePrototype : Node3D
                 ? SavePrototypeState.Ready
                 : SavePrototypeState.Failed;
             _statusMessage = _recoveryReport.Result;
+            _recoveryOperationHud = _recoveryReport.Recovered
+                ? $"PASS rev={_recoveryReport.Snapshot?.Revision ?? 0}, " +
+                  $"atomic={(_recoveryReport.AtomicReplacementUsed ? 1 : 0)}, " +
+                  $"quarantine={(!string.IsNullOrWhiteSpace(_recoveryReport.QuarantinePath) ? 1 : 0)}"
+                : $"FAIL {_recoveryReport.Result}";
             string output = BuildRecoveryOutput(_recoveryReport);
             if (_recoveryReport.Recovered)
             {
@@ -519,12 +560,17 @@ public partial class SavePrototype : Node3D
                 GD.PushError(output);
             }
 
-            RefreshDiagnostics();
+            BeginRefresh(
+                completionMessage: _recoveryOperationHud,
+                completionState: _recoveryReport.Recovered
+                    ? SavePrototypeState.Ready
+                    : SavePrototypeState.Failed);
         }
         catch (Exception exception)
         {
             _state = SavePrototypeState.Failed;
             _statusMessage = $"recovery failed: {exception.Message}";
+            _recoveryOperationHud = $"FAIL {exception.Message}";
             GD.PushError($"Prototype E recovery failed: {exception}");
         }
     }
@@ -565,9 +611,12 @@ public partial class SavePrototype : Node3D
         }
     }
 
-    private void RefreshDiagnostics()
+    private void BeginRefresh(
+        string completionMessage,
+        SavePrototypeState completionState)
     {
-        if (_database is null || _loadTask is not null ||
+        if (_database is null || _refreshTask is not null ||
+            _loadTask is not null ||
             _writeTask is not null || _acceptanceTask is not null ||
             _backupTask is not null || _recoveryTask is not null ||
             _recoveryAcceptanceTask is not null)
@@ -575,23 +624,66 @@ public partial class SavePrototype : Node3D
             return;
         }
 
-        _loadTask = LoadAndRefreshDiagnosticsAsync();
+        _refreshCompletionMessage = completionMessage;
+        _refreshCompletionState = completionState;
+        _state = SavePrototypeState.Loading;
+        _statusMessage = "обновление snapshot и диагностики";
+        _refreshTask = LoadAndRefreshDiagnosticsAsync();
     }
 
-    private async Task<SaveGameSnapshot?> LoadAndRefreshDiagnosticsAsync()
+    private async Task<SavePrototypeRefresh> LoadAndRefreshDiagnosticsAsync()
     {
         if (_database is null)
         {
-            return null;
+            throw new InvalidOperationException("Save database is unavailable.");
         }
 
         SaveGameSnapshot? snapshot = await _database.LoadAsync(
             SlotId,
             _lifetimeCancellation.Token).ConfigureAwait(false);
-        _diagnostics = await _database.ReadDiagnosticsAsync(
-            SlotId,
-            _lifetimeCancellation.Token).ConfigureAwait(false);
-        return snapshot;
+        SaveDatabaseDiagnostics diagnostics =
+            await _database.ReadDiagnosticsAsync(
+                SlotId,
+                _lifetimeCancellation.Token).ConfigureAwait(false);
+        return new SavePrototypeRefresh(snapshot, diagnostics);
+    }
+
+    private void PollRefreshTask()
+    {
+        if (_refreshTask is null || !_refreshTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SavePrototypeRefresh> task = _refreshTask;
+        _refreshTask = null;
+        try
+        {
+            SavePrototypeRefresh refresh = task.GetAwaiter().GetResult();
+            _loadedSnapshot = refresh.Snapshot;
+            _diagnostics = refresh.Diagnostics;
+            if (_loadedSnapshot is null)
+            {
+                _manualRevision = 0;
+                ResetVisualization();
+            }
+            else
+            {
+                _manualRevision = Math.Max(
+                    _manualRevision,
+                    _loadedSnapshot.Revision);
+                ApplySnapshotToVisualization(_loadedSnapshot);
+            }
+
+            _state = _refreshCompletionState;
+            _statusMessage = _refreshCompletionMessage;
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"refresh failed: {exception.Message}";
+            GD.PushError($"Prototype E diagnostics refresh failed: {exception}");
+        }
     }
 
     private void ApplySnapshotToVisualization(SaveGameSnapshot snapshot)
@@ -660,6 +752,9 @@ public partial class SavePrototype : Node3D
             snapshotLine + "\n" +
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
+            $"Slot S/L/R: {_slotOperationHud}\n" +
+            $"Backup B: {_backupOperationHud}\n" +
+            $"Restore Y: {_recoveryOperationHud}\n" +
             $"Backup: {(diagnostics.BackupExists ? "есть" : "нет")} • " +
             $"integrity={diagnostics.BackupIntegrityResult} • " +
             $"bytes={diagnostics.BackupBytes}\n" +
@@ -692,6 +787,9 @@ public partial class SavePrototype : Node3D
             BuildSnapshotDetails() + "\n\n" +
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
+            $"Slot S/L/R: {_slotOperationHud}\n" +
+            $"Backup B: {_backupOperationHud}\n" +
+            $"Restore Y: {_recoveryOperationHud}\n" +
             "Foundation acceptance: explicit migration, WAL/FK/NORMAL/busy_timeout, " +
             "transactional player/ship/inventory/planet save, exact load comparison, " +
             "8 concurrent submissions through a single writer gate, integrity_check.\n" +
@@ -890,4 +988,8 @@ public partial class SavePrototype : Node3D
     {
         return physical == expected || logical == expected;
     }
+
+    private sealed record SavePrototypeRefresh(
+        SaveGameSnapshot? Snapshot,
+        SaveDatabaseDiagnostics Diagnostics);
 }

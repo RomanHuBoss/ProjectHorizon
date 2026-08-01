@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -36,11 +36,73 @@
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
-| E. Сохранение | `IN_PROGRESS` | SQLite foundation и round-trip подтверждены; реализованы валидированная предыдущая backup, атомарная замена, corruption detection, quarantine, error log и recovery; требуется runtime-приёмка `TASK-057` |
+| E. Сохранение | `IN_PROGRESS` | SQLite foundation подтверждён; автоматический `X`-тест recovery прошёл, но ручная проверка выявила самоперезапускающийся refresh, блокировавший последующие команды; hotfix реализован и требует повторной runtime-приёмки `TASK-057` |
 
-**Вывод:** `TASK-054` и приёмочная `TASK-055` переведены в `VERIFIED` по прямому подтверждению пользователя: чистая сборка, `Z: PASS`, schema `1`, WAL, FK, `synchronous=1`, `busy_timeout=5000`, exact round-trip, `writes=8`, `maxWriters=1`, `integrity=ok`. Текущая итерация реализует `TASK-056`; runtime-приёмка backup/recovery назначена как `TASK-057`.
+**Вывод:** `TASK-054` и приёмочная `TASK-055` остаются `VERIFIED`. Для `TASK-056` получены чистая сборка `0/0` и автоматический `X: PASS` (`candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`), однако ручной контур не мог быть принят из-за дефекта служебного refresh. `TASK-056` остаётся `IMPLEMENTED`, `TASK-057` — `IN_PROGRESS` до повторной проверки hotfix.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — hotfix ручного контура backup/recovery (`TASK-056/TASK-057`)
+
+**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 22.2, 22.3, 22.9, 36.3, Прототип E раздела 39 и пункты 10, 14, 15 раздела 41 PDF-ТЗ; `TASK-056`, `TASK-057`, `PE-020`–`PE-025`, `PE-ACC-010`–`PE-ACC-016`.
+
+**Полученное runtime-доказательство:**
+
+- локальная сборка завершилась успешно: `0` предупреждений, `0` ошибок;
+- автоматический тест показал `TASK-056 recovery (X): PASS rev=10`;
+- подтверждены `candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`;
+- backup существовала и проходила `integrity=ok`;
+- при последовательной ручной проверке HUD оставался на snapshot revision `2`, а счётчик `writes=2` не увеличивался после первой завершённой операции;
+- пользователь обоснованно сообщил, что ручной режим работает не полностью.
+
+**Установленная причина:**
+
+- служебный `RefreshDiagnostics()` использовал то же поле `_loadTask`, что и ручная команда `L`;
+- `PollLoadTask()` после завершения любого такого task снова вызывал `RefreshDiagnostics()`;
+- возникала бесконечная цепочка `load → refresh → load → refresh`;
+- `_loadTask` почти постоянно оставался ненулевым, поэтому `CanStartOperation()` молча отклонял последующие `S/L/R/B/Y/X/Z`, хотя HUD уже показывал `DB: Ready`;
+- initialization не загружал существующий snapshot, из-за чего `_manualRevision` после перезапуска мог начинаться с нуля и записать revision ниже фактической;
+- compact HUD не сохранял отдельные результаты ручных `B` и `Y`, поэтому успешность операций нельзя было однозначно увидеть на одном экране.
+
+**Исправлено:**
+
+- внутреннее обновление вынесено в отдельный `_refreshTask` и `PollRefreshTask()`;
+- refresh является одноразовым и не запускает новый refresh после собственного завершения;
+- `CanStartOperation()` учитывает `_refreshTask`, а HUD показывает `DB: Loading` до фактического окончания обновления вместо ложного `Ready`;
+- после initialization выполняется одноразовая загрузка snapshot и diagnostics;
+- `_manualRevision` синхронизируется с revision, реально находящейся в SQLite;
+- ручной `L` больше не смешивается со служебным refresh;
+- compact и detailed HUD получили сохраняемые строки `Slot S/L/R`, `Backup B` и `Restore Y` со статусами `RUNNING/PASS/FAIL` и ключевыми метриками;
+- успешные `S/L/R` дополнительно печатаются в Godot Output;
+- прежняя автоматическая логика backup, candidate validation, `File.Replace`, quarantine и recovery не изменялась.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/Persistence/SavePrototype.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Проверки в среде подготовки:**
+
+- статически подтверждено, что `PollRefreshTask()` не вызывает `BeginRefresh()`;
+- ручная `_loadTask` и служебная `_refreshTask` разделены;
+- `CanStartOperation()` блокирует запуск только до завершения явно видимого состояния `Loading`;
+- initialization выполняет ровно один refresh;
+- проверены ветви `S`, `L`, `R`, `B`, `Y`, `Z`, `X` и отсутствие конфликтов клавиш;
+- выполнена лексическая проверка изменённого C#-файла, строк, комментариев и скобок;
+- `.NET SDK` и Godot в среде подготовки отсутствуют, поэтому сборка hotfix и повторный runtime-тест здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-054`, `TASK-055` и соответствующие foundation-требования остаются `VERIFIED`;
+- `TASK-056`, `PE-020`–`PE-025` остаются `IMPLEMENTED`;
+- `TASK-057`, `PE-ACC-010`–`PE-ACC-016` остаются `IN_PROGRESS` до сборки hotfix и полного ручного сценария;
+- автоматический `X: PASS` принят как частичное доказательство, но не закрывает ручную приёмку.
+
+**Следующий рекомендуемый шаг:** собрать hotfix, выполнить последовательность `R → S → B → S → Y`, убедиться в появлении трёх независимых `PASS`-строк и изменении revision `1 → 2 → 1`, затем повторить `X` и `Z`.
 
 ### 2026-08-01 — валидированная backup и атомарное recovery (`TASK-056`)
 
@@ -103,7 +165,9 @@
 - `TASK-054`, `TASK-055`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006` → `VERIFIED`;
 - `TASK-056`, `PE-020`–`PE-025` → `IMPLEMENTED`;
 - `TASK-057`, `PE-ACC-010`–`PE-ACC-016` → `IN_PROGRESS`;
-- Прототип E остаётся `IN_PROGRESS` до локальной сборки и `X: PASS`.
+- Прототип E остаётся `IN_PROGRESS`; исходная редакция уже дала сборку `0/0` и
+  `X: PASS`, но hotfix ручного контура требует повторной сборки и полного
+  сценария `R → S → B → S → Y → X → Z`.
 
 **Следующий рекомендуемый шаг:** выполнить локальную runtime-приёмку `TASK-057`; после `PASS` закрыть backup/recovery и определить отдельную итерацию миграции старой версии/unknown content.
 
@@ -1139,13 +1203,13 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PE-023` | Повреждение primary определяется и запускает recovery | `IMPLEMENTED` | Read-only inspection, schema и `PRAGMA integrity_check`; автоматическая проверка при initialize |
 | `PE-024` | Recovery сохраняет заменяемую primary и журналирует событие | `IMPLEMENTED` | Atomic replace, `save_1.quarantine.last.db`, sidecar quarantine, `logs/save_1.recovery.log` |
 | `PE-025` | Ручная диагностика и изолированный recovery acceptance | `IMPLEMENTED` | `B` backup, `Y` restore, `X` isolated corruption/recovery test; основной slot не повреждается |
-| `PE-ACC-010` | Backup/recovery редакция собирается 0/0 | `IN_PROGRESS` | Локальная `dotnet build`; в среде подготовки .NET SDK отсутствует |
-| `PE-ACC-011` | Первая и последующая записи создают корректную предыдущую копию | `IN_PROGRESS` | `B` Output PASS; после двух `S` primary rev=2, backup rev=1 |
+| `PE-ACC-010` | Backup/recovery редакция собирается 0/0 | `IN_PROGRESS` | Исходная редакция собрана 0/0; manual-refresh hotfix требует новой локальной сборки |
+| `PE-ACC-011` | Первая и последующая записи создают корректную предыдущую копию | `IN_PROGRESS` | Повторить после hotfix: `S rev=1 → B rev=1 → S rev=2 → Y rev=1`; прежний ручной прогон блокировался refresh-loop |
 | `PE-ACC-012` | Повреждённый backup-кандидат отклоняется без изменения исправной backup | `IN_PROGRESS` | `candidateRejected=1`, `backupPreserved=1` |
 | `PE-ACC-013` | Повреждение основной БД определяется | `IN_PROGRESS` | `corruptionDetected=1`; test повреждает только isolated database |
 | `PE-ACC-014` | Валидная backup атомарно восстанавливает предыдущую ревизию | `IN_PROGRESS` | protected=10, newer=11, recovered=10, `atomicReplace=1`, exactComparisons=2 |
 | `PE-ACC-015` | Backup остаётся исправной, primary помещается в quarantine, log записан | `IN_PROGRESS` | primaryIntegrity=ok, backupIntegrity=ok, `quarantinePreserved=1`, `logWritten=1`; backup SHA неизменна |
-| `PE-ACC-016` | Автоматический `X`-тест завершается PASS и foundation не регрессирует | `IN_PROGRESS` | `TASK-056 recovery (X): PASS`; после теста основной slot и `Z` остаются работоспособны |
+| `PE-ACC-016` | Автоматический `X`-тест завершается PASS и foundation не регрессирует | `IN_PROGRESS` | Исходная редакция дала `TASK-056 recovery (X): PASS`; после hotfix требуется повторить `X` и затем `Z: PASS` |
 
 ### 8.4. Оставшаяся часть Прототипа E
 
@@ -1168,7 +1232,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-057` | Выполнить runtime-приёмку backup/recovery | Чистая сборка; `X: PASS`; candidate rejection; unchanged backup SHA; corruption detection; atomic rollback 11→10; quarantine/log |
+| 1 | `TASK-057` | Повторить runtime-приёмку backup/recovery после hotfix | Чистая сборка; последовательные `R/S/B/S/Y` без блокировки; revision `1→2→1`; отдельные HUD `PASS`; затем `X: PASS` и `Z: PASS` |
 | 2 | `TASK-058` | Реализовать migration старой версии и unknown content | Миграция копии без разрушения исходника; безопасная обработка неизвестных item/content ID |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
@@ -1179,18 +1243,28 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 ## 10. Runtime-приёмка `TASK-056/TASK-057`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. Compact HUD должен показать `DB: Ready`, schema `1`, `WAL=wal`, `FK=ON`, строки `TASK-054 save (Z): READY` и `TASK-056 recovery (X): READY`.
-3. Для детерминированного ручного сценария сначала нажать `R`, дождаться `Ready`, затем `L` и убедиться, что slot пуст. Нажать `S`, дождаться `Ready`, затем `B`. В Output ожидается `Prototype E validated backup PASS` с revision `1`, `integrity=ok` и непустым SHA-256.
-4. Нажать `S` второй раз. Primary должна иметь revision `2`, а previous-copy backup — revision `1`. Нажать `Y`: HUD/Output должны показать восстановленную revision `1`, `primaryIntegrity=ok`, `backupIntegrity=ok`, `atomicReplace=1` и существующий путь quarantine.
-5. Нажать `X` и не использовать управление. Тест работает в отдельной `save_1.recovery-test.db`, намеренно повреждает только её и обычно завершается за несколько секунд.
-6. Ожидаемый HUD:
+2. Запустить стартовую сцену и дождаться `DB: Ready`. На старте существующий snapshot должен загрузиться автоматически; кратковременное `DB: Loading` допустимо только во время одноразового refresh.
+3. Нажать `R` и дождаться одновременно `DB: Ready` и `Slot S/L/R: PASS reset; slot пуст`. Счётчик `writes` должен увеличиться.
+4. Нажать `S`, дождаться `Slot S/L/R: PASS save rev=1`; snapshot должен показать revision `1`.
+5. Нажать `B`, дождаться `Backup B: PASS rev=1, integrity=ok`. В Output требуется строка `Prototype E validated backup PASS` с непустым SHA-256.
+6. Нажать `S` повторно. Требуется `Slot S/L/R: PASS save rev=2`, primary revision `2`, backup revision `1`.
+7. Нажать `Y`. На одном compact HUD должны одновременно сохраниться:
+
+```text
+Slot S/L/R: PASS save rev=2
+Backup B: PASS rev=1, integrity=ok, atomic=<0|1>
+Restore Y: PASS rev=1, atomic=1, quarantine=1
+```
+
+Snapshot после восстановления должен иметь revision `1`; в Output требуется `primaryIntegrity=ok`, `backupIntegrity=ok`, `atomicReplace=1` и непустой путь quarantine. После каждого шага состояние должно возвращаться в `DB: Ready`, а следующая команда должна приниматься без перезапуска сцены.
+8. Нажать `X` и не использовать управление до завершения. Ожидаемый HUD:
 
 ```text
 TASK-056 recovery (X): PASS rev=10,
 candidateRejected=1, backupPreserved=1, atomic=1, quarantine=1
 ```
 
-7. Ожидаемая итоговая строка Godot Output:
+9. Ожидаемая итоговая строка Godot Output:
 
 ```text
 TASK-056 SQLite backup/recovery acceptance PASS:
@@ -1201,15 +1275,31 @@ atomicReplace=1; quarantinePreserved=1; logWritten=1; exactComparisons=2;
 elapsedMs=<время>; result=previous-copy backup survived rejection and restored the corrupted primary
 ```
 
-8. Обязательные критерии `PASS`: локальная сборка 0/0; invalid candidate отклонён; SHA-256 исправной backup не изменился; intentional corruption обнаружена; recovery использует `File.Replace`; заменяемая primary физически сохранена в quarantine; revision `11` откатывается к защищённой revision `10`; обе БД проходят `integrity_check`; exact comparisons `2`; recovery-log записан; основной пользовательский slot не затронут тестовым повреждением.
-9. После `X: PASS` повторно нажать `Z`. Foundation acceptance должна остаться `PASS`, что подтверждает отсутствие регрессии migration, writer queue и round-trip.
-10. В качестве доказательства прислать результат сборки, screenshot компактного HUD с `X: PASS`, полную итоговую строку `TASK-056 ... PASS`, строку ручного `B: PASS`, строку ручного `Y: PASS` и результат повторного `Z: PASS`.
-11. При `FAIL` прислать финальный HUD, полную строку `TASK-056 ... FAIL`, последние 40 строк Output и указать, существуют ли `save_1.backup.db`, `save_1.quarantine.last.db` и recovery-log.
+10. После `X: PASS` нажать `Z`. Foundation acceptance должна снова показать `PASS`.
+11. Полный `PASS` требует: сборку 0/0; отсутствие бесконечного refresh; принятие всех последовательных ручных команд; revision `1→2→1`; отдельные `PASS`-строки slot/backup/restore; изменение `writes` после каждой write-операции; `X: PASS`; `Z: PASS`; обе `integrity_check=ok`; quarantine и recovery-log существуют.
+12. В качестве доказательства прислать один screenshot после `Y`, один screenshot после `X`, полные строки Output для `B`, `Y`, `X` и `Z`, а также итоговое значение `writes`.
+13. При `FAIL` прислать финальный HUD, последние 50 строк Output и указать, после какой клавиши перестали меняться `DB`, `writes`, revision или одна из трёх manual status-строк.
 
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — hotfix блокировки последовательных manual-команд `TASK-057`
+
+**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`  
+**Git SHA:** отсутствует в архиве
+
+**Runtime-доказательство пользователя:** исходная редакция собрана с `0` предупреждений и `0` ошибок; изолированный `X`-тест завершился `PASS` с revision `10`, `candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`, backup `integrity=ok`. На трёх снимках ручной проверки snapshot и счётчик оставались `rev=2`, `writes=2`, что подтвердило непринятие последующих команд после первой операции.
+
+**Дефект:** служебный refresh повторно использовал `_loadTask`, а `PollLoadTask()` запускал следующий refresh после каждого завершения. Получался бесконечный цикл фоновых чтений; `CanStartOperation()` постоянно видел занятый `_loadTask` и отбрасывал дальнейшие клавиши. Состояние при этом ошибочно возвращалось в `Ready`, поэтому причина не была видна пользователю.
+
+**Исправление:** добавлена отдельная одноразовая `_refreshTask`; refresh обрабатывается `PollRefreshTask()` и не перезапускает себя; во время refresh HUD показывает `Loading`; startup загружает текущий snapshot и синхронизирует manual revision; compact/detailed HUD сохраняет независимые `Slot S/L/R`, `Backup B`, `Restore Y` результаты; slot-операции дублируются в Output.
+
+**Статические проверки:** `PollRefreshTask()` не содержит вызова `BeginRefresh()`; ручной load и внутренний refresh используют разные task-поля; все ветви завершения очищают соответствующее поле; проверены скобки, строки, комментарии, nullable-пути и клавиши. Сборка и runtime hotfix в среде подготовки недоступны.
+
+**Статусы:** `TASK-056` остаётся `IMPLEMENTED`; `TASK-057` остаётся `IN_PROGRESS` до последовательного `R → S → B → S → Y`, повторных `X: PASS` и `Z: PASS`.
 
 ### 2026-08-01 — `TASK-056`, валидированная backup и атомарное recovery
 
