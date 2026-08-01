@@ -177,7 +177,8 @@ public partial class ShipFlightPrototype
     {
         if (physical == Key.L || logical == Key.L)
         {
-            if (_testState == ShipFlightTestState.Running)
+            if (_testState == ShipFlightTestState.Running ||
+                LandingTestRunning || (_ship?.LandingAssistActive ?? false))
             {
                 return true;
             }
@@ -198,7 +199,8 @@ public partial class ShipFlightPrototype
 
         if (physical == Key.P || logical == Key.P)
         {
-            if (_testState == ShipFlightTestState.Running || AtmosphereTestRunning)
+            if (_testState == ShipFlightTestState.Running || AtmosphereTestRunning ||
+                LandingTestRunning || (_ship?.LandingAssistActive ?? false))
             {
                 return true;
             }
@@ -243,7 +245,8 @@ public partial class ShipFlightPrototype
 
     private void BeginAtmosphereTest()
     {
-        if (_ship is null || !_ship.HasAtmosphereReference)
+        if (_ship is null || !_ship.HasAtmosphereReference ||
+            LandingTestRunning || _ship.LandingAssistActive)
         {
             return;
         }

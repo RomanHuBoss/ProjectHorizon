@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-entry-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-landing-point-alignment.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,74 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Свободный полёт принят; атмосферная редакция собирается 0/0, первый `L`-прогон завершился `FAIL timeout phase=Entry`; добавлен physics-guidance hotfix, ожидающий повторной приёмки |
+| D. Корабль | `IN_PROGRESS` | Свободный полёт и атмосферный режим приняты runtime; реализованы поиск посадочной точки, проверки уклона/препятствий, резервирование и автоматическое выравнивание, ожидающие `TASK-048` |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-043/TASK-044` подтверждены и свободный полёт принят. Атмосферная редакция успешно собирается, но первый `L`-прогон остановился на фазе `Entry`. Текущий hotfix добавляет радиальный guidance в physics tick и раннюю диагностику stalled-entry; `TASK-045` остаётся `IMPLEMENTED`, `TASK-046` — `IN_PROGRESS`.
+**Вывод:** `TASK-043`–`TASK-046` подтверждены: свободный полёт и атмосферный режим приняты. Текущая итерация реализует `TASK-047` — поиск допустимой поверхности, проверки уклона и препятствий, резервирование точки и автоматическое выравнивание на безопасной высоте; runtime-приёмка вынесена в `TASK-048`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка `TASK-045/TASK-046` и реализация landing-point alignment `TASK-047`
+
+**Исходный снимок:** `ProjectHorizon-main(3)(2).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-landing-point-alignment.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** разделы 14.4, 15.3, 36.4 и Прототип D раздела 39 PDF-ТЗ; `TASK-045`–`TASK-049`, `PD-020`–`PD-035`, `PD-ACC-010`–`PD-ACC-027`.
+
+**Runtime-доказательство предыдущей итерации:**
+
+- локальная сборка: `0` предупреждений, `0` ошибок;
+- ручной `P`-подход подтвердил переход `SPACE → ATMOSPHERE`;
+- `TASK-045 atmosphere (L): PASS`;
+- `entry=1`, `exit=1`, `maxBlend=0,94`, `dragDrop=9,4 м/с`;
+- minimum-speed applications `62`, climb limit `16,0 м/с`, surface-safety `85`;
+- `minAltitude=13,8 м`, `recoveries=0`, `collisions=0`, `errors=0`;
+- free-flight regression: `J: PASS`, `vmax=72,0 м/с`, distance `220,5 м`, final speed/angular `0`.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/Ship/ArcadeShipLanding.cs`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipLanding.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ShipLandingAcceptance.cs`;
+- `src/Game.Client/Scripts/Ship/ShipLandingAcceptance.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ShipLandingTestSite.cs`;
+- `src/Game.Client/Scripts/Ship/ShipLandingTestSite.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipController.cs`;
+- `src/Game.Client/Scripts/Ship/ShipFlightPrototype.cs`;
+- `src/Game.Client/Scripts/Ship/ShipAtmosphereAcceptance.cs`;
+- `src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Реализовано в `TASK-047`:**
+
+- surface probe выполняется лучами к физической поверхности планеты;
+- кандидаты проверяются последовательно и получают измеримый счётчик `checks/hits`;
+- уклон вычисляется по углу между normal попадания и радиальным Up; предел — `12°`;
+- препятствия проверяются по зарезервированной clearance-зоне; тестовый obstacle находится в группе `landing_obstacle`;
+- первая тестовая точка отклоняется по уклону, вторая — по препятствию, третья безопасно резервируется;
+- зарезервированная точка визуализируется отдельным emissive marker;
+- landing assist отключает ручную основную физику, плавно перемещает корабль к hover-точке `12 м` и согласует локальный Up с normal поверхности;
+- состояние `Aligned` удерживает нулевые линейную и угловую скорости до отмены;
+- `M` запускает/отменяет ручной поиск и выравнивание;
+- `N` запускает автономный `TASK-047` acceptance test и восстанавливает baseline;
+- free-flight и atmosphere tests блокируются на время landing assist, чтобы исключить конфликт внешних команд.
+
+**Статические проверки:**
+
+- все `24` C#-файла прошли лексическую проверку строк, комментариев и скобок;
+- проверены все `res://`-ссылки, scene `load_steps`, NodePath и resource IDs;
+- расчётная модель подхода: расстояние до safe hover ≈ `40,33 м`, минимальный clearance траектории `12 м`, settle ≈ `4,65 с`;
+- тестовая геометрия гарантирует один slope rejection (`18° > 12°`) и один obstacle rejection;
+- Godot/.NET SDK в текущей среде отсутствуют, поэтому сборка и runtime новой функции не заявляются.
+
+**Изменения статусов:**
+
+- `TASK-045`, `TASK-046`, `PD-020`–`PD-025`, `PD-ACC-011`–`PD-ACC-018` → `VERIFIED`;
+- `TASK-047`, `PD-030`–`PD-035` → `IMPLEMENTED`;
+- `TASK-048`, `PD-ACC-020`–`PD-ACC-027` → `IN_PROGRESS`.
+
+**Ограничение:** текущая ступень заканчивается устойчивым выравниванием над зарезервированной точкой. Финальное снижение, посадочные опоры, `LANDED`, отключение основной физики на опорах и взлёт относятся к следующей `TASK-049`.
 
 ### 2026-08-01 — runtime `L: FAIL Entry timeout` и atmospheric-entry hotfix
 
@@ -722,21 +784,35 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-ACC-004` | Форсаж, торможение и стабилизация работают | `VERIFIED` | Ручная проверка и `J: PASS`; final speed/angular = 0 |
 | `PD-ACC-005` | Обе камеры переключаются без потери управления | `VERIFIED` | Ручная проверка и автоматические camera switches |
 | `PD-ACC-006` | Автоматический тест завершается PASS | `VERIFIED` | `TASK-043 flight (J): PASS`; vmax=72,0, distance=221,2, collisions=0 |
-| `PD-020` | Автоматический переход SPACE ↔ ATMOSPHERE | `IMPLEMENTED` | Высота, radial up, smooth atmosphere blend и entry/exit counters |
-| `PD-021` | Упрощённые подъёмная сила и минимальная скорость | `IMPLEMENTED` | Gravity/lift balance и minimum-forward-speed assist без полноценной аэродинамики |
-| `PD-022` | Атмосферное сопротивление | `IMPLEMENTED` | Drag зависит от blend и квадрата скорости; acceleration ограничено |
-| `PD-023` | Ограничение вертикального набора | `IMPLEMENTED` | Положительная radial velocity ограничивается `AtmosphereMaximumClimbSpeed` |
-| `PD-024` | Автоматическое предотвращение грубого столкновения | `IMPLEMENTED` | Stopping-distance safety, clearance clamp и аварийный hard floor |
-| `PD-025` | Диагностика и автоматический atmosphere test | `IMPLEMENTED` | HUD SPACE/ATMOSPHERE; `P` approach; `L` проверяет entry/exit/drag/min-speed/climb/safety |
+| `PD-020` | Автоматический переход SPACE ↔ ATMOSPHERE | `VERIFIED` | Высота, radial up, smooth atmosphere blend и entry/exit counters |
+| `PD-021` | Упрощённые подъёмная сила и минимальная скорость | `VERIFIED` | Gravity/lift balance и minimum-forward-speed assist без полноценной аэродинамики |
+| `PD-022` | Атмосферное сопротивление | `VERIFIED` | Drag зависит от blend и квадрата скорости; acceleration ограничено |
+| `PD-023` | Ограничение вертикального набора | `VERIFIED` | Положительная radial velocity ограничивается `AtmosphereMaximumClimbSpeed` |
+| `PD-024` | Автоматическое предотвращение грубого столкновения | `VERIFIED` | Stopping-distance safety, clearance clamp и аварийный hard floor |
+| `PD-025` | Диагностика и автоматический atmosphere test | `VERIFIED` | HUD SPACE/ATMOSPHERE; `P` approach; `L` проверяет entry/exit/drag/min-speed/climb/safety |
 | `PD-ACC-010` | Атмосферная редакция собирается 0/0 | `VERIFIED` | Пользовательская сборка: `0` предупреждений, `0` ошибок |
-| `PD-ACC-011` | Ручной переход SPACE ↔ ATMOSPHERE видим в HUD | `IN_PROGRESS` | `P`, altitude/blend и entry/exit без рывка камеры |
-| `PD-ACC-012` | Minimum-speed assist и lift удерживают управляемый полёт | `IN_PROGRESS` | `L: PASS`, minSpeed applications > 0, maxBlend ≥ 0,55 |
-| `PD-ACC-013` | Drag заметно снижает скорость | `IN_PROGRESS` | `dragDrop ≥ 4 м/с` |
-| `PD-ACC-014` | Радиальный набор ограничен | `IN_PROGRESS` | climbLimit > 0, maxClimb ≤ limit + 1 м/с |
-| `PD-ACC-015` | Surface-safety предотвращает грубое столкновение | `IN_PROGRESS` | safety > 0, minAltitude ≥ 8 м, recoveries=0, collisions=0 |
-| `PD-ACC-016` | Выход обратно в космос корректен | `IN_PROGRESS` | exit ≥ 1, итоговый mode SPACE |
-| `PD-ACC-017` | Автоматический atmosphere test завершается PASS | `IN_PROGRESS` | `TASK-045 atmosphere (L): PASS` |
-| `PD-ACC-018` | Free-flight и камеры не регрессировали | `IN_PROGRESS` | После L работают J, F2 и ручное управление |
+| `PD-ACC-011` | Ручной переход SPACE ↔ ATMOSPHERE видим в HUD | `VERIFIED` | `P`, altitude/blend и entry/exit без рывка камеры |
+| `PD-ACC-012` | Minimum-speed assist и lift удерживают управляемый полёт | `VERIFIED` | `L: PASS`, minSpeed applications > 0, maxBlend ≥ 0,55 |
+| `PD-ACC-013` | Drag заметно снижает скорость | `VERIFIED` | `dragDrop ≥ 4 м/с` |
+| `PD-ACC-014` | Радиальный набор ограничен | `VERIFIED` | climbLimit > 0, maxClimb ≤ limit + 1 м/с |
+| `PD-ACC-015` | Surface-safety предотвращает грубое столкновение | `VERIFIED` | safety > 0, minAltitude ≥ 8 м, recoveries=0, collisions=0 |
+| `PD-ACC-016` | Выход обратно в космос корректен | `VERIFIED` | exit ≥ 1, итоговый mode SPACE |
+| `PD-ACC-017` | Автоматический atmosphere test завершается PASS | `VERIFIED` | `TASK-045 atmosphere (L): PASS` |
+| `PD-ACC-018` | Free-flight и камеры не регрессировали | `VERIFIED` | После L работают J, F2 и ручное управление |
+| `PD-030` | Поиск допустимой посадочной поверхности | `IMPLEMENTED` | Physics ray probes по трём детерминированным кандидатам; fallback ring для общего случая |
+| `PD-031` | Проверка уклона посадочной поверхности | `IMPLEMENTED` | Угол normal к radial Up; предел `12°`; тестовый кандидат `18°` отклоняется |
+| `PD-032` | Проверка препятствий и clearance | `IMPLEMENTED` | Проверяется группа `landing_obstacle`; минимальный clearance `5,5 м` |
+| `PD-033` | Резервирование посадочной точки | `IMPLEMENTED` | Хранятся surface point, normal, slope, clearance и candidate index; marker видим в сцене |
+| `PD-034` | Автоматическое выравнивание над точкой | `IMPLEMENTED` | Основная ручная физика приостанавливается; position/basis сходятся к hover transform `12 м` |
+| `PD-035` | Диагностика и landing-point acceptance test | `IMPLEMENTED` | `M` — ручной assist; `N` — checks/rejects/reservation/alignment/restore |
+| `PD-ACC-020` | Landing-point редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
+| `PD-ACC-021` | Surface probe последовательно проверяет кандидаты | `IN_PROGRESS` | `checks >= 3`, `hits >= 3` |
+| `PD-ACC-022` | Крутая поверхность отклоняется | `IN_PROGRESS` | `slopeReject >= 1`, зарезервированный slope `<= 12°` |
+| `PD-ACC-023` | Препятствие отклоняется | `IN_PROGRESS` | `obstacleReject >= 1`, reserved clearance `>= 5,5 м` |
+| `PD-ACC-024` | Точка резервируется и визуально маркируется | `IN_PROGRESS` | `reservations >= 1`, marker находится на safe pad |
+| `PD-ACC-025` | Корабль устойчиво выравнивается над normal | `IN_PROGRESS` | `alignments >= 1`, posErr `<= 0,75 м`, angErr `<= 2,5°` |
+| `PD-ACC-026` | Alignment не вызывает столкновений и runtime ошибок | `IN_PROGRESS` | final speed `<= 0,8`, angular `<= 1°/с`, collisions/errors `0` |
+| `PD-ACC-027` | Предыдущие режимы не регрессировали | `IN_PROGRESS` | После `N: PASS` работают `J`, `L`, `P`, `F2`, ручное управление и HUD |
 
 ### 8.3. Оставшиеся прототипы
 
@@ -751,46 +827,47 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-044`; Прототипы A, B и C; свободный полёт Прототипа D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-046`; Прототипы A, B и C; свободный и атмосферный полёт Прототипа D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-046` | Выполнить runtime-приёмку атмосферного режима | Чистая сборка; ручной вход/выход по P; `L: PASS`; safety без столкновений |
-| 2 | `TASK-047` | Реализовать поиск посадочной точки и автоматическое выравнивание | Surface probe, slope/obstacle checks, reserved point и landing alignment |
+| 1 | `TASK-048` | Выполнить runtime-приёмку landing-point alignment | Чистая сборка; ручной `M`; `N: PASS`; slope/obstacle rejection; устойчивое выравнивание |
+| 2 | `TASK-049` | Реализовать финальное снижение, опоры, `LANDED` и взлёт | Touchdown sequence, gear/support contacts, physics lock, takeoff и повторный цикл |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-043`, `TASK-044`, `PD-001`, `PD-010`–`PD-017`, `PD-ACC-001`–`PD-ACC-006`.
-**Реализовано:** `TASK-045`, `PD-020`–`PD-025`.
-**Текущая приёмочная задача:** `TASK-046`.
+**Подтверждено в этой итерации:** `TASK-045`, `TASK-046`, `PD-020`–`PD-025`, `PD-ACC-010`–`PD-ACC-018`.
+**Реализовано:** `TASK-047`, `PD-030`–`PD-035`.
+**Текущая приёмочная задача:** `TASK-048`.
 
-## 10. Runtime-приёмка `TASK-045/TASK-046`
+## 10. Runtime-приёмка `TASK-047/TASK-048`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. В обычном spawn HUD должен показывать `SPACE`, atmosphere blend `0` и доступные тесты `J/L`.
-3. Нажать `P`: корабль переносится над атмосферной границей. При снижении HUD должен плавно перейти `SPACE → ATMOSPHERE`, altitude уменьшаться, blend увеличиваться. Повторное `P` возвращает космический spawn.
-4. Ручная проверка в атмосфере:
-   - управление и обе камеры сохраняются;
-   - при отпускании газа сопротивление уменьшает скорость;
-   - при малой forward airspeed появляется `MIN-SPEED`;
-   - чрезмерный вертикальный набор ограничивается;
-   - возле поверхности появляется `SAFETY`, корабль не врезается и не проваливается внутрь сферы.
-5. Нажать `L` и не вмешиваться. Entry-guidance должен за 2–4 секунды провести корабль через границу атмосферы; весь тест обычно занимает 7–11 секунд, общий timeout — 16 секунд.
+2. Запустить стартовую сцену. HUD должен показывать `TASK-047 landing (N): READY`, а рядом с верхней частью тестовой планеты должны быть видны коричневая наклонная площадка, серое препятствие и зелёная безопасная площадка.
+3. Нажать `M`. Система должна:
+   - последовательно проверить не менее трёх surface candidates;
+   - отклонить наклонную площадку (`slopeReject >= 1`);
+   - отклонить точку с препятствием (`obstacleReject >= 1`);
+   - зарезервировать зелёную точку и показать cyan marker;
+   - перейти `Searching → Reserved → Aligning → Aligned`;
+   - остановить корабль примерно в `12 м` над normal поверхности без столкновения.
+4. Повторное `M` должно отменить assist и восстановить исходный baseline.
+5. Нажать `N` и не вмешиваться. Обычная продолжительность — `5–9 секунд`, timeout — `14 секунд`.
 6. Критерий автоматического `PASS`:
 
 ```text
-TASK-045 atmosphere (L): PASS
-entryStart ≈ 104 м
-entryMin < 70 м
-entries >= 1
-exits >= 1
-maxBlend >= 0,55
-dragDrop >= 4 м/с
-minSpeed applications > 0
-climbLimit applications > 0
-maxClimb <= 17 м/с
-surface safety applications > 0
-minAltitude >= 8 м
-recoveries=0
+TASK-047 landing (N): PASS
+checks >= 3
+hits >= 3
+slopeReject >= 1
+obstacleReject >= 1
+reservations >= 1
+alignments >= 1
+reserved slope <= 12°
+reserved clearance >= 5,5 м
+positionError <= 0,75 м
+angularError <= 2,5°
+final speed <= 0,8 м/с
+final angular <= 1,0°/с
 collisions=0
 errors=0
 ```
@@ -798,14 +875,14 @@ errors=0
 7. В Godot Output должна появиться строка с префиксом:
 
 ```text
-TASK-045 atmospheric flight acceptance PASS
+TASK-047 landing-point acceptance PASS
 ```
 
-8. После теста корабль должен восстановить исходное состояние. Повторно проверить `J: PASS`, `F2`, ручное управление и режимы HUD.
-9. Передать результат сборки, screenshot compact HUD после `L: PASS`, полную итоговую строку Output и краткое подтверждение ручного входа/выхода по `P`.
+8. После теста корабль должен восстановить исходное состояние. Повторно проверить `J: PASS`, `L: PASS`, `P`, `F2`, ручное управление и режимы HUD.
+9. Передать результат сборки, screenshot compact HUD после `N: PASS`, полную итоговую строку Output и краткое подтверждение ручного сценария по `M`.
 10. При `FAIL` передать screenshot, полную строку `FAIL` и последние 20–30 строк Output.
 
-Критерий `PASS`: воспроизводимый переход SPACE/ATMOSPHERE, измеримое сопротивление и minimum-speed assist, ограниченный набор, surface-safety без recovery/collision и отсутствие регрессии свободного полёта.
+Критерий `PASS`: воспроизводимый поиск поверхности с фактическим отклонением уклона и препятствия, резервирование безопасной точки, устойчивое автоматическое выравнивание без collision/runtime errors и отсутствие регрессии принятого полёта.
 
 ## 11. Журнал проверок
 
@@ -813,8 +890,8 @@ TASK-045 atmospheric flight acceptance PASS
 
 ### 2026-08-01 — hotfix `TASK-045`, детерминированный вход в атмосферу
 
-**Исходный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-entry-hotfix.zip`  
+**Исходный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-entry-hotfix.zip`
 **Git SHA:** отсутствует в архиве
 
 **Runtime-доказательство:** сборка 0/0; `L: FAIL timeout phase=Entry`; после восстановления baseline HUD показывал SPACE/alt=441,8 м. Free-flight `J: PASS` не регрессировал.

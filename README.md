@@ -110,20 +110,23 @@ Detailed mode прокручивается колёсиком мыши. Разм
 
 ### Прототип D. Базовый корабль — `IN_PROGRESS`
 
-Свободный космический полёт подтверждён runtime-тестом. Текущая ступень добавляет
-упрощённый атмосферный режим из раздела 14.1 PDF-ТЗ без полноценной
-аэродинамической модели:
+Свободный космический и упрощённый атмосферный полёт подтверждены runtime-тестами.
+Текущая ступень реализует первую половину посадочной последовательности раздела
+14.4 PDF-ТЗ:
 
-- автоматический переход `SPACE ↔ ATMOSPHERE` по высоте;
-- упрощённая радиальная gravity/lift модель;
-- минимальная forward airspeed и stall-assist;
-- сопротивление, зависящее от плотности атмосферы и скорости;
-- ограничение радиального набора;
-- прогнозирование тормозного пути и surface-safety;
-- аварийный hard floor как отдельная диагностируемая защита;
-- физическая тестовая планета и прозрачная атмосферная оболочка;
-- автономный измеримый atmosphere-test;
-- детерминированный entry-guidance, который временно поддерживает inward radial speed до подтверждённого входа и затем отключается.
+- surface ray probes к физической поверхности планеты;
+- проверка уклона по normal относительно радиального Up;
+- проверка препятствий и минимального clearance;
+- последовательный поиск кандидатов и резервирование допустимой точки;
+- визуальный cyan marker зарезервированной площадки;
+- автоматическое согласование локального Up корабля с normal поверхности;
+- плавный подход к безопасной hover-точке `12 м`;
+- временное отключение ручной основной физики на этапе alignment;
+- ручной assist по `M` и автономный landing-point test по `N`;
+- детерминированный тестовый участок: наклонная площадка, препятствие и безопасная площадка.
+
+Ранее принятый атмосферный режим сохраняет `SPACE ↔ ATMOSPHERE`, simplified
+lift/minimum speed, drag, climb limit, surface-safety и entry-guidance.
 
 Активная стартовая сцена:
 
@@ -152,17 +155,20 @@ G         автоматическая стабилизация
 F2        chase/cockpit camera
 R         сброс к spawn
 P         атмосферный подход / возврат к space spawn
+M         поиск посадочной точки / отмена alignment
 H         compact/detailed/hidden HUD
 J         автоматический TASK-043 free-flight test
 L         автоматический TASK-045 atmosphere test
+N         автоматический TASK-047 landing-point test
 ```
 
-HUD показывает режим среды, высоту над поверхностью, atmosphere blend,
-радиальную скорость, forward airspeed и состояния `MIN-SPEED`/`SAFETY`.
+HUD показывает режим среды, высоту, atmosphere blend, радиальную скорость,
+forward airspeed, состояния `MIN-SPEED`/`SAFETY`, landing state, slope,
+clearance и ошибки position/orientation.
 
-Текущая итерация не включает поиск посадочной точки, проверку уклона и
-препятствий, опоры, landed-state и взлёт. Эти функции выполняются следующими
-изолированными задачами.
+Текущая итерация заканчивается состоянием `Aligned` над зарезервированной точкой.
+Финальное снижение, посадочные опоры, `LANDED`, фиксация корабля на опорах и взлёт
+выполняются следующей изолированной задачей.
 
 ## Состояние реализации ТЗ
 
@@ -280,17 +286,21 @@ src/Game.Client/project.godot
 6. Нажать `P`: корабль перемещается к верхней границе атмосферы. Временный
    radial guidance поддерживает снижение до `blend >= 0,20`, затем отключается;
    повторное `P` возвращает космический spawn.
-7. Нажать `L` и дождаться `TASK-045 atmosphere (L): PASS`. В строке Output
-   дополнительно проверяются `entryStart` и `entryMin`. При невозможности входа
-   тест завершается ранним `entry stalled ...`, а не общим timeout.
-8. Клавиша `H` переключает compact, detailed и hidden HUD корабля.
-9. Для регрессии Прототипа C открыть
+7. Нажать `L` и убедиться, что принятый atmospheric test остаётся
+   `TASK-045 atmosphere (L): PASS`.
+8. Нажать `M`: коричневая наклонная площадка и серое препятствие должны быть
+   отклонены, зелёная площадка зарезервирована и помечена cyan marker, корабль
+   должен перейти в `Aligned` примерно в `12 м` над surface normal. Повторное
+   `M` восстанавливает baseline.
+9. Нажать `N` и дождаться `TASK-047 landing (N): PASS`.
+10. Клавиша `H` переключает compact, detailed и hidden HUD корабля.
+11. Для регрессии Прототипа C открыть
    `Scenes/Planet/CubeSpherePrototype.tscn` через `F6`; compact mode теперь явно
    отключает scrollbar, detailed mode сохраняет прокрутку.
-10. Для регрессии Прототипа B открыть
+12. Для регрессии Прототипа B открыть
    `Scenes/Terrain/TerrainChunkPrototype.tscn` через `F6`; `F10` запускает
    stress-test, `P` — soak-test.
-11. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
+13. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
 
 ### Сборка через командную строку
 
@@ -335,10 +345,11 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - свободный аркадный полёт — `VERIFIED`;
 - тяга, импульсные двигатели, тангаж/рыскание/крен — `VERIFIED`;
 - форсаж, торможение, стабилизация и камеры — `VERIFIED`;
-- переход `SPACE ↔ ATMOSPHERE` — `IMPLEMENTED`;
-- simplified lift, minimum speed, drag и climb limit — `IMPLEMENTED`;
-- surface-safety — `IMPLEMENTED`;
-- посадка — `NOT_STARTED`;
+- переход `SPACE ↔ ATMOSPHERE` — `VERIFIED`;
+- simplified lift, minimum speed, drag и climb limit — `VERIFIED`;
+- surface-safety — `VERIFIED`;
+- поиск точки, slope/obstacle checks и alignment — `IMPLEMENTED`;
+- touchdown, опоры и landed-state — `NOT_STARTED`;
 - взлёт — `NOT_STARTED`.
 
 ### Прототип E. Сохранение

@@ -140,6 +140,7 @@ public partial class ShipFlightPrototype : Node3D
 
         GetViewport().SizeChanged += UpdateHudLayout;
         InitializeAtmospherePrototype();
+        InitializeLandingPrototype();
         ApplyHudMode();
         UpdateHud();
         GD.Print("Prototype D flight foundation ready. Press J for acceptance test.");
@@ -156,6 +157,7 @@ public partial class ShipFlightPrototype : Node3D
     public override void _Process(double delta)
     {
         UpdateAtmospherePrototype((float)delta);
+        UpdateLandingPrototype((float)delta);
 
         if (_testState == ShipFlightTestState.Running)
         {
@@ -165,6 +167,11 @@ public partial class ShipFlightPrototype : Node3D
         if (AtmosphereTestRunning)
         {
             UpdateAtmosphereTest((float)delta);
+        }
+
+        if (LandingTestRunning)
+        {
+            UpdateLandingTest((float)delta);
         }
 
         UpdateHud();
@@ -197,9 +204,16 @@ public partial class ShipFlightPrototype : Node3D
             return;
         }
 
+        if (HandleLandingInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (physical == Key.J || logical == Key.J)
         {
-            if (AtmosphereTestRunning)
+            if (AtmosphereTestRunning || LandingTestRunning ||
+                (_ship?.LandingAssistActive ?? false))
             {
                 GetViewport().SetInputAsHandled();
                 return;
@@ -221,7 +235,8 @@ public partial class ShipFlightPrototype : Node3D
 
     private void BeginFlightTest()
     {
-        if (_ship is null || AtmosphereTestRunning)
+        if (_ship is null || AtmosphereTestRunning || LandingTestRunning ||
+            _ship.LandingAssistActive)
         {
             return;
         }
@@ -590,7 +605,7 @@ public partial class ShipFlightPrototype : Node3D
                 : "CRUISE";
 
         _compactLabel.Text =
-            "ПРОТОТИП D — КОСМОС + АТМОСФЕРА  •  H — HUD\n" +
+            "ПРОТОТИП D — КОСМОС + АТМОСФЕРА + ПОСАДКА  •  H — HUD\n" +
             $"Скорость: {_ship.Speed:F1} м/с  •  режим: {driveState}  •  " +
             $"камера: {camera}  •  стабилизация: {stabilization}\n" +
             $"Local V: X={_ship.LocalVelocity.X:F1}  " +
@@ -598,13 +613,15 @@ public partial class ShipFlightPrototype : Node3D
             $"Z={_ship.LocalVelocity.Z:F1} м/с  •  " +
             $"ω={_ship.AngularSpeedDegrees:F1}°/с\n" +
             $"{AtmosphereCompactStatus}\n" +
+            $"{LandingCompactStatus}\n" +
             $"{FlightTestStatusText}\n" +
             $"{AtmosphereTestStatusText}\n" +
+            $"{LandingTestStatusText}\n" +
             "W/S — тяга  •  A/D — боковая  •  Space/C — вверх/вниз  •  " +
             "мышь — тангаж/рыскание\n" +
             "Q/E — крен  •  B — форсаж  •  X — тормоз  •  " +
             "G — стабилизация  •  F2 — камера  •  P — атмосфера  •  " +
-            "J/L — тесты";
+            "M — посадка  •  J/L/N — тесты";
 
         _detailedLabel.Text =
             "ПРОТОТИП D — АРКАДНАЯ ФИЗИКА КОРАБЛЯ\n" +
@@ -627,9 +644,11 @@ public partial class ShipFlightPrototype : Node3D
             $"external control={_ship.ExternalControlActive}\n" +
             $"Collision events={_ship.CollisionEvents}  •  " +
             $"runtime errors={_ship.RuntimeErrorCount}\n" +
-            $"{AtmosphereDetailedStatus}\n\n" +
+            $"{AtmosphereDetailedStatus}\n" +
+            $"{LandingDetailedStatus}\n\n" +
             $"{FlightTestStatusText}\n" +
             $"{AtmosphereTestStatusText}\n" +
+            $"{LandingTestStatusText}\n" +
             $"Free-flight metrics: vmax={_maximumSpeed:F2}; " +
             $"distance={_maximumDistance:F2}; " +
             $"lateral={_maximumLateralSpeed:F2}; " +
@@ -647,8 +666,10 @@ public partial class ShipFlightPrototype : Node3D
             "F2 — переключение погоня/кабина\n" +
             "R — сброс корабля\n" +
             "P — атмосферный подход/возврат в космос\n" +
+            "M — поиск точки и автоматическое выравнивание\n" +
             "J — автоматический free-flight test\n" +
             "L — автоматический atmosphere test\n" +
+            "N — автоматический landing-point test\n" +
             "H — compact/detailed/hidden HUD";
     }
 }

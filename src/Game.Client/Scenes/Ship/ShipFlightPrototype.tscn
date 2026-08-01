@@ -1,7 +1,8 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=28 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Ship/ShipFlightPrototype.cs" id="1_prototype"]
 [ext_resource type="PackedScene" path="res://Scenes/Ship/ArcadeShip.tscn" id="2_ship"]
+[ext_resource type="Script" path="res://Scripts/Ship/ShipLandingTestSite.cs" id="3_landing_site"]
 
 [sub_resource type="Environment" id="Environment_space"]
 background_mode = 1
@@ -89,6 +90,62 @@ roughness = 0.35
 material = SubResource("Material_lane")
 size = Vector3(0.35, 0.35, 38)
 
+[sub_resource type="StandardMaterial3D" id="Material_landing_slope"]
+albedo_color = Color(0.42, 0.22, 0.08, 1)
+roughness = 0.9
+
+[sub_resource type="BoxMesh" id="BoxMesh_landing_slope"]
+material = SubResource("Material_landing_slope")
+size = Vector3(10, 0.8, 10)
+
+[sub_resource type="BoxShape3D" id="BoxShape_landing_slope"]
+size = Vector3(10, 0.8, 10)
+
+[sub_resource type="StandardMaterial3D" id="Material_landing_obstacle"]
+albedo_color = Color(0.2, 0.22, 0.25, 1)
+roughness = 0.96
+
+[sub_resource type="SphereMesh" id="SphereMesh_landing_obstacle"]
+material = SubResource("Material_landing_obstacle")
+radius = 2.4
+height = 4.8
+radial_segments = 18
+rings = 9
+
+[sub_resource type="SphereShape3D" id="SphereShape_landing_obstacle"]
+radius = 2.4
+
+[sub_resource type="StandardMaterial3D" id="Material_landing_safe"]
+albedo_color = Color(0.04, 0.5, 0.22, 1)
+emission_enabled = true
+emission = Color(0.04, 0.85, 0.3, 1)
+emission_energy_multiplier = 2.2
+roughness = 0.45
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_landing_safe"]
+material = SubResource("Material_landing_safe")
+top_radius = 4.0
+bottom_radius = 4.0
+height = 0.18
+radial_segments = 32
+rings = 1
+
+[sub_resource type="StandardMaterial3D" id="Material_landing_marker"]
+transparency = 1
+albedo_color = Color(0.1, 0.95, 0.78, 0.7)
+emission_enabled = true
+emission = Color(0.05, 1, 0.75, 1)
+emission_energy_multiplier = 4.0
+roughness = 0.2
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_landing_marker"]
+material = SubResource("Material_landing_marker")
+top_radius = 5.2
+bottom_radius = 5.2
+height = 0.12
+radial_segments = 40
+rings = 1
+
 [node name="ShipFlightPrototype" type="Node3D"]
 script = ExtResource("1_prototype")
 TestTimeoutSeconds = 15.0
@@ -106,8 +163,12 @@ AtmosphereTestClimbTolerance = 1.0
 AtmosphereTestEntrySpeed = 18.0
 AtmosphereTestEntryGuidanceAcceleration = 60.0
 AtmosphereTestEntryPhaseTimeoutSeconds = 5.0
-HudCompactWidth = 620.0
-HudCompactHeight = 260.0
+LandingTestTimeoutSeconds = 14.0
+LandingTestApproachAltitude = 48.0
+LandingTestMaximumPositionError = 0.75
+LandingTestMaximumAngularErrorDegrees = 2.5
+HudCompactWidth = 700.0
+HudCompactHeight = 330.0
 HudDetailedWidth = 760.0
 HudDetailedHeight = 580.0
 
@@ -142,6 +203,19 @@ SurfaceSafetyActivationAltitude = 32.0
 SurfaceSafetyClearance = 9.0
 SurfaceSafetyAcceleration = 58.0
 SurfaceHardFloor = 5.0
+LandingTestSitePath = NodePath("../AtmospherePlanet/LandingTestSite")
+LandingSurfaceMask = 1
+LandingProbeHeight = 70.0
+LandingProbeDepth = 24.0
+LandingMaximumSlopeDegrees = 12.0
+LandingObstacleClearance = 5.5
+LandingAlignmentHeight = 12.0
+LandingMaximumApproachSpeed = 12.0
+LandingApproachAcceleration = 24.0
+LandingOrientationSharpness = 7.0
+LandingPositionTolerance = 0.65
+LandingAngularToleranceDegrees = 2.0
+LandingStableHoldSeconds = 0.6
 
 [node name="AtmospherePlanet" type="Node3D" parent="."]
 position = Vector3(0, -160, -360)
@@ -160,6 +234,47 @@ collision_mask = 0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="AtmospherePlanet/SurfaceBody"]
 shape = SubResource("SphereShape_surface")
+
+[node name="LandingTestSite" type="Node3D" parent="AtmospherePlanet"]
+script = ExtResource("3_landing_site")
+PlanetRadius = 120.0
+ReferenceDirection = Vector3(0, 1, 0)
+CandidateAngularOffsetDegrees = 7.0
+RejectedSlopeDegrees = 18.0
+ObstacleRadius = 2.4
+
+[node name="SlopePatch" type="StaticBody3D" parent="AtmospherePlanet/LandingTestSite"]
+collision_layer = 1
+collision_mask = 0
+
+[node name="Visual" type="MeshInstance3D" parent="AtmospherePlanet/LandingTestSite/SlopePatch"]
+mesh = SubResource("BoxMesh_landing_slope")
+cast_shadow = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AtmospherePlanet/LandingTestSite/SlopePatch"]
+shape = SubResource("BoxShape_landing_slope")
+
+[node name="ObstacleRock" type="StaticBody3D" parent="AtmospherePlanet/LandingTestSite" groups=["landing_obstacle"]]
+collision_layer = 4
+collision_mask = 0
+
+[node name="Visual" type="MeshInstance3D" parent="AtmospherePlanet/LandingTestSite/ObstacleRock"]
+mesh = SubResource("SphereMesh_landing_obstacle")
+cast_shadow = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AtmospherePlanet/LandingTestSite/ObstacleRock"]
+shape = SubResource("SphereShape_landing_obstacle")
+
+[node name="SafePad" type="MeshInstance3D" parent="AtmospherePlanet/LandingTestSite"]
+mesh = SubResource("CylinderMesh_landing_safe")
+cast_shadow = 0
+
+[node name="LandingTargetMarker" type="Node3D" parent="."]
+visible = false
+
+[node name="Disc" type="MeshInstance3D" parent="LandingTargetMarker"]
+mesh = SubResource("CylinderMesh_landing_marker")
+cast_shadow = 0
 
 [node name="Landmarks" type="Node3D" parent="."]
 
@@ -202,8 +317,8 @@ layer = 100
 [node name="CompactMargin" type="MarginContainer" parent="Hud"]
 offset_left = 12.0
 offset_top = 12.0
-offset_right = 632.0
-offset_bottom = 272.0
+offset_right = 712.0
+offset_bottom = 342.0
 mouse_filter = 2
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/CompactMargin"]
@@ -217,7 +332,7 @@ size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 14
 mouse_filter = 2
 autowrap_mode = 2
-text = "ПРОТОТИП D — КОСМОС + АТМОСФЕРА\nИнициализация..."
+text = "ПРОТОТИП D — КОСМОС + АТМОСФЕРА + ПОСАДКА\nИнициализация..."
 
 [node name="DetailedMargin" type="MarginContainer" parent="Hud"]
 offset_left = 12.0

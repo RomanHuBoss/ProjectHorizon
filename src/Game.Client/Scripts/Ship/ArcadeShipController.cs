@@ -126,6 +126,7 @@ public partial class ArcadeShipController : CharacterBody3D
         SafeMargin = 0.02f;
         _spawnTransform = GlobalTransform;
         InitializeAtmosphere();
+        InitializeLandingSystem();
         SetCameraMode(ShipCameraMode.Chase, false);
         Input.MouseMode = Input.MouseModeEnum.Captured;
         UpdateDiagnostics();
@@ -211,6 +212,25 @@ public partial class ArcadeShipController : CharacterBody3D
             : ReadManualCommand();
 
         UpdateAtmosphereContext();
+        if (ProcessLandingPhysics(deltaSeconds))
+        {
+            if (LandingState != ShipLandingAssistState.Aligned)
+            {
+                int landingSlideCount = GetSlideCollisionCount();
+                if (landingSlideCount > 0)
+                {
+                    _collisionEvents += landingSlideCount;
+                }
+            }
+
+            _mouseLookInput = _mouseLookInput.MoveToward(
+                Vector2.Zero,
+                MouseInputDecay);
+            UpdateAtmosphereContext();
+            UpdateDiagnostics();
+            return;
+        }
+
         ApplyLinearFlight(command, deltaSeconds);
         ApplyAtmosphericFlight(command, deltaSeconds);
         ApplyAtmosphericRadialGuidance(deltaSeconds);
@@ -284,6 +304,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
     public void ResetToSpawn()
     {
+        CancelLandingAssist(false);
         ClearExternalCommand();
         ClearRadialGuidance();
         GlobalTransform = _spawnTransform;
@@ -291,6 +312,7 @@ public partial class ArcadeShipController : CharacterBody3D
         AngularVelocityLocal = Vector3.Zero;
         _mouseLookInput = Vector2.Zero;
         _collisionEvents = 0;
+        SetManualControlEnabled(true);
         UpdateAtmosphereContext();
         UpdateDiagnostics();
         GD.Print("Arcade ship reset to spawn.");
@@ -308,6 +330,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
     public void RestoreRuntimeState(ArcadeShipRuntimeState state)
     {
+        CancelLandingAssist(false);
         ClearExternalCommand();
         ClearRadialGuidance();
         GlobalTransform = state.GlobalTransform;
