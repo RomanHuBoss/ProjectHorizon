@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-free-flight.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,56 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Реализована первая ступень: отдельная сцена, свободный аркадный полёт, импульсные двигатели, форсаж, торможение, стабилизация и две камеры; ожидается runtime-приёмка |
+| D. Корабль | `IN_PROGRESS` | Свободный космический полёт принят runtime; реализован упрощённый атмосферный режим с lift/min-speed/drag/climb-limit/surface-safety, ожидающий приёмки |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-041/TASK-042` подтверждены чистой сборкой и тремя screenshot: compact, detailed и hidden HUD работают, 3D-холст освобождён. Прототип C остаётся `VERIFIED`. Текущая итерация начинает Прототип D (`TASK-043`) отдельной сценой базового корабля и свободного космического полёта.
+**Вывод:** `TASK-043/TASK-044` подтверждены чистой сборкой, автоматическим `J: PASS` и ручной проверкой всех органов управления. Свободный космический полёт принят. Текущая итерация реализует `TASK-045` — упрощённый атмосферный режим и surface-safety; посадка и опоры остаются отдельным шагом.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка free-flight и `TASK-045` atmospheric flight foundation
+
+**Runtime-доказательство предыдущей итерации:**
+
+- локальная сборка `Game.Client.csproj`: `0` предупреждений, `0` ошибок;
+- `TASK-043 flight (J): PASS`;
+- `vmax=72,0 м/с`, `distance=221,2 м`, `lateral=38,4 м/с`, `vertical=20,4 м/с`;
+- `angular=105,4°/с`, конечные линейная и угловая скорости равны `0`;
+- столкновения `0/0/0`;
+- пользователь вручную подтвердил тягу, strafe/lift, тангаж/рыскание/крен, форсаж, торможение, стабилизацию и обе камеры.
+
+**Реализовано в `TASK-045`:**
+
+- сцена получила физическую тестовую планету радиусом `120 м` и атмосферную оболочку высотой `90 м`;
+- корабль автоматически определяет высоту над поверхностью, радиальное направление и плавный коэффициент атмосферы;
+- в атмосфере применяются упрощённые gravity/lift forces без полноценной аэродинамической модели;
+- минимальная forward airspeed поддерживается мягким stall-assist, если торможение не включено;
+- сопротивление зависит от плотности атмосферы и квадрата скорости, с ограничением максимального замедления;
+- радиальная скорость набора ограничена параметром `AtmosphereMaximumClimbSpeed`;
+- surface-safety прогнозирует тормозной путь, создаёт подъёмный импульс и блокирует отрицательную радиальную скорость около поверхности;
+- hard-floor correction оставлена только как аварийная защита и отдельно учитывается счётчиком recoveries;
+- `P` переносит корабль к границе атмосферы для ручной проверки и возвращает к космическому spawn;
+- `L` запускает автономный acceptance route: вход, minimum-speed assist, drag, climb-limit, safety descent и выход обратно в космос;
+- compact/detailed HUD показывает SPACE/ATMOSPHERE, altitude, blend, radial speed, forward airspeed, stall/safety state и измеримые результаты теста;
+- free-flight test по `J` сохранён и остаётся отдельным регрессионным сценарием.
+
+**Выполненные статические проверки:**
+
+- лексическая проверка всех 21 C#-файлов, строковых констант, комментариев и скобок — `PASS`;
+- все ссылки `res://`, `load_steps`, NodePath и идентификаторы ресурсов сцен — `PASS`;
+- в архиве отсутствуют `.godot`, `bin`, `obj`, `.git` и IDE-кэш;
+- детерминированная математическая симуляция acceptance route при 120 Hz завершилась за `6,51 с`: entry=`1`, exit=`1`, maxBlend=`0,940`, dragDrop=`9,75 м/с`, minSpeed=`122`, climbLimit=`63`, maxClimb=`15,73 м/с`, safety=`169`, minAltitude=`13,40 м`, recoveries=`0`.
+
+Симуляция не заменяет сборку и runtime-приёмку в Godot; она подтверждает только согласованность порогов и тестового маршрута.
+
+**Изменения статусов:**
+
+- `TASK-043`, `TASK-044`, `PD-001`, `PD-010`–`PD-017`, `PD-ACC-001`–`PD-ACC-006` → `VERIFIED`;
+- `TASK-045`, `PD-020`–`PD-025` → `IMPLEMENTED`;
+- `TASK-046`, `PD-ACC-010`–`PD-ACC-018` → `IN_PROGRESS` до локального `L: PASS`;
+- Прототип D остаётся `IN_PROGRESS`.
+
+**Ограничение:** посадка, проверка уклона/препятствий, опоры и отключение основной физики не входят в `TASK-045` и будут реализованы после приёмки атмосферного режима.
 
 ### 2026-08-01 — приёмка HUD ergonomics и `TASK-043` free-flight foundation
 
@@ -637,21 +681,36 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `PD-001` | Отдельная тестовая сцена корабля | `IMPLEMENTED` | `Scenes/Ship/ShipFlightPrototype.tscn`; назначена стартовой сценой |
-| `PD-010` | Упрощённая аркадная физика в свободном пространстве | `IMPLEMENTED` | `ArcadeShipController` использует floating `CharacterBody3D`, скорость и локальную угловую скорость |
-| `PD-011` | Тяга вперёд и назад | `IMPLEMENTED` | W/S; отдельные forward/reverse acceleration и ограничение скорости |
-| `PD-012` | Боковые и вертикальные импульсные двигатели | `IMPLEMENTED` | A/D и Space/C; ускорение применяется в локальном basis корабля |
-| `PD-013` | Рыскание, тангаж и крен | `IMPLEMENTED` | Мышь/стрелки и Q/E; локальные pitch/yaw/roll rates |
-| `PD-014` | Форсаж, торможение и автоматическая стабилизация | `IMPLEMENTED` | B, X и G; отдельные boost speed, brake deceleration и angular stabilization |
-| `PD-015` | Переключение камер корабля | `IMPLEMENTED` | F2 переключает chase camera со SpringArm3D и cockpit camera |
-| `PD-016` | Эргономичный HUD корабля | `IMPLEMENTED` | Compact без scrollbar, detailed со ScrollContainer, hidden hint; H циклически переключает режимы |
-| `PD-017` | Автоматический free-flight acceptance test | `IMPLEMENTED` | J выполняет thrust/rotation/strafe/boost/brake/camera route и возвращает baseline |
-| `PD-ACC-001` | Редакция корабля собирается 0/0 | `IN_PROGRESS` | Выполнить локальную сборку без предупреждений и ошибок |
-| `PD-ACC-002` | Сцена запускается, корабль и ориентиры видимы | `IN_PROGRESS` | Screenshot compact HUD и 3D-сцены |
-| `PD-ACC-003` | Ручное управление подтверждает все шесть степеней свободы | `IN_PROGRESS` | W/S, A/D, Space/C, мышь, Q/E; без NaN и неожиданных рывков |
-| `PD-ACC-004` | Форсаж, торможение и стабилизация работают | `IN_PROGRESS` | B увеличивает доступную скорость; X останавливает; G переключает auto stabilization |
-| `PD-ACC-005` | Обе камеры переключаются без потери управления | `IN_PROGRESS` | F2: chase ↔ cockpit |
-| `PD-ACC-006` | Автоматический тест завершается PASS | `IN_PROGRESS` | `TASK-043 flight (J): PASS`; thresholds из раздела 10 |
+| `PD-001` | Отдельная тестовая сцена корабля | `VERIFIED` | `Scenes/Ship/ShipFlightPrototype.tscn`; назначена стартовой сценой |
+| `PD-010` | Упрощённая аркадная физика в свободном пространстве | `VERIFIED` | `ArcadeShipController` использует floating `CharacterBody3D`, скорость и локальную угловую скорость |
+| `PD-011` | Тяга вперёд и назад | `VERIFIED` | W/S; отдельные forward/reverse acceleration и ограничение скорости |
+| `PD-012` | Боковые и вертикальные импульсные двигатели | `VERIFIED` | A/D и Space/C; ускорение применяется в локальном basis корабля |
+| `PD-013` | Рыскание, тангаж и крен | `VERIFIED` | Мышь/стрелки и Q/E; локальные pitch/yaw/roll rates |
+| `PD-014` | Форсаж, торможение и автоматическая стабилизация | `VERIFIED` | B, X и G; отдельные boost speed, brake deceleration и angular stabilization |
+| `PD-015` | Переключение камер корабля | `VERIFIED` | F2 переключает chase camera со SpringArm3D и cockpit camera |
+| `PD-016` | Эргономичный HUD корабля | `VERIFIED` | Compact без scrollbar, detailed со ScrollContainer, hidden hint; H циклически переключает режимы |
+| `PD-017` | Автоматический free-flight acceptance test | `VERIFIED` | J выполняет thrust/rotation/strafe/boost/brake/camera route и возвращает baseline |
+| `PD-ACC-001` | Редакция корабля собирается 0/0 | `VERIFIED` | Сборка пользователя: 0 предупреждений, 0 ошибок |
+| `PD-ACC-002` | Сцена запускается, корабль и ориентиры видимы | `VERIFIED` | Предоставлен screenshot compact HUD и корабля |
+| `PD-ACC-003` | Ручное управление подтверждает все шесть степеней свободы | `VERIFIED` | Пользователь подтвердил ручную проверку органов управления |
+| `PD-ACC-004` | Форсаж, торможение и стабилизация работают | `VERIFIED` | Ручная проверка и `J: PASS`; final speed/angular = 0 |
+| `PD-ACC-005` | Обе камеры переключаются без потери управления | `VERIFIED` | Ручная проверка и автоматические camera switches |
+| `PD-ACC-006` | Автоматический тест завершается PASS | `VERIFIED` | `TASK-043 flight (J): PASS`; vmax=72,0, distance=221,2, collisions=0 |
+| `PD-020` | Автоматический переход SPACE ↔ ATMOSPHERE | `IMPLEMENTED` | Высота, radial up, smooth atmosphere blend и entry/exit counters |
+| `PD-021` | Упрощённые подъёмная сила и минимальная скорость | `IMPLEMENTED` | Gravity/lift balance и minimum-forward-speed assist без полноценной аэродинамики |
+| `PD-022` | Атмосферное сопротивление | `IMPLEMENTED` | Drag зависит от blend и квадрата скорости; acceleration ограничено |
+| `PD-023` | Ограничение вертикального набора | `IMPLEMENTED` | Положительная radial velocity ограничивается `AtmosphereMaximumClimbSpeed` |
+| `PD-024` | Автоматическое предотвращение грубого столкновения | `IMPLEMENTED` | Stopping-distance safety, clearance clamp и аварийный hard floor |
+| `PD-025` | Диагностика и автоматический atmosphere test | `IMPLEMENTED` | HUD SPACE/ATMOSPHERE; `P` approach; `L` проверяет entry/exit/drag/min-speed/climb/safety |
+| `PD-ACC-010` | Атмосферная редакция собирается 0/0 | `IN_PROGRESS` | Выполнить локальную сборку |
+| `PD-ACC-011` | Ручной переход SPACE ↔ ATMOSPHERE видим в HUD | `IN_PROGRESS` | `P`, altitude/blend и entry/exit без рывка камеры |
+| `PD-ACC-012` | Minimum-speed assist и lift удерживают управляемый полёт | `IN_PROGRESS` | `L: PASS`, minSpeed applications > 0, maxBlend ≥ 0,55 |
+| `PD-ACC-013` | Drag заметно снижает скорость | `IN_PROGRESS` | `dragDrop ≥ 4 м/с` |
+| `PD-ACC-014` | Радиальный набор ограничен | `IN_PROGRESS` | climbLimit > 0, maxClimb ≤ limit + 1 м/с |
+| `PD-ACC-015` | Surface-safety предотвращает грубое столкновение | `IN_PROGRESS` | safety > 0, minAltitude ≥ 8 м, recoveries=0, collisions=0 |
+| `PD-ACC-016` | Выход обратно в космос корректен | `IN_PROGRESS` | exit ≥ 1, итоговый mode SPACE |
+| `PD-ACC-017` | Автоматический atmosphere test завершается PASS | `IN_PROGRESS` | `TASK-045 atmosphere (L): PASS` |
+| `PD-ACC-018` | Free-flight и камеры не регрессировали | `IN_PROGRESS` | После L работают J, F2 и ручное управление |
 
 ### 8.3. Оставшиеся прототипы
 
@@ -666,65 +725,90 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-042`; Прототипы A, B и C.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-044`; Прототипы A, B и C; свободный полёт Прототипа D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-044` | Выполнить runtime-приёмку базового свободного полёта | Чистая сборка; ручное управление; `J: PASS`; обе камеры; state restoration |
-| 2 | `TASK-045` | Реализовать атмосферный режим и предотвращение грубого столкновения | Сопротивление, минимальная скорость, ограничение вертикального набора и surface safety |
+| 1 | `TASK-046` | Выполнить runtime-приёмку атмосферного режима | Чистая сборка; ручной вход/выход по P; `L: PASS`; safety без столкновений |
+| 2 | `TASK-047` | Реализовать поиск посадочной точки и автоматическое выравнивание | Surface probe, slope/obstacle checks, reserved point и landing alignment |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-041`, `TASK-042`, `PC-100`–`PC-104`, `PC-ACC-070`–`PC-ACC-074`.
-**Реализовано:** `TASK-043`, `PD-001`, `PD-010`–`PD-017`.
-**Текущая приёмочная задача:** `TASK-044`.
+**Подтверждено в этой итерации:** `TASK-043`, `TASK-044`, `PD-001`, `PD-010`–`PD-017`, `PD-ACC-001`–`PD-ACC-006`.
+**Реализовано:** `TASK-045`, `PD-020`–`PD-025`.
+**Текущая приёмочная задача:** `TASK-046`.
 
-## 10. Runtime-приёмка `TASK-043/TASK-044`
+## 10. Runtime-приёмка `TASK-045/TASK-046`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. Должны быть видны базовый корабль, дальняя планета, станция и навигационные маяки; compact HUD не должен перекрывать основную часть 3D-холста.
-3. Ручная проверка управления:
-   - W/S — тяга вперёд/назад;
-   - A/D — боковые импульсные двигатели;
-   - Space/C — движение вверх/вниз;
-   - мышь либо стрелки — тангаж/рыскание;
-   - Q/E — крен;
-   - B — форсаж;
-   - X — торможение;
-   - G — автоматическая стабилизация;
-   - F2 — chase/cockpit camera;
-   - R — возврат к spawn.
-4. Нажать `J` и не вмешиваться до завершения. Ориентировочное время: 8–12 секунд.
-5. Критерий автоматического `PASS`:
+2. Запустить стартовую сцену. В обычном spawn HUD должен показывать `SPACE`, atmosphere blend `0` и доступные тесты `J/L`.
+3. Нажать `P`: корабль переносится над атмосферной границей. При снижении HUD должен плавно перейти `SPACE → ATMOSPHERE`, altitude уменьшаться, blend увеличиваться. Повторное `P` возвращает космический spawn.
+4. Ручная проверка в атмосфере:
+   - управление и обе камеры сохраняются;
+   - при отпускании газа сопротивление уменьшает скорость;
+   - при малой forward airspeed появляется `MIN-SPEED`;
+   - чрезмерный вертикальный набор ограничивается;
+   - возле поверхности появляется `SAFETY`, корабль не врезается и не проваливается внутрь сферы.
+5. Нажать `L` и не вмешиваться. Ориентировочное время: 6–10 секунд; предельный timeout — 16 секунд.
+6. Критерий автоматического `PASS`:
 
 ```text
-TASK-043 flight (J): PASS
-vmax >= 35 м/с
-distance >= 45 м
-lateral >= 4 м/с
-vertical >= 3 м/с
-angular >= 45°/с
-final speed <= 0,8 м/с
-final angular <= 1,0°/с
-cameraSwitches >= 2
+TASK-045 atmosphere (L): PASS
+entries >= 1
+exits >= 1
+maxBlend >= 0,55
+dragDrop >= 4 м/с
+minSpeed applications > 0
+climbLimit applications > 0
+maxClimb <= 17 м/с
+surface safety applications > 0
+minAltitude >= 8 м
+recoveries=0
 collisions=0
 errors=0
 ```
 
-6. В Godot Output должна появиться строка с префиксом:
+7. В Godot Output должна появиться строка с префиксом:
 
 ```text
-TASK-043 arcade flight acceptance PASS
+TASK-045 atmospheric flight acceptance PASS
 ```
 
-7. После теста корабль должен вернуться к исходному состоянию, управление и выбранная до теста камера должны быть восстановлены.
-8. Передать результат сборки, screenshot HUD после `PASS`, полную итоговую строку Output и краткое подтверждение ручного управления/камер.
-9. При `FAIL` передать screenshot, полную строку `FAIL` и последние 20–30 строк Output.
+8. После теста корабль должен восстановить исходное состояние. Повторно проверить `J: PASS`, `F2`, ручное управление и режимы HUD.
+9. Передать результат сборки, screenshot compact HUD после `L: PASS`, полную итоговую строку Output и краткое подтверждение ручного входа/выхода по `P`.
+10. При `FAIL` передать screenshot, полную строку `FAIL` и последние 20–30 строк Output.
 
-Критерий `PASS`: чистая сборка, воспроизводимый автоматический маршрут с измеримыми показателями и ручное подтверждение основных аркадных органов управления.
+Критерий `PASS`: воспроизводимый переход SPACE/ATMOSPHERE, измеримое сопротивление и minimum-speed assist, ограниченный набор, surface-safety без recovery/collision и отсутствие регрессии свободного полёта.
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-045`, упрощённый атмосферный режим
+
+**Исходный снимок:** `ProjectHorizon-main(2)(2).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** разделы 5.3, 14.1, 31.2 и 39 PDF-ТЗ; `TASK-043`–`TASK-047`, `PD-001`, `PD-010`–`PD-025`, `PD-ACC-001`–`PD-ACC-018`.
+
+**Runtime-доказательство предыдущей итерации:** сборка 0/0; `J: PASS`; vmax `72,0 м/с`, distance `221,2 м`, lateral `38,4`, vertical `20,4`, angular `105,4°/с`, final speed/angular `0`, collisions `0`; ручное управление подтверждено пользователем.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/Ship/ArcadeShipController.cs`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipAtmosphere.cs`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipAtmosphere.cs.uid`;
+- `src/Game.Client/Scripts/Ship/ShipFlightPrototype.cs`;
+- `src/Game.Client/Scripts/Ship/ShipAtmosphereAcceptance.cs`;
+- `src/Game.Client/Scripts/Ship/ShipAtmosphereAcceptance.cs.uid`;
+- `src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Краткий результат:** free-flight расширен автоматическим атмосферным контекстом, simplified lift/minimum speed/drag/climb limit и surface-safety. Добавлены ручной approach по `P`, измеримый test по `L` и физическая тестовая планета с атмосферной оболочкой.
+
+**Проверки:** 21 C#-файл прошёл лексический контроль; `res://`, scene `load_steps`, NodePath и структура ресурсов проверены; детерминированная симуляция `L`-маршрута при 120 Hz получила entry=1, exit=1, maxBlend=0,940, dragDrop=9,75 м/с, maxClimb=15,73 м/с, minAltitude=13,40 м и recoveries=0.
+
+**Ограничение:** сборка и runtime новой атмосферной редакции в текущей среде недоступны; требуется `TASK-046`. Посадочная точка, уклон, препятствия, опоры и landed-state не реализованы.
 
 ### 2026-08-01 — `TASK-043`, Прототип D: базовый корабль и свободный полёт
 

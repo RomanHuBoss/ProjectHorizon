@@ -139,6 +139,7 @@ public partial class ShipFlightPrototype : Node3D
         }
 
         GetViewport().SizeChanged += UpdateHudLayout;
+        InitializeAtmospherePrototype();
         ApplyHudMode();
         UpdateHud();
         GD.Print("Prototype D flight foundation ready. Press J for acceptance test.");
@@ -157,6 +158,11 @@ public partial class ShipFlightPrototype : Node3D
         if (_testState == ShipFlightTestState.Running)
         {
             UpdateFlightTest((float)delta);
+        }
+
+        if (AtmosphereTestRunning)
+        {
+            UpdateAtmosphereTest((float)delta);
         }
 
         UpdateHud();
@@ -183,8 +189,19 @@ public partial class ShipFlightPrototype : Node3D
             return;
         }
 
+        if (HandleAtmosphereInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (physical == Key.J || logical == Key.J)
         {
+            if (AtmosphereTestRunning)
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
             if (_testState == ShipFlightTestState.Running)
             {
                 FinishFlightTest(
@@ -202,7 +219,7 @@ public partial class ShipFlightPrototype : Node3D
 
     private void BeginFlightTest()
     {
-        if (_ship is null)
+        if (_ship is null || AtmosphereTestRunning)
         {
             return;
         }
@@ -571,18 +588,21 @@ public partial class ShipFlightPrototype : Node3D
                 : "CRUISE";
 
         _compactLabel.Text =
-            "ПРОТОТИП D — СВОБОДНЫЙ ПОЛЁТ  •  H — HUD\n" +
+            "ПРОТОТИП D — КОСМОС + АТМОСФЕРА  •  H — HUD\n" +
             $"Скорость: {_ship.Speed:F1} м/с  •  режим: {driveState}  •  " +
             $"камера: {camera}  •  стабилизация: {stabilization}\n" +
             $"Local V: X={_ship.LocalVelocity.X:F1}  " +
             $"Y={_ship.LocalVelocity.Y:F1}  " +
             $"Z={_ship.LocalVelocity.Z:F1} м/с  •  " +
             $"ω={_ship.AngularSpeedDegrees:F1}°/с\n" +
+            $"{AtmosphereCompactStatus}\n" +
             $"{FlightTestStatusText}\n" +
+            $"{AtmosphereTestStatusText}\n" +
             "W/S — тяга  •  A/D — боковая  •  Space/C — вверх/вниз  •  " +
             "мышь — тангаж/рыскание\n" +
             "Q/E — крен  •  B — форсаж  •  X — тормоз  •  " +
-            "G — стабилизация  •  F2 — камера  •  J — тест";
+            "G — стабилизация  •  F2 — камера  •  P — атмосфера  •  " +
+            "J/L — тесты";
 
         _detailedLabel.Text =
             "ПРОТОТИП D — АРКАДНАЯ ФИЗИКА КОРАБЛЯ\n" +
@@ -604,9 +624,11 @@ public partial class ShipFlightPrototype : Node3D
             $"Auto stabilization: {stabilization}  •  " +
             $"external control={_ship.ExternalControlActive}\n" +
             $"Collision events={_ship.CollisionEvents}  •  " +
-            $"runtime errors={_ship.RuntimeErrorCount}\n\n" +
+            $"runtime errors={_ship.RuntimeErrorCount}\n" +
+            $"{AtmosphereDetailedStatus}\n\n" +
             $"{FlightTestStatusText}\n" +
-            $"Test metrics: vmax={_maximumSpeed:F2}; " +
+            $"{AtmosphereTestStatusText}\n" +
+            $"Free-flight metrics: vmax={_maximumSpeed:F2}; " +
             $"distance={_maximumDistance:F2}; " +
             $"lateral={_maximumLateralSpeed:F2}; " +
             $"vertical={_maximumVerticalSpeed:F2}; " +
@@ -622,7 +644,9 @@ public partial class ShipFlightPrototype : Node3D
             "G — автоматическая стабилизация\n" +
             "F2 — переключение погоня/кабина\n" +
             "R — сброс корабля\n" +
-            "J — автоматический smoke-test\n" +
+            "P — атмосферный подход/возврат в космос\n" +
+            "J — автоматический free-flight test\n" +
+            "L — автоматический atmosphere test\n" +
             "H — compact/detailed/hidden HUD";
     }
 }

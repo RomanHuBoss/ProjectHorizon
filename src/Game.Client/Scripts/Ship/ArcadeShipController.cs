@@ -125,6 +125,7 @@ public partial class ArcadeShipController : CharacterBody3D
         MaxSlides = 8;
         SafeMargin = 0.02f;
         _spawnTransform = GlobalTransform;
+        InitializeAtmosphere();
         SetCameraMode(ShipCameraMode.Chase, false);
         Input.MouseMode = Input.MouseModeEnum.Captured;
         UpdateDiagnostics();
@@ -209,9 +210,12 @@ public partial class ArcadeShipController : CharacterBody3D
             ? _externalCommand
             : ReadManualCommand();
 
+        UpdateAtmosphereContext();
         ApplyLinearFlight(command, deltaSeconds);
+        ApplyAtmosphericFlight(command, deltaSeconds);
         ApplyAngularFlight(command, deltaSeconds);
         MoveAndSlide();
+        ApplyAtmosphericSurfaceCorrection();
 
         int slideCount = GetSlideCollisionCount();
         if (slideCount > 0)
@@ -285,6 +289,7 @@ public partial class ArcadeShipController : CharacterBody3D
         AngularVelocityLocal = Vector3.Zero;
         _mouseLookInput = Vector2.Zero;
         _collisionEvents = 0;
+        UpdateAtmosphereContext();
         UpdateDiagnostics();
         GD.Print("Arcade ship reset to spawn.");
     }
@@ -308,6 +313,7 @@ public partial class ArcadeShipController : CharacterBody3D
         AutoStabilizationEnabled = state.AutoStabilizationEnabled;
         SetCameraMode(state.CameraMode, false);
         _mouseLookInput = Vector2.Zero;
+        UpdateAtmosphereContext();
         UpdateDiagnostics();
     }
 
