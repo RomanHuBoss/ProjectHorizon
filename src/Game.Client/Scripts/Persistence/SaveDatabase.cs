@@ -10,7 +10,8 @@ using Microsoft.Data.Sqlite;
 
 public sealed partial class SaveDatabase : IDisposable
 {
-    public const int CurrentSchemaVersion = 1;
+    public const int CurrentSchemaVersion = 2;
+    public const int CurrentContentVersion = 2;
     public const int BusyTimeoutMilliseconds = 5000;
 
     private readonly string _databasePath;
@@ -48,8 +49,7 @@ public sealed partial class SaveDatabase : IDisposable
         return EnqueueWriteAsync(
             () =>
             {
-                EnsureParentDirectory();
-                RecoverPrimaryIfCorruptCore(slotId: null);
+                PrepareDatabaseCore(slotId: null);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
                 return ReadDiagnosticsCore(connection, string.Empty);
@@ -65,8 +65,7 @@ public sealed partial class SaveDatabase : IDisposable
         return EnqueueWriteAsync(
             () =>
             {
-                EnsureParentDirectory();
-                RecoverPrimaryIfCorruptCore(snapshot.SlotId);
+                PrepareDatabaseCore(snapshot.SlotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
 
@@ -107,7 +106,7 @@ public sealed partial class SaveDatabase : IDisposable
             () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                EnsureParentDirectory();
+                PrepareDatabaseCore(slotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
                 return LoadSnapshotCore(connection, slotId);
@@ -129,8 +128,7 @@ public sealed partial class SaveDatabase : IDisposable
         return EnqueueWriteAsync(
             () =>
             {
-                EnsureParentDirectory();
-                RecoverPrimaryIfCorruptCore(slotId);
+                PrepareDatabaseCore(slotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
 
@@ -292,7 +290,7 @@ public sealed partial class SaveDatabase : IDisposable
             () =>
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                EnsureParentDirectory();
+                PrepareDatabaseCore(slotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
                 return ReadDiagnosticsCore(connection, slotId);
@@ -322,7 +320,7 @@ public sealed partial class SaveDatabase : IDisposable
             slotId,
             revision,
             GeneratorVersion: 1,
-            ContentVersion: 1,
+            ContentVersion: CurrentContentVersion,
             updatedUtc,
             new PlayerSaveData(
                 "player.prototype",
@@ -386,6 +384,8 @@ public sealed partial class SaveDatabase : IDisposable
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
+            expected.Ship.OriginalTemplateId != actual.Ship.OriginalTemplateId ||
+            expected.Ship.TemplateResolution != actual.Ship.TemplateResolution ||
             !NearlyEqual(expected.Ship.Health, actual.Ship.Health) ||
             !NearlyEqual(expected.Ship.Fuel, actual.Ship.Fuel) ||
             !NearlyEqual(expected.Ship.PositionX, actual.Ship.PositionX) ||
@@ -408,6 +408,8 @@ public sealed partial class SaveDatabase : IDisposable
         {
             if (!actualItems.TryGetValue(expectedItem.ItemId, out InventoryItemSaveData? actualItem) ||
                 expectedItem.DefinitionId != actualItem.DefinitionId ||
+                expectedItem.OriginalDefinitionId != actualItem.OriginalDefinitionId ||
+                expectedItem.Resolution != actualItem.Resolution ||
                 expectedItem.Quantity != actualItem.Quantity ||
                 !NearlyEqual(expectedItem.Durability, actualItem.Durability))
             {
@@ -501,7 +503,8 @@ public sealed partial class SaveDatabase : IDisposable
         return connection;
     }
 
-    private static void ApplyMigrations(SqliteConnection connection)
+    private static MigrationTransformSummary ApplyMigrations(
+        SqliteConnection connection)
     {
         using SqliteCommand bootstrap = connection.CreateCommand();
         bootstrap.CommandText =
@@ -530,7 +533,24 @@ public sealed partial class SaveDatabase : IDisposable
         if (currentVersion < 1)
         {
             ApplyMigration1(connection);
+            currentVersion = 1;
         }
+
+        MigrationTransformSummary summary = MigrationTransformSummary.Empty;
+        if (currentVersion < 2)
+        {
+            summary = ApplyMigration2(connection);
+            currentVersion = 2;
+        }
+
+        if (currentVersion != CurrentSchemaVersion)
+        {
+            throw new InvalidOperationException(
+                $"Migration chain stopped at schema {currentVersion}; " +
+                $"expected {CurrentSchemaVersion}.");
+        }
+
+        return summary;
     }
 
     private static void ApplyMigration1(SqliteConnection connection)
@@ -586,6 +606,122 @@ public sealed partial class SaveDatabase : IDisposable
         transaction.Commit();
     }
 
+    private static MigrationTransformSummary ApplyMigration2(
+        SqliteConnection connection)
+    {
+        using SqliteTransaction transaction = connection.BeginTransaction();
+        ExecuteNonQuery(
+            connection,
+            transaction,
+            "ALTER TABLE inventory_items ADD COLUMN " +
+            "original_definition_id TEXT NULL;");
+        ExecuteNonQuery(
+            connection,
+            transaction,
+            "ALTER TABLE ships ADD COLUMN original_template_id TEXT NULL;");
+
+        List<(long RowId, string DefinitionId)> inventoryRows = new();
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText =
+                "SELECT rowid, definition_id FROM inventory_items ORDER BY rowid;";
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                inventoryRows.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+        }
+
+        int aliases = 0;
+        int placeholders = 0;
+        foreach ((long rowId, string definitionId) in inventoryRows)
+        {
+            ContentResolution resolution = ResolveInventoryDefinitionCore(
+                definitionId,
+                originalDefinitionId: null);
+            if (resolution.State == ContentResolutionState.Known)
+            {
+                continue;
+            }
+
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "UPDATE inventory_items SET definition_id = $definition_id, " +
+                "original_definition_id = $original_definition_id " +
+                "WHERE rowid = $row_id;",
+                ("$definition_id", resolution.EffectiveId),
+                ("$original_definition_id", resolution.OriginalId),
+                ("$row_id", rowId));
+
+            if (resolution.State == ContentResolutionState.Aliased)
+            {
+                aliases++;
+            }
+            else
+            {
+                placeholders++;
+            }
+        }
+
+        List<(long RowId, string TemplateId)> shipRows = new();
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.Transaction = transaction;
+            command.CommandText =
+                "SELECT rowid, template_id FROM ships ORDER BY rowid;";
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                shipRows.Add((reader.GetInt64(0), reader.GetString(1)));
+            }
+        }
+
+        foreach ((long rowId, string templateId) in shipRows)
+        {
+            ContentResolution resolution = ResolveShipTemplateCore(
+                templateId,
+                originalTemplateId: null);
+            if (resolution.State == ContentResolutionState.Known)
+            {
+                continue;
+            }
+
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "UPDATE ships SET template_id = $template_id, " +
+                "original_template_id = $original_template_id " +
+                "WHERE rowid = $row_id;",
+                ("$template_id", resolution.EffectiveId),
+                ("$original_template_id", resolution.OriginalId),
+                ("$row_id", rowId));
+            placeholders++;
+        }
+
+        string appliedUtc = DateTimeOffset.UtcNow.ToString(
+            "O",
+            CultureInfo.InvariantCulture);
+        ExecuteNonQuery(
+            connection,
+            transaction,
+            "UPDATE save_meta SET schema_version = $schema_version, " +
+            "content_version = CASE " +
+            "WHEN content_version < $content_version THEN $content_version " +
+            "ELSE content_version END;",
+            ("$schema_version", CurrentSchemaVersion),
+            ("$content_version", CurrentContentVersion));
+        ExecuteNonQuery(
+            connection,
+            transaction,
+            "INSERT INTO schema_migrations(version, applied_utc) " +
+            "VALUES(2, $applied_utc);",
+            ("$applied_utc", appliedUtc));
+        transaction.Commit();
+        return new MigrationTransformSummary(aliases, placeholders);
+    }
+
     private static void SaveSnapshotCore(
         SqliteConnection connection,
         SaveGameSnapshot snapshot)
@@ -611,7 +747,7 @@ public sealed partial class SaveDatabase : IDisposable
             ("$schema_version", CurrentSchemaVersion),
             ("$save_revision", snapshot.Revision),
             ("$generator_version", snapshot.GeneratorVersion),
-            ("$content_version", snapshot.ContentVersion),
+            ("$content_version", Math.Max(snapshot.ContentVersion, CurrentContentVersion)),
             ("$created_utc", createdUtc),
             ("$updated_utc", snapshot.UpdatedUtc));
 
@@ -641,13 +777,14 @@ public sealed partial class SaveDatabase : IDisposable
             connection,
             transaction,
             "INSERT INTO ships(" +
-            "ship_id, slot_id, template_id, display_name, health, fuel, " +
-            "pos_x, pos_y, pos_z) VALUES(" +
-            "$ship_id, $slot_id, $template_id, $display_name, $health, $fuel, " +
-            "$pos_x, $pos_y, $pos_z);",
+            "ship_id, slot_id, template_id, original_template_id, " +
+            "display_name, health, fuel, pos_x, pos_y, pos_z) VALUES(" +
+            "$ship_id, $slot_id, $template_id, $original_template_id, " +
+            "$display_name, $health, $fuel, $pos_x, $pos_y, $pos_z);",
             ("$ship_id", snapshot.Ship.ShipId),
             ("$slot_id", snapshot.SlotId),
-            ("$template_id", snapshot.Ship.TemplateId),
+            ("$template_id", PersistedShipTemplateCore(snapshot.Ship)),
+            ("$original_template_id", PersistedShipOriginalCore(snapshot.Ship)),
             ("$display_name", snapshot.Ship.DisplayName),
             ("$health", snapshot.Ship.Health),
             ("$fuel", snapshot.Ship.Fuel),
@@ -676,11 +813,14 @@ public sealed partial class SaveDatabase : IDisposable
                 connection,
                 transaction,
                 "INSERT INTO inventory_items(" +
-                "container_id, item_id, definition_id, quantity, durability) " +
-                "VALUES($container_id, $item_id, $definition_id, $quantity, $durability);",
+                "container_id, item_id, definition_id, original_definition_id, " +
+                "quantity, durability) VALUES(" +
+                "$container_id, $item_id, $definition_id, $original_definition_id, " +
+                "$quantity, $durability);",
                 ("$container_id", containerId),
                 ("$item_id", item.ItemId),
-                ("$definition_id", item.DefinitionId),
+                ("$definition_id", PersistedInventoryDefinitionCore(item)),
+                ("$original_definition_id", PersistedInventoryOriginalCore(item)),
                 ("$quantity", item.Quantity),
                 ("$durability", item.Durability));
         }
@@ -708,6 +848,17 @@ public sealed partial class SaveDatabase : IDisposable
     private static SaveGameSnapshot? LoadSnapshotCore(
         SqliteConnection connection,
         string slotId)
+    {
+        int schemaVersion = ExecuteScalarInt(
+            connection,
+            "SELECT COALESCE(MAX(version), 0) FROM schema_migrations;");
+        return LoadSnapshotCore(connection, slotId, schemaVersion);
+    }
+
+    private static SaveGameSnapshot? LoadSnapshotCore(
+        SqliteConnection connection,
+        string slotId,
+        int schemaVersion)
     {
         int revision;
         int generatorVersion;
@@ -756,9 +907,13 @@ public sealed partial class SaveDatabase : IDisposable
         ShipSaveData ship;
         using (SqliteCommand command = connection.CreateCommand())
         {
-            command.CommandText =
-                "SELECT ship_id, template_id, display_name, health, fuel, " +
-                "pos_x, pos_y, pos_z FROM ships WHERE slot_id = $slot_id;";
+            command.CommandText = schemaVersion >= 2
+                ? "SELECT ship_id, template_id, original_template_id, " +
+                  "display_name, health, fuel, pos_x, pos_y, pos_z " +
+                  "FROM ships WHERE slot_id = $slot_id;"
+                : "SELECT ship_id, template_id, NULL AS original_template_id, " +
+                  "display_name, health, fuel, pos_x, pos_y, pos_z " +
+                  "FROM ships WHERE slot_id = $slot_id;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             if (!reader.Read())
@@ -766,34 +921,57 @@ public sealed partial class SaveDatabase : IDisposable
                 throw new InvalidDataException("ships row is missing.");
             }
 
+            string persistedTemplateId = reader.GetString(1);
+            string? originalTemplateId = reader.IsDBNull(2)
+                ? null
+                : reader.GetString(2);
+            ContentResolution templateResolution = ResolveShipTemplateCore(
+                persistedTemplateId,
+                originalTemplateId);
             ship = new ShipSaveData(
                 reader.GetString(0),
-                reader.GetString(1),
-                reader.GetString(2),
-                reader.GetDouble(3),
+                templateResolution.EffectiveId,
+                reader.GetString(3),
                 reader.GetDouble(4),
                 reader.GetDouble(5),
                 reader.GetDouble(6),
-                reader.GetDouble(7));
+                reader.GetDouble(7),
+                reader.GetDouble(8),
+                templateResolution.OriginalId,
+                templateResolution.State);
         }
 
         List<InventoryItemSaveData> inventory = new();
         using (SqliteCommand command = connection.CreateCommand())
         {
-            command.CommandText =
-                "SELECT i.item_id, i.definition_id, i.quantity, i.durability " +
-                "FROM inventory_items i " +
-                "JOIN containers c ON c.container_id = i.container_id " +
-                "WHERE c.slot_id = $slot_id ORDER BY i.item_id;";
+            command.CommandText = schemaVersion >= 2
+                ? "SELECT i.item_id, i.definition_id, i.original_definition_id, " +
+                  "i.quantity, i.durability FROM inventory_items i " +
+                  "JOIN containers c ON c.container_id = i.container_id " +
+                  "WHERE c.slot_id = $slot_id ORDER BY i.item_id;"
+                : "SELECT i.item_id, i.definition_id, " +
+                  "NULL AS original_definition_id, i.quantity, i.durability " +
+                  "FROM inventory_items i " +
+                  "JOIN containers c ON c.container_id = i.container_id " +
+                  "WHERE c.slot_id = $slot_id ORDER BY i.item_id;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
             {
+                string persistedDefinitionId = reader.GetString(1);
+                string? originalDefinitionId = reader.IsDBNull(2)
+                    ? null
+                    : reader.GetString(2);
+                ContentResolution resolution = ResolveInventoryDefinitionCore(
+                    persistedDefinitionId,
+                    originalDefinitionId);
                 inventory.Add(new InventoryItemSaveData(
                     reader.GetString(0),
-                    reader.GetString(1),
-                    reader.GetInt32(2),
-                    reader.GetDouble(3)));
+                    resolution.EffectiveId,
+                    reader.GetInt32(3),
+                    reader.GetDouble(4),
+                    resolution.OriginalId,
+                    resolution.State));
             }
         }
 

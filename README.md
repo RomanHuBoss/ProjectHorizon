@@ -130,7 +130,7 @@ build: 0 warnings, 0 errors
 src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 ```
 
-### Прототип E. SQLite save, backup и recovery — `IN_PROGRESS`
+### Прототип E. SQLite save, backup, recovery и migration — `IN_PROGRESS`
 
 Текущая стартовая сцена:
 
@@ -138,75 +138,65 @@ src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 src/Game.Client/Scenes/Persistence/SavePrototype.tscn
 ```
 
-SQLite foundation (`TASK-054/TASK-055`) подтверждён пользователем и переведён в
+SQLite foundation (`TASK-054/TASK-055`) и backup/recovery
+(`TASK-056/TASK-057`) подтверждены локальной runtime-приёмкой и имеют статус
 `VERIFIED`:
 
 - `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
 - один slot — одна БД: `user://profiles/profile_prototype/save_1.db`;
-- явная migration `1`;
-- `journal_mode=WAL`, `foreign_keys=ON`, `synchronous=NORMAL`,
-  `busy_timeout=5000`;
-- единственная последовательная очередь записи вне Godot main thread;
-- транзакционный snapshot позиции игрока, корабля, inventory и посещённой планеты;
-- exact round-trip, параметризованный SQL и `PRAGMA integrity_check`;
-- compact/detailed/hidden HUD.
+- обязательные PRAGMA: `journal_mode=WAL`, `foreign_keys=ON`,
+  `synchronous=NORMAL`, `busy_timeout=5000`;
+- последовательная очередь записи вне Godot main thread;
+- транзакционный snapshot игрока, корабля, inventory и посещённой планеты;
+- exact round-trip и `PRAGMA integrity_check`;
+- последняя корректная копия в `save_1.backup.db`;
+- validation backup-кандидата до `File.Replace`;
+- corruption detection, атомарное recovery, quarantine и recovery-log;
+- ручной сценарий `R → S → B → S → Y` подтверждён переходом revision
+  `1 → 2 → 1`, `atomic=1`, `quarantine=1`, при сборке `0/0`.
 
-В `TASK-056` реализована следующая ступень раздела 22.9 PDF-ТЗ:
+В `TASK-058` реализована следующая ступень разделов 22 и 36.3 PDF-ТЗ —
+безопасная migration старого сохранения и обработка неизвестного контента:
 
-- предыдущая корректная копия хранится в
-  `user://profiles/profile_prototype/save_1.backup.db`;
-- backup создаётся SQLite online-backup API и проверяется до установки;
-- существующая backup заменяется только после валидации кандидата через
-  `File.Replace`; некорректный кандидат не уничтожает исправную копию;
-- перед изменением существующего slot автоматически защищается предыдущая
-  ревизия; первая ревизия получает backup после успешной записи;
-- очистка slot сохраняет предыдущую копию;
-- повреждение основной БД определяется по открытию, версии schema и
-  `PRAGMA integrity_check`;
-- при старте повреждённая основная БД автоматически восстанавливается из
-  валидной backup;
-- ручное восстановление сохраняет заменённую основную БД как
-  `save_1.quarantine.last.db`;
-- события corruption/recovery записываются в
-  `user://profiles/profile_prototype/logs/save_1.recovery.log`;
-- тест намеренного повреждения выполняется в изолированной временной БД и не
-  затрагивает основной slot.
-
-После runtime-проверки автоматического `X`-теста исправлен ручной контур:
-
-- служебное обновление snapshot/diagnostics вынесено в отдельную одноразовую
-  задачу и больше не перезапускает само себя;
-- HUD не показывает ложный `Ready` во время refresh: до его завершения состояние
-  равно `Loading`;
-- при старте текущий snapshot загружается автоматически, поэтому следующая
-  ручная revision продолжается от фактической revision в БД;
-- compact HUD сохраняет отдельные результаты `Slot S/L/R`, `Backup B` и
-  `Restore Y`, поэтому последовательность ручной проверки видна на одном экране.
+- текущая schema повышена с `1` до `2`, content version — до `2`;
+- старая БД не изменяется на месте: SQLite online backup создаёт отдельный
+  `*.migration-candidate`;
+- migration выполняется только над кандидатом, после чего проверяются schema,
+  snapshot и `PRAGMA integrity_check`;
+- валидированный кандидат атомарно устанавливается через `File.Replace`;
+- исходная schema-1 БД сохраняется побайтно в
+  `save_1.pre-migration.v1.db` и проверяется по SHA-256;
+- при ошибке предусмотрен rollback основной БД и её WAL/SHM sidecar-файлов;
+- migration-события записываются в
+  `user://profiles/profile_prototype/logs/save_1.migration.log`;
+- legacy alias `resource.iron` преобразуется в `resource.iron_ore`, при этом
+  исходный ID сохраняется;
+- неизвестные item/template ID заменяются безопасными placeholders
+  `content.unknown.item` и `content.unknown.ship`;
+- исходные ID, количество, durability, health и fuel переживают повторный
+  save/load без потери данных;
+- acceptance route использует отдельную `save_1.migration-test.db` и не меняет
+  пользовательский slot.
 
 Управление:
 
 ```text
-S    сохранить изменённый snapshot; предыдущая копия защищается автоматически
+S    сохранить snapshot; предыдущая копия защищается автоматически
 L    загрузить snapshot
 R    очистить slot, сохранив предыдущую копию
 B    создать или обновить валидированный backup
 Y    восстановить предыдущую копию с quarantine текущей БД
-Z    TASK-054 SQLite foundation acceptance test
-X    TASK-056 backup/recovery acceptance test в изолированной БД
+Z    TASK-054 SQLite foundation acceptance
+X    TASK-056 backup/recovery acceptance в изолированной БД
+C    TASK-058 schema migration / unknown-content acceptance в изолированной БД
 H    compact / detailed / hidden HUD
 ```
 
-После каждой команды необходимо дождаться `DB: Ready`. Во время служебного
-обновления HUD кратковременно показывает `DB: Loading`; нажатия в этот момент не
-считаются завершённой операцией. Успех ручных команд фиксируется строками
-`Slot S/L/R: PASS ...`, `Backup B: PASS ...` и `Restore Y: PASS ...`, а также
-дублируется в Godot Output.
-
-`X` создаёт защищённую revision `10`, записывает более новую revision `11`,
-отклоняет намеренно повреждённый backup-кандидат, проверяет неизменность
-исправной backup, повреждает только изолированную основную БД, атомарно
-восстанавливает revision `10`, проверяет обе базы, физическое сохранение заменённой primary в quarantine и наличие recovery-log.
-Runtime-приёмка этой ступени выделена в `TASK-057`.
+После каждой команды необходимо дождаться `DB: Ready`. `C` создаёт schema-1
+fixture с известным item, legacy alias, неизвестным item и удалённым ship
+шаблоном; мигрирует только копию; проверяет неизменность исходника, schema
+`1→2`, alias, два placeholder, сохранность значений, повторный save/load и
+`integrity=ok`. Runtime-приёмка этой ступени выделена в `TASK-059`.
 
 ## Состояние реализации ТЗ
 
@@ -397,12 +387,12 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 
 ### Прототип E. Сохранение — `IN_PROGRESS`
 
-- SQLite foundation и migration — `VERIFIED`;
-- инвентарь, позиция игрока, корабль и посещённая планета — `VERIFIED`;
-- последовательная очередь записи и exact round-trip — `VERIFIED`;
-- валидированная предыдущая backup и атомарная замена — `IMPLEMENTED`;
-- corruption detection, quarantine, error log и recovery — `IMPLEMENTED`;
-- runtime-приёмка backup/recovery — `IN_PROGRESS`.
+- SQLite foundation, snapshot и exact round-trip — `VERIFIED`;
+- последовательная очередь записи — `VERIFIED`;
+- валидированная backup, атомарное recovery и quarantine — `VERIFIED`;
+- copy migration schema `1→2` — `IMPLEMENTED`;
+- alias/placeholder compatibility для неизвестного контента — `IMPLEMENTED`;
+- runtime-приёмка migration/unknown-content — `IN_PROGRESS`.
 
 Переход к основной разработке допускается после принятия всех пяти прототипов.
 

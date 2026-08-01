@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -36,11 +36,73 @@
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
-| E. Сохранение | `IN_PROGRESS` | SQLite foundation подтверждён; автоматический `X`-тест recovery прошёл, но ручная проверка выявила самоперезапускающийся refresh, блокировавший последующие команды; hotfix реализован и требует повторной runtime-приёмки `TASK-057` |
+| E. Сохранение | `IN_PROGRESS` | SQLite foundation и backup/recovery подтверждены runtime; реализована copy migration schema `1→2` с сохранением исходника и безопасной обработкой alias/unknown content; требуется приёмка `TASK-059` |
 
-**Вывод:** `TASK-054` и приёмочная `TASK-055` остаются `VERIFIED`. Для `TASK-056` получены чистая сборка `0/0` и автоматический `X: PASS` (`candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`), однако ручной контур не мог быть принят из-за дефекта служебного refresh. `TASK-056` остаётся `IMPLEMENTED`, `TASK-057` — `IN_PROGRESS` до повторной проверки hotfix.
+**Вывод:** `TASK-054`–`TASK-057`, foundation и backup/recovery требования переведены в `VERIFIED` по чистой сборке и полному ручному сценарию `R → S → B → S → Y` с revision `1→2→1`, `atomic=1`, `quarantine=1`. В текущей итерации реализована `TASK-058`; `TASK-059` остаётся `IN_PROGRESS` до локальной сборки и `C: PASS`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — copy migration и unknown-content compatibility (`TASK-058`)
+
+**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 22.1–22.5, 22.9, 36.1, 36.3 и Прототип E раздела 39 PDF-ТЗ; `TASK-056`–`TASK-059`, `PE-020`–`PE-035`, `PE-ACC-010`–`PE-ACC-026`.
+
+**Синхронизация предыдущей приёмки:**
+
+- hotfix собран локально с `0` предупреждений и `0` ошибок;
+- ручной сценарий полностью выполнен: `R` очистил slot, первое `S` записало revision `1`, `B` сохранила revision `1`, второе `S` записало revision `2`, `Y` восстановила revision `1`;
+- HUD подтвердил `Backup B: PASS rev=1, integrity=ok, atomic=1`;
+- HUD подтвердил `Restore Y: PASS rev=1, atomic=1, quarantine=1`;
+- очередь после каждой операции освобождалась: `pending=0`, `maxConcurrent=1`;
+- пользователь прямо подтвердил: «ВСЁ РАБОТАЕТ!»;
+- `TASK-056`, `TASK-057`, `PE-020`–`PE-025`, `PE-ACC-010`–`PE-ACC-016` → `VERIFIED`.
+
+**Реализовано в `TASK-058`:**
+
+- schema сохранений повышена с `1` до `2`, content version — с `1` до `2`;
+- миграция существующей schema-1 БД выполняется не на исходнике, а на отдельном SQLite online-backup кандидате `*.migration-candidate`;
+- кандидат проходит явную migration chain, WAL checkpoint, schema/snapshot validation и `PRAGMA integrity_check` до установки;
+- установка выполняется через `File.Replace`; byte-identical исходник сохраняется как `save_1.pre-migration.v1.db` и сверяется по SHA-256;
+- rollback восстанавливает primary и WAL/SHM sidecar-файлы даже при сбое до создания backup-файла `File.Replace`;
+- добавлен `logs/save_1.migration.log`;
+- schema 2 хранит `original_definition_id` и `original_template_id`;
+- alias `resource.iron → resource.iron_ore` разрешается детерминированно с сохранением исходного ID;
+- неизвестный item преобразуется в `content.unknown.item`, неизвестный/удалённый шаблон корабля — в `content.unknown.ship`;
+- quantity, durability, health, fuel и исходные content ID сохраняются при повторном save/load;
+- добавлена изолированная acceptance route по клавише `C`: schema-1 fixture, migration `1→2`, неизменность исходника, один alias, два placeholder, шесть точных content-проверок, round-trip и integrity;
+- основной пользовательский slot acceptance-тестом не изменяется.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs.uid`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Recovery.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SavePrototype.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован один функциональный шаг — migration старой schema и compatibility неизвестного контента. Autosave, Save Inspector UI и остальные подсистемы сохранений в эту итерацию не включены.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ визуально проверено на страницах разделов 22, 36.3 и Прототипа E;
+- migration SQL проверен на отдельной SQLite schema-1 fixture;
+- изменённые C#-файлы проверены лексически, по скобкам, строкам, record-конструкторам и nullable-путям;
+- проверены `Game.Client.csproj`, `res://`, сцена, NodePath и отсутствие конфликта клавиши `C`;
+- инфраструктурные migration/DB-файлы не используют Godot API;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому локальная сборка и runtime `C` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-054`–`TASK-057`, `PE-001`, `PE-010`–`PE-025`, `PE-ACC-001`–`PE-ACC-016` → `VERIFIED`;
+- `TASK-058`, `PE-030`–`PE-035` → `IMPLEMENTED`;
+- `TASK-059`, `PE-ACC-020`–`PE-ACC-026` → `IN_PROGRESS`.
+
+**Следующий рекомендуемый шаг:** собрать проект, дождаться `DB: Ready`, нажать `C` и зафиксировать `TASK-058 ... PASS`; затем повторить `X` и `Z` как регрессионные проверки.
 
 ### 2026-08-01 — hotfix ручного контура backup/recovery (`TASK-056/TASK-057`)
 
@@ -1186,7 +1248,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 |---|---|---|---|
 | `PE-001` | Отдельная тестовая сцена сохранений | `VERIFIED` | `Scenes/Persistence/SavePrototype.tscn`; сцена и HUD приняты в `TASK-055` |
 | `PE-010` | SQLite через `Microsoft.Data.Sqlite`, один slot — одна БД | `VERIFIED` | PackageReference `8.0.29`; `user://profiles/profile_prototype/save_1.db` |
-| `PE-011` | Явные migrations и обязательные PRAGMA | `VERIFIED` | schema `1`; WAL, foreign keys, synchronous NORMAL, busy timeout `5000` подтверждены `Z: PASS` |
+| `PE-011` | Явные migrations и обязательные PRAGMA | `VERIFIED` | foundation schema `1` и PRAGMA подтверждены `Z: PASS`; migration chain расширена schema `2`, её runtime-приёмка ведётся в `PE-ACC-021` |
 | `PE-012` | Последовательная очередь записи вне main thread | `VERIFIED` | `writes=8`, `maxConcurrentWriters=1`; Godot API в worker не используется |
 | `PE-013` | Транзакционное сохранение минимального snapshot | `VERIFIED` | player, ship, inventory и visited planet прошли runtime round-trip |
 | `PE-014` | Загрузка и точный round-trip snapshot | `VERIFIED` | revision `2`, inventory `3`, visited `1`, exact comparisons `2` |
@@ -1197,30 +1259,45 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PE-ACC-004` | Игрок, корабль, inventory и planet проходят exact round-trip | `VERIFIED` | exactComparisons=2, revision=2, inventoryRows=3, visitedRows=1 |
 | `PE-ACC-005` | Параллельные submissions сериализуются | `VERIFIED` | queuedWrites=8, maxConcurrentWriters=1 |
 | `PE-ACC-006` | Integrity check и автоматический тест завершаются PASS | `VERIFIED` | `integrity=ok`; `TASK-054 save (Z): PASS` |
-| `PE-020` | Предыдущая корректная копия хранится рядом с slot | `IMPLEMENTED` | `save_1.backup.db`; первая ревизия защищается после записи, последующие — до изменения primary |
-| `PE-021` | Backup-кандидат валидируется до атомарной установки | `IMPLEMENTED` | SQLite online backup, schema/snapshot/integrity validation; `File.Replace`; rollback previous backup |
-| `PE-022` | Единственная исправная backup не уничтожается | `IMPLEMENTED` | Invalid candidate отклоняется до замены; SHA-256 backup сравнивается до/после acceptance route |
-| `PE-023` | Повреждение primary определяется и запускает recovery | `IMPLEMENTED` | Read-only inspection, schema и `PRAGMA integrity_check`; автоматическая проверка при initialize |
-| `PE-024` | Recovery сохраняет заменяемую primary и журналирует событие | `IMPLEMENTED` | Atomic replace, `save_1.quarantine.last.db`, sidecar quarantine, `logs/save_1.recovery.log` |
-| `PE-025` | Ручная диагностика и изолированный recovery acceptance | `IMPLEMENTED` | `B` backup, `Y` restore, `X` isolated corruption/recovery test; основной slot не повреждается |
-| `PE-ACC-010` | Backup/recovery редакция собирается 0/0 | `IN_PROGRESS` | Исходная редакция собрана 0/0; manual-refresh hotfix требует новой локальной сборки |
-| `PE-ACC-011` | Первая и последующая записи создают корректную предыдущую копию | `IN_PROGRESS` | Повторить после hotfix: `S rev=1 → B rev=1 → S rev=2 → Y rev=1`; прежний ручной прогон блокировался refresh-loop |
-| `PE-ACC-012` | Повреждённый backup-кандидат отклоняется без изменения исправной backup | `IN_PROGRESS` | `candidateRejected=1`, `backupPreserved=1` |
-| `PE-ACC-013` | Повреждение основной БД определяется | `IN_PROGRESS` | `corruptionDetected=1`; test повреждает только isolated database |
-| `PE-ACC-014` | Валидная backup атомарно восстанавливает предыдущую ревизию | `IN_PROGRESS` | protected=10, newer=11, recovered=10, `atomicReplace=1`, exactComparisons=2 |
-| `PE-ACC-015` | Backup остаётся исправной, primary помещается в quarantine, log записан | `IN_PROGRESS` | primaryIntegrity=ok, backupIntegrity=ok, `quarantinePreserved=1`, `logWritten=1`; backup SHA неизменна |
-| `PE-ACC-016` | Автоматический `X`-тест завершается PASS и foundation не регрессирует | `IN_PROGRESS` | Исходная редакция дала `TASK-056 recovery (X): PASS`; после hotfix требуется повторить `X` и затем `Z: PASS` |
+| `PE-020` | Предыдущая корректная копия хранится рядом с slot | `VERIFIED` | `save_1.backup.db`; ручной сценарий подтвердил revision `1→2→1` |
+| `PE-021` | Backup-кандидат валидируется до атомарной установки | `VERIFIED` | `Backup B: PASS rev=1, integrity=ok, atomic=1`; invalid candidate отдельно отклонён `X`-тестом |
+| `PE-022` | Единственная исправная backup не уничтожается | `VERIFIED` | `candidateRejected=1`, `backupPreserved=1`; SHA-256 неизменна |
+| `PE-023` | Повреждение primary определяется и запускает recovery | `VERIFIED` | `corruptionDetected=1`; основной slot тестом не повреждался |
+| `PE-024` | Recovery сохраняет заменяемую primary и журналирует событие | `VERIFIED` | `Restore Y: PASS rev=1, atomic=1, quarantine=1`; recovery-log подтверждён acceptance route |
+| `PE-025` | Ручная диагностика и изолированный recovery acceptance | `VERIFIED` | `R/S/B/S/Y` выполнены последовательно; `X: PASS`; `pending=0`, `maxConcurrent=1` |
+| `PE-ACC-010` | Backup/recovery редакция собирается 0/0 | `VERIFIED` | Локальная сборка hotfix: `0` предупреждений, `0` ошибок |
+| `PE-ACC-011` | Первая и последующая записи создают корректную предыдущую копию | `VERIFIED` | `R → S rev=1 → B rev=1 → S rev=2 → Y rev=1` |
+| `PE-ACC-012` | Повреждённый backup-кандидат отклоняется без изменения исправной backup | `VERIFIED` | `candidateRejected=1`, `backupPreserved=1` |
+| `PE-ACC-013` | Повреждение основной БД определяется | `VERIFIED` | `corruptionDetected=1`; test использует isolated database |
+| `PE-ACC-014` | Валидная backup атомарно восстанавливает предыдущую ревизию | `VERIFIED` | protected=10, newer=11, recovered=10, `atomicReplace=1`, exactComparisons=2 |
+| `PE-ACC-015` | Backup остаётся исправной, primary помещается в quarantine, log записан | `VERIFIED` | primary/backup `integrity=ok`, `quarantinePreserved=1`, `logWritten=1` |
+| `PE-ACC-016` | Автоматический `X`-тест завершается PASS и ручной контур не блокируется | `VERIFIED` | `X: PASS`; затем пользователь подтвердил полный manual workflow: «ВСЁ РАБОТАЕТ!» |
+| `PE-030` | Schema-1 save мигрируется только на отдельной копии | `IMPLEMENTED` | SQLite online backup в `*.migration-candidate`; исходник не изменяется до validation |
+| `PE-031` | Валидированный migration-кандидат устанавливается атомарно | `IMPLEMENTED` | schema/snapshot/integrity validation; `File.Replace`; rollback primary и sidecars |
+| `PE-032` | Исходная старая БД сохраняется без изменения | `IMPLEMENTED` | `save_1.pre-migration.v1.db`; SHA-256 source/preserved обязаны совпасть |
+| `PE-033` | Legacy alias и неизвестные content ID обрабатываются безопасно | `IMPLEMENTED` | `resource.iron→resource.iron_ore`; placeholders `content.unknown.item/ship` |
+| `PE-034` | Исходные ID и gameplay-значения переживают повторный save/load | `IMPLEMENTED` | schema 2: `original_definition_id`, `original_template_id`; quantity/durability/health/fuel сохраняются |
+| `PE-035` | Migration диагностируется и имеет изолированную acceptance route | `IMPLEMENTED` | `logs/save_1.migration.log`; клавиша `C`; отдельная `save_1.migration-test.db` |
+| `PE-ACC-020` | Migration-редакция собирается 0/0 | `IN_PROGRESS` | Требуется локальная сборка текущего архива |
+| `PE-ACC-021` | Schema-1 fixture мигрируется в schema 2, исходник сохранён | `IN_PROGRESS` | Ожидается `fromSchema=1`, `toSchema=2`, `sourcePreserved=1`, `sourceHashUnchanged=1` |
+| `PE-ACC-022` | Migration-кандидат установлен атомарно и целостен | `IN_PROGRESS` | Ожидается `atomicReplace=1`, `integrity=ok` |
+| `PE-ACC-023` | Alias разрешён с сохранением исходного ID | `IN_PROGRESS` | Ожидается `aliases=1`, `aliasResolved=1` |
+| `PE-ACC-024` | Unknown item и удалённый ship template заменены placeholders без потери значений | `IN_PROGRESS` | Ожидается `placeholders=2`, `unknownItemPreserved=1`, `unknownShipPreserved=1` |
+| `PE-ACC-025` | Повторный save/load сохраняет compatibility metadata | `IN_PROGRESS` | Ожидается `roundTripPreserved=1`, `exactContentChecks=6` |
+| `PE-ACC-026` | `C` завершается PASS, `X` и `Z` не регрессируют | `IN_PROGRESS` | Требуются полные строки Output для `C`, затем `X` и `Z` |
 
 ### 8.4. Оставшаяся часть Прототипа E
 
 | Подсистема | Статус |
 |---|---|
 | SQLite foundation и exact round-trip | `VERIFIED` |
-| Backup и атомарная замена | `IMPLEMENTED` |
-| Проверка повреждённой основной БД | `IMPLEMENTED` |
-| Recovery из последней корректной backup | `IMPLEMENTED` |
-| Runtime-приёмка backup/recovery | `IN_PROGRESS` |
-| Миграция старой версии и unknown content | `NOT_STARTED` |
+| Backup и атомарная замена | `VERIFIED` |
+| Проверка повреждённой основной БД | `VERIFIED` |
+| Recovery из последней корректной backup | `VERIFIED` |
+| Runtime-приёмка backup/recovery | `VERIFIED` |
+| Copy migration schema `1→2` | `IMPLEMENTED` |
+| Alias/placeholder compatibility неизвестного контента | `IMPLEMENTED` |
+| Runtime-приёмка migration/unknown-content | `IN_PROGRESS` |
 
 Основная разработка вертикального среза не начинается до приёмки всех пяти прототипов.
 
@@ -1228,62 +1305,78 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-055`; Прототипы A, B, C и D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-057`; Прототипы A, B, C и D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-057` | Повторить runtime-приёмку backup/recovery после hotfix | Чистая сборка; последовательные `R/S/B/S/Y` без блокировки; revision `1→2→1`; отдельные HUD `PASS`; затем `X: PASS` и `Z: PASS` |
-| 2 | `TASK-058` | Реализовать migration старой версии и unknown content | Миграция копии без разрушения исходника; безопасная обработка неизвестных item/content ID |
-| 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
+| 1 | `TASK-059` | Выполнить runtime-приёмку migration/unknown-content | Чистая сборка; `C: PASS`; schema `1→2`; исходник неизменён; alias `1`; placeholders `2`; round-trip; `integrity=ok`; затем `X: PASS` и `Z: PASS` |
+| 2 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-054`, `TASK-055`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006`.  
-**Реализовано:** `TASK-056`, `PE-020`–`PE-025`.  
-**Текущая приёмочная задача:** `TASK-057`.
+**Подтверждено в этой итерации:** `TASK-056`, `TASK-057`, `PE-020`–`PE-025`, `PE-ACC-010`–`PE-ACC-016`.  
+**Реализовано:** `TASK-058`, `PE-030`–`PE-035`.  
+**Текущая приёмочная задача:** `TASK-059`.
 
-## 10. Runtime-приёмка `TASK-056/TASK-057`
+## 10. Runtime-приёмка `TASK-058/TASK-059`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену и дождаться `DB: Ready`. На старте существующий snapshot должен загрузиться автоматически; кратковременное `DB: Loading` допустимо только во время одноразового refresh.
-3. Нажать `R` и дождаться одновременно `DB: Ready` и `Slot S/L/R: PASS reset; slot пуст`. Счётчик `writes` должен увеличиться.
-4. Нажать `S`, дождаться `Slot S/L/R: PASS save rev=1`; snapshot должен показать revision `1`.
-5. Нажать `B`, дождаться `Backup B: PASS rev=1, integrity=ok`. В Output требуется строка `Prototype E validated backup PASS` с непустым SHA-256.
-6. Нажать `S` повторно. Требуется `Slot S/L/R: PASS save rev=2`, primary revision `2`, backup revision `1`.
-7. Нажать `Y`. На одном compact HUD должны одновременно сохраниться:
+2. Запустить стартовую сцену и дождаться `DB: Ready`. Для существующего пользовательского slot автоматическая migration может кратковременно показать `DB: Loading`; после завершения schema в HUD должна быть `2`.
+3. Нажать `C` один раз и не использовать другие клавиши до завершения. Тест работает с отдельной `save_1.migration-test.db` и не меняет основной slot.
+4. Ожидаемый compact HUD:
 
 ```text
-Slot S/L/R: PASS save rev=2
-Backup B: PASS rev=1, integrity=ok, atomic=<0|1>
-Restore Y: PASS rev=1, atomic=1, quarantine=1
+TASK-058 migration (C): PASS 1→2, source=1, aliases=1, unknown=2, roundTrip=1
 ```
 
-Snapshot после восстановления должен иметь revision `1`; в Output требуется `primaryIntegrity=ok`, `backupIntegrity=ok`, `atomicReplace=1` и непустой путь quarantine. После каждого шага состояние должно возвращаться в `DB: Ready`, а следующая команда должна приниматься без перезапуска сцены.
-8. Нажать `X` и не использовать управление до завершения. Ожидаемый HUD:
+5. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-056 recovery (X): PASS rev=10,
-candidateRejected=1, backupPreserved=1, atomic=1, quarantine=1
+TASK-058 SQLite migration/content acceptance PASS:
+fromSchema=1; toSchema=2; fromContent=1; toContent=2;
+sourcePreserved=1; sourceHashUnchanged=1; atomicReplace=1;
+aliases=1; placeholders=2; aliasResolved=1;
+unknownItemPreserved=1; unknownShipPreserved=1;
+roundTripPreserved=1; exactContentChecks=6;
+integrity=ok; elapsedMs=<время>;
+result=copy migration preserved the legacy source and resolved unknown content safely
 ```
 
-9. Ожидаемая итоговая строка Godot Output:
+6. Полный `PASS` требует одновременно:
+   - schema `1→2`, content version `1→2`;
+   - `sourcePreserved=1` и `sourceHashUnchanged=1`;
+   - `atomicReplace=1`, `integrity=ok`;
+   - `aliases=1`, `aliasResolved=1`;
+   - `placeholders=2`;
+   - `unknownItemPreserved=1`, `unknownShipPreserved=1`;
+   - `roundTripPreserved=1`, `exactContentChecks=6`.
+7. После `C: PASS` нажать `X` и дождаться прежнего `TASK-056 recovery (X): PASS`, затем нажать `Z` и дождаться `TASK-054 save (Z): PASS`. Это обязательная проверка отсутствия регрессии backup/recovery и foundation после повышения schema.
+8. В качестве доказательства прислать screenshot compact HUD после `C`, полную строку Output для `C`, итог сборки и строки `X: PASS`/`Z: PASS`.
+9. При `FAIL` прислать финальный HUD и последние 60 строк Godot Output. Если ошибка возникла при автоматической migration реального slot, дополнительно указать наличие файлов:
 
 ```text
-TASK-056 SQLite backup/recovery acceptance PASS:
-protectedRevision=10; newerRevision=11; recoveredRevision=10;
-primaryIntegrity=ok; backupIntegrity=ok;
-candidateRejected=1; backupPreserved=1; corruptionDetected=1;
-atomicReplace=1; quarantinePreserved=1; logWritten=1; exactComparisons=2;
-elapsedMs=<время>; result=previous-copy backup survived rejection and restored the corrupted primary
+save_1.db
+save_1.pre-migration.v1.db
+save_1.migration-candidate
+save_1.migration-failed
+logs/save_1.migration.log
 ```
-
-10. После `X: PASS` нажать `Z`. Foundation acceptance должна снова показать `PASS`.
-11. Полный `PASS` требует: сборку 0/0; отсутствие бесконечного refresh; принятие всех последовательных ручных команд; revision `1→2→1`; отдельные `PASS`-строки slot/backup/restore; изменение `writes` после каждой write-операции; `X: PASS`; `Z: PASS`; обе `integrity_check=ok`; quarantine и recovery-log существуют.
-12. В качестве доказательства прислать один screenshot после `Y`, один screenshot после `X`, полные строки Output для `B`, `Y`, `X` и `Z`, а также итоговое значение `writes`.
-13. При `FAIL` прислать финальный HUD, последние 50 строк Output и указать, после какой клавиши перестали меняться `DB`, `writes`, revision или одна из трёх manual status-строк.
-
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-058`, copy migration и unknown-content compatibility
+
+**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`  
+**Git SHA:** отсутствует в архиве
+
+**Принятое runtime-доказательство предыдущей ступени:** hotfix собран `0/0`; последовательность `R → S → B → S → Y` завершилась без блокировки; revision прошла `1→2→1`; backup показала `integrity=ok`, `atomic=1`; restore показал `atomic=1`, `quarantine=1`; пользователь подтвердил полную работоспособность. `TASK-056/TASK-057` и связанные требования переведены в `VERIFIED`.
+
+**Изменения:** добавлена schema 2 и отдельный `SaveDatabase.Migration.cs`; schema-1 БД копируется SQLite online-backup API, мигрируется и валидируется отдельно, затем атомарно заменяет primary, а byte-identical исходник сохраняется с SHA-256. Добавлены alias resolution, placeholders для неизвестного item и удалённого ship template, хранение original IDs, migration-log и изолированный `C`-тест с повторным save/load.
+
+**Статические проверки:** PDF-ТЗ визуально проверено; migration SQL выполнен на отдельной SQLite fixture; проверены C#-лексика, record-конструкторы, nullable-пути, XML проекта, сцена, NodePath, `res://`, горячая клавиша `C` и отсутствие Godot API в persistence infrastructure. В среде подготовки нет .NET SDK/Godot, поэтому текущая сборка и runtime не заявляются.
+
+**Статусы:** `TASK-058`, `PE-030`–`PE-035` → `IMPLEMENTED`; `TASK-059`, `PE-ACC-020`–`PE-ACC-026` → `IN_PROGRESS`.
 
 ### 2026-08-01 — hotfix блокировки последовательных manual-команд `TASK-057`
 

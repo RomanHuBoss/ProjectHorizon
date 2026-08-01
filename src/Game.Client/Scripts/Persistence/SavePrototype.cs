@@ -33,7 +33,7 @@ public partial class SavePrototype : Node3D
     public float HudCompactWidth { get; set; } = 720.0f;
 
     [Export(PropertyHint.Range, "180.0,500.0,10.0")]
-    public float HudCompactHeight { get; set; } = 400.0f;
+    public float HudCompactHeight { get; set; } = 450.0f;
 
     [Export(PropertyHint.Range, "520.0,1200.0,10.0")]
     public float HudDetailedWidth { get; set; } = 820.0f;
@@ -51,6 +51,7 @@ public partial class SavePrototype : Node3D
     private Task<SaveBackupReport>? _backupTask;
     private Task<SaveRecoveryReport>? _recoveryTask;
     private Task<SaveRecoveryAcceptanceReport>? _recoveryAcceptanceTask;
+    private Task<SaveMigrationAcceptanceReport>? _migrationAcceptanceTask;
     private SavePrototypeState _state = SavePrototypeState.Initializing;
     private SavePrototypeHudMode _hudMode = SavePrototypeHudMode.Compact;
     private SaveGameSnapshot? _loadedSnapshot;
@@ -59,6 +60,7 @@ public partial class SavePrototype : Node3D
     private SaveBackupReport? _backupReport;
     private SaveRecoveryReport? _recoveryReport;
     private SaveRecoveryAcceptanceReport? _recoveryAcceptanceReport;
+    private SaveMigrationAcceptanceReport? _migrationAcceptanceReport;
     private int _manualRevision;
     private string _statusMessage = "инициализация SQLite";
     private string _slotOperationHud = "READY";
@@ -116,8 +118,8 @@ public partial class SavePrototype : Node3D
         ApplyHudMode();
         UpdateHud();
         GD.Print(
-            "Prototype E SQLite backup/recovery initializing. " +
-            "Press Z for foundation acceptance or X for recovery acceptance after READY.");
+            "Prototype E SQLite migration/backup/recovery initializing. " +
+            "Press C for migration/content compatibility acceptance after READY.");
     }
 
     public override void _ExitTree()
@@ -142,6 +144,7 @@ public partial class SavePrototype : Node3D
         PollBackupTask();
         PollRecoveryTask();
         PollRecoveryAcceptanceTask();
+        PollMigrationAcceptanceTask();
         PollRefreshTask();
         UpdateHud();
     }
@@ -197,6 +200,11 @@ public partial class SavePrototype : Node3D
             BeginRestoreBackup();
             GetViewport().SetInputAsHandled();
         }
+        else if (Matches(physical, logical, Key.C))
+        {
+            BeginMigrationAcceptanceTest();
+            GetViewport().SetInputAsHandled();
+        }
         else if (Matches(physical, logical, Key.X))
         {
             BeginRecoveryAcceptanceTest();
@@ -219,7 +227,8 @@ public partial class SavePrototype : Node3D
             _acceptanceTask is null &&
             _backupTask is null &&
             _recoveryTask is null &&
-            _recoveryAcceptanceTask is null;
+            _recoveryAcceptanceTask is null &&
+            _migrationAcceptanceTask is null;
     }
 
     private void BeginManualSave()
@@ -346,6 +355,23 @@ public partial class SavePrototype : Node3D
             SlotId,
             _lifetimeCancellation.Token);
         GD.Print("TASK-056 SQLite backup/recovery acceptance started.");
+    }
+
+    private void BeginMigrationAcceptanceTest()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SavePrototypeState.Testing;
+        _statusMessage =
+            "isolated schema-1 copy → schema-2 migration → aliases/placeholders → round-trip";
+        _migrationAcceptanceReport = null;
+        _migrationAcceptanceTask = _database.RunMigrationAcceptanceAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+        GD.Print("TASK-058 SQLite migration/content compatibility acceptance started.");
     }
 
     private void PollInitializeTask()
@@ -611,6 +637,43 @@ public partial class SavePrototype : Node3D
         }
     }
 
+    private void PollMigrationAcceptanceTask()
+    {
+        if (_migrationAcceptanceTask is null ||
+            !_migrationAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveMigrationAcceptanceReport> task = _migrationAcceptanceTask;
+        _migrationAcceptanceTask = null;
+        try
+        {
+            _migrationAcceptanceReport = task.GetAwaiter().GetResult();
+            _state = _migrationAcceptanceReport.Passed
+                ? SavePrototypeState.Passed
+                : SavePrototypeState.Failed;
+            _statusMessage = _migrationAcceptanceReport.Result;
+            string output = BuildMigrationAcceptanceOutput(
+                _migrationAcceptanceReport);
+            if (_migrationAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"migration test failed: {exception.Message}";
+            GD.PushError(
+                $"TASK-058 SQLite migration/content acceptance failed: {exception}");
+        }
+    }
+
     private void BeginRefresh(
         string completionMessage,
         SavePrototypeState completionState)
@@ -619,7 +682,8 @@ public partial class SavePrototype : Node3D
             _loadTask is not null ||
             _writeTask is not null || _acceptanceTask is not null ||
             _backupTask is not null || _recoveryTask is not null ||
-            _recoveryAcceptanceTask is not null)
+            _recoveryAcceptanceTask is not null ||
+            _migrationAcceptanceTask is not null)
         {
             return;
         }
@@ -741,9 +805,10 @@ public partial class SavePrototype : Node3D
               $"planet visits={_loadedSnapshot.VisitedPlanet.VisitCount}";
         string acceptanceLine = BuildAcceptanceHudLine();
         string recoveryAcceptanceLine = BuildRecoveryAcceptanceHudLine();
+        string migrationAcceptanceLine = BuildMigrationAcceptanceHudLine();
 
         _compactLabel.Text =
-            "ПРОТОТИП E — SQLITE BACKUP / RECOVERY • H — HUD\n" +
+            "ПРОТОТИП E — SQLITE MIGRATION / RECOVERY • H — HUD\n" +
             $"DB: {_state} • schema={diagnostics.SchemaVersion} • " +
             $"WAL={diagnostics.JournalMode} • FK={(diagnostics.ForeignKeysEnabled ? "ON" : "OFF")}\n" +
             $"Queue: pending={_database?.QueuedWrites ?? 0} • " +
@@ -752,16 +817,17 @@ public partial class SavePrototype : Node3D
             snapshotLine + "\n" +
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
+            migrationAcceptanceLine + "\n" +
             $"Slot S/L/R: {_slotOperationHud}\n" +
             $"Backup B: {_backupOperationHud}\n" +
             $"Restore Y: {_recoveryOperationHud}\n" +
             $"Backup: {(diagnostics.BackupExists ? "есть" : "нет")} • " +
             $"integrity={diagnostics.BackupIntegrityResult} • " +
             $"bytes={diagnostics.BackupBytes}\n" +
-            "S/L/R — slot • B — backup • Y — restore • Z — save test • X — recovery test";
+            "S/L/R — slot • B/Y — backup/restore • Z/X/C — acceptance tests";
 
         _detailedLabel.Text =
-            "ПРОТОТИП E — SQLITE / BACKUP / ATOMIC RECOVERY\n" +
+            "ПРОТОТИП E — SQLITE / COPY MIGRATION / ATOMIC RECOVERY\n" +
             "HUD: подробный • H — compact/hidden • колесо — прокрутка\n\n" +
             $"State: {_state}\n" +
             $"Message: {_statusMessage}\n" +
@@ -778,6 +844,7 @@ public partial class SavePrototype : Node3D
             $"Backup bytes: {diagnostics.BackupBytes}\n" +
             $"Backup integrity: {diagnostics.BackupIntegrityResult}\n" +
             $"Recovery log: {_database?.RecoveryLogPath ?? "—"}\n" +
+            $"Migration log: {_database?.MigrationLogPath ?? "—"}\n" +
             $"Inventory rows: {diagnostics.InventoryRows}\n" +
             $"Visited planet rows: {diagnostics.VisitedPlanetRows}\n" +
             $"Queued writes: {_database?.QueuedWrites ?? 0}\n" +
@@ -787,6 +854,7 @@ public partial class SavePrototype : Node3D
             BuildSnapshotDetails() + "\n\n" +
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
+            migrationAcceptanceLine + "\n" +
             $"Slot S/L/R: {_slotOperationHud}\n" +
             $"Backup B: {_backupOperationHud}\n" +
             $"Restore Y: {_recoveryOperationHud}\n" +
@@ -795,7 +863,11 @@ public partial class SavePrototype : Node3D
             "8 concurrent submissions through a single writer gate, integrity_check.\n" +
             "Recovery acceptance uses an isolated database: protected revision 10, " +
             "newer primary revision 11, rejected invalid backup candidate, intentional " +
-            "primary corruption, atomic replacement, quarantine and exact rollback.\n\n" +
+            "primary corruption, atomic replacement, quarantine and exact rollback.\n" +
+            "Migration acceptance creates an isolated schema-1 save, migrates only a " +
+            "validated copy to schema 2, preserves the byte-identical source, resolves a " +
+            "legacy alias and substitutes placeholders for removed item/ship IDs while " +
+            "retaining their original IDs and gameplay values through a second save/load.\n\n" +
             "S — сохранить snapshot; предыдущая копия защищается автоматически\n" +
             "L — загрузить snapshot\n" +
             "R — очистить slot, сохранив предыдущую копию\n" +
@@ -803,6 +875,7 @@ public partial class SavePrototype : Node3D
             "Y — восстановить предыдущую копию с quarantine текущей БД\n" +
             "Z — TASK-054 foundation acceptance\n" +
             "X — TASK-056 backup/recovery acceptance\n" +
+            "C — TASK-058 migration/unknown-content acceptance\n" +
             "H — compact / detailed / hidden";
     }
 
@@ -845,6 +918,53 @@ public partial class SavePrototype : Node3D
               $"atomic={(_recoveryAcceptanceReport.AtomicReplacementUsed ? 1 : 0)}, " +
               $"quarantine={(_recoveryAcceptanceReport.QuarantinePreserved ? 1 : 0)}"
             : $"TASK-056 recovery (X): FAIL — {_recoveryAcceptanceReport.Result}";
+    }
+
+    private string BuildMigrationAcceptanceHudLine()
+    {
+        if (_migrationAcceptanceTask is not null)
+        {
+            return "TASK-058 migration (C): RUNNING schema-1 copy/content compatibility";
+        }
+
+        if (_migrationAcceptanceReport is null)
+        {
+            return "TASK-058 migration (C): READY";
+        }
+
+        SaveMigrationReport migration = _migrationAcceptanceReport.Migration;
+        return _migrationAcceptanceReport.Passed
+            ? $"TASK-058 migration (C): PASS {migration.FromSchemaVersion}→" +
+              $"{migration.ToSchemaVersion}, source=1, aliases={migration.AliasedReferences}, " +
+              $"unknown={migration.PlaceholderReferences}, roundTrip=1"
+            : $"TASK-058 migration (C): FAIL — {_migrationAcceptanceReport.Result}";
+    }
+
+    private static string BuildMigrationAcceptanceOutput(
+        SaveMigrationAcceptanceReport report)
+    {
+        SaveMigrationReport migration = report.Migration;
+        string prefix = report.Passed
+            ? "TASK-058 SQLite migration/content acceptance PASS"
+            : "TASK-058 SQLite migration/content acceptance FAIL";
+        return prefix +
+            $": fromSchema={migration.FromSchemaVersion}; " +
+            $"toSchema={migration.ToSchemaVersion}; " +
+            $"fromContent={migration.FromContentVersion}; " +
+            $"toContent={migration.ToContentVersion}; " +
+            $"sourcePreserved={(migration.SourcePreserved ? 1 : 0)}; " +
+            $"sourceHashUnchanged={(report.LegacySourceUnchanged ? 1 : 0)}; " +
+            $"atomicReplace={(migration.AtomicReplacementUsed ? 1 : 0)}; " +
+            $"aliases={migration.AliasedReferences}; " +
+            $"placeholders={migration.PlaceholderReferences}; " +
+            $"aliasResolved={(report.AliasResolved ? 1 : 0)}; " +
+            $"unknownItemPreserved={(report.UnknownItemPreserved ? 1 : 0)}; " +
+            $"unknownShipPreserved={(report.UnknownShipPreserved ? 1 : 0)}; " +
+            $"roundTripPreserved={(report.RoundTripPreserved ? 1 : 0)}; " +
+            $"exactContentChecks={report.ExactContentChecks}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; elapsedMs=" +
+            report.ElapsedMilliseconds.ToString("F2", CultureInfo.InvariantCulture) +
+            $"; result={report.Result}";
     }
 
     private static string BuildBackupOutput(SaveBackupReport report)

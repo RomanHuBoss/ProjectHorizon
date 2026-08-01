@@ -50,8 +50,7 @@ public sealed partial class SaveDatabase
         return EnqueueWriteAsync(
             () =>
             {
-                EnsureParentDirectory();
-                RecoverPrimaryIfCorruptCore(slotId);
+                PrepareDatabaseCore(slotId);
                 using SqliteConnection connection = OpenConnection();
                 ApplyMigrations(connection);
                 if (!TryLoadSnapshotCore(connection, slotId, out SaveGameSnapshot? snapshot) ||
@@ -644,7 +643,7 @@ public sealed partial class SaveDatabase
             SaveGameSnapshot? snapshot = null;
             if (!string.IsNullOrWhiteSpace(slotId))
             {
-                snapshot = LoadSnapshotCore(connection, slotId);
+                snapshot = LoadSnapshotCore(connection, slotId, schemaVersion);
                 if (requireSnapshot && snapshot is null)
                 {
                     return new SaveFileInspection(
@@ -833,6 +832,8 @@ public sealed partial class SaveDatabase
         DeleteFileFamilyCore(BackupFailedPath);
         DeleteFileFamilyCore(RecoveryCandidatePath);
         DeleteFileFamilyCore(RecoveryQuarantinePath);
+        DeleteMigrationArtifactsCore();
+        DeleteIfExistsCore(MigrationLogPath);
     }
 
     private void DeleteFileFamilyCore(string path)

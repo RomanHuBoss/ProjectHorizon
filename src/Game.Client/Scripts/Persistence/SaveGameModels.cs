@@ -1,6 +1,13 @@
 using System;
 using System.Collections.Generic;
 
+public enum ContentResolutionState
+{
+    Known = 0,
+    Aliased = 1,
+    Placeholder = 2
+}
+
 public sealed record PlayerSaveData(
     string PlayerId,
     double PositionX,
@@ -16,13 +23,17 @@ public sealed record ShipSaveData(
     double Fuel,
     double PositionX,
     double PositionY,
-    double PositionZ);
+    double PositionZ,
+    string OriginalTemplateId = "",
+    ContentResolutionState TemplateResolution = ContentResolutionState.Known);
 
 public sealed record InventoryItemSaveData(
     string ItemId,
     string DefinitionId,
     int Quantity,
-    double Durability);
+    double Durability,
+    string OriginalDefinitionId = "",
+    ContentResolutionState Resolution = ContentResolutionState.Known);
 
 public sealed record VisitedPlanetSaveData(
     string PlanetId,
@@ -67,7 +78,6 @@ public sealed record SavePrototypeAcceptanceReport(
     int ExactComparisons,
     double ElapsedMilliseconds);
 
-
 public sealed record SaveBackupReport(
     bool Succeeded,
     string Result,
@@ -106,4 +116,35 @@ public sealed record SaveRecoveryAcceptanceReport(
     int ExactComparisons,
     string BackupSha256Before,
     string BackupSha256After,
+    double ElapsedMilliseconds);
+
+public sealed record SaveMigrationReport(
+    bool Migrated,
+    bool Succeeded,
+    string Result,
+    int FromSchemaVersion,
+    int ToSchemaVersion,
+    int FromContentVersion,
+    int ToContentVersion,
+    string PreservedSourcePath,
+    bool SourcePreserved,
+    bool AtomicReplacementUsed,
+    int AliasedReferences,
+    int PlaceholderReferences,
+    string SourceSha256,
+    string PreservedSha256,
+    double ElapsedMilliseconds);
+
+public sealed record SaveMigrationAcceptanceReport(
+    bool Passed,
+    string Result,
+    SaveGameSnapshot? LoadedSnapshot,
+    SaveDatabaseDiagnostics Diagnostics,
+    SaveMigrationReport Migration,
+    bool LegacySourceUnchanged,
+    bool AliasResolved,
+    bool UnknownItemPreserved,
+    bool UnknownShipPreserved,
+    bool RoundTripPreserved,
+    int ExactContentChecks,
     double ElapsedMilliseconds);
