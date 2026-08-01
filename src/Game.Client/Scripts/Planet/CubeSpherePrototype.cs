@@ -8,6 +8,12 @@ public enum CubeSphereDebugMode
     RadialNormals = 1
 }
 
+public enum CubeSphereCameraMode
+{
+    PlanetaryPlayer = 0,
+    OverviewOrbit = 1
+}
+
 public partial class CubeSpherePrototype : Node3D
 {
     [Export(PropertyHint.Range, "3,257,2")]
@@ -36,28 +42,47 @@ public partial class CubeSpherePrototype : Node3D
     private Node3D? _facesRoot;
     private StaticBody3D? _collisionBody;
     private Node3D? _cameraRig;
+    private Camera3D? _overviewCamera;
+    private PlanetaryPlayerController? _planetaryPlayer;
     private Label? _hudLabel;
     private CubeSphereBuildData? _buildData;
     private CubeSphereDebugMode _debugMode = CubeSphereDebugMode.FaceIds;
+    private CubeSphereCameraMode _cameraMode =
+        CubeSphereCameraMode.PlanetaryPlayer;
     private bool _orbitPaused;
+    private double _hudRefreshAccumulator;
 
     public override void _Ready()
     {
         _facesRoot = GetNode<Node3D>("Planet/Faces");
         _collisionBody = GetNode<StaticBody3D>("Planet/CollisionBody");
         _cameraRig = GetNode<Node3D>("CameraRig");
-        _hudLabel = GetNode<Label>("Hud/MarginContainer/PanelContainer/Label");
+        _overviewCamera = GetNode<Camera3D>("CameraRig/Camera3D");
+        _planetaryPlayer = GetNode<PlanetaryPlayerController>(
+            "PlanetaryPlayer");
+        _hudLabel = GetNode<Label>(
+            "Hud/MarginContainer/PanelContainer/Label");
 
         BuildPlanet();
+        ApplyCameraMode();
         UpdateHud();
     }
 
     public override void _Process(double delta)
     {
-        if (!_orbitPaused && _cameraRig is not null)
+        if (_cameraMode == CubeSphereCameraMode.OverviewOrbit &&
+            !_orbitPaused &&
+            _cameraRig is not null)
         {
             _cameraRig.RotateY(
                 Mathf.DegToRad(OrbitDegreesPerSecond) * (float)delta);
+        }
+
+        _hudRefreshAccumulator += delta;
+        if (_hudRefreshAccumulator >= 0.1)
+        {
+            _hudRefreshAccumulator = 0.0;
+            UpdateHud();
         }
     }
 
@@ -79,7 +104,17 @@ public partial class CubeSpherePrototype : Node3D
             UpdateHud();
             GetViewport().SetInputAsHandled();
         }
-        else if (keyEvent.Keycode == Key.Space)
+        else if (keyEvent.Keycode == Key.F2)
+        {
+            _cameraMode = _cameraMode == CubeSphereCameraMode.PlanetaryPlayer
+                ? CubeSphereCameraMode.OverviewOrbit
+                : CubeSphereCameraMode.PlanetaryPlayer;
+            ApplyCameraMode();
+            UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (keyEvent.Keycode == Key.Space &&
+            _cameraMode == CubeSphereCameraMode.OverviewOrbit)
         {
             _orbitPaused = !_orbitPaused;
             UpdateHud();
@@ -143,6 +178,23 @@ public partial class CubeSpherePrototype : Node3D
             $"maxSeamPositionError={_buildData.MaximumSeamPositionError:E3}; " +
             $"maxSeamNormalError={_buildData.MaximumSeamNormalError:E3}; " +
             $"build={elapsedMilliseconds:F2} ms");
+    }
+
+    private void ApplyCameraMode()
+    {
+        if (_overviewCamera is null || _planetaryPlayer is null)
+        {
+            return;
+        }
+
+        bool playerMode =
+            _cameraMode == CubeSphereCameraMode.PlanetaryPlayer;
+        _overviewCamera.Current = !playerMode;
+        _planetaryPlayer.SetControlEnabled(playerMode);
+
+        GD.Print(
+            "CubeSphere camera mode: " +
+            (playerMode ? "planetary player" : "overview orbit"));
     }
 
     private void RebuildVisualMeshes()
@@ -246,18 +298,43 @@ public partial class CubeSpherePrototype : Node3D
             _buildData.MaximumSeamNormalError <= 0.0001f;
         string seamStatus = seamPass ? "PASS" : "FAIL";
 
+        string playerStatus = "игрок не найден";
+        string radialStatus = "N/A";
+        if (_planetaryPlayer is not null)
+        {
+            bool radialPass =
+                _planetaryPlayer.UpAlignmentErrorDegrees <= 1.0f &&
+                _planetaryPlayer.GravityDirection.Dot(
+                    -_planetaryPlayer.RadialUp) >= 0.9999f;
+            radialStatus = radialPass ? "PASS" : "ALIGNING";
+            playerStatus =
+                $"r={_planetaryPlayer.RadialDistance:F1} м  •  " +
+                $"ground={(_planetaryPlayer.IsGrounded ? "да" : "нет")}  •  " +
+                $"vₜ={_planetaryPlayer.TangentialSpeed:F1} м/с  •  " +
+                $"Δup={_planetaryPlayer.UpAlignmentErrorDegrees:F2}°";
+        }
+
+        bool playerCamera =
+            _cameraMode == CubeSphereCameraMode.PlanetaryPlayer;
+        string cameraState = playerCamera
+            ? "игрок"
+            : $"обзор ({orbitState})";
+        string contextualSpace = playerCamera
+            ? "Space — прыжок"
+            : "Space — пауза обзора";
+
         _hudLabel.Text =
-            "ПРОТОТИП C — ОСНОВА CUBE SPHERE\n" +
+            "ПРОТОТИП C — РАДИАЛЬНАЯ ГРАВИТАЦИЯ\n" +
             $"Грани: {_faceMeshes.Count}/6  •  collision: {_collisionShapes.Count}/" +
-            $"{(GenerateCollision ? 6 : 0)}  •  режим: {debugMode}\n" +
+            $"{(GenerateCollision ? 6 : 0)}  •  швы: {seamStatus} " +
+            $"({_buildData.SeamComparisons}/{_buildData.ExpectedSeamComparisons})\n" +
+            $"Игрок: {playerStatus}\n" +
+            $"Радиальная система: {radialStatus}  •  камера: {cameraState}  •  " +
+            $"режим: {debugMode}\n" +
             $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
-            $"seed: {NoiseSeed}\n" +
-            $"Сетка грани: {_buildData.Resolution}×{_buildData.Resolution}  •  " +
-            $"вершины: {_buildData.TotalVertices}  •  треугольники: {_buildData.TotalTriangles}\n" +
-            $"Швы: {seamStatus}  •  пары: {_buildData.SeamComparisons}/" +
-            $"{_buildData.ExpectedSeamComparisons}  •  " +
-            $"Δpos max: {_buildData.MaximumSeamPositionError:E2}  •  " +
-            $"Δnormal max: {_buildData.MaximumSeamNormalError:E2}\n" +
-            $"Камера: {orbitState}  •  F1 — цвета/нормали  •  Space — пауза вращения";
+            $"seed: {NoiseSeed}  •  сетка: {_buildData.Resolution}×{_buildData.Resolution}\n" +
+            "WASD — касательное движение  •  мышь — обзор  •  " +
+            $"{contextualSpace}  •  R — сброс\n" +
+            "F1 — цвета/нормали  •  F2 — игрок/обзор";
     }
 }

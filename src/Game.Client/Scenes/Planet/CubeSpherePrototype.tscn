@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Planet/CubeSpherePrototype.cs" id="1_planet"]
+[ext_resource type="PackedScene" path="res://Scenes/Planet/PlanetaryPlayer.tscn" id="2_player"]
 
 [sub_resource type="Environment" id="Environment_planet"]
 background_mode = 1
@@ -46,12 +47,15 @@ directional_shadow_max_distance = 500.0
 
 [node name="CollisionBody" type="StaticBody3D" parent="Planet"]
 
+[node name="PlanetaryPlayer" parent="." instance=ExtResource("2_player")]
+position = Vector3(104, 20, 18)
+
 [node name="CameraRig" type="Node3D" parent="."]
 rotation = Vector3(-0.261799, 0.523599, 0)
 
 [node name="Camera3D" type="Camera3D" parent="CameraRig"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 300)
-current = true
+current = false
 fov = 42.0
 near = 0.1
 far = 2000.0
@@ -61,12 +65,12 @@ far = 2000.0
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 930.0
-offset_bottom = 220.0
+offset_right = 1080.0
+offset_bottom = 250.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП C — CUBE SPHERE\nПостроение геометрии..."
+text = "ПРОТОТИП C — РАДИАЛЬНАЯ ГРАВИТАЦИЯ\nПостроение геометрии..."

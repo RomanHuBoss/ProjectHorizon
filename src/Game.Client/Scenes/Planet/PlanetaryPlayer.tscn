@@ -1,0 +1,52 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Planet/PlanetaryPlayerController.cs" id="1_player"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_planet_player"]
+radius = 0.45
+height = 1.9
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_planet_player"]
+radius = 0.45
+height = 1.9
+
+[sub_resource type="StandardMaterial3D" id="PlayerMaterial"]
+albedo_color = Color(1, 0.58, 0.12, 1)
+roughness = 0.72
+metallic_specular = 0.1
+
+[node name="PlanetaryPlayer" type="CharacterBody3D"]
+collision_layer = 2
+collision_mask = 1
+script = ExtResource("1_player")
+PlanetCenterPath = NodePath("../Planet")
+GravityAcceleration = 24.0
+MoveSpeed = 8.0
+GroundAcceleration = 36.0
+AirAcceleration = 10.0
+JumpVelocity = 8.0
+OrientationSharpness = 14.0
+MouseSensitivity = 0.0025
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("CapsuleShape_planet_player")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+mesh = SubResource("CapsuleMesh_planet_player")
+material_override = SubResource("PlayerMaterial")
+cast_shadow = 1
+
+[node name="CameraPitch" type="Node3D" parent="."]
+position = Vector3(0, 0.8, 0)
+rotation = Vector3(-0.18, 0, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPitch"]
+spring_length = 8.0
+margin = 0.25
+collision_mask = 1
+
+[node name="Camera3D" type="Camera3D" parent="CameraPitch/SpringArm3D"]
+current = true
+fov = 58.0
+near = 0.1
+far = 2000.0
