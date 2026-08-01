@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://d7q2m5k8r4vbn"]
 
-[ext_resource type="Script" uid="uid://b2k7w4p9m6xqs" path="res://Scripts/Terrain/TerrainChunk.cs" id="1_terrain"]
+[ext_resource type="Script" uid="uid://c4j8r2n6v9mqs" path="res://Scripts/Terrain/TerrainChunkManager.cs" id="1_manager"]
 [ext_resource type="PackedScene" uid="uid://dg4e7visk71oc" path="res://Scenes/Player/Player.tscn" id="2_player"]
 
 [sub_resource type="Environment" id="Environment_terrain"]
@@ -30,26 +30,22 @@ environment = SubResource("Environment_terrain")
 transform = Transform3D(0.8660254, 0.38302222, -0.32139382, 0, 0.64278764, 0.76604444, 0.5, -0.66341394, 0.5566704, 0, 0, 0)
 shadow_enabled = true
 
-[node name="TerrainChunk" type="StaticBody3D" parent="."]
-script = ExtResource("1_terrain")
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="TerrainChunk"]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="TerrainChunk"]
-
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, 8)
+
+[node name="TerrainChunkManager" type="Node3D" parent="."]
+script = ExtResource("1_manager")
 
 [node name="Hud" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 610.0
-offset_bottom = 102.0
+offset_right = 760.0
+offset_bottom = 132.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
-text = "ПРОТОТИП B — ЧАНК РЕЛЬЕФА\n33 × 33 вершины • OpenSimplex2/FastNoiseLite • mesh + trimesh collision\nWASD — движение, Space — прыжок, мышь — обзор, Esc — освободить курсор"
+text = "ПРОТОТИП B — СТРИМИНГ ЧАНКОВ И LOD\nИнициализация активной сетки рельефа..."
