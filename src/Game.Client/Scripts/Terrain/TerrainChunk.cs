@@ -81,6 +81,7 @@ public partial class TerrainChunk : StaticBody3D
     private MeshInstance3D? _meshInstance;
     private MeshInstance3D? _debugOverlay;
     private CollisionShape3D? _collisionShape;
+    private TerrainMeshData? _lastTopSurface;
 
     public override void _Ready()
     {
@@ -97,7 +98,6 @@ public partial class TerrainChunk : StaticBody3D
             AddChild(_debugOverlay);
         }
 
-        GenerateChunk();
     }
 
     public void Configure(
@@ -161,9 +161,9 @@ public partial class TerrainChunk : StaticBody3D
         ShowChunkBorders = showChunkBorders;
         DebugGridSpacing = normalizedGridSpacing;
 
-        if (changed && _meshInstance is not null && _debugOverlay is not null)
+        if (changed && _lastTopSurface is not null)
         {
-            GenerateVisualMesh(CreateNoise(), EffectiveResolution);
+            RebuildVisualFromCachedData();
         }
 
         return changed;
@@ -185,58 +185,9 @@ public partial class TerrainChunk : StaticBody3D
             SkirtMask != skirtMask;
     }
 
-    public bool SetDetailLevel(
-        int lodLevel,
-        int visualResolution,
-        bool generateCollision,
-        TerrainEdgeStitchMask stitchMask,
-        TerrainEdgeStitchMask skirtMask)
-    {
-        int normalizedLodLevel = Math.Max(0, lodLevel);
-        int normalizedResolution = NormalizeResolution(visualResolution);
-        bool visualChanged =
-            LodLevel != normalizedLodLevel ||
-            EffectiveResolution != normalizedResolution ||
-            StitchMask != stitchMask ||
-            SkirtMask != skirtMask;
-        bool collisionChanged = GenerateCollision != generateCollision;
-        bool changed = visualChanged || collisionChanged;
-
-        LodLevel = normalizedLodLevel;
-        GridResolution = normalizedResolution;
-        GenerateCollision = generateCollision;
-        StitchMask = stitchMask;
-        SkirtMask = skirtMask;
-
-        if (changed && _meshInstance is not null && _collisionShape is not null)
-        {
-            ulong startedAtMicroseconds = Time.GetTicksUsec();
-            FastNoiseLite noise = CreateNoise();
-            int collisionResolution = NormalizeResolution(CollisionResolution);
-
-            if (visualChanged)
-            {
-                GenerateVisualMesh(noise, normalizedResolution);
-            }
-
-            if (collisionChanged)
-            {
-                UpdateCollisionShape(noise, collisionResolution);
-            }
-
-            LogGeneration(
-                "updated",
-                normalizedResolution,
-                collisionResolution,
-                visualChanged,
-                collisionChanged,
-                startedAtMicroseconds);
-        }
-
-        return changed;
-    }
-
-    public void GenerateChunk()
+    public void ApplyGeneratedData(
+        TerrainChunkBuildResult result,
+        string operation)
     {
         if (_meshInstance is null || _collisionShape is null)
         {
@@ -244,50 +195,55 @@ public partial class TerrainChunk : StaticBody3D
                 "TerrainChunk requires MeshInstance3D and CollisionShape3D children.");
         }
 
-        int visualResolution = NormalizeResolution(GridResolution);
-        int collisionResolution = NormalizeResolution(CollisionResolution);
-        ulong startedAtMicroseconds = Time.GetTicksUsec();
-        FastNoiseLite noise = CreateNoise();
+        TerrainChunkBuildRequest request = result.Request;
 
-        GenerateVisualMesh(noise, visualResolution);
-        UpdateCollisionShape(noise, collisionResolution);
-        LogGeneration(
-            "generated",
-            visualResolution,
-            collisionResolution,
-            true,
-            true,
-            startedAtMicroseconds);
-    }
-
-    private void GenerateVisualMesh(
-        FastNoiseLite noise,
-        int visualResolution)
-    {
-        if (_meshInstance is null)
+        if (request.ChunkX != ChunkX || request.ChunkZ != ChunkZ)
         {
             throw new InvalidOperationException(
-                "TerrainChunk requires a MeshInstance3D child.");
+                "Terrain build result does not match the configured chunk.");
         }
 
-        EffectiveResolution = visualResolution;
-        MeshData topData = BuildTopSurface(
-            visualResolution,
-            noise,
-            StitchMask);
-        MeshData visualData = BuildVisualSurfaceWithSkirts(
-            topData,
-            visualResolution,
+        ulong applyStartedAtMicroseconds = Time.GetTicksUsec();
+        EffectiveResolution = request.VisualResolution;
+        _lastTopSurface = result.VisualTopSurface;
+        RebuildVisualFromCachedData();
+
+        if (request.RebuildCollision)
+        {
+            ApplyCollisionData(result.CollisionTopSurface);
+        }
+        double mainThreadElapsedMilliseconds =
+            (Time.GetTicksUsec() - applyStartedAtMicroseconds) / 1000.0;
+
+        LogGeneration(
+            operation,
+            request.VisualResolution,
+            request.CollisionResolution,
+            true,
+            request.RebuildCollision,
+            result.WorkerElapsedMilliseconds,
+            mainThreadElapsedMilliseconds);
+    }
+
+    private void RebuildVisualFromCachedData()
+    {
+        if (_meshInstance is null || _lastTopSurface is null)
+        {
+            return;
+        }
+
+        PopulateDiagnosticColors(_lastTopSurface);
+        TerrainMeshData visualData = BuildVisualSurfaceWithSkirts(
+            _lastTopSurface,
+            EffectiveResolution,
             SkirtMask);
         ArrayMesh visualMesh = BuildMesh(visualData);
         visualMesh.SurfaceSetMaterial(0, CreateTerrainMaterial());
         _meshInstance.Mesh = visualMesh;
-        GenerateDebugOverlay(topData, visualResolution);
+        GenerateDebugOverlay(_lastTopSurface, EffectiveResolution);
     }
 
-    private void UpdateCollisionShape(
-        FastNoiseLite noise,
-        int collisionResolution)
+    private void ApplyCollisionData(TerrainMeshData? collisionData)
     {
         if (_collisionShape is null)
         {
@@ -295,7 +251,7 @@ public partial class TerrainChunk : StaticBody3D
                 "TerrainChunk requires a CollisionShape3D child.");
         }
 
-        if (!GenerateCollision)
+        if (!GenerateCollision || collisionData is null)
         {
             _collisionShape.Shape = null;
             _collisionShape.Disabled = true;
@@ -304,15 +260,23 @@ public partial class TerrainChunk : StaticBody3D
 
         // Collision remains full and unstitched. Adjacent collision chunks use
         // identical samples on their common border and therefore remain exact.
-        MeshData collisionData = BuildTopSurface(
-            collisionResolution,
-            noise,
-            TerrainEdgeStitchMask.None);
         ArrayMesh collisionMesh = BuildMesh(collisionData);
         ConcavePolygonShape3D collisionShape = collisionMesh.CreateTrimeshShape();
         collisionShape.BackfaceCollision = true;
         _collisionShape.Shape = collisionShape;
         _collisionShape.Disabled = false;
+    }
+
+    private void PopulateDiagnosticColors(TerrainMeshData data)
+    {
+        data.Colors.Clear();
+
+        for (int i = 0; i < data.Vertices.Count; i++)
+        {
+            data.Colors.Add(CalculateDiagnosticColor(
+                data.Vertices[i],
+                data.Normals[i]));
+        }
     }
 
     private void LogGeneration(
@@ -321,7 +285,8 @@ public partial class TerrainChunk : StaticBody3D
         int collisionResolution,
         bool visualChanged,
         bool collisionChanged,
-        ulong startedAtMicroseconds)
+        double workerElapsedMilliseconds,
+        double mainThreadElapsedMilliseconds)
     {
         int topVertexCount = visualResolution * visualResolution;
         int topTriangleCount =
@@ -329,8 +294,6 @@ public partial class TerrainChunk : StaticBody3D
         int skirtTriangleCount = SkirtDepth > 0.0f
             ? (visualResolution - 1) * CountEdges(SkirtMask) * 2
             : 0;
-        double elapsedMilliseconds =
-            (Time.GetTicksUsec() - startedAtMicroseconds) / 1000.0;
         string collisionInfo = GenerateCollision
             ? $"{collisionResolution}x{collisionResolution}"
             : "none";
@@ -343,11 +306,13 @@ public partial class TerrainChunk : StaticBody3D
             $"skirts={skirtTriangleCount}; collision={collisionInfo}; " +
             $"visualChanged={visualChanged}; " +
             $"collisionChanged={collisionChanged}; " +
-            $"time={elapsedMilliseconds:F2} ms");
+            $"worker={workerElapsedMilliseconds:F2} ms; " +
+            $"main={mainThreadElapsedMilliseconds:F2} ms");
     }
 
     public void ReleaseGeneratedResources()
     {
+        _lastTopSurface = null;
         if (_meshInstance is not null)
         {
             _meshInstance.Mesh = null;
@@ -366,156 +331,12 @@ public partial class TerrainChunk : StaticBody3D
         }
     }
 
-    private MeshData BuildTopSurface(
-        int resolution,
-        FastNoiseLite noise,
-        TerrainEdgeStitchMask stitchMask)
-    {
-        float cellSize = ChunkSize / (resolution - 1);
-        float halfSize = ChunkSize * 0.5f;
-        float normalSampleStep = ChunkSize /
-            Math.Max(2, NormalizeResolution(CollisionResolution) - 1);
-        MeshData data = new(resolution * resolution);
-
-        for (int z = 0; z < resolution; z++)
-        {
-            for (int x = 0; x < resolution; x++)
-            {
-                float localX = (x * cellSize) - halfSize;
-                float localZ = (z * cellSize) - halfSize;
-                float sampleX = (ChunkX * ChunkSize) + (x * cellSize);
-                float sampleZ = (ChunkZ * ChunkSize) + (z * cellSize);
-                float height = SampleHeight(noise, sampleX, sampleZ);
-
-                data.Vertices.Add(new Vector3(localX, height, localZ));
-                data.Normals.Add(CalculateGlobalNormal(
-                    noise,
-                    sampleX,
-                    sampleZ,
-                    normalSampleStep));
-                data.Uvs.Add(new Vector2(
-                    x / (float)(resolution - 1),
-                    z / (float)(resolution - 1)));
-            }
-        }
-
-        ApplyEdgeStitching(data, resolution, stitchMask);
-
-        for (int i = 0; i < data.Vertices.Count; i++)
-        {
-            data.Colors.Add(CalculateDiagnosticColor(
-                data.Vertices[i],
-                data.Normals[i]));
-        }
-
-        for (int z = 0; z < resolution - 1; z++)
-        {
-            for (int x = 0; x < resolution - 1; x++)
-            {
-                int topLeft = (z * resolution) + x;
-                int topRight = topLeft + 1;
-                int bottomLeft = topLeft + resolution;
-                int bottomRight = bottomLeft + 1;
-
-                // Godot treats clockwise winding as the front face.
-                data.Indices.Add(topLeft);
-                data.Indices.Add(bottomLeft);
-                data.Indices.Add(topRight);
-
-                data.Indices.Add(topRight);
-                data.Indices.Add(bottomLeft);
-                data.Indices.Add(bottomRight);
-            }
-        }
-
-        return data;
-    }
-
-    private static void ApplyEdgeStitching(
-        MeshData data,
-        int resolution,
-        TerrainEdgeStitchMask stitchMask)
-    {
-        if (stitchMask == TerrainEdgeStitchMask.None || resolution < 5)
-        {
-            return;
-        }
-
-        // LOD0 has one extra midpoint between each pair of LOD1 edge vertices.
-        // Snapping every odd edge vertex to the linear LOD1 segment removes the
-        // geometric T-junction while retaining the high-detail interior.
-        if ((stitchMask & TerrainEdgeStitchMask.North) != 0)
-        {
-            for (int x = 1; x < resolution - 1; x += 2)
-            {
-                StitchMidpoint(data, x, x - 1, x + 1);
-            }
-        }
-
-        if ((stitchMask & TerrainEdgeStitchMask.South) != 0)
-        {
-            int rowStart = (resolution - 1) * resolution;
-
-            for (int x = 1; x < resolution - 1; x += 2)
-            {
-                StitchMidpoint(
-                    data,
-                    rowStart + x,
-                    rowStart + x - 1,
-                    rowStart + x + 1);
-            }
-        }
-
-        if ((stitchMask & TerrainEdgeStitchMask.West) != 0)
-        {
-            for (int z = 1; z < resolution - 1; z += 2)
-            {
-                StitchMidpoint(
-                    data,
-                    z * resolution,
-                    (z - 1) * resolution,
-                    (z + 1) * resolution);
-            }
-        }
-
-        if ((stitchMask & TerrainEdgeStitchMask.East) != 0)
-        {
-            int column = resolution - 1;
-
-            for (int z = 1; z < resolution - 1; z += 2)
-            {
-                StitchMidpoint(
-                    data,
-                    (z * resolution) + column,
-                    ((z - 1) * resolution) + column,
-                    ((z + 1) * resolution) + column);
-            }
-        }
-    }
-
-    private static void StitchMidpoint(
-        MeshData data,
-        int midpointIndex,
-        int firstIndex,
-        int secondIndex)
-    {
-        Vector3 midpoint = data.Vertices[midpointIndex];
-        midpoint.Y = (data.Vertices[firstIndex].Y + data.Vertices[secondIndex].Y) * 0.5f;
-        data.Vertices[midpointIndex] = midpoint;
-
-        Vector3 blendedNormal =
-            data.Normals[firstIndex] + data.Normals[secondIndex];
-        data.Normals[midpointIndex] = blendedNormal.LengthSquared() > 0.000001f
-            ? blendedNormal.Normalized()
-            : Vector3.Up;
-    }
-
-    private MeshData BuildVisualSurfaceWithSkirts(
-        MeshData topData,
+    private TerrainMeshData BuildVisualSurfaceWithSkirts(
+        TerrainMeshData topData,
         int resolution,
         TerrainEdgeStitchMask skirtMask)
     {
-        MeshData visualData = new(topData.Vertices.Count + (resolution * 16));
+        TerrainMeshData visualData = new(topData.Vertices.Count + (resolution * 16));
         visualData.Vertices.AddRange(topData.Vertices);
         visualData.Normals.AddRange(topData.Normals);
         visualData.Uvs.AddRange(topData.Uvs);
@@ -565,7 +386,7 @@ public partial class TerrainChunk : StaticBody3D
     }
 
     private void AppendSkirt(
-        MeshData data,
+        TerrainMeshData data,
         IReadOnlyList<int> edgeIndices,
         Vector3 outwardNormal)
     {
@@ -615,7 +436,7 @@ public partial class TerrainChunk : StaticBody3D
         }
     }
 
-    private static ArrayMesh BuildMesh(MeshData data)
+    private static ArrayMesh BuildMesh(TerrainMeshData data)
     {
         SurfaceTool surfaceTool = new();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
@@ -636,49 +457,6 @@ public partial class TerrainChunk : StaticBody3D
         }
 
         return surfaceTool.Commit();
-    }
-
-    private float SampleHeight(
-        FastNoiseLite noise,
-        float sampleX,
-        float sampleZ)
-    {
-        return noise.GetNoise2D(sampleX, sampleZ) * HeightScale;
-    }
-
-    private Vector3 CalculateGlobalNormal(
-        FastNoiseLite noise,
-        float sampleX,
-        float sampleZ,
-        float sampleStep)
-    {
-        float left = SampleHeight(noise, sampleX - sampleStep, sampleZ);
-        float right = SampleHeight(noise, sampleX + sampleStep, sampleZ);
-        float north = SampleHeight(noise, sampleX, sampleZ - sampleStep);
-        float south = SampleHeight(noise, sampleX, sampleZ + sampleStep);
-
-        Vector3 normal = new(
-            left - right,
-            sampleStep * 2.0f,
-            north - south);
-
-        return normal.LengthSquared() > 0.000001f
-            ? normal.Normalized()
-            : Vector3.Up;
-    }
-
-    private FastNoiseLite CreateNoise()
-    {
-        return new FastNoiseLite
-        {
-            Seed = NoiseSeed,
-            NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex,
-            FractalType = FastNoiseLite.FractalTypeEnum.Fbm,
-            Frequency = NoiseFrequency,
-            FractalOctaves = 5,
-            FractalGain = 0.5f,
-            FractalLacunarity = 2.0f
-        };
     }
 
     private StandardMaterial3D CreateTerrainMaterial()
@@ -775,7 +553,7 @@ public partial class TerrainChunk : StaticBody3D
     }
 
     private void GenerateDebugOverlay(
-        MeshData topData,
+        TerrainMeshData topData,
         int resolution)
     {
         if (_debugOverlay is null)
@@ -842,7 +620,7 @@ public partial class TerrainChunk : StaticBody3D
 
     private static void AppendWireframeLines(
         SurfaceTool surfaceTool,
-        MeshData data,
+        TerrainMeshData data,
         int resolution,
         Color color,
         float elevation)
@@ -896,7 +674,7 @@ public partial class TerrainChunk : StaticBody3D
 
     private void AppendWorldGridLines(
         SurfaceTool surfaceTool,
-        MeshData data,
+        TerrainMeshData data,
         int resolution,
         Color color,
         float elevation)
@@ -952,7 +730,7 @@ public partial class TerrainChunk : StaticBody3D
 
     private static void AppendChunkBorderLines(
         SurfaceTool surfaceTool,
-        MeshData data,
+        TerrainMeshData data,
         int resolution,
         Color color,
         float elevation)
@@ -997,7 +775,7 @@ public partial class TerrainChunk : StaticBody3D
 
     private static void AppendDebugLine(
         SurfaceTool surfaceTool,
-        MeshData data,
+        TerrainMeshData data,
         int firstIndex,
         int secondIndex,
         Color color,
@@ -1064,25 +842,4 @@ public partial class TerrainChunk : StaticBody3D
         return resolution;
     }
 
-    private sealed class MeshData
-    {
-        public MeshData(int vertexCapacity)
-        {
-            Vertices = new List<Vector3>(vertexCapacity);
-            Normals = new List<Vector3>(vertexCapacity);
-            Uvs = new List<Vector2>(vertexCapacity);
-            Colors = new List<Color>(vertexCapacity);
-            Indices = new List<int>();
-        }
-
-        public List<Vector3> Vertices { get; }
-
-        public List<Vector3> Normals { get; }
-
-        public List<Vector2> Uvs { get; }
-
-        public List<Color> Colors { get; }
-
-        public List<int> Indices { get; }
-    }
 }

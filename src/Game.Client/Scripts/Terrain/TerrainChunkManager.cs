@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using Godot;
 
 public partial class TerrainChunkManager : Node3D
@@ -71,6 +74,10 @@ public partial class TerrainChunkManager : Node3D
 
     private readonly Dictionary<Vector2I, TerrainChunk> _activeChunks = new();
     private readonly Queue<ChunkOperation> _pendingOperations = new();
+    private readonly ConcurrentQueue<CompletedChunkJob> _completedJobs = new();
+    private readonly Dictionary<long, ActiveChunkJob> _activeJobs = new();
+    private readonly Queue<long> _jobApplyOrder = new();
+    private readonly Dictionary<long, ReadyChunkJob> _readyJobs = new();
     private Dictionary<Vector2I, ChunkSpec> _desiredSpecs = new();
     private CharacterBody3D? _player;
     private Label? _statusLabel;
@@ -86,12 +93,21 @@ public partial class TerrainChunkManager : Node3D
     private int _completedCreates;
     private int _completedUpdates;
     private int _completedRemovals;
+    private CancellationTokenSource? _planCancellation;
+    private long _nextJobId;
+    private int _workerLimit = 1;
+    private int _failedJobs;
+    private int _cancelledJobs;
+    private int _discardedStaleJobs;
 
     public override void _Ready()
     {
         _player = GetNode<CharacterBody3D>(PlayerPath);
         _statusLabel = GetNodeOrNull<Label>(StatusLabelPath);
         _currentChunk = WorldToChunkWithoutHysteresis(_player.GlobalPosition);
+        _workerLimit = Math.Max(
+            1,
+            Math.Min(4, System.Environment.ProcessorCount - 2));
         _operationTimer = new Timer
         {
             Name = "TerrainOperationTimer",
@@ -106,6 +122,14 @@ public partial class TerrainChunkManager : Node3D
         UpdateHud();
     }
 
+
+    public override void _ExitTree()
+    {
+        _operationTimer?.Stop();
+        _planCancellation?.Cancel();
+        _planCancellation?.Dispose();
+        _planCancellation = null;
+    }
 
     public override void _UnhandledInput(InputEvent @event)
     {
@@ -189,23 +213,354 @@ public partial class TerrainChunkManager : Node3D
     private void ProcessOperationQueue()
     {
         _operationsCompletedLastStep = 0;
-
         int operationBudget = Math.Max(1, MaxOperationsPerStep);
 
-        while (_pendingOperations.Count > 0 &&
-            _operationsCompletedLastStep < operationBudget)
-        {
-            ExecuteOperation(_pendingOperations.Dequeue());
-            _operationsCompletedLastStep++;
-        }
+        ApplyCompletedJobs(operationBudget);
+        StartGenerationJobs();
+        ExecuteReadyRemovals(operationBudget);
 
-        if (_pendingOperations.Count == 0)
+        if (IsRefreshComplete())
         {
             CompleteRefresh();
         }
         else
         {
+            EnsureOperationTimerRunning();
             UpdateHud();
+        }
+    }
+
+    private void ApplyCompletedJobs(int operationBudget)
+    {
+        DrainCompletedJobs();
+
+        while (_operationsCompletedLastStep < operationBudget &&
+            _jobApplyOrder.Count > 0)
+        {
+            long nextJobId = _jobApplyOrder.Peek();
+
+            if (!_readyJobs.Remove(
+                    nextJobId,
+                    out ReadyChunkJob readyJob))
+            {
+                // Later jobs may already be ready, but apply order must match
+                // the planned create/demotion/promotion sequence to avoid a
+                // transient incompatible LOD border.
+                break;
+            }
+
+            _jobApplyOrder.Dequeue();
+            CompletedChunkJob completedJob = readyJob.CompletedJob;
+            ActiveChunkJob activeJob = readyJob.ActiveJob;
+
+            if (completedJob.IsCancelled)
+            {
+                _cancelledJobs++;
+                continue;
+            }
+
+            if (completedJob.Error is not null)
+            {
+                _failedJobs++;
+                GD.PushError(
+                    $"Terrain worker failed for " +
+                    $"({activeJob.Operation.Coordinate.X}, " +
+                    $"{activeJob.Operation.Coordinate.Y}): " +
+                    completedJob.Error);
+                continue;
+            }
+
+            if (completedJob.Result is null)
+            {
+                _failedJobs++;
+                GD.PushError(
+                    "Terrain worker completed without a result.");
+                continue;
+            }
+
+            GD.Print(
+                $"Terrain worker: applying job={completedJob.JobId}; " +
+                $"revision={completedJob.Revision}; " +
+                $"type={activeJob.Operation.Type}; " +
+                $"coordinate={activeJob.Operation.Coordinate}; " +
+                $"worker={completedJob.Result.WorkerElapsedMilliseconds:F2} ms");
+            ApplyCompletedGeneration(
+                activeJob.Operation,
+                completedJob.Result);
+            _operationsCompletedLastStep++;
+        }
+    }
+
+    private void DrainCompletedJobs()
+    {
+        while (_completedJobs.TryDequeue(out CompletedChunkJob completedJob))
+        {
+            if (!_activeJobs.Remove(
+                    completedJob.JobId,
+                    out ActiveChunkJob activeJob))
+            {
+                continue;
+            }
+
+            if (completedJob.Revision != _planRevision ||
+                activeJob.Operation.Revision != _planRevision)
+            {
+                _discardedStaleJobs++;
+                GD.Print(
+                    $"Terrain worker: discarded stale job={completedJob.JobId}; " +
+                    $"jobRevision={completedJob.Revision}; " +
+                    $"currentRevision={_planRevision}; " +
+                    $"cancelled={completedJob.IsCancelled}");
+                continue;
+            }
+
+            _readyJobs.Add(
+                completedJob.JobId,
+                new ReadyChunkJob(activeJob, completedJob));
+        }
+    }
+
+    private void ApplyCompletedGeneration(
+        ChunkOperation operation,
+        TerrainChunkBuildResult result)
+    {
+        if (!_desiredSpecs.TryGetValue(
+                operation.Coordinate,
+                out ChunkSpec currentSpec))
+        {
+            return;
+        }
+
+        switch (operation.Type)
+        {
+            case ChunkOperationType.Create:
+                if (_activeChunks.ContainsKey(operation.Coordinate))
+                {
+                    return;
+                }
+
+                TerrainChunk createdChunk = CreateChunk(
+                    operation.Coordinate,
+                    currentSpec);
+                createdChunk.ApplyGeneratedData(result, "generated");
+                _activeChunks.Add(operation.Coordinate, createdChunk);
+                _completedCreates++;
+                break;
+
+            case ChunkOperationType.Update:
+                if (!_activeChunks.TryGetValue(
+                        operation.Coordinate,
+                        out TerrainChunk? chunk))
+                {
+                    return;
+                }
+
+                ConfigureChunk(
+                    chunk,
+                    operation.Coordinate,
+                    currentSpec);
+                chunk.ApplyGeneratedData(result, "updated");
+                _completedUpdates++;
+                break;
+
+            default:
+                throw new InvalidOperationException(
+                    "Only create and update operations produce worker results.");
+        }
+    }
+
+    private void StartGenerationJobs()
+    {
+        while (_activeJobs.Count < _workerLimit &&
+            _pendingOperations.Count > 0)
+        {
+            ChunkOperation nextOperation = _pendingOperations.Peek();
+
+            if (nextOperation.Type == ChunkOperationType.Remove)
+            {
+                return;
+            }
+
+            _pendingOperations.Dequeue();
+
+            if (!TryCreateBuildRequest(
+                    nextOperation,
+                    out TerrainChunkBuildRequest? request) ||
+                request is null)
+            {
+                continue;
+            }
+
+            StartGenerationJob(nextOperation, request);
+        }
+    }
+
+    private bool TryCreateBuildRequest(
+        ChunkOperation operation,
+        out TerrainChunkBuildRequest? request)
+    {
+        request = null;
+
+        if (operation.Revision != _planRevision ||
+            !_desiredSpecs.TryGetValue(
+                operation.Coordinate,
+                out ChunkSpec spec))
+        {
+            return false;
+        }
+
+        if (operation.Type == ChunkOperationType.Create &&
+            _activeChunks.ContainsKey(operation.Coordinate))
+        {
+            return false;
+        }
+
+        if (operation.Type == ChunkOperationType.Update &&
+            !_activeChunks.ContainsKey(operation.Coordinate))
+        {
+            return false;
+        }
+
+        bool rebuildCollision = operation.Type == ChunkOperationType.Create;
+
+        if (operation.Type == ChunkOperationType.Update &&
+            _activeChunks.TryGetValue(
+                operation.Coordinate,
+                out TerrainChunk? activeChunk))
+        {
+            rebuildCollision =
+                activeChunk.GenerateCollision != spec.GenerateCollision ||
+                activeChunk.CollisionResolution != CollisionResolution;
+        }
+
+        request = new TerrainChunkBuildRequest(
+            operation.Coordinate.X,
+            operation.Coordinate.Y,
+            spec.LodLevel,
+            spec.VisualResolution,
+            CollisionResolution,
+            ChunkSize,
+            HeightScale,
+            NoiseFrequency,
+            NoiseSeed,
+            SkirtDepth,
+            spec.GenerateCollision,
+            rebuildCollision,
+            spec.StitchMask,
+            spec.SkirtMask);
+        return true;
+    }
+
+    private void StartGenerationJob(
+        ChunkOperation operation,
+        TerrainChunkBuildRequest request)
+    {
+        if (_planCancellation is null)
+        {
+            throw new InvalidOperationException(
+                "Terrain generation plan has no cancellation source.");
+        }
+
+        long jobId = ++_nextJobId;
+        CancellationToken cancellationToken = _planCancellation.Token;
+        _activeJobs.Add(
+            jobId,
+            new ActiveChunkJob(jobId, operation, request));
+        _jobApplyOrder.Enqueue(jobId);
+
+        GD.Print(
+            $"Terrain worker: started job={jobId}; " +
+            $"revision={operation.Revision}; type={operation.Type}; " +
+            $"coordinate={operation.Coordinate}; " +
+            $"visual={request.VisualResolution}; " +
+            $"collision={request.RebuildCollision}");
+
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                TerrainChunkBuildResult result =
+                    TerrainChunkDataBuilder.Build(
+                        request,
+                        cancellationToken);
+                _completedJobs.Enqueue(
+                    CompletedChunkJob.Success(
+                        jobId,
+                        operation.Revision,
+                        result));
+            }
+            catch (OperationCanceledException)
+            {
+                _completedJobs.Enqueue(
+                    CompletedChunkJob.Cancelled(
+                        jobId,
+                        operation.Revision));
+            }
+            catch (Exception exception)
+            {
+                _completedJobs.Enqueue(
+                    CompletedChunkJob.Failed(
+                        jobId,
+                        operation.Revision,
+                        exception));
+            }
+        });
+    }
+
+    private void ExecuteReadyRemovals(int operationBudget)
+    {
+        if (_activeJobs.Count > 0 || _jobApplyOrder.Count > 0)
+        {
+            return;
+        }
+
+        while (_pendingOperations.Count > 0 &&
+            _operationsCompletedLastStep < operationBudget &&
+            _pendingOperations.Peek().Type == ChunkOperationType.Remove)
+        {
+            ExecuteRemove(_pendingOperations.Dequeue());
+            _operationsCompletedLastStep++;
+        }
+    }
+
+    private void ExecuteRemove(ChunkOperation operation)
+    {
+        if (operation.Revision != _planRevision ||
+            _desiredSpecs.ContainsKey(operation.Coordinate) ||
+            !_activeChunks.TryGetValue(
+                operation.Coordinate,
+                out TerrainChunk? chunk))
+        {
+            return;
+        }
+
+        chunk.ReleaseGeneratedResources();
+        chunk.QueueFree();
+        _activeChunks.Remove(operation.Coordinate);
+        _completedRemovals++;
+    }
+
+    private bool IsRefreshComplete()
+    {
+        return _pendingOperations.Count == 0 &&
+            _activeJobs.Count == 0 &&
+            _jobApplyOrder.Count == 0 &&
+            _readyJobs.Count == 0 &&
+            _completedRevision != _planRevision;
+    }
+
+    private void EnsureOperationTimerRunning()
+    {
+        if (_operationTimer is null)
+        {
+            return;
+        }
+
+        _operationTimer.WaitTime = GetOperationInterval();
+
+        if (_operationTimer.IsStopped())
+        {
+            _operationTimer.Start();
         }
     }
 
@@ -216,8 +571,18 @@ public partial class TerrainChunkManager : Node3D
 
     private void PlanRefresh(bool executeImmediately)
     {
+        int discardedReadyJobCount = _readyJobs.Count;
+
+        // Cancel the previous revision, but do not dispose its source here:
+        // in-flight workers may still be observing tokens created from it.
+        // Once those tasks finish, the old source becomes unreachable and can
+        // be collected normally.
+        _planCancellation?.Cancel();
+        _planCancellation = new CancellationTokenSource();
         _planRevision++;
         _pendingOperations.Clear();
+        _jobApplyOrder.Clear();
+        _readyJobs.Clear();
         _operationTimer?.Stop();
         _desiredSpecs = BuildDesiredSpecs();
 
@@ -289,10 +654,10 @@ public partial class TerrainChunkManager : Node3D
                 coordinate));
         }
 
-        // Incoming chunks are built first. High-detail chunks that must become
-        // low-detail are demoted before the new center is promoted, preventing a
-        // temporary high/high border where only one side is stitched. Remaining
-        // mask-only updates follow, and outgoing chunks are removed last.
+        // Incoming chunks are generated first. Demotions precede promotions so
+        // no temporary high/high border appears without the required stitching.
+        // Outgoing chunks remain visible until every create/update result has
+        // been applied on the main thread.
         EnqueueOperations(createOperations);
         EnqueueOperations(demotionOperations);
         EnqueueOperations(promotionOperations);
@@ -306,27 +671,27 @@ public partial class TerrainChunkManager : Node3D
         _completedCreates = 0;
         _completedUpdates = 0;
         _completedRemovals = 0;
+        _failedJobs = 0;
+        _cancelledJobs = 0;
+        _discardedStaleJobs = discardedReadyJobCount;
+
+        if (discardedReadyJobCount > 0)
+        {
+            GD.Print(
+                $"Terrain worker: discarded {discardedReadyJobCount} " +
+                "ready result(s) from the previous revision.");
+        }
 
         GD.Print(
             $"TerrainChunkManager: planned center={_currentChunk}; " +
             $"create={_plannedCreates}; update={_plannedUpdates}; " +
             $"remove={_plannedRemovals}; queued={_pendingOperations.Count}; " +
-            $"revision={_planRevision}");
+            $"workers={_workerLimit}; revision={_planRevision}");
 
-        if (executeImmediately)
-        {
-            while (_pendingOperations.Count > 0)
-            {
-                ExecuteOperation(_pendingOperations.Dequeue());
-            }
-
-            CompleteRefresh();
-        }
-        else if (_pendingOperations.Count > 0 && _operationTimer is not null)
-        {
-            _operationTimer.WaitTime = GetOperationInterval();
-            _operationTimer.Start();
-        }
+        // Even the initial load is asynchronous. This call only starts worker
+        // jobs; all Node, mesh and collision changes remain on the main thread.
+        _ = executeImmediately;
+        ProcessOperationQueue();
     }
 
     private void EnqueueOperations(IEnumerable<ChunkOperation> operations)
@@ -335,91 +700,6 @@ public partial class TerrainChunkManager : Node3D
         {
             _pendingOperations.Enqueue(operation);
         }
-    }
-
-    private void ExecuteOperation(ChunkOperation operation)
-    {
-        if (operation.Revision != _planRevision)
-        {
-            return;
-        }
-
-        switch (operation.Type)
-        {
-            case ChunkOperationType.Create:
-                ExecuteCreate(operation);
-                break;
-
-            case ChunkOperationType.Update:
-                ExecuteUpdate(operation);
-                break;
-
-            case ChunkOperationType.Remove:
-                ExecuteRemove(operation);
-                break;
-
-            default:
-                throw new ArgumentOutOfRangeException(
-                    nameof(operation.Type),
-                    operation.Type,
-                    "Unknown terrain chunk operation.");
-        }
-    }
-
-    private void ExecuteCreate(ChunkOperation operation)
-    {
-        if (_activeChunks.ContainsKey(operation.Coordinate) ||
-            !_desiredSpecs.TryGetValue(
-                operation.Coordinate,
-                out ChunkSpec currentSpec))
-        {
-            return;
-        }
-
-        TerrainChunk createdChunk = CreateChunk(
-            operation.Coordinate,
-            currentSpec);
-        _activeChunks.Add(operation.Coordinate, createdChunk);
-        _completedCreates++;
-    }
-
-    private void ExecuteUpdate(ChunkOperation operation)
-    {
-        if (!_activeChunks.TryGetValue(
-                operation.Coordinate,
-                out TerrainChunk? chunk) ||
-            !_desiredSpecs.TryGetValue(
-                operation.Coordinate,
-                out ChunkSpec currentSpec))
-        {
-            return;
-        }
-
-        if (chunk.SetDetailLevel(
-            currentSpec.LodLevel,
-            currentSpec.VisualResolution,
-            currentSpec.GenerateCollision,
-            currentSpec.StitchMask,
-            currentSpec.SkirtMask))
-        {
-            _completedUpdates++;
-        }
-    }
-
-    private void ExecuteRemove(ChunkOperation operation)
-    {
-        if (_desiredSpecs.ContainsKey(operation.Coordinate) ||
-            !_activeChunks.TryGetValue(
-                operation.Coordinate,
-                out TerrainChunk? chunk))
-        {
-            return;
-        }
-
-        chunk.ReleaseGeneratedResources();
-        chunk.QueueFree();
-        _activeChunks.Remove(operation.Coordinate);
-        _completedRemovals++;
     }
 
     private void CompleteRefresh()
@@ -433,6 +713,8 @@ public partial class TerrainChunkManager : Node3D
             $"active={_activeChunks.Count}; high={highDetailCount}; " +
             $"low={lowDetailCount}; created={_completedCreates}; " +
             $"updated={_completedUpdates}; removed={_completedRemovals}; " +
+            $"cancelled={_cancelledJobs}; stale={_discardedStaleJobs}; " +
+            $"failed={_failedJobs}; " +
             $"revision={_completedRevision}");
 
         UpdateHud();
@@ -585,6 +867,26 @@ public partial class TerrainChunkManager : Node3D
                 coordinate.Y * ChunkSize)
         };
 
+        ConfigureChunk(chunk, coordinate, spec);
+
+        chunk.AddChild(new MeshInstance3D
+        {
+            Name = "MeshInstance3D"
+        });
+        chunk.AddChild(new CollisionShape3D
+        {
+            Name = "CollisionShape3D"
+        });
+
+        AddChild(chunk);
+        return chunk;
+    }
+
+    private void ConfigureChunk(
+        TerrainChunk chunk,
+        Vector2I coordinate,
+        ChunkSpec spec)
+    {
         chunk.Configure(
             coordinate.X,
             coordinate.Y,
@@ -604,18 +906,6 @@ public partial class TerrainChunkManager : Node3D
             ShowWireframe,
             ShowChunkBorders,
             DebugGridSpacing);
-
-        chunk.AddChild(new MeshInstance3D
-        {
-            Name = "MeshInstance3D"
-        });
-        chunk.AddChild(new CollisionShape3D
-        {
-            Name = "CollisionShape3D"
-        });
-
-        AddChild(chunk);
-        return chunk;
     }
 
     private Vector2I CalculateHystereticCenter(Vector3 worldPosition)
@@ -761,9 +1051,12 @@ public partial class TerrainChunkManager : Node3D
 
         CountLodChunks(out int highDetailCount, out int lowDetailCount);
         int sideLength = (Math.Max(1, ActiveRadius) * 2) + 1;
-        string transitionState = _pendingOperations.Count > 0
+        bool transitionActive = _pendingOperations.Count > 0 ||
+            _jobApplyOrder.Count > 0;
+        string transitionState = transitionActive
             ? "выполняется"
-            : "стабильно";
+            : (_failedJobs > 0 ? "ошибка" : "стабильно");
+        int queuedWork = _pendingOperations.Count + _jobApplyOrder.Count;
 
         _statusLabel.Text =
             "ПРОТОТИП B — ДИАГНОСТИКА РЕЛЬЕФА, СТРИМИНГА И LOD\n" +
@@ -772,11 +1065,14 @@ public partial class TerrainChunkManager : Node3D
             $"чанк: ({_currentChunk.X}, {_currentChunk.Y})\n" +
             $"Активно: {_activeChunks.Count}/{sideLength * sideLength}  •  " +
             $"LOD0: {highDetailCount}  •  LOD1: {lowDetailCount}  •  " +
-            $"переход: {transitionState}  •  очередь: {_pendingOperations.Count}\n" +
+            $"переход: {transitionState}  •  очередь: {queuedWork}  •  " +
+            $"workers: {_activeJobs.Count}/{_workerLimit}\n" +
             $"Вид: {GetDebugViewName(DebugViewMode)}  •  " +
             $"сетка: {GetToggleState(ShowWorldGrid)}  •  " +
             $"wireframe: {GetToggleState(ShowWireframe)}  •  " +
             $"границы: {GetToggleState(ShowChunkBorders)}\n" +
+            $"Фоновая генерация с отменой  •  main-thread apply  •  " +
+            $"ошибки: {_failedJobs}  •  stale: {_discardedStaleJobs}\n" +
             $"Глобальные нормали  •  stitching  •  " +
             $"гистерезис: {ChunkSwitchHysteresis:F1} м  •  seed: {NoiseSeed}\n" +
             "F1 — режим цвета, F2 — мировая сетка, F3 — wireframe, " +
@@ -797,6 +1093,105 @@ public partial class TerrainChunkManager : Node3D
         Create,
         Update,
         Remove
+    }
+
+    private readonly struct ActiveChunkJob
+    {
+        public ActiveChunkJob(
+            long jobId,
+            ChunkOperation operation,
+            TerrainChunkBuildRequest request)
+        {
+            JobId = jobId;
+            Operation = operation;
+            Request = request;
+        }
+
+        public long JobId { get; }
+
+        public ChunkOperation Operation { get; }
+
+        public TerrainChunkBuildRequest Request { get; }
+    }
+
+    private readonly struct ReadyChunkJob
+    {
+        public ReadyChunkJob(
+            ActiveChunkJob activeJob,
+            CompletedChunkJob completedJob)
+        {
+            ActiveJob = activeJob;
+            CompletedJob = completedJob;
+        }
+
+        public ActiveChunkJob ActiveJob { get; }
+
+        public CompletedChunkJob CompletedJob { get; }
+    }
+
+    private sealed class CompletedChunkJob
+    {
+        private CompletedChunkJob(
+            long jobId,
+            int revision,
+            TerrainChunkBuildResult? result,
+            bool isCancelled,
+            Exception? error)
+        {
+            JobId = jobId;
+            Revision = revision;
+            Result = result;
+            IsCancelled = isCancelled;
+            Error = error;
+        }
+
+        public long JobId { get; }
+
+        public int Revision { get; }
+
+        public TerrainChunkBuildResult? Result { get; }
+
+        public bool IsCancelled { get; }
+
+        public Exception? Error { get; }
+
+        public static CompletedChunkJob Success(
+            long jobId,
+            int revision,
+            TerrainChunkBuildResult result)
+        {
+            return new CompletedChunkJob(
+                jobId,
+                revision,
+                result,
+                false,
+                null);
+        }
+
+        public static CompletedChunkJob Cancelled(
+            long jobId,
+            int revision)
+        {
+            return new CompletedChunkJob(
+                jobId,
+                revision,
+                null,
+                true,
+                null);
+        }
+
+        public static CompletedChunkJob Failed(
+            long jobId,
+            int revision,
+            Exception error)
+        {
+            return new CompletedChunkJob(
+                jobId,
+                revision,
+                null,
+                false,
+                error);
+        }
     }
 
     private readonly struct ChunkSpec
