@@ -140,6 +140,10 @@ src/Game.Client/Scenes/Persistence/SavePrototype.tscn
 
 Реализована первая ступень локального сохранения по разделу 22 PDF-ТЗ:
 
+> Build-hotfix: HUD получает размер окна через
+> `GetViewport().GetVisibleRect().Size`; предыдущий вызов `GetViewportRect()`
+> был недоступен для `Node3D` и приводил к `CS0103`.
+
 - `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
 - один slot — одна БД: `user://profiles/profile_prototype/save_1.db`;
 - явная migration `1`;

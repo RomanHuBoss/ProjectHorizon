@@ -603,7 +603,7 @@ public partial class SavePrototype : Node3D
             return;
         }
 
-        Vector2 viewportSize = GetViewportRect().Size;
+        Vector2 viewportSize = GetViewport().GetVisibleRect().Size;
         float maximumWidth = Math.Max(320.0f, viewportSize.X - 32.0f);
         float maximumHeight = Math.Max(160.0f, viewportSize.Y - 32.0f);
         _compactMargin.CustomMinimumSize = new Vector2(
