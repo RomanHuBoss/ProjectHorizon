@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-quadtree-lod-foundation.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-async-quadtree-streaming.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -34,13 +34,65 @@
 |---|---|---|
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
-| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы и floating origin подтверждены runtime; начальная quadtree LOD-ступень `L1/L2` реализована и ожидает `TASK-035` |
+| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы, floating origin и `L1/L2` quadtree подтверждены runtime; `L1/L2/L3` async visual streaming реализован и ожидает `TASK-037` |
 | D. Корабль | `NOT_STARTED` | Не начинался |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** floating origin подтверждён результатом `PASS` и остаётся `VERIFIED`. В текущей итерации реализована `TASK-033`: визуальная поверхность переведена с шести монолитных граней на независимые quadtree patches `L1/L2`, добавлены skirts, hysteresis, проверка покрытия соседей и автоматический acceptance test по `U`. До локальной сборки и результата `TASK-033 LOD (U): PASS` новая функция имеет статус `IMPLEMENTED`.
+**Вывод:** `TASK-033/TASK-035` подтверждены чистой сборкой и runtime-результатом `U: PASS`. В текущей итерации реализована `TASK-036`: рекурсивный `L1/L2/L3` quadtree, отменяемые фоновые jobs построения массивов, resident-set с выгрузкой patches за горизонтом и автоматический streaming acceptance test по `I`. Динамический collision LOD осознанно выделен в следующую задачу `TASK-038`; текущая стабильная collision-поверхность `6 × 129×129` сохранена без регрессии.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка `TASK-033/TASK-035` и реализация async visual streaming `TASK-036`
+
+**Основание:** раздел 9.3 PDF-ТЗ; локальное доказательство пользователя по `TASK-033/TASK-035`.
+
+**Принято как runtime-доказательство:**
+
+- сборка `Game.Client.csproj`: `0` ошибок, `0` предупреждений;
+- HUD: `TASK-033 LOD (U): PASS split=17, merge=16, Δlod=1, open=0, seam=0`;
+- `patches=36`, `L1=20`, `L2=16`, `atomic=112`, `nonManifold=0`;
+- collision `6/6 (129×129)`, `ground=да`, `floor=да`, `probe=да`;
+- `DEBT-CS8600` отсутствует в чистой сборке.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/Planet/CubeSpherePatchLod.cs`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePatchStreaming.cs`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePrototype.cs`;
+- `src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Реализовано в `TASK-036`:**
+
+- рекурсивное дерево использует три уровня `L1/L2/L3`;
+- отдельные split/merge thresholds и hysteresis применяются на базовом и глубоком уровнях;
+- после выбора уровней выполняется 2:1 balancing, поэтому соседние листья не отличаются более чем на один уровень;
+- полная логическая топология отделена от resident-набора визуальных patches;
+- patches за горизонтом не входят в resident-set; culling учитывает не только центр, но и угловой радиус участка, а obsolete patches освобождаются после полной готовности нового плана;
+- построение вершин, нормалей, UV, индексов и skirts выполняется в отменяемых worker jobs;
+- каждый план имеет revision; отменённые и stale результаты не применяются;
+- `MeshInstance3D`, `ArrayMesh`, `SceneTree` и освобождение узлов выполняются только в main thread;
+- новые patches создаются скрытыми; после загрузки всего нового resident-set устаревшие участки скрываются, целевой набор включается и старые узлы удаляются одним main-thread commit-этапом;
+- HUD показывает applied/resident/logical, `L1/L2/L3`, plan, queue, workers, ready, cancel, stale, errors и unloaded;
+- `I` запускает быстрый маршрут из девяти направлений, создаёт несколько revisions и затем ожидает `queue=0`, `workers=0`;
+- стабильные шесть collision-граней `129×129` сохранены; динамический collision LOD перенесён в `TASK-038`.
+
+**Статические проверки:**
+
+- математическая симуляция девяти направлений подтверждает `L3>0`, `open=0`, `nonManifold=0`, `maxDelta=1` и `atomic=228–240`;
+- типичные состояния: `logical=42–48`, resident `39–44`, уровни включают `L1/L2/L3`;
+- проверены C#-строки, комментарии, баланс скобок, scene/resource paths и ZIP hygiene;
+- Godot/.NET SDK в текущей среде отсутствуют, поэтому сборка и runtime для новой функции не заявляются.
+
+**Изменения статусов:**
+
+- `TASK-033`, `TASK-035`, `PC-070`–`PC-074`, `PC-ACC-040`–`PC-ACC-045`, `DEBT-CS8600` → `VERIFIED`;
+- `TASK-036`, `PC-080`–`PC-086` → `IMPLEMENTED`;
+- `TASK-037`, `PC-ACC-050`–`PC-ACC-057` → `IN_PROGRESS`;
+- `TASK-038` → `PLANNED` как отдельный collision LOD шаг.
+
+**Следующая задача:** выполнить локальную приёмку `TASK-037` по клавише `I`; после `PASS` перейти к динамическому collision LOD `TASK-038`.
 
 ### 2026-08-01 — реализация начальной quadtree LOD-ступени `TASK-033`
 
@@ -367,11 +419,18 @@
 | `PC-062` | Все участники локальной сцены переносятся синхронно | `VERIFIED` | Planet, PlanetaryPlayer и CameraRig получают одинаковую translation |
 | `PC-063` | Логическая позиция и сохранённые точки не меняются при rebase | `VERIFIED` | Continuity check в double; `NotifyWorldTranslated` корректирует spawn/test transforms |
 | `PC-064` | Автоматический floating-origin acceptance test | `VERIFIED` | `Y`: 4 shifts, 6 cell transitions, контроль local/logical/relative/contact и восстановление baseline |
-| `PC-070` | Независимые визуальные quadtree patches на шести гранях | `IMPLEMENTED` | Базовое покрытие `L1`: 24 участка; каждый участок строится отдельным `MeshInstance3D` |
-| `PC-071` | Локальное дробление участка возле игрока | `IMPLEMENTED` | Родитель `L1` заменяется четырьмя дочерними `L2`; split/merge имеют раздельные угловые пороги |
-| `PC-072` | Устранение щелей между соседними LOD | `IMPLEMENTED` | Одинаковая функция высоты, ограничение `Δlod <= 1`, skirts на четырёх сторонах patch |
-| `PC-073` | Диагностика покрытия и соседства LOD | `IMPLEMENTED` | Validator: atomic segments, open, non-manifold, max neighbor delta, seam position error |
-| `PC-074` | Автоматический quadtree LOD acceptance test | `IMPLEMENTED` | `U`: маршрут через 9 направлений, split/merge, topology changes, восстановление фокуса игрока |
+| `PC-070` | Независимые визуальные quadtree patches на шести гранях | `VERIFIED` | Runtime: 36 patches, `L1=20`, `L2=16`; сборка 0/0 |
+| `PC-071` | Локальное дробление участка возле игрока | `VERIFIED` | `U: PASS`, split=17, merge=16 |
+| `PC-072` | Устранение щелей между соседними LOD | `VERIFIED` | Runtime: `Δlod=1`, `open=0`, seam=0 |
+| `PC-073` | Диагностика покрытия и соседства LOD | `VERIFIED` | Runtime: atomic=112, nonManifold=0, open=0 |
+| `PC-074` | Автоматический quadtree LOD acceptance test | `VERIFIED` | `TASK-033 LOD (U): PASS split=17, merge=16` |
+| `PC-080` | Не менее трёх рабочих уровней quadtree | `IMPLEMENTED` | Рекурсивные `L1/L2/L3`; HUD показывает applied/logical counts каждого уровня |
+| `PC-081` | 2:1 balancing соседних листьев | `IMPLEMENTED` | Atomic-edge balancing принудительно делит грубые листья при разнице > 1 |
+| `PC-082` | Фоновая генерация patch arrays | `IMPLEMENTED` | `CubeSpherePatchDataBuilder`, до 4 worker jobs, `CancellationToken` |
+| `PC-083` | Revision/cancellation/stale protection | `IMPLEMENTED` | Новый plan отменяет старый; stale результаты отбрасываются до main-thread apply |
+| `PC-084` | Выгрузка невидимых patches | `IMPLEMENTED` | Resident-set использует угол 108° с консервативным запасом на угловой размер patch; obsolete patches удаляются после settle |
+| `PC-085` | Main-thread применение ресурсов Godot | `IMPLEMENTED` | `ArrayMesh`, `MeshInstance3D`, `SceneTree` и `QueueFree` выполняются только в прототипе на main thread |
+| `PC-086` | Автоматический async streaming acceptance test | `IMPLEMENTED` | Клавиша `I`: 9 направлений, rapid revisions, settle и `PASS/FAIL` |
 | `PC-ACC-001` | Проект собирается без ошибок | `VERIFIED` | Основа cube sphere запущена; последующая радиальная редакция принята пользователем |
 | `PC-ACC-002` | Сцена запускается и показывает планету | `VERIFIED` | Предоставлен screenshot текущей сцены |
 | `PC-ACC-003` | HUD показывает `6/6` и collision `6/6` | `VERIFIED` | Прямое runtime-доказательство пользователя |
@@ -395,14 +454,22 @@
 | `PC-ACC-033` | Logical coordinate непрерывна | `VERIFIED` | `logicalErr=0,000 м` |
 | `PC-ACC-034` | Относительные трансформы и контакт сохраняются | `VERIFIED` | `relativeErr=0,0003 м`, `gap=0,00 с`, ground/floor/probe подтверждены |
 | `PC-ACC-035` | После теста восстановлены baseline и предыдущие функции | `VERIFIED` | Итоговый HUD вернулся к `cell=(0,0,0)`; предыдущие системы остались в состоянии PASS |
-| `PC-ACC-040` | Редакция quadtree LOD собирается без ошибок и предупреждений | `IN_PROGRESS` | Требуется локальный `dotnet build`; одновременно проверяется устранение `CS8600` |
-| `PC-ACC-041` | HUD подтверждает независимые `L1/L2` patches | `IN_PROGRESS` | Требуется screenshot с patches, L1/L2 и split > 0 |
-| `PC-ACC-042` | Topology validator не обнаруживает отверстий | `IN_PROGRESS` | Критерии: `open=0`, `nonManifold=0`, `Δlod <= 1`, `Δpos <= 1E-03` |
-| `PC-ACC-043` | Автоматический тест выполняет split и merge | `IN_PROGRESS` | Итог `TASK-033 LOD (U): PASS`, split > 0, merge > 0, changes >= 4 |
-| `PC-ACC-044` | Визуально отсутствуют отверстия на LOD-переходах | `IN_PROGRESS` | Ручная проверка движения игрока и skirts в режиме цветов LOD |
-| `PC-ACC-045` | Collision и предыдущие тесты не регрессировали | `IN_PROGRESS` | После `U` работают WASD, Space, R, F1/F2, T и Y; ground/probe сохраняются |
+| `PC-ACC-040` | Редакция quadtree LOD собирается без ошибок и предупреждений | `VERIFIED` | Сборка пользователя: 0 ошибок, 0 предупреждений |
+| `PC-ACC-041` | HUD подтверждает независимые `L1/L2` patches | `VERIFIED` | HUD: patches=36, L1=20, L2=16, split=4 |
+| `PC-ACC-042` | Topology validator не обнаруживает отверстий | `VERIFIED` | Runtime: open=0, nonManifold=0, Δlod=1, Δpos=0 |
+| `PC-ACC-043` | Автоматический тест выполняет split и merge | `VERIFIED` | U: PASS split=17, merge=16 |
+| `PC-ACC-044` | Визуально отсутствуют отверстия на LOD-переходах | `VERIFIED` | Пользователь подтвердил нормальный визуальный результат |
+| `PC-ACC-045` | Collision и предыдущие тесты не регрессировали | `VERIFIED` | ground/floor/probe и collision 6/6 сохранены |
+| `PC-ACC-050` | Новая редакция собирается без ошибок и предупреждений | `IN_PROGRESS` | Требуется локальный `dotnet build` 0/0 |
+| `PC-ACC-051` | После settle applied совпадает с resident | `IN_PROGRESS` | `Applied = resident`, `queue=0`, `workers=0` |
+| `PC-ACC-052` | Третий уровень реально загружен | `IN_PROGRESS` | HUD и `I: PASS` содержат `L3>0` |
+| `PC-ACC-053` | Невидимые patches выгружаются | `IN_PROGRESS` | `resident < logical`, `unloaded>0` |
+| `PC-ACC-054` | Worker pipeline не содержит ошибок | `IN_PROGRESS` | `errors=0`; cancel/stale допустимы и диагностируются |
+| `PC-ACC-055` | Логическая топология остаётся корректной | `IN_PROGRESS` | `open=0`, `nonManifold=0`, `Δlod<=1`, seam<=1E-03 |
+| `PC-ACC-056` | Автоматический streaming test завершается PASS | `IN_PROGRESS` | `TASK-036 stream (I): PASS` и Output prefix |
+| `PC-ACC-057` | Предыдущие физические и диагностические тесты не регрессировали | `IN_PROGRESS` | Проверить WASD, Space, R, F1/F2, T, Y, U |
 
-Ходьба через границы и floating origin приняты по runtime-доказательствам. Начальная quadtree LOD-ступень реализована и ожидает локальную приёмку `TASK-035`.
+Ходьба, floating origin и начальная `L1/L2` quadtree LOD-ступень приняты по runtime-доказательствам. `L1/L2/L3` async visual streaming реализован и ожидает локальную приёмку `TASK-037`.
 
 ### 8.2. Оставшиеся прототипы
 
@@ -417,53 +484,67 @@
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-032`, `TASK-034`; Прототипы A и B; геометрия, радиальная система, collision-швы и floating origin Прототипа C.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-035`; Прототипы A и B; геометрия, радиальная система, collision-швы, floating origin и начальная quadtree LOD Прототипа C.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-035` | Выполнить runtime-приёмку `TASK-033` | Чистая сборка и `TASK-033 LOD (U): PASS` с `open=0`, `Δlod<=1` |
-| 2 | `TASK-036` | Расширить quadtree LOD и стриминг patches | 3+ уровня, фоновые jobs, выгрузка невидимых участков, collision LOD |
+| 1 | `TASK-037` | Выполнить runtime-приёмку `TASK-036` | Чистая сборка и `TASK-036 stream (I): PASS` |
+| 2 | `TASK-038` | Добавить отдельный collision LOD | Локальные collision patches, безопасная двухфазная замена, отсутствие провалов |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Реализовано в этой итерации:** `TASK-033`, `PC-070`–`PC-074`; исправление `DEBT-CS8600`.
-**Текущая приёмочная задача:** `TASK-035`.
+**Реализовано в этой итерации:** `TASK-036`, `PC-080`–`PC-086`.
+**Текущая приёмочная задача:** `TASK-037`.
 
-## 10. Runtime-приёмка `TASK-033/TASK-035`
+## 10. Runtime-приёмка `TASK-036/TASK-037`
 
-1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0`
-   предупреждений; прежний `CS8600` отсутствует.
-2. Запустить стартовую сцену и дождаться `ground=да`, `probe=да`, радиальной
-   системы `PASS`.
-3. Убедиться, что HUD показывает `LOD-швы: PASS`, `open: 0`, `nonManifold: 0`,
-   `Δlod <= 1`.
-4. Нажать `U` и не использовать управление 6–8 секунд.
-5. Ожидаемый итог HUD:
-
-```text
-TASK-033 LOD (U): PASS split>0, merge>0, Δlod<=1, open=0, seam<=1.00E-03
-```
-
-6. В Output требуется итоговая строка:
+1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
+2. Запустить стартовую сцену и дождаться стабильного состояния:
+   - `Applied = resident`;
+   - `resident < logical`;
+   - `queue=0`, `workers=0`, `errors=0`;
+   - `L3 > 0`;
+   - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
+   - `collision=6/6 (129×129)`, `ground=да`, `probe=да`.
+3. Нажать `I` и не использовать управление до завершения. Обычная длительность — до 15 секунд.
+4. Ожидаемый итог HUD:
 
 ```text
-TASK-033 quadtree LOD acceptance PASS
+TASK-036 stream (I): PASS revisions>=4, L3>0, resident<logical,
+unloaded>0, queue=0, workers=0, errors=0
 ```
 
-7. Ручная проверка: оранжевые `L2` patches следуют за игроком, синие `L1`
-   остаются вдали; отверстий и провалов на переходах нет; collision не исчезает;
-   после теста работают WASD, `Space`, `R`, `F1`, `F2`, `T` и `Y`.
-8. При `FAIL` предоставить screenshot HUD, итоговую строку Output и последние
-   20–30 строк лога.
+5. В Godot Output требуется строка с префиксом:
+
+```text
+TASK-036 async patch streaming acceptance PASS
+```
+
+6. Передать screenshot HUD после `PASS`, итоговую строку Output и результат сборки.
+7. Ручная проверка: розовые `L3` следуют за игроком, оранжевые `L2` образуют промежуточную зону, синие `L1` остаются вдали; отверстий на горизонте и LOD-переходах нет; collision и WASD/Space/R/F1/F2/T/Y/U работают.
+8. При `FAIL` передать screenshot HUD, итоговую строку Output и последние 20–30 строк лога.
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
 
+### 2026-08-01 — `TASK-036`, L1/L2/L3 async visual patch streaming
+
+**Исходный снимок:** `ProjectHorizon-main(1)(4).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-async-quadtree-streaming.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** раздел 9.3 PDF-ТЗ; `TASK-033`–`TASK-038`, `PC-070`–`PC-086`, `PC-ACC-040`–`PC-ACC-057`.
+
+**Runtime-доказательство предыдущей итерации:** сборка 0/0; `TASK-033 LOD (U): PASS split=17, merge=16, Δlod=1, open=0, seam=0`; patches 36, L1 20, L2 16, atomic 112, nonManifold 0.
+
+**Краткий результат:** добавлены рекурсивный третий уровень, 2:1 balancing, отменяемые worker jobs, plan revisions, stale protection, дозированное main-thread применение и resident/unload lifecycle. Клавиша `I` выполняет автоматическую приёмку. Стабильная collision-сетка сохранена; collision LOD выделен в `TASK-038`.
+
+**Проверки текущей среды:** математическая симуляция topology/resident route, лексический C#-контроль, scene/resource paths, ZIP hygiene. Сборка и Godot runtime недоступны.
+
 ### 2026-08-01 — `TASK-033`, начальная quadtree LOD-ступень
 
-**Исходный снимок:** `ProjectHorizon-main(6).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-quadtree-lod-foundation.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main(6).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-quadtree-lod-foundation.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** раздел 9.3 PDF-ТЗ; `PC-070`–`PC-074`, `PC-ACC-040`–`PC-ACC-045`.
 
 **Краткий результат:** визуальные грани заменены независимыми `L1/L2` patches,
@@ -477,9 +558,9 @@ collision-граней сохранены без перестроения. `TASK
 
 ### 2026-08-01 — приёмка `TASK-032/TASK-034` и добавление регламента итераций
 
-**Исходный снимок:** `ProjectHorizon-main-floating-origin-build-hotfix.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-development-iteration-protocol.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main-floating-origin-build-hotfix.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-development-iteration-protocol.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** `TASK-032`, `TASK-034`, `PC-060`–`PC-064`, `PC-ACC-030`–`PC-ACC-035`; процесс ведения журнала и передачи итераций.
 
 **Runtime-доказательство от пользователя:**

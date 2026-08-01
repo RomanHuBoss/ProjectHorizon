@@ -1,5 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
+using CancellationToken = System.Threading.CancellationToken;
+using CancellationTokenSource = System.Threading.CancellationTokenSource;
+using System.Threading.Tasks;
 using Godot;
 
 public enum CubeSphereDebugMode
@@ -24,6 +28,16 @@ public enum CubeSphereLodTestState
     Cancelled = 4
 }
 
+public enum CubeSphereStreamingTestState
+{
+    Ready = 0,
+    RunningRoute = 1,
+    WaitingForSettle = 2,
+    Passed = 3,
+    Failed = 4,
+    Cancelled = 5
+}
+
 public partial class CubeSpherePrototype : Node3D
 {
     private sealed class PatchRuntime
@@ -41,6 +55,39 @@ public partial class CubeSpherePrototype : Node3D
         public MeshInstance3D MeshInstance { get; }
     }
 
+    private sealed class ActivePatchJob
+    {
+        public ActivePatchJob(CubeSpherePatchBuildRequest request)
+        {
+            Request = request;
+        }
+
+        public CubeSpherePatchBuildRequest Request { get; }
+    }
+
+    private sealed class CompletedPatchJob
+    {
+        public CompletedPatchJob(
+            CubeSpherePatchBuildRequest request,
+            CubeSpherePatchBuildResult? result,
+            bool cancelled,
+            string? error)
+        {
+            Request = request;
+            Result = result;
+            Cancelled = cancelled;
+            Error = error;
+        }
+
+        public CubeSpherePatchBuildRequest Request { get; }
+
+        public CubeSpherePatchBuildResult? Result { get; }
+
+        public bool Cancelled { get; }
+
+        public string? Error { get; }
+    }
+
     private static readonly Vector3[] LodAcceptanceRoute =
     {
         Vector3.Right,
@@ -51,6 +98,19 @@ public partial class CubeSpherePrototype : Node3D
         new Vector3(-1.0f, 0.0f, -1.0f).Normalized(),
         Vector3.Forward,
         new Vector3(1.0f, 0.0f, -1.0f).Normalized(),
+        Vector3.Right
+    };
+
+    private static readonly Vector3[] StreamingAcceptanceRoute =
+    {
+        Vector3.Right,
+        Vector3.Up,
+        Vector3.Back,
+        Vector3.Left,
+        Vector3.Down,
+        Vector3.Forward,
+        new Vector3(1.0f, 1.0f, 1.0f).Normalized(),
+        new Vector3(-1.0f, 1.0f, -1.0f).Normalized(),
         Vector3.Right
     };
 
@@ -93,9 +153,41 @@ public partial class CubeSpherePrototype : Node3D
     [Export(PropertyHint.Range, "0.25,3.0,0.05")]
     public float LodTestStepSeconds { get; set; } = 0.65f;
 
+    [Export(PropertyHint.Range, "3,5,1")]
+    public int LodLevelCount { get; set; } = 3;
+
+    [Export(PropertyHint.Range, "5.0,60.0,0.5")]
+    public float LodFineSplitAngleDegrees { get; set; } = 24.0f;
+
+    [Export(PropertyHint.Range, "8.0,75.0,0.5")]
+    public float LodFineMergeAngleDegrees { get; set; } = 34.0f;
+
+    [Export(PropertyHint.Range, "91.0,150.0,1.0")]
+    public float LodResidentAngleDegrees { get; set; } = 108.0f;
+
+    [Export(PropertyHint.Range, "1,4,1")]
+    public int MaxPatchWorkers { get; set; } = 4;
+
+    [Export(PropertyHint.Range, "1,8,1")]
+    public int MaxPatchAppliesPerFrame { get; set; } = 2;
+
+    [Export(PropertyHint.Range, "0.03,0.50,0.01")]
+    public float StreamingTestStepSeconds { get; set; } = 0.08f;
+
+    [Export(PropertyHint.Range, "3.0,30.0,0.5")]
+    public float StreamingTestSettleTimeoutSeconds { get; set; } = 12.0f;
+
     private readonly Dictionary<CubeSpherePatchKey, PatchRuntime> _patches = new();
     private readonly HashSet<CubeSpherePatchKey> _splitParents = new();
+    private readonly HashSet<CubeSpherePatchKey> _logicalLeaves = new();
+    private readonly HashSet<CubeSpherePatchKey> _targetResidentLeaves = new();
     private readonly List<CollisionShape3D> _collisionShapes = new();
+    private readonly Queue<CubeSpherePatchKey> _pendingPatchBuilds = new();
+    private readonly ConcurrentQueue<CompletedPatchJob> _completedPatchJobs = new();
+    private readonly Dictionary<long, ActivePatchJob> _activePatchJobs = new();
+    private readonly Dictionary<CubeSpherePatchKey, CubeSpherePatchBuildResult>
+        _readyPatchResults = new();
+    private readonly Queue<CubeSpherePatchKey> _readyApplyOrder = new();
     private Node3D? _planetRoot;
     private Node3D? _facesRoot;
     private StaticBody3D? _collisionBody;
@@ -111,15 +203,31 @@ public partial class CubeSpherePrototype : Node3D
         CubeSphereCameraMode.PlanetaryPlayer;
     private CubeSphereLodTestState _lodTestState =
         CubeSphereLodTestState.Ready;
+    private CubeSphereStreamingTestState _streamingTestState =
+        CubeSphereStreamingTestState.Ready;
     private bool _orbitPaused;
     private double _hudRefreshAccumulator;
     private double _lodUpdateAccumulator;
     private int _lodLevelBasePatchCount;
+    private int _lodLevelMidPatchCount;
     private int _lodLevelFinePatchCount;
+    private int _logicalBasePatchCount;
+    private int _logicalMidPatchCount;
+    private int _logicalFinePatchCount;
     private int _lodSkirtTriangles;
     private int _collisionResolution;
     private double _lastLodUpdateMilliseconds;
     private int _lodTopologyRevision;
+    private int _patchPlanRevision;
+    private CancellationTokenSource? _patchPlanCancellation;
+    private long _nextPatchJobId;
+    private int _patchWorkerLimit = 1;
+    private int _patchJobsCancelled;
+    private int _patchJobsStale;
+    private int _patchJobsFailed;
+    private int _patchesApplied;
+    private int _patchesUnloaded;
+    private double _lastPatchBuildMilliseconds;
     private Vector3 _lodTestFocusDirection = Vector3.Right;
     private int _lodTestRouteIndex;
     private float _lodTestStepElapsed;
@@ -133,9 +241,27 @@ public partial class CubeSpherePrototype : Node3D
     private int _lodTestMaximumNeighborDelta;
     private float _lodTestMaximumSeamError;
     private string _lodTestResult = "готов";
+    private Vector3 _streamingTestFocusDirection = Vector3.Right;
+    private int _streamingTestRouteIndex;
+    private float _streamingTestStepElapsed;
+    private float _streamingTestSettleElapsed;
+    private int _streamingTestStartingRevision;
+    private int _streamingTestBaselineCancelled;
+    private int _streamingTestBaselineStale;
+    private int _streamingTestBaselineFailed;
+    private int _streamingTestBaselineUnloaded;
+    private int _streamingTestPeakQueue;
+    private int _streamingTestPeakWorkers;
+    private int _streamingTestPeakResident;
+    private int _streamingTestMinimumLogicalFine;
+    private string _streamingTestResult = "готов";
 
     public bool LodTestRunning =>
         _lodTestState == CubeSphereLodTestState.Running;
+
+    public bool StreamingTestRunning =>
+        _streamingTestState == CubeSphereStreamingTestState.RunningRoute ||
+        _streamingTestState == CubeSphereStreamingTestState.WaitingForSettle;
 
     public override void _Ready()
     {
@@ -150,10 +276,22 @@ public partial class CubeSpherePrototype : Node3D
             "FloatingOriginController");
         _hudLabel = GetNode<Label>(
             "Hud/MarginContainer/PanelContainer/Label");
+        _patchWorkerLimit = Math.Max(
+            1,
+            Math.Min(
+                Math.Clamp(MaxPatchWorkers, 1, 4),
+                Math.Max(1, System.Environment.ProcessorCount - 2)));
 
         BuildPlanet();
         ApplyCameraMode();
         UpdateHud();
+    }
+
+    public override void _ExitTree()
+    {
+        _patchPlanCancellation?.Cancel();
+        _patchPlanCancellation?.Dispose();
+        _patchPlanCancellation = null;
     }
 
     public override void _Process(double delta)
@@ -171,12 +309,19 @@ public partial class CubeSpherePrototype : Node3D
             UpdateLodAcceptanceTest((float)delta);
         }
 
+        if (StreamingTestRunning)
+        {
+            UpdateStreamingAcceptanceTest((float)delta);
+        }
+
         _lodUpdateAccumulator += delta;
         if (_lodUpdateAccumulator >= Math.Max(0.05f, LodUpdateIntervalSeconds))
         {
             _lodUpdateAccumulator = 0.0;
             UpdateQuadtreeLod(GetCurrentLodFocusDirection(), false);
         }
+
+        ProcessPatchStreamingPipeline();
 
         _hudRefreshAccumulator += delta;
         if (_hudRefreshAccumulator >= 0.1)
@@ -215,6 +360,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.T ||
             keyEvent.PhysicalKeycode == Key.T)
         {
+            if (StreamingTestRunning)
+            {
+                CancelStreamingAcceptanceTest();
+            }
+
             if (LodTestRunning)
             {
                 CancelLodAcceptanceTest();
@@ -253,6 +403,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.Y ||
             keyEvent.PhysicalKeycode == Key.Y)
         {
+            if (StreamingTestRunning)
+            {
+                CancelStreamingAcceptanceTest();
+            }
+
             if (LodTestRunning)
             {
                 CancelLodAcceptanceTest();
@@ -284,6 +439,11 @@ public partial class CubeSpherePrototype : Node3D
         else if (keyEvent.Keycode == Key.U ||
             keyEvent.PhysicalKeycode == Key.U)
         {
+            if (StreamingTestRunning)
+            {
+                CancelStreamingAcceptanceTest();
+            }
+
             if (LodTestRunning)
             {
                 CancelLodAcceptanceTest();
@@ -298,9 +458,37 @@ public partial class CubeSpherePrototype : Node3D
             UpdateHud();
             GetViewport().SetInputAsHandled();
         }
+        else if (keyEvent.Keycode == Key.I ||
+            keyEvent.PhysicalKeycode == Key.I)
+        {
+            if (StreamingTestRunning)
+            {
+                CancelStreamingAcceptanceTest();
+            }
+            else
+            {
+                if (LodTestRunning)
+                {
+                    CancelLodAcceptanceTest();
+                }
+
+                _floatingOrigin?.CancelAcceptanceTest(true);
+                _planetaryPlayer?.CancelSeamTraversalTest(true);
+                BeginStreamingAcceptanceTest();
+            }
+
+            UpdateHud();
+            GetViewport().SetInputAsHandled();
+        }
         else if (keyEvent.Keycode == Key.R ||
             keyEvent.PhysicalKeycode == Key.R)
         {
+            if (StreamingTestRunning)
+            {
+                CancelStreamingAcceptanceTest();
+                UpdateHud();
+            }
+
             if (LodTestRunning)
             {
                 CancelLodAcceptanceTest();
@@ -344,7 +532,7 @@ public partial class CubeSpherePrototype : Node3D
         {
             _collisionResolution = Math.Min(
                 257,
-                ((foundationData.Resolution - 1) * (1 << GetFineLevel())) + 1);
+                ((foundationData.Resolution - 1) * (1 << GetMiddleLevel())) + 1);
             CubeSphereBuildData collisionBuildData = CubeSphereMeshBuilder.Build(
                 _collisionResolution,
                 PlanetRadius,
@@ -375,11 +563,12 @@ public partial class CubeSpherePrototype : Node3D
         GD.Print(
             "CubeSphere quadtree foundation: " +
             $"patches={_patches.Count}; " +
-            $"baseLevel={GetBaseLevel()}; fineLevel={GetFineLevel()}; " +
+            $"levels=L{GetBaseLevel()}-L{GetMaximumLevel()}; " +
             $"resolution={foundationData.Resolution}x{foundationData.Resolution}; " +
             $"collision={_collisionShapes.Count}@{_collisionResolution}x{_collisionResolution}; " +
             $"faceSeams={foundationData.SeamComparisons}/" +
             $"{foundationData.ExpectedSeamComparisons}; " +
+            $"logical={_logicalLeaves.Count}; resident={_targetResidentLeaves.Count}; " +
             $"lodOpen={_lodValidation?.OpenSegments ?? -1}; " +
             $"lodDelta={_lodValidation?.MaximumNeighborLevelDelta ?? -1}; " +
             $"build={elapsedMilliseconds:F2} ms");
@@ -393,9 +582,17 @@ public partial class CubeSpherePrototype : Node3D
         }
 
         Vector3 normalizedFocus = focusDirection.Normalized();
-        HashSet<CubeSpherePatchKey> desiredSplits =
-            BuildDesiredSplitParents(normalizedFocus);
-        bool topologyChanged = !_splitParents.SetEquals(desiredSplits);
+        BuildDesiredTopology(
+            normalizedFocus,
+            out HashSet<CubeSpherePatchKey> desiredSplits,
+            out HashSet<CubeSpherePatchKey> desiredLogicalLeaves);
+        HashSet<CubeSpherePatchKey> desiredResidentLeaves =
+            BuildResidentLeaves(desiredLogicalLeaves, normalizedFocus);
+        bool topologyChanged =
+            !_splitParents.SetEquals(desiredSplits) ||
+            !_logicalLeaves.SetEquals(desiredLogicalLeaves);
+        bool residentSetChanged =
+            !_targetResidentLeaves.SetEquals(desiredResidentLeaves);
 
         int splitEvents = 0;
         int mergeEvents = 0;
@@ -419,9 +616,8 @@ public partial class CubeSpherePrototype : Node3D
         {
             _splitParents.Clear();
             _splitParents.UnionWith(desiredSplits);
-            HashSet<CubeSpherePatchKey> desiredLeaves =
-                BuildDesiredLeaves(_splitParents);
-            ApplyPatchSet(desiredLeaves);
+            _logicalLeaves.Clear();
+            _logicalLeaves.UnionWith(desiredLogicalLeaves);
             _lodTopologyRevision++;
 
             if (LodTestRunning)
@@ -432,12 +628,19 @@ public partial class CubeSpherePrototype : Node3D
             }
         }
 
+        if (topologyChanged || residentSetChanged)
+        {
+            _targetResidentLeaves.Clear();
+            _targetResidentLeaves.UnionWith(desiredResidentLeaves);
+            BeginPatchStreamingPlan();
+        }
+
         if (topologyChanged || forceValidation || _lodValidation is null)
         {
             ulong startedAtMicroseconds = Time.GetTicksUsec();
             _lodValidation = CubeSpherePatchBuilder.ValidateTopology(
-                _patches.Keys,
-                GetFineLevel(),
+                _logicalLeaves,
+                GetMaximumLevel(),
                 PlanetRadius,
                 HeightAmplitude,
                 NoiseFrequency,
@@ -449,9 +652,11 @@ public partial class CubeSpherePrototype : Node3D
 
             GD.Print(
                 "CubeSphere LOD revision: " +
-                $"revision={_lodTopologyRevision}; patches={_patches.Count}; " +
-                $"L{GetBaseLevel()}={_lodLevelBasePatchCount}; " +
-                $"L{GetFineLevel()}={_lodLevelFinePatchCount}; " +
+                $"topology={_lodTopologyRevision}; plan={_patchPlanRevision}; " +
+                $"logical={_logicalLeaves.Count}; resident={_targetResidentLeaves.Count}; " +
+                $"applied={_patches.Count}; L{GetBaseLevel()}={_logicalBasePatchCount}; " +
+                $"L{GetMiddleLevel()}={_logicalMidPatchCount}; " +
+                $"L{GetMaximumLevel()}={_logicalFinePatchCount}; " +
                 $"split+={splitEvents}; merge+={mergeEvents}; " +
                 $"atomic={_lodValidation.AtomicSegments}; " +
                 $"open={_lodValidation.OpenSegments}; " +
@@ -462,85 +667,398 @@ public partial class CubeSpherePrototype : Node3D
         }
     }
 
-    private HashSet<CubeSpherePatchKey> BuildDesiredSplitParents(
+    private void BuildDesiredTopology(
+        Vector3 focusDirection,
+        out HashSet<CubeSpherePatchKey> desiredSplits,
+        out HashSet<CubeSpherePatchKey> desiredLeaves)
+    {
+        desiredSplits = new HashSet<CubeSpherePatchKey>();
+        desiredLeaves = new HashSet<CubeSpherePatchKey>();
+        int baseLevel = GetBaseLevel();
+        int divisions = 1 << baseLevel;
+
+        foreach (CubeSphereFaceId faceId in CubeSpherePatchBuilder.FaceIds)
+        {
+            for (int y = 0; y < divisions; y++)
+            {
+                for (int x = 0; x < divisions; x++)
+                {
+                    EvaluatePatchNode(
+                        new CubeSpherePatchKey(faceId, baseLevel, x, y),
+                        focusDirection,
+                        desiredSplits,
+                        desiredLeaves);
+                }
+            }
+        }
+
+        BalanceDesiredLeaves(desiredSplits, desiredLeaves);
+    }
+
+    private void EvaluatePatchNode(
+        CubeSpherePatchKey key,
+        Vector3 focusDirection,
+        HashSet<CubeSpherePatchKey> desiredSplits,
+        HashSet<CubeSpherePatchKey> desiredLeaves)
+    {
+        if (key.Level >= GetMaximumLevel() ||
+            !ShouldSplitPatch(key, focusDirection))
+        {
+            desiredLeaves.Add(key);
+            return;
+        }
+
+        desiredSplits.Add(key);
+        foreach (CubeSpherePatchKey child in GetChildren(key))
+        {
+            EvaluatePatchNode(
+                child,
+                focusDirection,
+                desiredSplits,
+                desiredLeaves);
+        }
+    }
+
+    private bool ShouldSplitPatch(
+        CubeSpherePatchKey key,
         Vector3 focusDirection)
     {
-        HashSet<CubeSpherePatchKey> result = new();
-        int baseLevel = GetBaseLevel();
-        int divisions = 1 << baseLevel;
-        float splitDot = Mathf.Cos(Mathf.DegToRad(
-            Math.Clamp(LodSplitAngleDegrees, 1.0f, 88.0f)));
-        float mergeAngle = Math.Max(
-            LodSplitAngleDegrees + 1.0f,
-            Math.Clamp(LodMergeAngleDegrees, 2.0f, 89.0f));
-        float mergeDot = Mathf.Cos(Mathf.DegToRad(mergeAngle));
+        int depthFromBase = key.Level - GetBaseLevel();
+        float splitAngle;
+        float mergeAngle;
 
-        foreach (CubeSphereFaceId faceId in CubeSpherePatchBuilder.FaceIds)
+        if (depthFromBase <= 0)
         {
-            for (int y = 0; y < divisions; y++)
+            splitAngle = Math.Clamp(LodSplitAngleDegrees, 1.0f, 88.0f);
+            mergeAngle = Math.Max(
+                splitAngle + 1.0f,
+                Math.Clamp(LodMergeAngleDegrees, 2.0f, 89.0f));
+        }
+        else
+        {
+            float scale = MathF.Pow(0.58f, Math.Max(0, depthFromBase - 1));
+            splitAngle = Math.Clamp(
+                LodFineSplitAngleDegrees * scale,
+                3.0f,
+                70.0f);
+            mergeAngle = Math.Clamp(
+                Math.Max(splitAngle + 2.0f, LodFineMergeAngleDegrees * scale),
+                splitAngle + 1.0f,
+                80.0f);
+        }
+
+        float alignment = CubeSpherePatchBuilder
+            .GetPatchCenterDirection(key)
+            .Dot(focusDirection);
+        bool wasSplit = _splitParents.Contains(key);
+        float threshold = wasSplit
+            ? Mathf.Cos(Mathf.DegToRad(mergeAngle))
+            : Mathf.Cos(Mathf.DegToRad(splitAngle));
+        return alignment >= threshold;
+    }
+
+    private void BalanceDesiredLeaves(
+        HashSet<CubeSpherePatchKey> desiredSplits,
+        HashSet<CubeSpherePatchKey> desiredLeaves)
+    {
+        int safetyCounter = 0;
+        while (safetyCounter++ < 12)
+        {
+            IReadOnlyCollection<CubeSpherePatchKey> leavesToSplit =
+                CubeSpherePatchBuilder.FindLeavesRequiringBalance(
+                    desiredLeaves,
+                    GetMaximumLevel());
+            if (leavesToSplit.Count == 0)
             {
-                for (int x = 0; x < divisions; x++)
+                return;
+            }
+
+            bool changed = false;
+            foreach (CubeSpherePatchKey leaf in leavesToSplit)
+            {
+                if (!desiredLeaves.Remove(leaf) ||
+                    leaf.Level >= GetMaximumLevel())
                 {
-                    CubeSpherePatchKey parent = new(faceId, baseLevel, x, y);
-                    float alignment = CubeSpherePatchBuilder
-                        .GetPatchCenterDirection(parent)
-                        .Dot(focusDirection);
-                    bool wasSplit = _splitParents.Contains(parent);
-                    bool shouldSplit = wasSplit
-                        ? alignment >= mergeDot
-                        : alignment >= splitDot;
-                    if (shouldSplit)
-                    {
-                        result.Add(parent);
-                    }
+                    continue;
                 }
+
+                desiredSplits.Add(leaf);
+                foreach (CubeSpherePatchKey child in GetChildren(leaf))
+                {
+                    desiredLeaves.Add(child);
+                }
+
+                changed = true;
+            }
+
+            if (!changed)
+            {
+                return;
+            }
+        }
+    }
+
+    private HashSet<CubeSpherePatchKey> BuildResidentLeaves(
+        IReadOnlyCollection<CubeSpherePatchKey> logicalLeaves,
+        Vector3 focusDirection)
+    {
+        HashSet<CubeSpherePatchKey> residentLeaves = new();
+        float residentAngleRadians = Mathf.DegToRad(Math.Clamp(
+            LodResidentAngleDegrees,
+            91.0f,
+            150.0f));
+
+        foreach (CubeSpherePatchKey leaf in logicalLeaves)
+        {
+            float alignment = Math.Clamp(
+                CubeSpherePatchBuilder
+                    .GetPatchCenterDirection(leaf)
+                    .Dot(focusDirection),
+                -1.0f,
+                1.0f);
+            float centerAngle = MathF.Acos(alignment);
+            float patchAngularRadius =
+                CubeSpherePatchBuilder.GetPatchAngularRadiusRadians(leaf);
+
+            // Keep the whole patch resident while any part of its angular
+            // bounding cap can still intersect the conservative view cap.
+            if (centerAngle - patchAngularRadius <= residentAngleRadians)
+            {
+                residentLeaves.Add(leaf);
             }
         }
 
-        return result;
+        return residentLeaves;
     }
 
-    private HashSet<CubeSpherePatchKey> BuildDesiredLeaves(
-        IReadOnlyCollection<CubeSpherePatchKey> splitParents)
+    private static IReadOnlyList<CubeSpherePatchKey> GetChildren(
+        CubeSpherePatchKey parent)
     {
-        HashSet<CubeSpherePatchKey> leaves = new();
-        HashSet<CubeSpherePatchKey> splitLookup = new(splitParents);
-        int baseLevel = GetBaseLevel();
-        int fineLevel = GetFineLevel();
-        int divisions = 1 << baseLevel;
-
-        foreach (CubeSphereFaceId faceId in CubeSpherePatchBuilder.FaceIds)
+        int level = parent.Level + 1;
+        int childX = parent.X * 2;
+        int childY = parent.Y * 2;
+        return new[]
         {
-            for (int y = 0; y < divisions; y++)
-            {
-                for (int x = 0; x < divisions; x++)
-                {
-                    CubeSpherePatchKey parent = new(faceId, baseLevel, x, y);
-                    if (!splitLookup.Contains(parent))
-                    {
-                        leaves.Add(parent);
-                        continue;
-                    }
+            new CubeSpherePatchKey(parent.FaceId, level, childX, childY),
+            new CubeSpherePatchKey(parent.FaceId, level, childX + 1, childY),
+            new CubeSpherePatchKey(parent.FaceId, level, childX, childY + 1),
+            new CubeSpherePatchKey(parent.FaceId, level, childX + 1, childY + 1)
+        };
+    }
 
-                    int childX = x * 2;
-                    int childY = y * 2;
-                    leaves.Add(new CubeSpherePatchKey(faceId, fineLevel, childX, childY));
-                    leaves.Add(new CubeSpherePatchKey(faceId, fineLevel, childX + 1, childY));
-                    leaves.Add(new CubeSpherePatchKey(faceId, fineLevel, childX, childY + 1));
-                    leaves.Add(new CubeSpherePatchKey(faceId, fineLevel, childX + 1, childY + 1));
-                }
+    private void BeginPatchStreamingPlan()
+    {
+        _patchPlanCancellation?.Cancel();
+        _patchPlanCancellation?.Dispose();
+        _patchPlanCancellation = new CancellationTokenSource();
+        _patchPlanRevision++;
+        _pendingPatchBuilds.Clear();
+        _readyPatchResults.Clear();
+        _readyApplyOrder.Clear();
+
+        List<CubeSpherePatchKey> missingKeys = new();
+        foreach (CubeSpherePatchKey key in _targetResidentLeaves)
+        {
+            if (!_patches.ContainsKey(key))
+            {
+                missingKeys.Add(key);
             }
         }
 
-        return leaves;
+        missingKeys.Sort(static (left, right) =>
+        {
+            int levelComparison = right.Level.CompareTo(left.Level);
+            if (levelComparison != 0)
+            {
+                return levelComparison;
+            }
+
+            int faceComparison = left.FaceId.CompareTo(right.FaceId);
+            if (faceComparison != 0)
+            {
+                return faceComparison;
+            }
+
+            int yComparison = left.Y.CompareTo(right.Y);
+            return yComparison != 0 ? yComparison : left.X.CompareTo(right.X);
+        });
+
+        foreach (CubeSpherePatchKey key in missingKeys)
+        {
+            _pendingPatchBuilds.Enqueue(key);
+        }
     }
 
-    private void ApplyPatchSet(HashSet<CubeSpherePatchKey> desiredLeaves)
+    private void ProcessPatchStreamingPipeline()
     {
+        DrainCompletedPatchJobs();
+        StartPendingPatchJobs();
+        ApplyReadyPatchResults();
+        CommitPatchPlanIfReady();
+        RecordStreamingTestMetrics();
+    }
+
+    private void DrainCompletedPatchJobs()
+    {
+        while (_completedPatchJobs.TryDequeue(out CompletedPatchJob? completed) &&
+            completed is not null)
+        {
+            _activePatchJobs.Remove(completed.Request.JobId);
+
+            if (completed.Cancelled)
+            {
+                _patchJobsCancelled++;
+                continue;
+            }
+
+            if (!string.IsNullOrWhiteSpace(completed.Error))
+            {
+                _patchJobsFailed++;
+                GD.PushError(
+                    $"CubeSphere patch worker failed: job={completed.Request.JobId}; " +
+                    $"key={completed.Request.Key.DisplayName}; {completed.Error}");
+                continue;
+            }
+
+            CubeSpherePatchBuildResult? completedResult = completed.Result;
+            if (completedResult is null ||
+                completed.Request.PlanRevision != _patchPlanRevision ||
+                !_targetResidentLeaves.Contains(completed.Request.Key))
+            {
+                _patchJobsStale++;
+                continue;
+            }
+
+            _readyPatchResults[completed.Request.Key] = completedResult;
+            _readyApplyOrder.Enqueue(completed.Request.Key);
+        }
+    }
+
+    private void StartPendingPatchJobs()
+    {
+        if (_patchPlanCancellation is null)
+        {
+            return;
+        }
+
+        while (_activePatchJobs.Count < _patchWorkerLimit &&
+            _pendingPatchBuilds.Count > 0)
+        {
+            CubeSpherePatchKey key = _pendingPatchBuilds.Dequeue();
+
+            if (_patches.ContainsKey(key) ||
+                !_targetResidentLeaves.Contains(key))
+            {
+                continue;
+            }
+
+            long jobId = ++_nextPatchJobId;
+            CubeSpherePatchBuildRequest request = new(
+                jobId,
+                _patchPlanRevision,
+                key,
+                FaceResolution,
+                PlanetRadius,
+                HeightAmplitude,
+                NoiseFrequency,
+                NoiseSeed,
+                LodSkirtDepth);
+            _activePatchJobs[jobId] = new ActivePatchJob(request);
+            CancellationToken cancellationToken =
+                _patchPlanCancellation.Token;
+
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    CubeSpherePatchBuildResult result =
+                        CubeSpherePatchDataBuilder.Build(
+                            request,
+                            cancellationToken);
+                    _completedPatchJobs.Enqueue(
+                        new CompletedPatchJob(request, result, false, null));
+                }
+                catch (OperationCanceledException)
+                {
+                    _completedPatchJobs.Enqueue(
+                        new CompletedPatchJob(request, null, true, null));
+                }
+                catch (Exception exception)
+                {
+                    _completedPatchJobs.Enqueue(
+                        new CompletedPatchJob(
+                            request,
+                            null,
+                            false,
+                            exception.ToString()));
+                }
+            });
+        }
+    }
+
+    private void ApplyReadyPatchResults()
+    {
+        int applyBudget = Math.Clamp(MaxPatchAppliesPerFrame, 1, 8);
+        int applied = 0;
+
+        while (applied < applyBudget && _readyApplyOrder.Count > 0)
+        {
+            CubeSpherePatchKey key = _readyApplyOrder.Dequeue();
+            if (!_readyPatchResults.TryGetValue(
+                    key,
+                    out CubeSpherePatchBuildResult? result) ||
+                result is null)
+            {
+                continue;
+            }
+
+            _readyPatchResults.Remove(key);
+
+            if (result.Request.PlanRevision != _patchPlanRevision ||
+                !_targetResidentLeaves.Contains(key))
+            {
+                _patchJobsStale++;
+                continue;
+            }
+
+            if (!_patches.ContainsKey(key))
+            {
+                AddPatchFromData(result.PatchData);
+                _patchesApplied++;
+                _lastPatchBuildMilliseconds = result.BuildMilliseconds;
+                applied++;
+            }
+        }
+    }
+
+    private void CommitPatchPlanIfReady()
+    {
+        foreach (CubeSpherePatchKey key in _targetResidentLeaves)
+        {
+            if (!_patches.ContainsKey(key))
+            {
+                return;
+            }
+        }
+
+        foreach (ActivePatchJob activeJob in _activePatchJobs.Values)
+        {
+            if (activeJob.Request.PlanRevision == _patchPlanRevision)
+            {
+                return;
+            }
+        }
+
+        if (_pendingPatchBuilds.Count > 0 ||
+            _readyPatchResults.Count > 0)
+        {
+            return;
+        }
+
         List<CubeSpherePatchKey> keysToRemove = new();
         foreach (CubeSpherePatchKey existingKey in _patches.Keys)
         {
-            if (!desiredLeaves.Contains(existingKey))
+            if (!_targetResidentLeaves.Contains(existingKey))
             {
                 keysToRemove.Add(existingKey);
             }
@@ -548,45 +1066,75 @@ public partial class CubeSpherePrototype : Node3D
 
         foreach (CubeSpherePatchKey key in keysToRemove)
         {
+            _patches[key].MeshInstance.Visible = false;
+        }
+
+        foreach (CubeSpherePatchKey key in _targetResidentLeaves)
+        {
+            _patches[key].MeshInstance.Visible = true;
+        }
+
+        foreach (CubeSpherePatchKey key in keysToRemove)
+        {
             PatchRuntime runtime = _patches[key];
             runtime.MeshInstance.QueueFree();
             _patches.Remove(key);
+            _patchesUnloaded++;
         }
 
-        foreach (CubeSpherePatchKey desiredKey in desiredLeaves)
-        {
-            if (_patches.ContainsKey(desiredKey))
-            {
-                continue;
-            }
-
-            AddPatch(desiredKey);
-        }
+        UpdateLodCounters();
     }
 
-    private void AddPatch(CubeSpherePatchKey key)
+    private void AddPatchFromData(CubeSpherePatchData patchData)
     {
         if (_facesRoot is null)
         {
             return;
         }
 
-        CubeSpherePatchData patchData = CubeSpherePatchBuilder.BuildPatch(
-            key,
-            FaceResolution,
-            PlanetRadius,
-            HeightAmplitude,
-            NoiseFrequency,
-            NoiseSeed,
-            LodSkirtDepth);
+        CubeSpherePatchKey key = patchData.Key;
         MeshInstance3D meshInstance = new()
         {
             Name = $"Patch_{SanitizeName(patchData.FaceDisplayName)}_" +
                 $"L{key.Level}_{key.X}_{key.Y}",
-            Mesh = CreatePatchMesh(patchData)
+            Mesh = CreatePatchMesh(patchData),
+            Visible = false
         };
         _facesRoot.AddChild(meshInstance);
         _patches.Add(key, new PatchRuntime(patchData, meshInstance));
+    }
+
+    private bool IsPatchPlanSettled()
+    {
+        if (_activePatchJobs.Count > 0 ||
+            _pendingPatchBuilds.Count > 0 ||
+            _readyPatchResults.Count > 0 ||
+            !_completedPatchJobs.IsEmpty)
+        {
+            return false;
+        }
+
+        if (_patches.Count != _targetResidentLeaves.Count)
+        {
+            return false;
+        }
+
+        foreach (CubeSpherePatchKey key in _targetResidentLeaves)
+        {
+            if (!_patches.ContainsKey(key))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private int GetPatchQueueDepth()
+    {
+        return _pendingPatchBuilds.Count +
+            _readyPatchResults.Count +
+            _completedPatchJobs.Count;
     }
 
     private void ApplyCameraMode()
@@ -674,7 +1222,12 @@ public partial class CubeSpherePrototype : Node3D
 
         if (_debugMode == CubeSphereDebugMode.LodLevels)
         {
-            return patchData.Key.Level == GetFineLevel()
+            if (patchData.Key.Level >= GetMaximumLevel())
+            {
+                return new Color(0.95f, 0.25f, 0.72f, 1.0f);
+            }
+
+            return patchData.Key.Level == GetMiddleLevel()
                 ? new Color(1.0f, 0.58f, 0.18f, 1.0f)
                 : new Color(0.18f, 0.62f, 0.96f, 1.0f);
         }
@@ -720,7 +1273,7 @@ public partial class CubeSpherePrototype : Node3D
         GD.Print(
             "TASK-033 quadtree LOD acceptance started: " +
             $"route={LodAcceptanceRoute.Length}; " +
-            $"base=L{GetBaseLevel()}; fine=L{GetFineLevel()}; " +
+            $"levels=L{GetBaseLevel()}-L{GetMaximumLevel()}; " +
             $"resolution={FaceResolution}x{FaceResolution}");
     }
 
@@ -840,10 +1393,10 @@ public partial class CubeSpherePrototype : Node3D
 
         _lodTestMinimumPatches = Math.Min(
             _lodTestMinimumPatches,
-            _patches.Count);
+            _logicalLeaves.Count);
         _lodTestMaximumPatches = Math.Max(
             _lodTestMaximumPatches,
-            _patches.Count);
+            _logicalLeaves.Count);
         _lodTestMaximumOpenSegments = Math.Max(
             _lodTestMaximumOpenSegments,
             _lodValidation.OpenSegments);
@@ -858,8 +1411,230 @@ public partial class CubeSpherePrototype : Node3D
             _lodValidation.MaximumSeamPositionError);
     }
 
+    private void BeginStreamingAcceptanceTest()
+    {
+        _streamingTestState = CubeSphereStreamingTestState.RunningRoute;
+        _streamingTestRouteIndex = 0;
+        _streamingTestStepElapsed = 0.0f;
+        _streamingTestSettleElapsed = 0.0f;
+        _streamingTestFocusDirection = StreamingAcceptanceRoute[0];
+        _streamingTestStartingRevision = _patchPlanRevision;
+        _streamingTestBaselineCancelled = _patchJobsCancelled;
+        _streamingTestBaselineStale = _patchJobsStale;
+        _streamingTestBaselineFailed = _patchJobsFailed;
+        _streamingTestBaselineUnloaded = _patchesUnloaded;
+        _streamingTestPeakQueue = 0;
+        _streamingTestPeakWorkers = 0;
+        _streamingTestPeakResident = 0;
+        _streamingTestMinimumLogicalFine = int.MaxValue;
+        _streamingTestResult = "выполняется";
+
+        UpdateQuadtreeLod(_streamingTestFocusDirection, true);
+        RecordStreamingTestMetrics();
+        GD.Print(
+            "TASK-036 async patch streaming acceptance started: " +
+            $"route={StreamingAcceptanceRoute.Length}; " +
+            $"levels=L{GetBaseLevel()}-L{GetMaximumLevel()}; " +
+            $"workers={_patchWorkerLimit}; residentAngle={LodResidentAngleDegrees:F1}");
+    }
+
+    private void UpdateStreamingAcceptanceTest(float deltaSeconds)
+    {
+        RecordStreamingTestMetrics();
+
+        if (_streamingTestState == CubeSphereStreamingTestState.RunningRoute)
+        {
+            _streamingTestStepElapsed += deltaSeconds;
+            if (_streamingTestStepElapsed <
+                Math.Max(0.03f, StreamingTestStepSeconds))
+            {
+                return;
+            }
+
+            _streamingTestStepElapsed = 0.0f;
+            _streamingTestRouteIndex++;
+            if (_streamingTestRouteIndex < StreamingAcceptanceRoute.Length)
+            {
+                _streamingTestFocusDirection =
+                    StreamingAcceptanceRoute[_streamingTestRouteIndex];
+                UpdateQuadtreeLod(_streamingTestFocusDirection, true);
+                return;
+            }
+
+            _streamingTestState =
+                CubeSphereStreamingTestState.WaitingForSettle;
+            _streamingTestFocusDirection = GetPlayerFocusDirection();
+            _streamingTestSettleElapsed = 0.0f;
+            UpdateQuadtreeLod(_streamingTestFocusDirection, true);
+            return;
+        }
+
+        if (_streamingTestState !=
+            CubeSphereStreamingTestState.WaitingForSettle)
+        {
+            return;
+        }
+
+        _streamingTestSettleElapsed += deltaSeconds;
+        if (IsPatchPlanSettled())
+        {
+            UpdateLodCounters();
+            bool passed =
+                _patchPlanRevision - _streamingTestStartingRevision >= 4 &&
+                _logicalFinePatchCount > 0 &&
+                _streamingTestMinimumLogicalFine > 0 &&
+                _lodLevelFinePatchCount > 0 &&
+                _targetResidentLeaves.Count < _logicalLeaves.Count &&
+                _patchesUnloaded > _streamingTestBaselineUnloaded &&
+                _patches.Count == _targetResidentLeaves.Count &&
+                _streamingTestPeakQueue > 0 &&
+                _streamingTestPeakWorkers > 0 &&
+                _patchJobsFailed == _streamingTestBaselineFailed &&
+                _lodValidation?.Passed == true;
+
+            FinishStreamingAcceptanceTest(
+                passed
+                    ? CubeSphereStreamingTestState.Passed
+                    : CubeSphereStreamingTestState.Failed,
+                passed
+                    ? "критерии выполнены"
+                    : BuildStreamingTestFailureReason());
+            return;
+        }
+
+        if (_streamingTestSettleElapsed >=
+            Math.Max(3.0f, StreamingTestSettleTimeoutSeconds))
+        {
+            FinishStreamingAcceptanceTest(
+                CubeSphereStreamingTestState.Failed,
+                "таймаут ожидания пустых очередей");
+        }
+    }
+
+    private void CancelStreamingAcceptanceTest()
+    {
+        if (!StreamingTestRunning)
+        {
+            return;
+        }
+
+        FinishStreamingAcceptanceTest(
+            CubeSphereStreamingTestState.Cancelled,
+            "остановлен пользователем");
+    }
+
+    private void FinishStreamingAcceptanceTest(
+        CubeSphereStreamingTestState finalState,
+        string result)
+    {
+        _streamingTestState = finalState;
+        int cancelledDelta =
+            _patchJobsCancelled - _streamingTestBaselineCancelled;
+        int staleDelta = _patchJobsStale - _streamingTestBaselineStale;
+        int failedDelta = _patchJobsFailed - _streamingTestBaselineFailed;
+        int unloadedDelta =
+            _patchesUnloaded - _streamingTestBaselineUnloaded;
+        string resultLabel = finalState switch
+        {
+            CubeSphereStreamingTestState.Passed => "PASS",
+            CubeSphereStreamingTestState.Failed => "FAIL",
+            _ => "CANCELLED"
+        };
+        string metrics =
+            $"revisions={_patchPlanRevision - _streamingTestStartingRevision}, " +
+            $"L{GetMaximumLevel()}={_lodLevelFinePatchCount}, " +
+            $"resident={_targetResidentLeaves.Count}/{_logicalLeaves.Count}, " +
+            $"unloaded={unloadedDelta}, queue=0, workers=0, " +
+            $"cancel={cancelledDelta}, stale={staleDelta}, errors={failedDelta}";
+        _streamingTestResult = finalState == CubeSphereStreamingTestState.Passed
+            ? metrics
+            : $"{result}; {metrics}";
+
+        GD.Print(
+            $"TASK-036 async patch streaming acceptance {resultLabel}: " +
+            $"revisions={_patchPlanRevision - _streamingTestStartingRevision}; " +
+            $"logical={_logicalLeaves.Count}; resident={_targetResidentLeaves.Count}; " +
+            $"applied={_patches.Count}; L{GetMaximumLevel()}={_lodLevelFinePatchCount}; " +
+            $"unloaded={unloadedDelta}; residentPeak={_streamingTestPeakResident}; " +
+            $"fineMin={_streamingTestMinimumLogicalFine}; " +
+            $"queuePeak={_streamingTestPeakQueue}; " +
+            $"workersPeak={_streamingTestPeakWorkers}; cancelled={cancelledDelta}; " +
+            $"stale={staleDelta}; errors={failedDelta}; " +
+            $"open={_lodValidation?.OpenSegments ?? -1}; " +
+            $"maxDelta={_lodValidation?.MaximumNeighborLevelDelta ?? -1}; " +
+            $"result={result}");
+
+        UpdateHud();
+    }
+
+    private string BuildStreamingTestFailureReason()
+    {
+        if (_patchJobsFailed != _streamingTestBaselineFailed)
+        {
+            return $"worker errors: {_patchJobsFailed - _streamingTestBaselineFailed}";
+        }
+
+        if (_lodValidation?.Passed != true)
+        {
+            return "логическая LOD-топология не прошла проверку";
+        }
+
+        if (_logicalFinePatchCount <= 0 || _lodLevelFinePatchCount <= 0)
+        {
+            return $"не подтверждён L{GetMaximumLevel()}";
+        }
+
+        if (_targetResidentLeaves.Count >= _logicalLeaves.Count)
+        {
+            return "невидимые patches не были исключены из resident-set";
+        }
+
+        if (_patchesUnloaded <= _streamingTestBaselineUnloaded)
+        {
+            return "не подтверждена выгрузка старых или невидимых patches";
+        }
+
+        if (_patches.Count != _targetResidentLeaves.Count)
+        {
+            return "applied-set не совпадает с resident-set";
+        }
+
+        if (_streamingTestPeakQueue <= 0 || _streamingTestPeakWorkers <= 0)
+        {
+            return "фоновые jobs не наблюдались";
+        }
+
+        return "недостаточно подтверждённых plan revisions";
+    }
+
+    private void RecordStreamingTestMetrics()
+    {
+        if (!StreamingTestRunning)
+        {
+            return;
+        }
+
+        _streamingTestPeakQueue = Math.Max(
+            _streamingTestPeakQueue,
+            GetPatchQueueDepth());
+        _streamingTestPeakWorkers = Math.Max(
+            _streamingTestPeakWorkers,
+            _activePatchJobs.Count);
+        _streamingTestPeakResident = Math.Max(
+            _streamingTestPeakResident,
+            _targetResidentLeaves.Count);
+        _streamingTestMinimumLogicalFine = Math.Min(
+            _streamingTestMinimumLogicalFine,
+            _logicalFinePatchCount);
+    }
+
     private void CancelAllAcceptanceTests()
     {
+        if (StreamingTestRunning)
+        {
+            CancelStreamingAcceptanceTest();
+        }
+
         if (LodTestRunning)
         {
             CancelLodAcceptanceTest();
@@ -878,6 +1653,11 @@ public partial class CubeSpherePrototype : Node3D
 
     private Vector3 GetCurrentLodFocusDirection()
     {
+        if (StreamingTestRunning)
+        {
+            return _streamingTestFocusDirection;
+        }
+
         return LodTestRunning
             ? _lodTestFocusDirection
             : GetPlayerFocusDirection();
@@ -902,9 +1682,15 @@ public partial class CubeSpherePrototype : Node3D
         return Math.Clamp(LodBaseLevel, 0, 6);
     }
 
-    private int GetFineLevel()
+    private int GetMiddleLevel()
     {
-        return Math.Min(7, GetBaseLevel() + 1);
+        return Math.Min(10, GetBaseLevel() + 1);
+    }
+
+    private int GetMaximumLevel()
+    {
+        int levelCount = Math.Clamp(LodLevelCount, 3, 5);
+        return Math.Min(10, GetBaseLevel() + levelCount - 1);
     }
 
     private int GetMinimumPatchCount()
@@ -915,13 +1701,19 @@ public partial class CubeSpherePrototype : Node3D
 
     private int GetMaximumPatchCount()
     {
-        return GetMinimumPatchCount() * 4;
+        int basePatchCount = GetMinimumPatchCount();
+        int additionalLevels = GetMaximumLevel() - GetBaseLevel();
+        return basePatchCount * (1 << (additionalLevels * 2));
     }
 
     private void UpdateLodCounters()
     {
         _lodLevelBasePatchCount = 0;
+        _lodLevelMidPatchCount = 0;
         _lodLevelFinePatchCount = 0;
+        _logicalBasePatchCount = 0;
+        _logicalMidPatchCount = 0;
+        _logicalFinePatchCount = 0;
         _lodSkirtTriangles = 0;
 
         foreach (PatchRuntime runtime in _patches.Values)
@@ -930,17 +1722,41 @@ public partial class CubeSpherePrototype : Node3D
             {
                 _lodLevelBasePatchCount++;
             }
-            else if (runtime.Data.Key.Level == GetFineLevel())
+            else if (runtime.Data.Key.Level == GetMiddleLevel())
+            {
+                _lodLevelMidPatchCount++;
+            }
+            else if (runtime.Data.Key.Level >= GetMaximumLevel())
             {
                 _lodLevelFinePatchCount++;
             }
 
             _lodSkirtTriangles += runtime.Data.SkirtTriangleCount;
         }
+
+        foreach (CubeSpherePatchKey key in _logicalLeaves)
+        {
+            if (key.Level == GetBaseLevel())
+            {
+                _logicalBasePatchCount++;
+            }
+            else if (key.Level == GetMiddleLevel())
+            {
+                _logicalMidPatchCount++;
+            }
+            else if (key.Level >= GetMaximumLevel())
+            {
+                _logicalFinePatchCount++;
+            }
+        }
     }
 
     private void ClearGeneratedChildren()
     {
+        _patchPlanCancellation?.Cancel();
+        _patchPlanCancellation?.Dispose();
+        _patchPlanCancellation = null;
+
         foreach (PatchRuntime runtime in _patches.Values)
         {
             runtime.MeshInstance.QueueFree();
@@ -953,7 +1769,16 @@ public partial class CubeSpherePrototype : Node3D
 
         _patches.Clear();
         _splitParents.Clear();
+        _logicalLeaves.Clear();
+        _targetResidentLeaves.Clear();
         _collisionShapes.Clear();
+        _pendingPatchBuilds.Clear();
+        _readyPatchResults.Clear();
+        _readyApplyOrder.Clear();
+        _activePatchJobs.Clear();
+        while (_completedPatchJobs.TryDequeue(out _))
+        {
+        }
     }
 
     private string LodTestStatusText
@@ -976,6 +1801,32 @@ public partial class CubeSpherePrototype : Node3D
                 CubeSphereLodTestState.Cancelled =>
                     "TASK-033 LOD (U): CANCELLED",
                 _ => "TASK-033 LOD (U): READY"
+            };
+        }
+    }
+
+    private string StreamingTestStatusText
+    {
+        get
+        {
+            return _streamingTestState switch
+            {
+                CubeSphereStreamingTestState.RunningRoute =>
+                    $"TASK-036 stream (I): RUNNING {_streamingTestRouteIndex + 1}/" +
+                    $"{StreamingAcceptanceRoute.Length}, queue={GetPatchQueueDepth()}, " +
+                    $"workers={_activePatchJobs.Count}/{_patchWorkerLimit}",
+                CubeSphereStreamingTestState.WaitingForSettle =>
+                    $"TASK-036 stream (I): SETTLING " +
+                    $"{_streamingTestSettleElapsed:F1}/" +
+                    $"{StreamingTestSettleTimeoutSeconds:F1} c, " +
+                    $"queue={GetPatchQueueDepth()}, workers={_activePatchJobs.Count}",
+                CubeSphereStreamingTestState.Passed =>
+                    $"TASK-036 stream (I): PASS {_streamingTestResult}",
+                CubeSphereStreamingTestState.Failed =>
+                    $"TASK-036 stream (I): FAIL — {_streamingTestResult}",
+                CubeSphereStreamingTestState.Cancelled =>
+                    "TASK-036 stream (I): CANCELLED",
+                _ => "TASK-036 stream (I): READY"
             };
         }
     }
@@ -1003,8 +1854,8 @@ public partial class CubeSpherePrototype : Node3D
         if (_buildData is null)
         {
             _hudLabel.Text =
-                "ПРОТОТИП C — QUADTREE LOD\n" +
-                "Построение геометрии...";
+                "ПРОТОТИП C — ASYNC QUADTREE STREAMING\n" +
+                "Построение collision и планирование patches...";
             return;
         }
 
@@ -1062,19 +1913,29 @@ public partial class CubeSpherePrototype : Node3D
             : "Space — пауза обзора";
 
         _hudLabel.Text =
-            "ПРОТОТИП C — QUADTREE LOD\n" +
-            $"Патчи: {_patches.Count}  •  L{GetBaseLevel()}: {_lodLevelBasePatchCount}  •  " +
-            $"L{GetFineLevel()}: {_lodLevelFinePatchCount}  •  split: {_splitParents.Count}  •  " +
-            $"collision: {_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
-            $"({_collisionResolution}×{_collisionResolution})\n" +
-            $"LOD-швы: {lodSeamStatus}  •  atomic: {_lodValidation?.AtomicSegments ?? 0}  •  " +
-            $"open: {_lodValidation?.OpenSegments ?? -1}  •  " +
-            $"nonManifold: {_lodValidation?.NonManifoldSegments ?? -1}  •  " +
-            $"Δlod: {_lodValidation?.MaximumNeighborLevelDelta ?? -1}  •  " +
-            $"Δpos: {(_lodValidation?.MaximumSeamPositionError ?? -1.0f):E2}\n" +
-            $"Skirts: {_lodSkirtTriangles} треуг.  •  revision: {_lodTopologyRevision}  •  " +
-            $"validation: {_lastLodUpdateMilliseconds:F2} мс  •  " +
-            $"грани: {faceSeamStatus} ({_buildData.SeamComparisons}/" +
+            "ПРОТОТИП C — ASYNC QUADTREE STREAMING\n" +
+            $"Applied/resident/logical: {_patches.Count}/" +
+            $"{_targetResidentLeaves.Count}/{_logicalLeaves.Count}  •  " +
+            $"L{GetBaseLevel()}: {_lodLevelBasePatchCount}/{_logicalBasePatchCount}  •  " +
+            $"L{GetMiddleLevel()}: {_lodLevelMidPatchCount}/{_logicalMidPatchCount}  •  " +
+            $"L{GetMaximumLevel()}: {_lodLevelFinePatchCount}/{_logicalFinePatchCount}\n" +
+            $"Stream: plan={_patchPlanRevision}  •  queue={GetPatchQueueDepth()}  •  " +
+            $"workers={_activePatchJobs.Count}/{_patchWorkerLimit}  •  " +
+            $"ready={_readyPatchResults.Count}  •  applied={_patchesApplied}  •  " +
+            $"unloaded={_patchesUnloaded}\n" +
+            $"Jobs: cancel={_patchJobsCancelled}  •  stale={_patchJobsStale}  •  " +
+            $"errors={_patchJobsFailed}  •  lastBuild={_lastPatchBuildMilliseconds:F2} мс  •  " +
+            $"cull={LodResidentAngleDegrees:F0}°+extent\n" +
+            $"LOD-швы: {lodSeamStatus}  •  atomic={_lodValidation?.AtomicSegments ?? 0}  •  " +
+            $"open={_lodValidation?.OpenSegments ?? -1}  •  " +
+            $"nonManifold={_lodValidation?.NonManifoldSegments ?? -1}  •  " +
+            $"Δlod={_lodValidation?.MaximumNeighborLevelDelta ?? -1}  •  " +
+            $"Δpos={(_lodValidation?.MaximumSeamPositionError ?? -1.0f):E2}\n" +
+            $"Skirts: {_lodSkirtTriangles}  •  topology={_lodTopologyRevision}  •  " +
+            $"validation={_lastLodUpdateMilliseconds:F2} мс  •  " +
+            $"collision={_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
+            $"({_collisionResolution}×{_collisionResolution})  •  " +
+            $"грани={faceSeamStatus} ({_buildData.SeamComparisons}/" +
             $"{_buildData.ExpectedSeamComparisons})\n" +
             $"Игрок: {playerStatus}\n" +
             $"{contactStatus}\n" +
@@ -1084,11 +1945,13 @@ public partial class CubeSpherePrototype : Node3D
             $"{originStatus}\n" +
             $"{seamTestStatus}\n" +
             $"{LodTestStatusText}\n" +
+            $"{StreamingTestStatusText}\n" +
             $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
             $"seed: {NoiseSeed}  •  patch: {FaceResolution}×{FaceResolution}\n" +
             "WASD — касательное движение  •  мышь — обзор  •  " +
             $"{contextualSpace}  •  R — сброс\n" +
             "F1 — грань/LOD/нормали  •  F2 — игрок/обзор  •  " +
-            "T — seam-test  •  Y — origin-test  •  U — LOD-test";
+            "T — seam  •  Y — origin  •  U — LOD  •  I — async-stream";
     }
+
 }

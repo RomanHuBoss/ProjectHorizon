@@ -37,6 +37,14 @@ LodMergeAngleDegrees = 62.0
 LodUpdateIntervalSeconds = 0.2
 LodSkirtDepth = 2.0
 LodTestStepSeconds = 0.65
+LodLevelCount = 3
+LodFineSplitAngleDegrees = 24.0
+LodFineMergeAngleDegrees = 34.0
+LodResidentAngleDegrees = 108.0
+MaxPatchWorkers = 4
+MaxPatchAppliesPerFrame = 2
+StreamingTestStepSeconds = 0.08
+StreamingTestSettleTimeoutSeconds = 12.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_planet")
@@ -83,11 +91,11 @@ TestAllowedGroundGapSeconds = 0.12
 offset_left = 16.0
 offset_top = 16.0
 offset_right = 1130.0
-offset_bottom = 545.0
+offset_bottom = 665.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП C — QUADTREE LOD\nПостроение геометрии..."
+text = "ПРОТОТИП C — ASYNC QUADTREE STREAMING\nПостроение геометрии..."

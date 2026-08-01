@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using CancellationToken = System.Threading.CancellationToken;
 using Godot;
 
 public enum CubeSpherePatchEdge
@@ -125,6 +126,7 @@ public static class CubeSpherePatchBuilder
         DirectionKey End);
 
     private readonly record struct EdgeOwner(
+        CubeSpherePatchKey Key,
         int Level,
         Vector3 StartPosition,
         Vector3 EndPosition);
@@ -193,7 +195,8 @@ public static class CubeSpherePatchBuilder
         float heightAmplitude,
         float noiseFrequency,
         int noiseSeed,
-        float skirtDepth)
+        float skirtDepth,
+        CancellationToken cancellationToken = default)
     {
         int resolution = NormalizeResolution(requestedResolution);
         float normalizedRadius = Math.Max(1.0f, radius);
@@ -213,6 +216,7 @@ public static class CubeSpherePatchBuilder
 
         for (int y = 0; y < resolution; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             float v01 = y / (float)(resolution - 1);
             float v = Mathf.Lerp(vMin, vMax, v01);
 
@@ -237,6 +241,7 @@ public static class CubeSpherePatchBuilder
 
         for (int y = 0; y < resolution - 1; y++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             for (int x = 0; x < resolution - 1; x++)
             {
                 int topLeft = (y * resolution) + x;
@@ -257,6 +262,7 @@ public static class CubeSpherePatchBuilder
         patch.TopTriangleCount =
             (resolution - 1) * (resolution - 1) * 2;
 
+        cancellationToken.ThrowIfCancellationRequested();
         AddSkirt(patch, BuildEdgeIndices(CubeSpherePatchEdge.Left, resolution), normalizedSkirtDepth);
         AddSkirt(patch, BuildEdgeIndices(CubeSpherePatchEdge.Right, resolution), normalizedSkirtDepth);
         AddSkirt(patch, BuildEdgeIndices(CubeSpherePatchEdge.Bottom, resolution), normalizedSkirtDepth);
@@ -273,6 +279,35 @@ public static class CubeSpherePatchBuilder
             basis,
             (uMin + uMax) * 0.5f,
             (vMin + vMax) * 0.5f);
+    }
+
+    public static float GetPatchAngularRadiusRadians(CubeSpherePatchKey key)
+    {
+        FaceBasis basis = GetFaceBasis(key.FaceId);
+        GetPatchBounds(
+            key,
+            out float uMin,
+            out float uMax,
+            out float vMin,
+            out float vMax);
+        Vector3 centerDirection = FaceUvToDirection(
+            basis,
+            (uMin + uMax) * 0.5f,
+            (vMin + vMax) * 0.5f);
+        float maximumAngle = 0.0f;
+        maximumAngle = Math.Max(
+            maximumAngle,
+            GetAngularDistance(centerDirection, FaceUvToDirection(basis, uMin, vMin)));
+        maximumAngle = Math.Max(
+            maximumAngle,
+            GetAngularDistance(centerDirection, FaceUvToDirection(basis, uMax, vMin)));
+        maximumAngle = Math.Max(
+            maximumAngle,
+            GetAngularDistance(centerDirection, FaceUvToDirection(basis, uMin, vMax)));
+        maximumAngle = Math.Max(
+            maximumAngle,
+            GetAngularDistance(centerDirection, FaceUvToDirection(basis, uMax, vMax)));
+        return maximumAngle;
     }
 
     public static CubeSphereLodValidation ValidateTopology(
@@ -346,6 +381,57 @@ public static class CubeSpherePatchBuilder
             maximumSeamPositionError);
     }
 
+    public static IReadOnlyCollection<CubeSpherePatchKey>
+        FindLeavesRequiringBalance(
+            IReadOnlyCollection<CubeSpherePatchKey> leaves,
+            int maximumLevel)
+    {
+        int normalizedMaximumLevel = Math.Clamp(maximumLevel, 0, 12);
+        FastNoiseLite noise = CreateNoise(0.01f, 0);
+        Dictionary<EdgeSegmentKey, List<EdgeOwner>> ownersBySegment = new();
+
+        foreach (CubeSpherePatchKey leaf in leaves)
+        {
+            foreach (CubeSpherePatchEdge edge in Enum.GetValues<CubeSpherePatchEdge>())
+            {
+                AddAtomicEdgeOwners(
+                    ownersBySegment,
+                    leaf,
+                    edge,
+                    normalizedMaximumLevel,
+                    1.0f,
+                    0.0f,
+                    noise);
+            }
+        }
+
+        HashSet<CubeSpherePatchKey> leavesToSplit = new();
+        foreach (List<EdgeOwner> owners in ownersBySegment.Values)
+        {
+            if (owners.Count < 2)
+            {
+                continue;
+            }
+
+            int maximumOwnerLevel = 0;
+            foreach (EdgeOwner owner in owners)
+            {
+                maximumOwnerLevel = Math.Max(maximumOwnerLevel, owner.Level);
+            }
+
+            foreach (EdgeOwner owner in owners)
+            {
+                if (maximumOwnerLevel - owner.Level > 1 &&
+                    owner.Level < normalizedMaximumLevel)
+                {
+                    leavesToSplit.Add(owner.Key);
+                }
+            }
+        }
+
+        return leavesToSplit;
+    }
+
     private static void AddAtomicEdgeOwners(
         Dictionary<EdgeSegmentKey, List<EdgeOwner>> ownersBySegment,
         CubeSpherePatchKey patch,
@@ -380,12 +466,12 @@ public static class CubeSpherePatchBuilder
             if (startKey.CompareTo(endKey) <= 0)
             {
                 key = new EdgeSegmentKey(startKey, endKey);
-                owner = new EdgeOwner(patch.Level, startPosition, endPosition);
+                owner = new EdgeOwner(patch, patch.Level, startPosition, endPosition);
             }
             else
             {
                 key = new EdgeSegmentKey(endKey, startKey);
-                owner = new EdgeOwner(patch.Level, endPosition, startPosition);
+                owner = new EdgeOwner(patch, patch.Level, endPosition, startPosition);
             }
 
             if (!ownersBySegment.TryGetValue(key, out List<EdgeOwner>? owners) ||
@@ -432,6 +518,17 @@ public static class CubeSpherePatchBuilder
         }
 
         return FaceUvToDirection(basis, u, v);
+    }
+
+    private static float GetAngularDistance(
+        Vector3 firstDirection,
+        Vector3 secondDirection)
+    {
+        float alignment = Math.Clamp(
+            firstDirection.Dot(secondDirection),
+            -1.0f,
+            1.0f);
+        return MathF.Acos(alignment);
     }
 
     private static void AddSkirt(
