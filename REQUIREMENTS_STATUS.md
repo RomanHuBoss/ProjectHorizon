@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-dynamic-collision-lod-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-c-hud-ergonomics.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -34,13 +34,48 @@
 |---|---|---|
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
-| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы, floating origin и async visual streaming подтверждены; первый collision LOD test выявил radial underflow, исправленная редакция ожидает повторную `TASK-039` |
+| C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
 | D. Корабль | `NOT_STARTED` | Не начинался |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-036/TASK-037` подтверждены чистой сборкой и runtime-результатом `I: PASS`. Первая редакция `TASK-038` собрана без предупреждений и ошибок, однако runtime-тест завершился `FAIL timeout`: при `plan=150`, `commits=150`, `created=647`, `unloaded=620`, `errors=0` игрок циклически проваливался от поверхности к `r≈83 м`, теряя `ground/floor/probe`. Текущая hotfix-редакция заменяет локально обрезанный collision target полным логическим quadtree-cover, включает inward-skirts в physics, увеличивает overlap и вводит radial underflow guard. `TASK-039` требует повторной приёмки.
+**Вывод:** hotfix динамического collision LOD подтверждён чистой сборкой и `TASK-038 collision (K): PASS`: `plans=60`, `commits=60`, `created=257`, `unloaded=233`, `gap=0,00 с`, `rMin=92,46 м`, `recoveries=0`, `errors=0`. `TASK-038`, `TASK-039` и итоговая `TASK-040` закрыты как `VERIFIED`; Прототип C принят. Текущая итерация исправляет перекрывающий 3D-холст диагностический HUD.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка dynamic collision LOD, завершение Прототипа C и HUD ergonomics
+
+**Runtime-доказательство пользователя:**
+
+- сборка `Game.Client.csproj`: `0` предупреждений, `0` ошибок;
+- исходное состояние collision: `active=42/42`, `staged=0`, `queue=0`, `state=Idle`, `fallback=off`, `recoveries=0`, `errors=0`;
+- acceptance test: `TASK-038 collision (K): PASS`;
+- `plans=60`, `commits=60`, `created=257`, `unloaded=233`, `fallback=60`;
+- во время маршрута присутствовал fine collision LOD: `L3=28`;
+- `gap=0,00 с`, `rMin=92,46 м`, `recoveries=0`, `errors=0`;
+- после теста сохранены `ground=да`, `floor=да`, `probe=да`, `Δup=0,00°` и четыре межгранных перехода;
+- пользователь больше не наблюдает циклических провалов и подбрасываний.
+
+**Итог Прототипа C (`TASK-040`):**
+
+PDF-ТЗ требует cube sphere, гравитацию к центру, ходьбу, floating origin и швы LOD. Все пять пунктов подтверждены отдельными runtime-тестами; visual и collision quadtree дополнительно проверены стресс-маршрутами. Прототип C переведён в `VERIFIED`.
+
+**Реализовано в `TASK-041`:**
+
+- диагностический HUD по умолчанию переведён в компактный режим высотой `220 px` вместо панели почти на весь экран;
+- клавиша `H` циклически переключает `COMPACT → DETAILED → HIDDEN`;
+- compact HUD показывает только критические visual/collision/player/topology/test показатели;
+- detailed HUD сохраняет всю прежнюю телеметрию внутри ограниченной прокручиваемой панели;
+- hidden mode оставляет только небольшой индикатор `HUD скрыт • H` в правом верхнем углу;
+- размер панели ограничивается фактическим viewport, поэтому HUD не выходит за границы окна при изменении разрешения;
+- compact mode не перехватывает мышь; detailed mode разрешает прокрутку колёсиком;
+- смена режима дублируется в Output строкой `Prototype HUD mode: ...`; HUD обновлён в сцене, README и инструкции приёмки.
+
+**Изменения статусов:**
+
+- `TASK-038`, `TASK-039`, `TASK-040`, `PC-090`–`PC-096`, `PC-ACC-061`–`PC-ACC-068` → `VERIFIED`;
+- Прототип C → `VERIFIED`;
+- `TASK-041`, `PC-100`–`PC-104` → `IMPLEMENTED`;
+- `TASK-042`, `PC-ACC-070`–`PC-ACC-074` → `IN_PROGRESS`.
 
 ### 2026-08-01 — hotfix после `TASK-038 collision (K): FAIL timeout`
 
@@ -501,13 +536,18 @@
 | `PC-084` | Выгрузка невидимых patches | `VERIFIED` | Resident-set использует угол 108° с консервативным запасом на угловой размер patch; obsolete patches удаляются после settle |
 | `PC-085` | Main-thread применение ресурсов Godot | `VERIFIED` | `ArrayMesh`, `MeshInstance3D`, `SceneTree` и `QueueFree` выполняются только в прототипе на main thread |
 | `PC-086` | Автоматический async streaming acceptance test | `VERIFIED` | Клавиша `I`: 9 направлений, rapid revisions, settle и `PASS/FAIL` |
-| `PC-090` | Collision LOD следует за логической quadtree-топологией | `IMPLEMENTED` | Target равен полному набору logical leaves; visual horizon culling не может создать physics-дыру |
-| `PC-091` | Collision использует рабочие уровни `L1/L2/L3` | `IMPLEMENTED` | HUD считает динамические collision patches каждого уровня; ближайшая область включает `L3` |
-| `PC-092` | Collision создаётся отдельно от visual mesh | `IMPLEMENTED` | Patch строится детерминированно независимо от visual resident-set; physics mesh включает inward-skirts |
-| `PC-093` | Двухфазная безопасная замена collision-набора | `IMPLEMENTED` | New shapes создаются disabled, включаются deferred, перекрываются 4 physics-кадра и требуют 6 кадров подтверждённого контакта |
-| `PC-094` | Полногранная collision-поверхность используется как fallback | `IMPLEMENTED` | `6 × 129×129` включаются при plan и radial underflow; аварийное восстановление поднимает игрока над максимальной поверхностью |
-| `PC-095` | Collision patches выгружаются после безопасного commit | `IMPLEMENTED` | Устаревшие shapes сначала disabled deferred, затем `QueueFree`; created/unloaded диагностируются |
-| `PC-096` | Автоматический dynamic collision acceptance test | `IMPLEMENTED` | `K`: подготовка, межгранный traversal, несколько collision plan/commit и финальный `PASS/FAIL` |
+| `PC-090` | Collision LOD следует за логической quadtree-топологией | `VERIFIED` | После settle `active=target=logical=42`; visual horizon culling не создаёт physics-дыр |
+| `PC-091` | Collision использует рабочие уровни `L1/L2/L3` | `VERIFIED` | Runtime: исходно `L1/L2/L3=20/14/8`; в маршруте `L3=28` |
+| `PC-092` | Collision создаётся отдельно от visual mesh | `VERIFIED` | Collision active `42/42` при visual `41/41/42`; отдельный physics-cover подтверждён runtime |
+| `PC-093` | Двухфазная безопасная замена collision-набора | `VERIFIED` | `60` планов и `60` commit без ground gap и underflow |
+| `PC-094` | Полногранная collision-поверхность используется как fallback | `VERIFIED` | В тесте `fallback=60`, итог `fallback=off`, `recoveries=0`, `rMin=92,46 м` |
+| `PC-095` | Collision patches выгружаются после безопасного commit | `VERIFIED` | Runtime: `created=257`, `unloaded=233`, финальное состояние Idle |
+| `PC-096` | Автоматический dynamic collision acceptance test | `VERIFIED` | `TASK-038 collision (K): PASS`, 4 перехода, `gap=0`, errors `0` |
+| `PC-100` | Компактный диагностический HUD по умолчанию | `IMPLEMENTED` | Высота 220 px, критические показатели в 7 строках вместо полноэкранного блока |
+| `PC-101` | Подробный HUD доступен без потери телеметрии | `IMPLEMENTED` | Detailed mode содержит все прежние visual/collision/player/test показатели в ScrollContainer |
+| `PC-102` | HUD можно почти полностью скрыть | `IMPLEMENTED` | Hidden mode оставляет только небольшой индикатор `HUD скрыт • H` |
+| `PC-103` | HUD адаптируется к размеру viewport | `IMPLEMENTED` | Размер compact/detailed панели ограничивается видимым прямоугольником окна |
+| `PC-104` | Единое переключение HUD по клавише H | `IMPLEMENTED` | Цикл `COMPACT → DETAILED → HIDDEN`; режим отражается в тексте и README |
 | `PC-ACC-001` | Проект собирается без ошибок | `VERIFIED` | Основа cube sphere запущена; последующая радиальная редакция принята пользователем |
 | `PC-ACC-002` | Сцена запускается и показывает планету | `VERIFIED` | Предоставлен screenshot текущей сцены |
 | `PC-ACC-003` | HUD показывает `6/6` и collision `6/6` | `VERIFIED` | Прямое runtime-доказательство пользователя |
@@ -546,16 +586,21 @@
 | `PC-ACC-056` | Автоматический streaming test завершается PASS | `VERIFIED` | `TASK-036 stream (I): PASS revisions=10, L3=12, unloaded=93, stale=24, errors=0` |
 | `PC-ACC-057` | Предыдущие физические и диагностические тесты не регрессировали | `VERIFIED` | HUD после теста: collision `6/6`, ground/floor/probe и радиальная система `PASS` |
 | `PC-ACC-060` | Редакция dynamic collision LOD собирается 0/0 | `VERIFIED` | Пользовательская сборка: 0 предупреждений, 0 ошибок |
-| `PC-ACC-061` | После settle активен topology-complete collision-набор | `IN_PROGRESS` | Требуется `active=target=logical>0`, staged/queue `0`, state `Idle`, fallback `off` |
-| `PC-ACC-062` | Collision resident-set содержит `L3` | `IN_PROGRESS` | HUD после settle и `K: PASS` показывает `L3>0` |
-| `PC-ACC-063` | Collision plan выполняет безопасные commits | `IN_PROGRESS` | `plans>=3`, `commits>=3`, created>0, unloaded>0, fallback activations>0 |
-| `PC-ACC-064` | Во время замены отсутствует потеря контакта и radial underflow | `IN_PROGRESS` | `gap<=0,12 с`, `rMin>=89,5 м`, `recoveries=0`, ground/floor/probe сохраняются |
-| `PC-ACC-065` | Collision pipeline не содержит ошибок | `IN_PROGRESS` | collision errors `0`, visual queue/workers после settle `0` |
-| `PC-ACC-066` | Автоматический collision test завершается PASS | `IN_PROGRESS` | Первая попытка дала `FAIL timeout`; требуется повторный `K: PASS` на hotfix |
-| `PC-ACC-067` | Старые collision patches реально выгружаются | `IN_PROGRESS` | `unloaded>0`, active final совпадает с target |
-| `PC-ACC-068` | Предыдущие тесты и управление не регрессировали | `IN_PROGRESS` | Проверить WASD, Space, R, F1/F2, T, Y, U, I |
+| `PC-ACC-061` | После settle активен topology-complete collision-набор | `VERIFIED` | `active=target=logical=42`, staged/queue `0`, state `Idle`, fallback `off` |
+| `PC-ACC-062` | Collision resident-set содержит `L3` | `VERIFIED` | До теста `L3=8`; в acceptance route `L3=28` |
+| `PC-ACC-063` | Collision plan выполняет безопасные commits | `VERIFIED` | `plans=60`, `commits=60`, `created=257`, `unloaded=233`, `fallback=60` |
+| `PC-ACC-064` | Во время замены отсутствует потеря контакта и radial underflow | `VERIFIED` | `gap=0,00 с`, `rMin=92,46 м`, `recoveries=0`, ground/floor/probe `да` |
+| `PC-ACC-065` | Collision pipeline не содержит ошибок | `VERIFIED` | collision errors `0`; visual/collision queue `0`, workers `0` |
+| `PC-ACC-066` | Автоматический collision test завершается PASS | `VERIFIED` | Повторный hotfix-тест: `TASK-038 collision (K): PASS` |
+| `PC-ACC-067` | Старые collision patches реально выгружаются | `VERIFIED` | `unloaded=233`; финально `active=target=42` |
+| `PC-ACC-068` | Предыдущие тесты и управление не регрессировали | `VERIFIED` | Seam-test остаётся PASS; игрок ground/floor/probe `да`, радиальная система PASS |
+| `PC-ACC-070` | HUD-редакция собирается 0/0 | `IN_PROGRESS` | Выполнить локальную сборку без ошибок и предупреждений |
+| `PC-ACC-071` | Compact mode оставляет большую часть 3D-холста открытой | `IN_PROGRESS` | Screenshot по умолчанию: панель около 700×220, планета и игрок доступны для работы |
+| `PC-ACC-072` | H циклически переключает три режима | `IN_PROGRESS` | Подтвердить compact, detailed и hidden без exceptions |
+| `PC-ACC-073` | Detailed mode сохраняет полную диагностику и прокрутку | `IN_PROGRESS` | Все visual/collision/test строки доступны, колесо прокручивает содержимое |
+| `PC-ACC-074` | Hidden mode восстанавливается клавишей H | `IN_PROGRESS` | Остаётся только правый верхний hint; повторное H возвращает compact mode |
 
-Ходьба, floating origin и `L1/L2/L3` async visual streaming приняты по runtime-доказательствам. Dynamic collision LOD реализован и ожидает локальную приёмку `TASK-039`.
+Все требования Прототипа C, включая dynamic collision LOD, приняты по runtime-доказательствам. Текущая вспомогательная итерация улучшает эргономику диагностического HUD перед переходом к Прототипу D.
 
 ### 8.2. Оставшиеся прототипы
 
@@ -570,49 +615,63 @@
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-037`; Прототипы A и B; геометрия, радиальная система, collision-швы, floating origin и async visual quadtree Прототипа C.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-040`; Прототипы A, B и C.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-039` | Выполнить runtime-приёмку `TASK-038` | Чистая сборка и `TASK-038 collision (K): PASS` без потери ground contact |
-| 2 | `TASK-040` | Подвести итог Прототипа C | Сверить все критерии cube sphere, gravity, walking, floating origin, visual/collision LOD и принять либо определить остаточный шаг |
+| 1 | `TASK-042` | Выполнить runtime-приёмку HUD ergonomics | Чистая сборка; `H` переключает compact/detailed/hidden; 3D-холст больше не перекрыт |
+| 2 | `TASK-043` | Начать Прототип D: базовый корабль и свободный полёт | Отдельная сцена корабля, аркадное управление, камера и измеримый smoke-test |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Реализовано в этой итерации:** `TASK-038`, `PC-090`–`PC-096`.
-**Текущая приёмочная задача:** `TASK-039`.
+**Подтверждено в этой итерации:** `TASK-038`, `TASK-039`, `TASK-040`; Прототип C.
+**Реализовано:** `TASK-041`, `PC-100`–`PC-104`.
+**Текущая приёмочная задача:** `TASK-042`.
 
-## 10. Runtime-приёмка `TASK-038/TASK-039`
+## 10. Runtime-приёмка `TASK-041/TASK-042`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить сцену и дождаться стабильного состояния:
-   - visual `Applied = resident`, queue `0`, workers `0`, errors `0`;
-   - collision `active=target=logical>0`, staged `0`, queue `0`, state `Idle`;
-   - collision `L3>0`, fallback `off`, recoveries `0`, collision errors `0`;
-   - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
-   - `ground=да`, `floor=да`, `probe=да`.
-3. Нажать `K` и не использовать управление до завершения. Тест использует межгранный маршрут и может занимать до `75 с`.
-4. Ожидаемый итог HUD:
+2. Запустить стартовую сцену. По умолчанию HUD должен быть компактным и занимать примерно `700 × 220 px`, а не почти весь экран.
+3. В compact mode должны оставаться видимыми критические строки visual, collision, player, topology и краткие состояния тестов `T/Y/U/I/K`.
+4. Нажать `H`: должен открыться detailed mode ограниченного размера. Колесо мыши прокручивает полный набор прежней телеметрии.
+5. Нажать `H` повторно: основная панель исчезает; в правом верхнем углу остаётся только `HUD скрыт • H`.
+6. Нажать `H` ещё раз: возвращается compact mode.
+7. Изменить размер окна либо запустить при другом разрешении: панель не должна выходить за границы viewport.
+8. Проверить, что WASD, мышь, Space, F1/F2 и тестовые клавиши не регрессировали.
+9. Передать два screenshot: compact mode и hidden mode, результат сборки и строки Output:
 
 ```text
-TASK-038 collision (K): PASS plans>=3, commits>=3,
-created>0, unloaded>0, fallback>0, active=logical, L3>0,
-gap<=0,12 с, rMin>=89,5 м, recoveries=0, errors=0
+Prototype HUD mode: Detailed
+Prototype HUD mode: Hidden
+Prototype HUD mode: Compact
 ```
 
-5. В Godot Output требуется строка с префиксом:
+10. При `FAIL` передать screenshot проблемного режима и последние строки Output.
 
-```text
-TASK-038 dynamic collision LOD acceptance PASS
-```
-
-6. После `PASS` collision HUD должен показывать `active=target=logical`, staged/queue `0`, state `Idle`, fallback `off`, recoveries `0`.
-7. Передать screenshot HUD после `PASS`, итоговую строку Output и результат сборки.
-8. Ручная проверка: игрок не проваливается и не подпрыгивает при движении и переходах граней; visible collision shapes показывают полное quadtree-покрытие планеты; старые patches исчезают после commit; работают WASD, Space, R, F1/F2, T, Y, U и I.
-9. При `FAIL` передать screenshot HUD, итоговую строку Output и последние 20–30 строк лога.
+Критерий `PASS`: все три HUD-режима переключаются без ошибок, compact/hidden режимы освобождают 3D-холст, а detailed mode сохраняет полную диагностику.
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-041`, завершение Прототипа C и HUD ergonomics
+
+**Исходный снимок:** `ProjectHorizon-main(8).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-c-hud-ergonomics.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** разделы 31.4 и 39 PDF-ТЗ; `TASK-038`–`TASK-043`, `PC-090`–`PC-104`, `PC-ACC-060`–`PC-ACC-074`.
+
+**Runtime-доказательство предыдущей итерации:** сборка 0/0; `K: PASS`; `plans=60`, `commits=60`, `created=257`, `unloaded=233`, `fallback=60`, `L3=28`, `gap=0`, `rMin=92,46 м`, `recoveries=0`, `errors=0`; финально ground/floor/probe `да`.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/Planet/CubeSpherePrototype.cs`;
+- `src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Краткий результат:** Прототип C принят по всем критериям PDF-ТЗ. Диагностический overlay заменён трёхрежимным responsive HUD: compact по умолчанию, detailed со ScrollContainer и hidden с минимальным hint.
+
+**Ограничение:** сборка и runtime новой HUD-редакции в текущей среде недоступны; требуется `TASK-042`.
 
 ### 2026-08-01 — `TASK-038`, dynamic collision LOD
 

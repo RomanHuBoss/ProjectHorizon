@@ -62,69 +62,29 @@ PASS: 121 s, moves=82, managedDelta=0.0 MB, mesh=9, collision=9
 src/Game.Client/Scenes/Terrain/TerrainChunkPrototype.tscn
 ```
 
-### Прототип C. Сферическая планета — `IN_PROGRESS`
+### Прототип C. Сферическая планета — `VERIFIED`
 
-Основа cube sphere, радиальная система игрока, collision-швы, floating origin и
-начальная quadtree LOD-ступень подтверждены локальными runtime-проверками.
-`TASK-033/TASK-035` приняты со следующими показателями:
+Все обязательные критерии PDF-ТЗ подтверждены локальными runtime-проверками:
+
+- cube sphere и совпадение швов граней;
+- гравитация к центру и касательное управление;
+- ходьба через независимые collision-грани;
+- floating origin;
+- quadtree LOD-швы;
+- отменяемый async visual streaming `L1/L2/L3`;
+- динамический topology-complete collision LOD.
+
+Финальная collision-приёмка:
 
 ```text
 build: 0 errors, 0 warnings
-TASK-033 LOD (U): PASS split=17, merge=16, Δlod=1, open=0, seam=0
-patches=36, L1=20, L2=16, atomic=112, nonManifold=0
+TASK-038 collision (K): PASS
+plans=60, commits=60, created=257, unloaded=233, fallback=60
+L3=28, gap=0.00 s, rMin=92.46 m, recoveries=0, errors=0
 ```
 
-`TASK-036/TASK-037` приняты по runtime-проверке:
-
-```text
-build: 0 errors, 0 warnings
-TASK-036 stream (I): PASS revisions=10, L3=12, resident=44/45,
-unloaded=93, queue=0, workers=0, stale=24, errors=0
-```
-
-Первый runtime-запуск `TASK-038` выявил дефект предыдущей collision-версии:
-тест завершался `FAIL timeout`, игрок циклически проваливался до `r≈83 м` и
-возвращался fallback-поверхностью к `r≈90 м`. Текущий hotfix устраняет причину:
-collision cover больше не зависит от visual resident culling, а LOD-границы
-закрываются physics-skirts.
-
-Текущая итерация `TASK-038` добавляет динамический collision LOD поверх принятого визуального quadtree:
-
-- дерево использует три рабочих уровня `L1/L2/L3`;
-- узлы рекурсивно делятся по угловым порогам с hysteresis;
-- дополнительная балансировка гарантирует разницу соседей не более одного уровня;
-- полная логическая топология хранится отдельно от resident-набора;
-- patches за горизонтом исключаются из resident-набора с консервативным запасом
-  на угловой размер участка и освобождаются после готовности нового плана;
-- массивы вершин, нормалей, UV, индексов и skirts строятся в отменяемых фоновых
-  jobs;
-- `MeshInstance3D`, `ArrayMesh` и операции `SceneTree` выполняются только в
-  основном потоке;
-- новые patches загружаются скрытыми; после полной готовности resident-набора
-  устаревшие участки скрываются, новый набор включается и старые узлы освобождаются
-  в одном main-thread commit-этапе;
-- HUD показывает applied/resident/logical, распределение `L1/L2/L3`, plan
-  revision, queue, workers, ready, cancel, stale, errors и число выгрузок;
-- `F1` показывает: синий `L1`, оранжевый `L2`, розовый `L3`;
-- `I` запускает автоматический stress/acceptance test фонового стриминга;
-- ранее принятые тесты `T`, `Y`, `U` и `I` сохранены.
-
-- collision-набор строится по полной логической quadtree-топологии, поэтому покрытие
-  планеты не зависит от visual horizon culling;
-- collision patches используют отдельные trimesh с inward-skirts на границах LOD,
-  закрывающими T-junction между `L1/L2/L3`;
-- шесть полногранных поверхностей `129 × 129` сохранены как safety fallback;
-- новый collision-набор сначала создаётся disabled, затем включается deferred;
-- fallback, старый и новый наборы перекрываются не менее четырёх physics-кадров,
-  после чего контакт подтверждается ещё шестью последовательными кадрами;
-- после безопасного commit fallback и устаревшие patches отключаются и выгружаются;
-- angular movement больше не включает fallback при полном collision-cover;
-- radial underflow ниже безопасного радиуса немедленно включает fallback и
-  восстанавливает игрока выше максимальной поверхности;
-- HUD показывает collision plan, active/target/staged, `L1/L2/L3`, commits,
-  fallback activations, created/unloaded и errors;
-- `K` запускает автоматический collision acceptance test с реальным межгранным
-  маршрутом игрока.
+После теста сохранены `ground=да`, `floor=да`, `probe=да`, радиальная система
+`PASS`, а циклические провалы и подбрасывания отсутствуют.
 
 Активная стартовая сцена:
 
@@ -132,13 +92,20 @@ collision cover больше не зависит от visual resident culling, �
 src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn
 ```
 
-Ожидаемый результат новой приёмки:
+### Диагностический HUD
 
-```text
-TASK-038 collision (K): PASS plans>=3, commits>=3,
-created>0, unloaded>0, fallback>0, active=logical, L3>0,
-gap<=0.12 s, rMin>=89.5 m, recoveries=0, errors=0
-```
+Панель больше не должна перекрывать весь 3D-холст. По умолчанию используется
+компактный HUD размером около `700 × 220 px`.
+
+Клавиша `H` циклически переключает:
+
+1. `COMPACT` — только ключевые visual/collision/player/topology/test показатели;
+2. `DETAILED` — вся телеметрия в ограниченной прокручиваемой панели;
+3. `HIDDEN` — основная панель скрыта, остаётся небольшой hint `HUD скрыт • H`.
+
+Detailed mode прокручивается колёсиком мыши. Размер обоих видимых режимов
+ограничивается текущим viewport, поэтому панель не выходит за границы окна.
+Каждое переключение дублируется в Output строкой `Prototype HUD mode: ...`.
 
 ## Состояние реализации ТЗ
 
@@ -241,43 +208,21 @@ src/Game.Client/project.godot
 ```
 
 2. Дождаться импорта ресурсов и выполнить сборку C#.
-3. Нажать `F5`; после завершения фоновой загрузки HUD должен показывать:
-   - visual `Applied = resident`, `queue=0`, `workers=0`, `errors=0`;
-   - collision `active=target=logical>0`, `staged=0`, `queue=0`, `state=Idle`;
-   - collision `L3>0`, `fallback=off`, `recoveries=0`, `errors=0`;
-   - `LOD-швы: PASS`, `open=0`, `nonManifold=0`, `Δlod<=1`;
-   - `ground=да`, `floor=да`, `probe=да`, радиальную систему `PASS`.
-4. Нажать `K` и не использовать управление до окончания теста. Тест запускает
-   принятый межгранный маршрут и проверяет, что topology-complete collision LOD
-   перестраивается без потери контакта. Максимальное время — `75 с`.
-5. Ожидаемый итог HUD:
-
-```text
-TASK-038 collision (K): PASS plans=..., commits=...,
-created=..., unloaded=..., fallback=..., active=logical,
-L3=..., gap<=0.12 s, rMin>=89.5 m, recoveries=0, errors=0
-```
-
-6. В Godot Output должна появиться строка с префиксом:
-
-```text
-TASK-038 dynamic collision LOD acceptance PASS
-```
-
-7. Ручная проверка после теста:
-   - игрок не проваливается и не подпрыгивает при переходах между гранями;
-   - в режиме `Debug → Visible Collision Shapes` вся планета покрыта текущими
-     quadtree collision patches, а устаревшие участки исчезают после commit;
-   - после стабилизации `active=target`, `staged=0`, collision queue `0`,
-     `state=Idle`, `fallback=off`;
-   - работают WASD, `Space`, `R`, `F1`, `F2`, `T`, `Y`, `U` и `I`.
-8. Повторное `K`, а также `F2`, `R`, `T`, `Y`, `U` или `I`, безопасно
-   останавливает collision acceptance test. Клавиша `I` остаётся отдельной
-   регрессией async visual streaming.
-9. Для регрессии Прототипа B открыть
+3. Нажать `F5`. По умолчанию должен появиться компактный HUD, оставляющий большую
+   часть 3D-холста свободной.
+4. Нажимать `H`:
+   - первое нажатие открывает detailed mode;
+   - второе скрывает основную панель и оставляет `HUD скрыт • H`;
+   - третье возвращает compact mode.
+5. В detailed mode проверить прокрутку колёсиком и наличие полной телеметрии visual,
+   collision, player, topology и тестов `T/Y/U/I/K`.
+6. Изменить размер окна: панель не должна выходить за границы viewport.
+7. Ручная регрессия: WASD, мышь, `Space`, `R`, `F1`, `F2`, `T`, `Y`, `U`, `I`,
+   `K` продолжают работать.
+8. Для регрессии Прототипа B открыть
    `Scenes/Terrain/TerrainChunkPrototype.tscn` через `F6`; `F10` запускает
    stress-test, `P` — soak-test.
-10. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
+9. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
 
 ### Сборка через командную строку
 

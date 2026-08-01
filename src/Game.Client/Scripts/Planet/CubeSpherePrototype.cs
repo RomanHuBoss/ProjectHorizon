@@ -19,6 +19,13 @@ public enum CubeSphereCameraMode
     OverviewOrbit = 1
 }
 
+public enum PrototypeHudMode
+{
+    Compact = 0,
+    Detailed = 1,
+    Hidden = 2
+}
+
 public enum CubeSphereLodTestState
 {
     Ready = 0,
@@ -177,6 +184,18 @@ public partial class CubeSpherePrototype : Node3D
     [Export(PropertyHint.Range, "3.0,30.0,0.5")]
     public float StreamingTestSettleTimeoutSeconds { get; set; } = 12.0f;
 
+    [Export(PropertyHint.Range, "360.0,1000.0,10.0")]
+    public float HudCompactWidth { get; set; } = 700.0f;
+
+    [Export(PropertyHint.Range, "130.0,360.0,10.0")]
+    public float HudCompactHeight { get; set; } = 220.0f;
+
+    [Export(PropertyHint.Range, "480.0,1200.0,10.0")]
+    public float HudDetailedWidth { get; set; } = 820.0f;
+
+    [Export(PropertyHint.Range, "320.0,1000.0,10.0")]
+    public float HudDetailedHeight { get; set; } = 620.0f;
+
     private readonly Dictionary<CubeSpherePatchKey, PatchRuntime> _patches = new();
     private readonly HashSet<CubeSpherePatchKey> _splitParents = new();
     private readonly HashSet<CubeSpherePatchKey> _logicalLeaves = new();
@@ -195,7 +214,12 @@ public partial class CubeSpherePrototype : Node3D
     private Camera3D? _overviewCamera;
     private PlanetaryPlayerController? _planetaryPlayer;
     private FloatingOriginController? _floatingOrigin;
+    private MarginContainer? _hudMargin;
+    private PanelContainer? _hudPanel;
+    private ScrollContainer? _hudScroll;
     private Label? _hudLabel;
+    private PanelContainer? _hudHiddenHint;
+    private PrototypeHudMode _hudMode = PrototypeHudMode.Compact;
     private CubeSphereBuildData? _buildData;
     private CubeSphereLodValidation? _lodValidation;
     private CubeSphereDebugMode _debugMode = CubeSphereDebugMode.LodLevels;
@@ -274,8 +298,16 @@ public partial class CubeSpherePrototype : Node3D
             "PlanetaryPlayer");
         _floatingOrigin = GetNode<FloatingOriginController>(
             "FloatingOriginController");
+        _hudMargin = GetNode<MarginContainer>(
+            "Hud/MarginContainer");
+        _hudPanel = GetNode<PanelContainer>(
+            "Hud/MarginContainer/PanelContainer");
+        _hudScroll = GetNode<ScrollContainer>(
+            "Hud/MarginContainer/PanelContainer/ScrollContainer");
         _hudLabel = GetNode<Label>(
-            "Hud/MarginContainer/PanelContainer/Label");
+            "Hud/MarginContainer/PanelContainer/ScrollContainer/Label");
+        _hudHiddenHint = GetNode<PanelContainer>(
+            "Hud/HiddenHint");
         _patchWorkerLimit = Math.Max(
             1,
             Math.Min(
@@ -286,6 +318,10 @@ public partial class CubeSpherePrototype : Node3D
         InitializeCollisionLod();
         ApplyCameraMode();
         UpdateHud();
+        GD.Print(
+            "Prototype HUD initialized: mode=Compact; " +
+            $"compact={HudCompactWidth:F0}x{HudCompactHeight:F0}; " +
+            $"detailed={HudDetailedWidth:F0}x{HudDetailedHeight:F0}");
     }
 
     public override void _ExitTree()
@@ -353,7 +389,15 @@ public partial class CubeSpherePrototype : Node3D
             return;
         }
 
-        if (keyEvent.Keycode == Key.F1)
+        if (keyEvent.Keycode == Key.H ||
+            keyEvent.PhysicalKeycode == Key.H)
+        {
+            _hudMode = (PrototypeHudMode)(((int)_hudMode + 1) % 3);
+            UpdateHud();
+            GD.Print($"Prototype HUD mode: {_hudMode}");
+            GetViewport().SetInputAsHandled();
+        }
+        else if (keyEvent.Keycode == Key.F1)
         {
             _debugMode = (CubeSphereDebugMode)(((int)_debugMode + 1) % 3);
             RebuildVisualMeshes();
@@ -1900,12 +1944,193 @@ public partial class CubeSpherePrototype : Node3D
         return name.Replace('+', 'P').Replace('-', 'N');
     }
 
+    private static string GetCompactTestState(string status)
+    {
+        if (status.Contains("FAIL", StringComparison.OrdinalIgnoreCase))
+        {
+            return "FAIL";
+        }
+
+        if (status.Contains("PASS", StringComparison.OrdinalIgnoreCase))
+        {
+            return "PASS";
+        }
+
+        if (status.Contains("RUNNING", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("PREPARING", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("SETTLING", StringComparison.OrdinalIgnoreCase))
+        {
+            return "RUN";
+        }
+
+        if (status.Contains("CANCEL", StringComparison.OrdinalIgnoreCase) ||
+            status.Contains("остановлен", StringComparison.OrdinalIgnoreCase))
+        {
+            return "STOP";
+        }
+
+        return "READY";
+    }
+
+    private void UpdateHudLayout()
+    {
+        if (_hudMargin is null || _hudPanel is null ||
+            _hudScroll is null || _hudHiddenHint is null)
+        {
+            return;
+        }
+
+        Vector2 viewportSize = GetViewport().GetVisibleRect().Size;
+        const float outerMargin = 12.0f;
+        float maximumWidth = Math.Max(1.0f, viewportSize.X - (outerMargin * 2.0f));
+        float maximumHeight = Math.Max(1.0f, viewportSize.Y - (outerMargin * 2.0f));
+        Vector2 requestedSize = _hudMode == PrototypeHudMode.Detailed
+            ? new Vector2(HudDetailedWidth, HudDetailedHeight)
+            : new Vector2(HudCompactWidth, HudCompactHeight);
+        Vector2 actualSize = new(
+            Math.Min(requestedSize.X, maximumWidth),
+            Math.Min(requestedSize.Y, maximumHeight));
+
+        _hudMargin.Position = new Vector2(outerMargin, outerMargin);
+        _hudMargin.Size = actualSize;
+        _hudMargin.CustomMinimumSize = actualSize;
+        _hudPanel.Visible = _hudMode != PrototypeHudMode.Hidden;
+        _hudScroll.CustomMinimumSize = new Vector2(
+            Math.Max(1.0f, actualSize.X - 24.0f),
+            Math.Max(1.0f, actualSize.Y - 20.0f));
+        if (_hudLabel is not null)
+        {
+            _hudLabel.CustomMinimumSize = new Vector2(
+                Math.Max(1.0f, actualSize.X - 42.0f),
+                0.0f);
+        }
+
+        _hudScroll.MouseFilter = _hudMode == PrototypeHudMode.Detailed
+            ? Control.MouseFilterEnum.Stop
+            : Control.MouseFilterEnum.Ignore;
+        _hudHiddenHint.Visible = _hudMode == PrototypeHudMode.Hidden;
+    }
+
+    private string BuildCompactHudText(
+        string lodSeamStatus,
+        string faceSeamStatus,
+        string playerStatus,
+        string contactStatus,
+        string radialStatus,
+        string cameraState)
+    {
+        string originState = _floatingOrigin is null
+            ? "N/A"
+            : GetCompactTestState(_floatingOrigin.TestStatusText);
+        string seamState = _planetaryPlayer is null
+            ? "N/A"
+            : GetCompactTestState(_planetaryPlayer.SeamTestStatusText);
+        string lodState = GetCompactTestState(LodTestStatusText);
+        string streamState = GetCompactTestState(StreamingTestStatusText);
+        string collisionState = GetCompactTestState(CollisionTestStatusText);
+        string fallbackState = _fallbackCollisionEnabled ? "ON" : "off";
+
+        return
+            "ПРОТОТИП C — VERIFIED  •  HUD: компактный  •  H — режим\n" +
+            $"Visual {_patches.Count}/{_targetResidentLeaves.Count}/" +
+            $"{_logicalLeaves.Count}  •  L1/L2/L3=" +
+            $"{_lodLevelBasePatchCount}/{_lodLevelMidPatchCount}/" +
+            $"{_lodLevelFinePatchCount}  •  q={GetPatchQueueDepth()}  •  " +
+            $"w={_activePatchJobs.Count}  •  err={_patchJobsFailed}\n" +
+            $"Collision {_collisionPatches.Count}/{_targetCollisionLeaves.Count}  •  " +
+            $"L1/L2/L3={_collisionBasePatchCount}/{_collisionMidPatchCount}/" +
+            $"{_collisionFinePatchCount}  •  q={_pendingCollisionBuilds.Count}  •  " +
+            $"{_collisionTransitionState}  •  fallback={fallbackState}  •  " +
+            $"err={_collisionErrors}\n" +
+            $"Игрок: {playerStatus}  •  {contactStatus}\n" +
+            $"Topology {lodSeamStatus}  •  open={_lodValidation?.OpenSegments ?? -1}  •  " +
+            $"nonManifold={_lodValidation?.NonManifoldSegments ?? -1}  •  " +
+            $"Δlod={_lodValidation?.MaximumNeighborLevelDelta ?? -1}  •  " +
+            $"грани={faceSeamStatus}  •  radial={radialStatus}  •  camera={cameraState}\n" +
+            $"Tests: T={seamState}  Y={originState}  U={lodState}  " +
+            $"I={streamState}  K={collisionState}\n" +
+            "H — подробно/скрыть  •  F1 — вид  •  F2 — камера  •  " +
+            "T/Y/U/I/K — тесты";
+    }
+
+    private string BuildDetailedHudText(
+        string lodSeamStatus,
+        string faceSeamStatus,
+        string playerStatus,
+        string contactStatus,
+        string radialStatus,
+        string cameraState,
+        string debugMode,
+        string contextualSpace,
+        string coordinateStatus,
+        string originStatus,
+        string seamTestStatus)
+    {
+        return
+            "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
+            "HUD: подробный  •  H — компактный/скрытый  •  колесо мыши — прокрутка\n" +
+            $"Applied/resident/logical: {_patches.Count}/" +
+            $"{_targetResidentLeaves.Count}/{_logicalLeaves.Count}  •  " +
+            $"L{GetBaseLevel()}: {_lodLevelBasePatchCount}/{_logicalBasePatchCount}  •  " +
+            $"L{GetMiddleLevel()}: {_lodLevelMidPatchCount}/{_logicalMidPatchCount}  •  " +
+            $"L{GetMaximumLevel()}: {_lodLevelFinePatchCount}/{_logicalFinePatchCount}\n" +
+            $"Stream: plan={_patchPlanRevision}  •  queue={GetPatchQueueDepth()}  •  " +
+            $"workers={_activePatchJobs.Count}/{_patchWorkerLimit}  •  " +
+            $"ready={_readyPatchResults.Count}  •  applied={_patchesApplied}  •  " +
+            $"unloaded={_patchesUnloaded}\n" +
+            $"Jobs: cancel={_patchJobsCancelled}  •  stale={_patchJobsStale}  •  " +
+            $"errors={_patchJobsFailed}  •  lastBuild={_lastPatchBuildMilliseconds:F2} мс  •  " +
+            $"cull={LodResidentAngleDegrees:F0}°+extent\n" +
+            $"Collision LOD: active={_collisionPatches.Count}/" +
+            $"{_targetCollisionLeaves.Count}  •  staged={_stagedCollisionPatches.Count}  •  " +
+            $"queue={_pendingCollisionBuilds.Count}  •  plan={_collisionPlanRevision}  •  " +
+            $"commits={_collisionCommits}  •  state={_collisionTransitionState}\n" +
+            $"Collision jobs: L{GetBaseLevel()}={_collisionBasePatchCount}  •  " +
+            $"L{GetMiddleLevel()}={_collisionMidPatchCount}  •  " +
+            $"L{GetMaximumLevel()}={_collisionFinePatchCount}  •  " +
+            $"created={_collisionPatchesCreated}  •  unloaded={_collisionPatchesUnloaded}  •  " +
+            $"fallback={(_fallbackCollisionEnabled ? "on" : "off")}  •  " +
+            $"activations={_collisionFallbackActivations}  •  " +
+            $"recoveries={_collisionSafetyRecoveries}  •  errors={_collisionErrors}  •  " +
+            $"lastBuild={_lastCollisionBuildMilliseconds:F2} мс\n" +
+            $"LOD-швы: {lodSeamStatus}  •  atomic={_lodValidation?.AtomicSegments ?? 0}  •  " +
+            $"open={_lodValidation?.OpenSegments ?? -1}  •  " +
+            $"nonManifold={_lodValidation?.NonManifoldSegments ?? -1}  •  " +
+            $"Δlod={_lodValidation?.MaximumNeighborLevelDelta ?? -1}  •  " +
+            $"Δpos={(_lodValidation?.MaximumSeamPositionError ?? -1.0f):E2}\n" +
+            $"Skirts: {_lodSkirtTriangles}  •  topology={_lodTopologyRevision}  •  " +
+            $"validation={_lastLodUpdateMilliseconds:F2} мс  •  " +
+            $"fallbackCollision={_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
+            $"({_collisionResolution}×{_collisionResolution})  •  " +
+            $"грани={faceSeamStatus} ({_buildData!.SeamComparisons}/" +
+            $"{_buildData.ExpectedSeamComparisons})\n" +
+            $"Игрок: {playerStatus}\n" +
+            $"{contactStatus}\n" +
+            $"Радиальная система: {radialStatus}  •  камера: {cameraState}  •  " +
+            $"режим: {debugMode}\n" +
+            $"{coordinateStatus}\n" +
+            $"{originStatus}\n" +
+            $"{seamTestStatus}\n" +
+            $"{LodTestStatusText}\n" +
+            $"{StreamingTestStatusText}\n" +
+            $"{CollisionTestStatusText}\n" +
+            $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
+            $"seed: {NoiseSeed}  •  patch: {FaceResolution}×{FaceResolution}\n" +
+            "WASD — касательное движение  •  мышь — обзор  •  " +
+            $"{contextualSpace}  •  R — сброс\n" +
+            "H — HUD  •  F1 — грань/LOD/нормали  •  F2 — игрок/обзор  •  " +
+            "T — seam  •  Y — origin  •  U — LOD  •  I — async-stream  •  " +
+            "K — collision-LOD";
+    }
+
     private void UpdateHud()
     {
         if (_hudLabel is null)
         {
             return;
         }
+
+        UpdateHudLayout();
 
         string orbitState = _orbitPaused ? "пауза" : "вращение";
         string debugMode = _debugMode switch
@@ -1919,7 +2144,8 @@ public partial class CubeSpherePrototype : Node3D
         {
             _hudLabel.Text =
                 "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
-                "Построение collision и планирование patches...";
+                "Построение collision и планирование patches...\n" +
+                "H — компактный/подробный/скрытый HUD";
             return;
         }
 
@@ -1976,60 +2202,26 @@ public partial class CubeSpherePrototype : Node3D
             ? "Space — прыжок"
             : "Space — пауза обзора";
 
-        _hudLabel.Text =
-            "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
-            $"Applied/resident/logical: {_patches.Count}/" +
-            $"{_targetResidentLeaves.Count}/{_logicalLeaves.Count}  •  " +
-            $"L{GetBaseLevel()}: {_lodLevelBasePatchCount}/{_logicalBasePatchCount}  •  " +
-            $"L{GetMiddleLevel()}: {_lodLevelMidPatchCount}/{_logicalMidPatchCount}  •  " +
-            $"L{GetMaximumLevel()}: {_lodLevelFinePatchCount}/{_logicalFinePatchCount}\n" +
-            $"Stream: plan={_patchPlanRevision}  •  queue={GetPatchQueueDepth()}  •  " +
-            $"workers={_activePatchJobs.Count}/{_patchWorkerLimit}  •  " +
-            $"ready={_readyPatchResults.Count}  •  applied={_patchesApplied}  •  " +
-            $"unloaded={_patchesUnloaded}\n" +
-            $"Jobs: cancel={_patchJobsCancelled}  •  stale={_patchJobsStale}  •  " +
-            $"errors={_patchJobsFailed}  •  lastBuild={_lastPatchBuildMilliseconds:F2} мс  •  " +
-            $"cull={LodResidentAngleDegrees:F0}°+extent\n" +
-            $"Collision LOD: active={_collisionPatches.Count}/" +
-            $"{_targetCollisionLeaves.Count}  •  staged={_stagedCollisionPatches.Count}  •  " +
-            $"queue={_pendingCollisionBuilds.Count}  •  plan={_collisionPlanRevision}  •  " +
-            $"commits={_collisionCommits}  •  state={_collisionTransitionState}\n" +
-            $"Collision jobs: L{GetBaseLevel()}={_collisionBasePatchCount}  •  " +
-            $"L{GetMiddleLevel()}={_collisionMidPatchCount}  •  " +
-            $"L{GetMaximumLevel()}={_collisionFinePatchCount}  •  " +
-            $"created={_collisionPatchesCreated}  •  unloaded={_collisionPatchesUnloaded}  •  " +
-            $"fallback={(_fallbackCollisionEnabled ? "on" : "off")}  •  " +
-            $"activations={_collisionFallbackActivations}  •  " +
-            $"recoveries={_collisionSafetyRecoveries}  •  errors={_collisionErrors}  •  " +
-            $"lastBuild={_lastCollisionBuildMilliseconds:F2} мс\n" +
-            $"LOD-швы: {lodSeamStatus}  •  atomic={_lodValidation?.AtomicSegments ?? 0}  •  " +
-            $"open={_lodValidation?.OpenSegments ?? -1}  •  " +
-            $"nonManifold={_lodValidation?.NonManifoldSegments ?? -1}  •  " +
-            $"Δlod={_lodValidation?.MaximumNeighborLevelDelta ?? -1}  •  " +
-            $"Δpos={(_lodValidation?.MaximumSeamPositionError ?? -1.0f):E2}\n" +
-            $"Skirts: {_lodSkirtTriangles}  •  topology={_lodTopologyRevision}  •  " +
-            $"validation={_lastLodUpdateMilliseconds:F2} мс  •  " +
-            $"fallbackCollision={_collisionShapes.Count}/{(GenerateCollision ? 6 : 0)} " +
-            $"({_collisionResolution}×{_collisionResolution})  •  " +
-            $"грани={faceSeamStatus} ({_buildData.SeamComparisons}/" +
-            $"{_buildData.ExpectedSeamComparisons})\n" +
-            $"Игрок: {playerStatus}\n" +
-            $"{contactStatus}\n" +
-            $"Радиальная система: {radialStatus}  •  камера: {cameraState}  •  " +
-            $"режим: {debugMode}\n" +
-            $"{coordinateStatus}\n" +
-            $"{originStatus}\n" +
-            $"{seamTestStatus}\n" +
-            $"{LodTestStatusText}\n" +
-            $"{StreamingTestStatusText}\n" +
-            $"{CollisionTestStatusText}\n" +
-            $"Радиус: {PlanetRadius:F1} м  •  рельеф: ±{HeightAmplitude:F1} м  •  " +
-            $"seed: {NoiseSeed}  •  patch: {FaceResolution}×{FaceResolution}\n" +
-            "WASD — касательное движение  •  мышь — обзор  •  " +
-            $"{contextualSpace}  •  R — сброс\n" +
-            "F1 — грань/LOD/нормали  •  F2 — игрок/обзор  •  " +
-            "T — seam  •  Y — origin  •  U — LOD  •  I — async-stream  •  " +
-            "K — collision-LOD";
+        _hudLabel.Text = _hudMode == PrototypeHudMode.Detailed
+            ? BuildDetailedHudText(
+                lodSeamStatus,
+                faceSeamStatus,
+                playerStatus,
+                contactStatus,
+                radialStatus,
+                cameraState,
+                debugMode,
+                contextualSpace,
+                coordinateStatus,
+                originStatus,
+                seamTestStatus)
+            : BuildCompactHudText(
+                lodSeamStatus,
+                faceSeamStatus,
+                playerStatus,
+                contactStatus,
+                radialStatus,
+                cameraState);
     }
 
 }
