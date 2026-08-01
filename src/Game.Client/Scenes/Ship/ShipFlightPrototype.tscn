@@ -1,0 +1,215 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Ship/ShipFlightPrototype.cs" id="1_prototype"]
+[ext_resource type="PackedScene" path="res://Scenes/Ship/ArcadeShip.tscn" id="2_ship"]
+
+[sub_resource type="Environment" id="Environment_space"]
+background_mode = 1
+background_color = Color(0.003, 0.006, 0.018, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.16, 0.22, 0.36, 1)
+ambient_light_energy = 0.62
+
+[sub_resource type="StyleBoxFlat" id="StyleBox_hud"]
+bg_color = Color(0.015, 0.025, 0.05, 0.86)
+corner_radius_top_left = 7
+corner_radius_top_right = 7
+corner_radius_bottom_right = 7
+corner_radius_bottom_left = 7
+content_margin_left = 12.0
+content_margin_top = 10.0
+content_margin_right = 12.0
+content_margin_bottom = 10.0
+
+[sub_resource type="StandardMaterial3D" id="Material_planet"]
+albedo_color = Color(0.12, 0.2, 0.42, 1)
+metallic = 0.05
+roughness = 0.82
+
+[sub_resource type="SphereMesh" id="SphereMesh_planet"]
+material = SubResource("Material_planet")
+radius = 105.0
+height = 210.0
+radial_segments = 48
+rings = 24
+
+[sub_resource type="StandardMaterial3D" id="Material_beacon_blue"]
+albedo_color = Color(0.08, 0.35, 0.85, 1)
+emission_enabled = true
+emission = Color(0.05, 0.42, 1, 1)
+emission_energy_multiplier = 5.0
+roughness = 0.2
+
+[sub_resource type="StandardMaterial3D" id="Material_beacon_orange"]
+albedo_color = Color(0.9, 0.3, 0.05, 1)
+emission_enabled = true
+emission = Color(1, 0.22, 0.03, 1)
+emission_energy_multiplier = 4.0
+roughness = 0.2
+
+[sub_resource type="SphereMesh" id="SphereMesh_beacon"]
+radius = 3.0
+height = 6.0
+radial_segments = 20
+rings = 10
+
+[sub_resource type="StandardMaterial3D" id="Material_station"]
+albedo_color = Color(0.18, 0.22, 0.3, 1)
+metallic = 0.65
+roughness = 0.32
+
+[sub_resource type="BoxMesh" id="BoxMesh_station"]
+material = SubResource("Material_station")
+size = Vector3(45, 8, 18)
+
+[sub_resource type="StandardMaterial3D" id="Material_lane"]
+albedo_color = Color(0.04, 0.25, 0.42, 1)
+emission_enabled = true
+emission = Color(0.02, 0.24, 0.7, 1)
+emission_energy_multiplier = 2.0
+roughness = 0.35
+
+[sub_resource type="BoxMesh" id="BoxMesh_lane"]
+material = SubResource("Material_lane")
+size = Vector3(0.35, 0.35, 38)
+
+[node name="ShipFlightPrototype" type="Node3D"]
+script = ExtResource("1_prototype")
+TestTimeoutSeconds = 15.0
+TestMinimumSpeed = 35.0
+TestMinimumTravelDistance = 45.0
+TestMinimumLateralSpeed = 4.0
+TestMinimumVerticalSpeed = 3.0
+TestMinimumAngularSpeedDegrees = 45.0
+TestMaximumFinalSpeed = 0.8
+TestMaximumFinalAngularSpeedDegrees = 1.0
+HudCompactWidth = 620.0
+HudCompactHeight = 210.0
+HudDetailedWidth = 760.0
+HudDetailedHeight = 520.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_space")
+
+[node name="KeyLight" type="DirectionalLight3D" parent="."]
+rotation = Vector3(-0.55, -0.75, 0.12)
+light_color = Color(0.74, 0.84, 1, 1)
+light_energy = 1.45
+shadow_enabled = true
+directional_shadow_max_distance = 900.0
+
+[node name="FillLight" type="OmniLight3D" parent="."]
+position = Vector3(-70, 55, 25)
+light_color = Color(0.2, 0.45, 1, 1)
+light_energy = 7.0
+omni_range = 220.0
+
+[node name="ArcadeShip" parent="." instance=ExtResource("2_ship")]
+
+[node name="Landmarks" type="Node3D" parent="."]
+
+[node name="DistantPlanet" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(170, -110, -820)
+mesh = SubResource("SphereMesh_planet")
+
+[node name="BlueBeaconA" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(-55, 18, -130)
+mesh = SubResource("SphereMesh_beacon")
+material_override = SubResource("Material_beacon_blue")
+
+[node name="BlueBeaconB" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(65, -22, -210)
+mesh = SubResource("SphereMesh_beacon")
+material_override = SubResource("Material_beacon_blue")
+
+[node name="OrangeBeacon" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(12, 75, -330)
+mesh = SubResource("SphereMesh_beacon")
+material_override = SubResource("Material_beacon_orange")
+
+[node name="Station" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(-150, 42, -460)
+rotation = Vector3(0.18, 0.52, 0.1)
+mesh = SubResource("BoxMesh_station")
+
+[node name="LaneLeft" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(-18, -8, -105)
+mesh = SubResource("BoxMesh_lane")
+
+[node name="LaneRight" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(18, -8, -105)
+mesh = SubResource("BoxMesh_lane")
+
+[node name="LaneUpper" type="MeshInstance3D" parent="Landmarks"]
+position = Vector3(0, 10, -145)
+rotation = Vector3(0, 0, 1.5708)
+mesh = SubResource("BoxMesh_lane")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+layer = 100
+
+[node name="CompactMargin" type="MarginContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 632.0
+offset_bottom = 222.0
+mouse_filter = 2
+
+[node name="PanelContainer" type="PanelContainer" parent="Hud/CompactMargin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Label" type="Label" parent="Hud/CompactMargin/PanelContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+autowrap_mode = 2
+text = "ПРОТОТИП D — СВОБОДНЫЙ ПОЛЁТ\nИнициализация..."
+
+[node name="DetailedMargin" type="MarginContainer" parent="Hud"]
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 772.0
+offset_bottom = 532.0
+visible = false
+mouse_filter = 1
+
+[node name="PanelContainer" type="PanelContainer" parent="Hud/DetailedMargin"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Hud/DetailedMargin/PanelContainer"]
+layout_mode = 2
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+
+[node name="Label" type="Label" parent="Hud/DetailedMargin/PanelContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+autowrap_mode = 2
+text = "ПРОТОТИП D — ПОДРОБНЫЙ HUD\nИнициализация..."
+
+[node name="HiddenHint" type="PanelContainer" parent="Hud"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -176.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 46.0
+grow_horizontal = 0
+visible = false
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBox_hud")
+
+[node name="Label" type="Label" parent="Hud/HiddenHint"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+mouse_filter = 2
+text = "HUD скрыт  •  H"
+horizontal_alignment = 1
+vertical_alignment = 1

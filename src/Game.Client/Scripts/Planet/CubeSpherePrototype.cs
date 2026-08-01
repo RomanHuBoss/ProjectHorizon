@@ -2008,6 +2008,14 @@ public partial class CubeSpherePrototype : Node3D
         _hudScroll.MouseFilter = _hudMode == PrototypeHudMode.Detailed
             ? Control.MouseFilterEnum.Stop
             : Control.MouseFilterEnum.Ignore;
+        _hudScroll.VerticalScrollMode =
+            _hudMode == PrototypeHudMode.Detailed
+                ? ScrollContainer.ScrollMode.Auto
+                : ScrollContainer.ScrollMode.Disabled;
+        if (_hudMode != PrototypeHudMode.Detailed)
+        {
+            _hudScroll.ScrollVertical = 0;
+        }
         _hudHiddenHint.Visible = _hudMode == PrototypeHudMode.Hidden;
     }
 
