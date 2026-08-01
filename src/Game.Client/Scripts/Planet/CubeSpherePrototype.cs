@@ -409,8 +409,7 @@ public partial class CubeSpherePrototype : Node3D
             coordinateStatus =
                 $"Floating origin: cell=({_floatingOrigin.CellX}," +
                 $"{_floatingOrigin.CellY},{_floatingOrigin.CellZ})  •  " +
-                $"local=({local.X:F1},{local.Y:F1},{local.Z:F1}) м
-" +
+                $"local=({local.X:F1},{local.Y:F1},{local.Z:F1}) м\n" +
                 $"Логические: ({_floatingOrigin.LogicalX:F1}," +
                 $"{_floatingOrigin.LogicalY:F1},{_floatingOrigin.LogicalZ:F1}) м  •  " +
                 $"shifts={_floatingOrigin.ShiftEvents}";

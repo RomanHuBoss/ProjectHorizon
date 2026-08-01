@@ -64,6 +64,8 @@ src/Game.Client/Scenes/Terrain/TerrainChunkPrototype.tscn
 
 ### Прототип C. Сферическая планета — `IN_PROGRESS`
 
+> Build hotfix от 2026-08-01: исправлен некорректный физический перевод строки в HUD floating origin, вызывавший `CS1039/CS1010` при компиляции `CubeSpherePrototype.cs`.
+
 Основа cube sphere, радиальная система игрока и устойчивое прохождение collision-швов приняты по локальным runtime-проверкам. Текущая итерация реализует иерархические локальные координаты и floating origin из раздела 6 PDF-ТЗ:
 
 - локальная ячейка имеет размер `4096 м`;
