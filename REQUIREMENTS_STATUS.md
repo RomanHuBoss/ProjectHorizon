@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-entry-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,38 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Свободный космический полёт принят runtime; реализован упрощённый атмосферный режим с lift/min-speed/drag/climb-limit/surface-safety, ожидающий приёмки |
+| D. Корабль | `IN_PROGRESS` | Свободный полёт принят; атмосферная редакция собирается 0/0, первый `L`-прогон завершился `FAIL timeout phase=Entry`; добавлен physics-guidance hotfix, ожидающий повторной приёмки |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-043/TASK-044` подтверждены чистой сборкой, автоматическим `J: PASS` и ручной проверкой всех органов управления. Свободный космический полёт принят. Текущая итерация реализует `TASK-045` — упрощённый атмосферный режим и surface-safety; посадка и опоры остаются отдельным шагом.
+**Вывод:** `TASK-043/TASK-044` подтверждены и свободный полёт принят. Атмосферная редакция успешно собирается, но первый `L`-прогон остановился на фазе `Entry`. Текущий hotfix добавляет радиальный guidance в physics tick и раннюю диагностику stalled-entry; `TASK-045` остаётся `IMPLEMENTED`, `TASK-046` — `IN_PROGRESS`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — runtime `L: FAIL Entry timeout` и atmospheric-entry hotfix
+
+**Фактическое доказательство пользователя:**
+
+- локальная сборка `Game.Client.csproj`: `0` предупреждений, `0` ошибок;
+- free-flight regression остаётся `TASK-043 flight (J): PASS`;
+- автоматический атмосферный тест завершился `TASK-045 atmosphere (L): FAIL — timeout phase=Entry`;
+- после восстановления baseline HUD показывал `SPACE`, `alt=441,8 м`, `blend=0,00`;
+- следовательно, сборка и запуск подтверждены, но переход через entry-фазу не был воспроизводимым.
+
+**Причина и исправление:**
+
+- прежний acceptance route полагался на единственный стартовый inward-импульс и локальную lift-команду;
+- добавлен отдельный radial-guidance target, применяемый внутри `_PhysicsProcess` после атмосферных сил и до `MoveAndSlide`;
+- guidance поддерживает заданную отрицательную радиальную скорость только до достижения `InAtmosphere && blend >= 0,20`, после чего полностью отключается;
+- ручной подход по `P` использует тот же временный entry-guidance и отключает его после устойчивого входа;
+- `ResetToSpawn`, восстановление baseline и завершение теста принудительно очищают guidance;
+- вместо общего 16-секундного ожидания entry-фаза имеет отдельный timeout `5 с` и выводит `startAlt`, `minAlt`, текущие `alt/radial/blend`;
+- остальные фазы minimum-speed, drag, climb-limit, surface-safety и exit не изменялись.
+
+**Статусы:**
+
+- `PD-ACC-010` → `VERIFIED` по чистой пользовательской сборке;
+- `TASK-045`, `PD-020`–`PD-025` остаются `IMPLEMENTED`;
+- `TASK-046`, `PD-ACC-011`–`PD-ACC-018` остаются `IN_PROGRESS` до повторного `L: PASS`.
 
 ### 2026-08-01 — приёмка free-flight и `TASK-045` atmospheric flight foundation
 
@@ -81,7 +107,7 @@
 
 - `TASK-043`, `TASK-044`, `PD-001`, `PD-010`–`PD-017`, `PD-ACC-001`–`PD-ACC-006` → `VERIFIED`;
 - `TASK-045`, `PD-020`–`PD-025` → `IMPLEMENTED`;
-- `TASK-046`, `PD-ACC-010`–`PD-ACC-018` → `IN_PROGRESS` до локального `L: PASS`;
+- `TASK-046`, `PD-ACC-011`–`PD-ACC-018` → `IN_PROGRESS` до локального `L: PASS`;
 - Прототип D остаётся `IN_PROGRESS`.
 
 **Ограничение:** посадка, проверка уклона/препятствий, опоры и отключение основной физики не входят в `TASK-045` и будут реализованы после приёмки атмосферного режима.
@@ -702,7 +728,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-023` | Ограничение вертикального набора | `IMPLEMENTED` | Положительная radial velocity ограничивается `AtmosphereMaximumClimbSpeed` |
 | `PD-024` | Автоматическое предотвращение грубого столкновения | `IMPLEMENTED` | Stopping-distance safety, clearance clamp и аварийный hard floor |
 | `PD-025` | Диагностика и автоматический atmosphere test | `IMPLEMENTED` | HUD SPACE/ATMOSPHERE; `P` approach; `L` проверяет entry/exit/drag/min-speed/climb/safety |
-| `PD-ACC-010` | Атмосферная редакция собирается 0/0 | `IN_PROGRESS` | Выполнить локальную сборку |
+| `PD-ACC-010` | Атмосферная редакция собирается 0/0 | `VERIFIED` | Пользовательская сборка: `0` предупреждений, `0` ошибок |
 | `PD-ACC-011` | Ручной переход SPACE ↔ ATMOSPHERE видим в HUD | `IN_PROGRESS` | `P`, altitude/blend и entry/exit без рывка камеры |
 | `PD-ACC-012` | Minimum-speed assist и lift удерживают управляемый полёт | `IN_PROGRESS` | `L: PASS`, minSpeed applications > 0, maxBlend ≥ 0,55 |
 | `PD-ACC-013` | Drag заметно снижает скорость | `IN_PROGRESS` | `dragDrop ≥ 4 м/с` |
@@ -748,11 +774,13 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
    - при малой forward airspeed появляется `MIN-SPEED`;
    - чрезмерный вертикальный набор ограничивается;
    - возле поверхности появляется `SAFETY`, корабль не врезается и не проваливается внутрь сферы.
-5. Нажать `L` и не вмешиваться. Ориентировочное время: 6–10 секунд; предельный timeout — 16 секунд.
+5. Нажать `L` и не вмешиваться. Entry-guidance должен за 2–4 секунды провести корабль через границу атмосферы; весь тест обычно занимает 7–11 секунд, общий timeout — 16 секунд.
 6. Критерий автоматического `PASS`:
 
 ```text
 TASK-045 atmosphere (L): PASS
+entryStart ≈ 104 м
+entryMin < 70 м
 entries >= 1
 exits >= 1
 maxBlend >= 0,55
@@ -782,6 +810,18 @@ TASK-045 atmospheric flight acceptance PASS
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — hotfix `TASK-045`, детерминированный вход в атмосферу
+
+**Исходный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-flight.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-atmospheric-entry-hotfix.zip`  
+**Git SHA:** отсутствует в архиве
+
+**Runtime-доказательство:** сборка 0/0; `L: FAIL timeout phase=Entry`; после восстановления baseline HUD показывал SPACE/alt=441,8 м. Free-flight `J: PASS` не регрессировал.
+
+**Изменения:** добавлен physics-tick radial guidance, гарантированное движение через entry boundary, отдельный 5-секундный entry timeout, расширенные `entryStart/entryMin/alt/radial/blend` diagnostics и очистка guidance при reset/restore/finish. Ручной `P`-подход использует тот же временный guidance.
+
+**Ограничение:** hotfix статически проверен, но требует повторной локальной сборки и `TASK-046` runtime-приёмки.
 
 ### 2026-08-01 — `TASK-045`, упрощённый атмосферный режим
 

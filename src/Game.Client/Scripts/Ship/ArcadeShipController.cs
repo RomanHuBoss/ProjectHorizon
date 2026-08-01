@@ -213,6 +213,7 @@ public partial class ArcadeShipController : CharacterBody3D
         UpdateAtmosphereContext();
         ApplyLinearFlight(command, deltaSeconds);
         ApplyAtmosphericFlight(command, deltaSeconds);
+        ApplyAtmosphericRadialGuidance(deltaSeconds);
         ApplyAngularFlight(command, deltaSeconds);
         MoveAndSlide();
         ApplyAtmosphericSurfaceCorrection();
@@ -284,6 +285,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public void ResetToSpawn()
     {
         ClearExternalCommand();
+        ClearRadialGuidance();
         GlobalTransform = _spawnTransform;
         Velocity = Vector3.Zero;
         AngularVelocityLocal = Vector3.Zero;
@@ -307,6 +309,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public void RestoreRuntimeState(ArcadeShipRuntimeState state)
     {
         ClearExternalCommand();
+        ClearRadialGuidance();
         GlobalTransform = state.GlobalTransform;
         Velocity = state.Velocity;
         AngularVelocityLocal = state.AngularVelocityLocal;

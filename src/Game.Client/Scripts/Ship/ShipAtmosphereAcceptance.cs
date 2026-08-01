@@ -35,6 +35,15 @@ public partial class ShipFlightPrototype
     [Export(PropertyHint.Range, "0.0,5.0,0.1")]
     public float AtmosphereTestClimbTolerance { get; set; } = 1.0f;
 
+    [Export(PropertyHint.Range, "5.0,40.0,0.5")]
+    public float AtmosphereTestEntrySpeed { get; set; } = 18.0f;
+
+    [Export(PropertyHint.Range, "5.0,150.0,1.0")]
+    public float AtmosphereTestEntryGuidanceAcceleration { get; set; } = 60.0f;
+
+    [Export(PropertyHint.Range, "2.0,10.0,0.25")]
+    public float AtmosphereTestEntryPhaseTimeoutSeconds { get; set; } = 5.0f;
+
     private Node3D? _atmospherePlanet;
     private ShipAtmosphereTestState _atmosphereTestState =
         ShipAtmosphereTestState.Ready;
@@ -47,6 +56,8 @@ public partial class ShipFlightPrototype
     private float _atmosphereMaximumObservedClimb;
     private float _atmosphereDragStartSpeed;
     private float _atmosphereDragEndSpeed;
+    private float _atmosphereEntryStartAltitude;
+    private float _atmosphereEntryMinimumAltitude;
     private int _atmosphereEntryBaseline;
     private int _atmosphereExitBaseline;
     private int _dragBaseline;
@@ -80,7 +91,8 @@ public partial class ShipFlightPrototype
                 ShipAtmosphereTestState.Running =>
                     $"TASK-045 atmosphere (L): RUNNING {_atmosphereTestPhase}, " +
                     $"t={_atmosphereTestElapsed:F1} с, " +
-                    $"alt={_ship?.AltitudeAboveSurface:F1} м",
+                    $"alt={_ship?.AltitudeAboveSurface:F1} м, " +
+                    $"radial={_ship?.RadialSpeed:F1} м/с",
                 ShipAtmosphereTestState.Passed =>
                     $"TASK-045 atmosphere (L): PASS entry={_atmosphereEntries}, " +
                     $"exit={_atmosphereExits}, blend={_atmosphereMaximumBlend:F2}, " +
@@ -207,6 +219,7 @@ public partial class ShipFlightPrototype
 
         if (_atmosphereDemoActive)
         {
+            _ship.ClearRadialGuidance();
             _ship.ResetToSpawn();
             _atmosphereDemoActive = false;
             GD.Print("Atmospheric approach: returned to space spawn.");
@@ -214,14 +227,15 @@ public partial class ShipFlightPrototype
         }
 
         Transform3D approach = _ship.CreateAtmosphericTransform(
-            _ship.AtmosphereHeight + 18.0f,
+            _ship.AtmosphereHeight + 8.0f,
             Vector3.Up,
             Vector3.Forward);
         Vector3 forward = -approach.Basis.Z;
         Vector3 velocity =
             (forward * (_ship.AtmosphereMinimumForwardSpeed + 8.0f)) -
-            (approach.Basis.Y * 7.0f);
+            (approach.Basis.Y * 12.0f);
         _ship.SetKinematicState(approach, velocity, Vector3.Zero);
+        _ship.SetRadialGuidance(-12.0f, 45.0f);
         _ship.SetAutoStabilization(true);
         _atmosphereDemoActive = true;
         GD.Print("Atmospheric approach: positioned above entry boundary.");
@@ -255,6 +269,8 @@ public partial class ShipFlightPrototype
         _atmosphereMaximumObservedClimb = 0.0f;
         _atmosphereDragStartSpeed = 0.0f;
         _atmosphereDragEndSpeed = 0.0f;
+        _atmosphereEntryStartAltitude = float.PositiveInfinity;
+        _atmosphereEntryMinimumAltitude = float.PositiveInfinity;
         _atmosphereEntries = 0;
         _atmosphereExits = 0;
         _atmosphereDragApplications = 0;
@@ -278,14 +294,39 @@ public partial class ShipFlightPrototype
             (entryForward * (_ship.AtmosphereMinimumForwardSpeed + 7.0f)) -
             (entryTransform.Basis.Y * 16.0f);
         _ship.SetKinematicState(entryTransform, entryVelocity, Vector3.Zero);
+        _ship.SetRadialGuidance(
+            -AtmosphereTestEntrySpeed,
+            AtmosphereTestEntryGuidanceAcceleration);
+        _atmosphereEntryStartAltitude = _ship.AltitudeAboveSurface;
+        _atmosphereEntryMinimumAltitude = _ship.AltitudeAboveSurface;
         _atmosphereEntryBaseline = _ship.AtmosphereEntryCount;
         _atmosphereExitBaseline = _ship.AtmosphereExitCount;
         _ship.SetExternalCommand(new ShipControlCommand(
-            0.35f, 0.0f, -0.25f,
+            0.35f, 0.0f, 0.0f,
             0.0f, 0.0f, 0.0f,
             false, false));
 
         GD.Print("TASK-045 atmospheric flight acceptance started.");
+    }
+
+    private void UpdateAtmospherePrototype(float deltaSeconds)
+    {
+        if (_ship is null || !_atmosphereDemoActive || AtmosphereTestRunning)
+        {
+            return;
+        }
+
+        if (_ship.InAtmosphere && _ship.AtmosphereBlend >= 0.20f)
+        {
+            _ship.ClearRadialGuidance();
+        }
+        else if (_ship.AltitudeAboveSurface > _ship.AtmosphereHeight + 20.0f)
+        {
+            _ship.ClearRadialGuidance();
+            _atmosphereDemoActive = false;
+            GD.PushWarning(
+                "Atmospheric approach aborted: ship moved away from entry boundary.");
+        }
     }
 
     private void UpdateAtmosphereTest(float deltaSeconds)
@@ -326,8 +367,13 @@ public partial class ShipFlightPrototype
         switch (_atmosphereTestPhase)
         {
             case AtmosphereTestPhase.Entry:
+                _atmosphereEntryMinimumAltitude = Math.Min(
+                    _atmosphereEntryMinimumAltitude,
+                    _ship.AltitudeAboveSurface);
+
                 if (_ship.InAtmosphere && _ship.AtmosphereBlend >= 0.20f)
                 {
+                    _ship.ClearRadialGuidance();
                     SetAtmosphereTestPhase(AtmosphereTestPhase.MinimumSpeed);
                     Transform3D minimumSpeedTransform =
                         _ship.CreateAtmosphericTransform(
@@ -340,6 +386,17 @@ public partial class ShipFlightPrototype
                         minimumForward * 2.0f,
                         Vector3.Zero);
                     _ship.SetExternalCommand(ShipControlCommand.Neutral);
+                }
+                else if (_atmospherePhaseElapsed >
+                    AtmosphereTestEntryPhaseTimeoutSeconds)
+                {
+                    FinishAtmosphereTest(
+                        ShipAtmosphereTestState.Failed,
+                        $"entry stalled startAlt={_atmosphereEntryStartAltitude:F1}, " +
+                        $"minAlt={_atmosphereEntryMinimumAltitude:F1}, " +
+                        $"alt={_ship.AltitudeAboveSurface:F1}, " +
+                        $"radial={_ship.RadialSpeed:F1}, " +
+                        $"blend={_ship.AtmosphereBlend:F2}");
                 }
                 break;
 
@@ -586,6 +643,7 @@ public partial class ShipFlightPrototype
         _atmosphereTestState = finalState;
         _atmosphereTestPhase = AtmosphereTestPhase.None;
         _atmosphereTestResult = result;
+        _ship.ClearRadialGuidance();
         _ship.RestoreRuntimeState(_atmosphereTestBaseline);
         _ship.SetManualControlEnabled(true);
         _atmosphereDemoActive = false;
@@ -600,6 +658,8 @@ public partial class ShipFlightPrototype
 
         GD.Print(
             $"TASK-045 atmospheric flight acceptance {status}: " +
+            $"entryStart={_atmosphereEntryStartAltitude:F2}; " +
+            $"entryMin={_atmosphereEntryMinimumAltitude:F2}; " +
             $"entries={_atmosphereEntries}; exits={_atmosphereExits}; " +
             $"maxBlend={_atmosphereMaximumBlend:F3}; " +
             $"dragDrop={_atmosphereDragStartSpeed - _atmosphereDragEndSpeed:F2}; " +

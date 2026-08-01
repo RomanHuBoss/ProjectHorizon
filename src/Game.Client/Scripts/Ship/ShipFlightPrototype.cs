@@ -155,6 +155,8 @@ public partial class ShipFlightPrototype : Node3D
 
     public override void _Process(double delta)
     {
+        UpdateAtmospherePrototype((float)delta);
+
         if (_testState == ShipFlightTestState.Running)
         {
             UpdateFlightTest((float)delta);

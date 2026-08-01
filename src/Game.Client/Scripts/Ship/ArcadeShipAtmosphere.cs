@@ -47,6 +47,9 @@ public partial class ArcadeShipController
 
     private Node3D? _atmosphereBody;
     private bool _wasInAtmosphere;
+    private bool _radialGuidanceActive;
+    private float _radialGuidanceTargetSpeed;
+    private float _radialGuidanceAcceleration;
 
     public bool HasAtmosphereReference => _atmosphereBody is not null;
     public bool InAtmosphere { get; private set; }
@@ -66,12 +69,30 @@ public partial class ArcadeShipController
     public int SurfaceRecoveryCount { get; private set; }
 
     public Vector3 AtmosphereCenter => _atmosphereBody?.GlobalPosition ?? Vector3.Zero;
+    public bool RadialGuidanceActive => _radialGuidanceActive;
+    public float RadialGuidanceTargetSpeed => _radialGuidanceTargetSpeed;
 
     public void SetAtmosphereBody(Node3D? atmosphereBody)
     {
         _atmosphereBody = atmosphereBody;
         _wasInAtmosphere = false;
         UpdateAtmosphereContext();
+    }
+
+    public void SetRadialGuidance(
+        float targetRadialSpeed,
+        float acceleration)
+    {
+        _radialGuidanceActive = true;
+        _radialGuidanceTargetSpeed = targetRadialSpeed;
+        _radialGuidanceAcceleration = Math.Max(1.0f, acceleration);
+    }
+
+    public void ClearRadialGuidance()
+    {
+        _radialGuidanceActive = false;
+        _radialGuidanceTargetSpeed = 0.0f;
+        _radialGuidanceAcceleration = 0.0f;
     }
 
     public void SetKinematicState(
@@ -178,6 +199,23 @@ public partial class ArcadeShipController
 
             _wasInAtmosphere = InAtmosphere;
         }
+    }
+
+    private void ApplyAtmosphericRadialGuidance(float deltaSeconds)
+    {
+        if (!_radialGuidanceActive || _atmosphereBody is null)
+        {
+            return;
+        }
+
+        float currentRadialSpeed = Velocity.Dot(AtmosphereRadialUp);
+        float guidedRadialSpeed = Mathf.MoveToward(
+            currentRadialSpeed,
+            _radialGuidanceTargetSpeed,
+            _radialGuidanceAcceleration * deltaSeconds);
+        Velocity += AtmosphereRadialUp *
+            (guidedRadialSpeed - currentRadialSpeed);
+        RadialSpeed = guidedRadialSpeed;
     }
 
     private void ApplyAtmosphericFlight(
