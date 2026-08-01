@@ -8,6 +8,18 @@ public enum ContentResolutionState
     Placeholder = 2
 }
 
+public enum AutosaveTrigger
+{
+    Periodic = 0,
+    Landing = 1,
+    Takeoff = 2,
+    Hyperspace = 3,
+    QuestCompleted = 4,
+    ShipPurchased = 5,
+    BaseChanged = 6,
+    GracefulExit = 7
+}
+
 public sealed record PlayerSaveData(
     string PlayerId,
     double PositionX,
@@ -147,4 +159,19 @@ public sealed record SaveMigrationAcceptanceReport(
     bool UnknownShipPreserved,
     bool RoundTripPreserved,
     int ExactContentChecks,
+    double ElapsedMilliseconds);
+
+public sealed record SaveAutosaveAcceptanceReport(
+    bool Passed,
+    string Result,
+    SaveGameSnapshot? LoadedSnapshot,
+    SaveDatabaseDiagnostics Diagnostics,
+    int TriggerTypesCovered,
+    int RequestedSaves,
+    int CompletedBatches,
+    int CoalescedRequests,
+    bool PeriodicTriggered,
+    bool GracefulExitFlushed,
+    bool ExactRoundTrip,
+    bool LogWritten,
     double ElapsedMilliseconds);

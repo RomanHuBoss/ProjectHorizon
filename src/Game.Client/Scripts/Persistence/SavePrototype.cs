@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -27,19 +28,26 @@ public enum SavePrototypeHudMode
 
 public partial class SavePrototype : Node3D
 {
+    private sealed record GracefulExitResult(
+        bool SnapshotWritten,
+        int Revision);
+
     private const string SlotId = "save_1";
 
     [Export(PropertyHint.Range, "420.0,1000.0,10.0")]
     public float HudCompactWidth { get; set; } = 720.0f;
 
-    [Export(PropertyHint.Range, "180.0,500.0,10.0")]
-    public float HudCompactHeight { get; set; } = 450.0f;
+    [Export(PropertyHint.Range, "180.0,560.0,10.0")]
+    public float HudCompactHeight { get; set; } = 510.0f;
 
     [Export(PropertyHint.Range, "520.0,1200.0,10.0")]
     public float HudDetailedWidth { get; set; } = 820.0f;
 
     [Export(PropertyHint.Range, "320.0,900.0,10.0")]
-    public float HudDetailedHeight { get; set; } = 560.0f;
+    public float HudDetailedHeight { get; set; } = 650.0f;
+
+    [Export(PropertyHint.Range, "5.0,600.0,5.0")]
+    public double AutosaveIntervalSeconds { get; set; } = 60.0;
 
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private SaveDatabase? _database;
@@ -52,6 +60,9 @@ public partial class SavePrototype : Node3D
     private Task<SaveRecoveryReport>? _recoveryTask;
     private Task<SaveRecoveryAcceptanceReport>? _recoveryAcceptanceTask;
     private Task<SaveMigrationAcceptanceReport>? _migrationAcceptanceTask;
+    private Task<SaveAutosaveAcceptanceReport>? _autosaveAcceptanceTask;
+    private Task<GracefulExitResult>? _gracefulExitTask;
+    private SaveAutosaveCoordinator? _autosaveCoordinator;
     private SavePrototypeState _state = SavePrototypeState.Initializing;
     private SavePrototypeHudMode _hudMode = SavePrototypeHudMode.Compact;
     private SaveGameSnapshot? _loadedSnapshot;
@@ -61,11 +72,17 @@ public partial class SavePrototype : Node3D
     private SaveRecoveryReport? _recoveryReport;
     private SaveRecoveryAcceptanceReport? _recoveryAcceptanceReport;
     private SaveMigrationAcceptanceReport? _migrationAcceptanceReport;
+    private SaveAutosaveAcceptanceReport? _autosaveAcceptanceReport;
     private int _manualRevision;
+    private int _observedAutosaveBatches;
+    private double _autosaveElapsedSeconds;
+    private bool _gracefulExitRequested;
+    private bool _previousAutoAcceptQuit = true;
     private string _statusMessage = "инициализация SQLite";
     private string _slotOperationHud = "READY";
     private string _backupOperationHud = "READY";
     private string _recoveryOperationHud = "READY";
+    private string _autosaveOperationHud = "READY";
     private string _writeCompletionHud = "PASS";
     private string _refreshCompletionMessage = "SQLite READY";
     private SavePrototypeState _refreshCompletionState =
@@ -111,15 +128,28 @@ public partial class SavePrototype : Node3D
             "profile_prototype",
             "save_1.db");
         _databaseDisplayPath = databasePath;
-        _database = new SaveDatabase(databasePath);
-        _initializeTask = _database.InitializeAsync(_lifetimeCancellation.Token);
+        SaveDatabase database = new(databasePath);
+        _database = database;
+        _autosaveCoordinator = new SaveAutosaveCoordinator(database);
+        _initializeTask = database.InitializeAsync(_lifetimeCancellation.Token);
 
+        SceneTree tree = GetTree();
+        _previousAutoAcceptQuit = tree.AutoAcceptQuit;
+        tree.AutoAcceptQuit = false;
         GetViewport().SizeChanged += UpdateHudLayout;
         ApplyHudMode();
         UpdateHud();
         GD.Print(
-            "Prototype E SQLite migration/backup/recovery initializing. " +
-            "Press C for migration/content compatibility acceptance after READY.");
+            "Prototype E SQLite autosave/migration/recovery initializing. " +
+            "Press F6 for autosave/graceful-exit acceptance after READY.");
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest)
+        {
+            BeginGracefulExit();
+        }
     }
 
     public override void _ExitTree()
@@ -129,14 +159,15 @@ public partial class SavePrototype : Node3D
             viewport.SizeChanged -= UpdateHudLayout;
         }
 
+        GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
         _lifetimeCancellation.Cancel();
+        _autosaveCoordinator?.Dispose();
         _database?.Dispose();
         _lifetimeCancellation.Dispose();
     }
 
     public override void _Process(double delta)
     {
-        _ = delta;
         PollInitializeTask();
         PollWriteTask();
         PollLoadTask();
@@ -145,7 +176,11 @@ public partial class SavePrototype : Node3D
         PollRecoveryTask();
         PollRecoveryAcceptanceTask();
         PollMigrationAcceptanceTask();
+        PollAutosaveAcceptanceTask();
+        PollAutosaveCoordinator();
+        PollGracefulExitTask();
         PollRefreshTask();
+        UpdateAutosaveTimer(delta);
         UpdateHud();
     }
 
@@ -200,6 +235,11 @@ public partial class SavePrototype : Node3D
             BeginRestoreBackup();
             GetViewport().SetInputAsHandled();
         }
+        else if (Matches(physical, logical, Key.F6))
+        {
+            BeginAutosaveAcceptanceTest();
+            GetViewport().SetInputAsHandled();
+        }
         else if (Matches(physical, logical, Key.C))
         {
             BeginMigrationAcceptanceTest();
@@ -228,7 +268,10 @@ public partial class SavePrototype : Node3D
             _backupTask is null &&
             _recoveryTask is null &&
             _recoveryAcceptanceTask is null &&
-            _migrationAcceptanceTask is null;
+            _migrationAcceptanceTask is null &&
+            _autosaveAcceptanceTask is null &&
+            _gracefulExitTask is null &&
+            !(_autosaveCoordinator?.IsBusy ?? false);
     }
 
     private void BeginManualSave()
@@ -374,6 +417,261 @@ public partial class SavePrototype : Node3D
         GD.Print("TASK-058 SQLite migration/content compatibility acceptance started.");
     }
 
+    private void BeginAutosaveAcceptanceTest()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        _state = SavePrototypeState.Testing;
+        _statusMessage =
+            "isolated periodic/events → coalescing → graceful-exit flush → exact load";
+        _autosaveAcceptanceReport = null;
+        _autosaveAcceptanceTask = _database.RunAutosaveAcceptanceAsync(
+            SlotId,
+            _lifetimeCancellation.Token);
+        GD.Print("TASK-060 SQLite autosave/graceful-exit acceptance started.");
+    }
+
+    private void BeginGracefulExit()
+    {
+        if (_gracefulExitRequested)
+        {
+            return;
+        }
+
+        _gracefulExitRequested = true;
+        if (_database is null || _autosaveCoordinator is null)
+        {
+            GetTree().Quit();
+            return;
+        }
+
+        SaveGameSnapshot? inMemorySnapshot = _loadedSnapshot;
+        Task[] activeTasks = CaptureActivePersistenceTasks();
+        _state = SavePrototypeState.Saving;
+        _statusMessage =
+            "graceful-exit: ожидание активных операций и полного autosave flush";
+        _autosaveOperationHud = "RUNNING GracefulExit flush";
+        _gracefulExitTask = FlushGracefulExitAsync(activeTasks);
+        GD.Print(
+            "Prototype E graceful-exit flush started: " +
+            $"activeTasks={activeTasks.Length}; " +
+            $"inMemoryRevision={inMemorySnapshot?.Revision ?? 0}.");
+    }
+
+    private Task[] CaptureActivePersistenceTasks()
+    {
+        List<Task> tasks = new();
+
+        AddIfActive(_initializeTask);
+        AddIfActive(_writeTask);
+        AddIfActive(_loadTask);
+        AddIfActive(_refreshTask);
+        AddIfActive(_acceptanceTask);
+        AddIfActive(_backupTask);
+        AddIfActive(_recoveryTask);
+        AddIfActive(_recoveryAcceptanceTask);
+        AddIfActive(_migrationAcceptanceTask);
+        AddIfActive(_autosaveAcceptanceTask);
+        return tasks.ToArray();
+
+        void AddIfActive(Task? task)
+        {
+            if (task is not null && !task.IsCompleted)
+            {
+                tasks.Add(task);
+            }
+        }
+    }
+
+    private async Task<GracefulExitResult> FlushGracefulExitAsync(
+        Task[] activeTasks)
+    {
+        SaveDatabase database = _database ??
+            throw new InvalidOperationException(
+                "Save database is unavailable during graceful exit.");
+        SaveAutosaveCoordinator coordinator = _autosaveCoordinator ??
+            throw new InvalidOperationException(
+                "Autosave coordinator is unavailable during graceful exit.");
+
+        if (activeTasks.Length > 0)
+        {
+            await Task.WhenAll(activeTasks).ConfigureAwait(false);
+        }
+
+        await coordinator.FlushPendingAsync(
+            _lifetimeCancellation.Token).ConfigureAwait(false);
+
+        SaveGameSnapshot? sourceSnapshot = await database.LoadAsync(
+            SlotId,
+            _lifetimeCancellation.Token).ConfigureAwait(false);
+        if (sourceSnapshot is null)
+        {
+            return new GracefulExitResult(
+                SnapshotWritten: false,
+                Revision: 0);
+        }
+
+        int revision = sourceSnapshot.Revision + 1;
+        SaveGameSnapshot exitSnapshot = sourceSnapshot with
+        {
+            Revision = revision,
+            UpdatedUtc = DateTimeOffset.UtcNow.ToString(
+                "O",
+                CultureInfo.InvariantCulture)
+        };
+        await coordinator.FlushAsync(
+            AutosaveTrigger.GracefulExit,
+            exitSnapshot,
+            _lifetimeCancellation.Token).ConfigureAwait(false);
+        return new GracefulExitResult(
+            SnapshotWritten: true,
+            Revision: revision);
+    }
+
+    private SaveGameSnapshot BuildNextAutosaveSnapshot(AutosaveTrigger trigger)
+    {
+        _manualRevision = Math.Max(
+            _manualRevision + 1,
+            (_loadedSnapshot?.Revision ?? 0) + 1);
+        string updatedUtc = DateTimeOffset.UtcNow.ToString(
+            "O",
+            CultureInfo.InvariantCulture);
+
+        if (_loadedSnapshot is not null)
+        {
+            return _loadedSnapshot with
+            {
+                Revision = _manualRevision,
+                UpdatedUtc = updatedUtc
+            };
+        }
+
+        int triggerOffset = (int)trigger;
+        return SaveDatabase.CreateAcceptanceSnapshot(
+            SlotId,
+            _manualRevision,
+            playerOffset: _manualRevision * 2.5 + triggerOffset,
+            oreQuantity: 10 + _manualRevision,
+            visitCount: Math.Max(1, _manualRevision));
+    }
+
+    private void RequestMainAutosave(AutosaveTrigger trigger)
+    {
+        if (_autosaveCoordinator is null || _gracefulExitRequested)
+        {
+            return;
+        }
+
+        SaveGameSnapshot snapshot = BuildNextAutosaveSnapshot(trigger);
+        _loadedSnapshot = snapshot;
+        ApplySnapshotToVisualization(snapshot);
+        _state = SavePrototypeState.Saving;
+        _statusMessage =
+            $"autosave {trigger} revision={snapshot.Revision}";
+        _autosaveOperationHud =
+            $"RUNNING {trigger} rev={snapshot.Revision}";
+        _autosaveCoordinator.Request(trigger, snapshot);
+    }
+
+    private void UpdateAutosaveTimer(double delta)
+    {
+        if (_gracefulExitRequested || _initializeTask is not null ||
+            _database is null || _autosaveCoordinator is null ||
+            _loadedSnapshot is null || _autosaveAcceptanceTask is not null)
+        {
+            return;
+        }
+
+        _autosaveElapsedSeconds += Math.Max(0.0, delta);
+        if (_autosaveElapsedSeconds < AutosaveIntervalSeconds ||
+            !CanStartOperation())
+        {
+            return;
+        }
+
+        _autosaveElapsedSeconds = 0.0;
+        RequestMainAutosave(AutosaveTrigger.Periodic);
+    }
+
+    private void PollAutosaveCoordinator()
+    {
+        if (_autosaveCoordinator is null || _gracefulExitTask is not null)
+        {
+            return;
+        }
+
+        string error = _autosaveCoordinator.LastErrorMessage;
+        if (!string.IsNullOrWhiteSpace(error))
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"autosave failed: {error}";
+            _autosaveOperationHud = $"FAIL {error}";
+            return;
+        }
+
+        int completedBatches = _autosaveCoordinator.CompletedBatches;
+        if (_autosaveCoordinator.IsBusy ||
+            completedBatches == _observedAutosaveBatches)
+        {
+            return;
+        }
+
+        _observedAutosaveBatches = completedBatches;
+        _autosaveElapsedSeconds = 0.0;
+        _autosaveOperationHud =
+            $"PASS rev={_autosaveCoordinator.LastSavedRevision}, " +
+            $"triggers={_autosaveCoordinator.LastCompletedTriggerSummary}, " +
+            $"batches={completedBatches}, " +
+            $"coalesced={_autosaveCoordinator.CoalescedRequests}";
+        GD.Print(
+            $"Prototype E autosave PASS: revision=" +
+            $"{_autosaveCoordinator.LastSavedRevision}; " +
+            $"triggers={_autosaveCoordinator.LastCompletedTriggerSummary}; " +
+            $"requests={_autosaveCoordinator.RequestedSaves}; " +
+            $"batches={completedBatches}; " +
+            $"coalesced={_autosaveCoordinator.CoalescedRequests}");
+        BeginRefresh(
+            completionMessage: _autosaveOperationHud,
+            completionState: SavePrototypeState.Ready);
+    }
+
+    private void PollGracefulExitTask()
+    {
+        if (_gracefulExitTask is null || !_gracefulExitTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<GracefulExitResult> task = _gracefulExitTask;
+        _gracefulExitTask = null;
+        try
+        {
+            GracefulExitResult result = task.GetAwaiter().GetResult();
+            _autosaveOperationHud = result.SnapshotWritten
+                ? $"PASS GracefulExit rev={result.Revision}"
+                : "PASS GracefulExit; slot empty";
+            GD.Print(
+                "Prototype E graceful-exit autosave PASS: " +
+                $"saved={(result.SnapshotWritten ? 1 : 0)}; " +
+                $"revision={result.Revision}; " +
+                $"pending={((_autosaveCoordinator?.IsBusy ?? false) ? 1 : 0)}");
+            GetTree().Quit();
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage =
+                $"graceful-exit autosave failed: {exception.Message}";
+            _autosaveOperationHud = $"FAIL GracefulExit {exception.Message}";
+            _gracefulExitRequested = false;
+            GD.PushError(
+                $"Prototype E graceful-exit autosave failed: {exception}");
+        }
+    }
+
     private void PollInitializeTask()
     {
         if (_initializeTask is null || !_initializeTask.IsCompleted)
@@ -410,6 +708,7 @@ public partial class SavePrototype : Node3D
         try
         {
             task.GetAwaiter().GetResult();
+            _autosaveElapsedSeconds = 0.0;
             _slotOperationHud = _writeCompletionHud;
             GD.Print(
                 $"Prototype E slot operation {_slotOperationHud}; " +
@@ -674,6 +973,43 @@ public partial class SavePrototype : Node3D
         }
     }
 
+    private void PollAutosaveAcceptanceTask()
+    {
+        if (_autosaveAcceptanceTask is null ||
+            !_autosaveAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<SaveAutosaveAcceptanceReport> task = _autosaveAcceptanceTask;
+        _autosaveAcceptanceTask = null;
+        try
+        {
+            _autosaveAcceptanceReport = task.GetAwaiter().GetResult();
+            _state = _autosaveAcceptanceReport.Passed
+                ? SavePrototypeState.Passed
+                : SavePrototypeState.Failed;
+            _statusMessage = _autosaveAcceptanceReport.Result;
+            string output = BuildAutosaveAcceptanceOutput(
+                _autosaveAcceptanceReport);
+            if (_autosaveAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            _state = SavePrototypeState.Failed;
+            _statusMessage = $"autosave test failed: {exception.Message}";
+            GD.PushError(
+                $"TASK-060 SQLite autosave/graceful-exit acceptance failed: {exception}");
+        }
+    }
+
     private void BeginRefresh(
         string completionMessage,
         SavePrototypeState completionState)
@@ -683,7 +1019,10 @@ public partial class SavePrototype : Node3D
             _writeTask is not null || _acceptanceTask is not null ||
             _backupTask is not null || _recoveryTask is not null ||
             _recoveryAcceptanceTask is not null ||
-            _migrationAcceptanceTask is not null)
+            _migrationAcceptanceTask is not null ||
+            _autosaveAcceptanceTask is not null ||
+            _gracefulExitTask is not null ||
+            (_autosaveCoordinator?.IsBusy ?? false))
         {
             return;
         }
@@ -806,9 +1145,13 @@ public partial class SavePrototype : Node3D
         string acceptanceLine = BuildAcceptanceHudLine();
         string recoveryAcceptanceLine = BuildRecoveryAcceptanceHudLine();
         string migrationAcceptanceLine = BuildMigrationAcceptanceHudLine();
+        string autosaveAcceptanceLine = BuildAutosaveAcceptanceHudLine();
+        double autosaveRemaining = Math.Max(
+            0.0,
+            AutosaveIntervalSeconds - _autosaveElapsedSeconds);
 
         _compactLabel.Text =
-            "ПРОТОТИП E — SQLITE MIGRATION / RECOVERY • H — HUD\n" +
+            "SQLITE AUTOSAVE / MIGRATION / RECOVERY • H — HUD\n" +
             $"DB: {_state} • schema={diagnostics.SchemaVersion} • " +
             $"WAL={diagnostics.JournalMode} • FK={(diagnostics.ForeignKeysEnabled ? "ON" : "OFF")}\n" +
             $"Queue: pending={_database?.QueuedWrites ?? 0} • " +
@@ -818,16 +1161,18 @@ public partial class SavePrototype : Node3D
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
             migrationAcceptanceLine + "\n" +
+            autosaveAcceptanceLine + "\n" +
+            $"Autosave: {_autosaveOperationHud} • next={autosaveRemaining:F1}s\n" +
             $"Slot S/L/R: {_slotOperationHud}\n" +
             $"Backup B: {_backupOperationHud}\n" +
             $"Restore Y: {_recoveryOperationHud}\n" +
             $"Backup: {(diagnostics.BackupExists ? "есть" : "нет")} • " +
             $"integrity={diagnostics.BackupIntegrityResult} • " +
             $"bytes={diagnostics.BackupBytes}\n" +
-            "S/L/R — slot • B/Y — backup/restore • Z/X/C — acceptance tests";
+            "S/L/R — slot • B/Y — backup/restore • F6/C/X/Z — acceptance tests";
 
         _detailedLabel.Text =
-            "ПРОТОТИП E — SQLITE / COPY MIGRATION / ATOMIC RECOVERY\n" +
+            "SQLITE / AUTOSAVE / COPY MIGRATION / ATOMIC RECOVERY\n" +
             "HUD: подробный • H — compact/hidden • колесо — прокрутка\n\n" +
             $"State: {_state}\n" +
             $"Message: {_statusMessage}\n" +
@@ -845,6 +1190,13 @@ public partial class SavePrototype : Node3D
             $"Backup integrity: {diagnostics.BackupIntegrityResult}\n" +
             $"Recovery log: {_database?.RecoveryLogPath ?? "—"}\n" +
             $"Migration log: {_database?.MigrationLogPath ?? "—"}\n" +
+            $"Autosave log: {_autosaveCoordinator?.AutosaveLogPath ?? "—"}\n" +
+            $"Autosave interval: {AutosaveIntervalSeconds:F1} s\n" +
+            $"Autosave next: {autosaveRemaining:F1} s\n" +
+            $"Autosave requests/batches/coalesced: " +
+            $"{_autosaveCoordinator?.RequestedSaves ?? 0}/" +
+            $"{_autosaveCoordinator?.CompletedBatches ?? 0}/" +
+            $"{_autosaveCoordinator?.CoalescedRequests ?? 0}\n" +
             $"Inventory rows: {diagnostics.InventoryRows}\n" +
             $"Visited planet rows: {diagnostics.VisitedPlanetRows}\n" +
             $"Queued writes: {_database?.QueuedWrites ?? 0}\n" +
@@ -855,6 +1207,8 @@ public partial class SavePrototype : Node3D
             acceptanceLine + "\n" +
             recoveryAcceptanceLine + "\n" +
             migrationAcceptanceLine + "\n" +
+            autosaveAcceptanceLine + "\n" +
+            $"Autosave: {_autosaveOperationHud}\n" +
             $"Slot S/L/R: {_slotOperationHud}\n" +
             $"Backup B: {_backupOperationHud}\n" +
             $"Restore Y: {_recoveryOperationHud}\n" +
@@ -867,7 +1221,10 @@ public partial class SavePrototype : Node3D
             "Migration acceptance creates an isolated schema-1 save, migrates only a " +
             "validated copy to schema 2, preserves the byte-identical source, resolves a " +
             "legacy alias and substitutes placeholders for removed item/ship IDs while " +
-            "retaining their original IDs and gameplay values through a second save/load.\n\n" +
+            "retaining their original IDs and gameplay values through a second save/load.\n" +
+            "Autosave acceptance covers the 60-second periodic trigger, six gameplay " +
+            "event reasons, deterministic burst coalescing, one-writer serialization, " +
+            "autosave logging and a graceful-exit flush of the latest immutable snapshot.\n\n" +
             "S — сохранить snapshot; предыдущая копия защищается автоматически\n" +
             "L — загрузить snapshot\n" +
             "R — очистить slot, сохранив предыдущую копию\n" +
@@ -876,6 +1233,7 @@ public partial class SavePrototype : Node3D
             "Z — TASK-054 foundation acceptance\n" +
             "X — TASK-056 backup/recovery acceptance\n" +
             "C — TASK-058 migration/unknown-content acceptance\n" +
+            "F6 — TASK-060 autosave/graceful-exit acceptance\n" +
             "H — compact / detailed / hidden";
     }
 
@@ -938,6 +1296,49 @@ public partial class SavePrototype : Node3D
               $"{migration.ToSchemaVersion}, source=1, aliases={migration.AliasedReferences}, " +
               $"unknown={migration.PlaceholderReferences}, roundTrip=1"
             : $"TASK-058 migration (C): FAIL — {_migrationAcceptanceReport.Result}";
+    }
+
+    private string BuildAutosaveAcceptanceHudLine()
+    {
+        if (_autosaveAcceptanceTask is not null)
+        {
+            return "TASK-060 autosave (F6): RUNNING periodic/events/graceful-exit";
+        }
+
+        if (_autosaveAcceptanceReport is null)
+        {
+            return "TASK-060 autosave (F6): READY";
+        }
+
+        return _autosaveAcceptanceReport.Passed
+            ? $"TASK-060 autosave (F6): PASS triggers=" +
+              $"{_autosaveAcceptanceReport.TriggerTypesCovered}, " +
+              $"requests={_autosaveAcceptanceReport.RequestedSaves}, " +
+              $"batches={_autosaveAcceptanceReport.CompletedBatches}, " +
+              $"coalesced={_autosaveAcceptanceReport.CoalescedRequests}, exit=1"
+            : $"TASK-060 autosave (F6): FAIL — {_autosaveAcceptanceReport.Result}";
+    }
+
+    private static string BuildAutosaveAcceptanceOutput(
+        SaveAutosaveAcceptanceReport report)
+    {
+        string prefix = report.Passed
+            ? "TASK-060 SQLite autosave/graceful-exit acceptance PASS"
+            : "TASK-060 SQLite autosave/graceful-exit acceptance FAIL";
+        return prefix +
+            $": triggerTypes={report.TriggerTypesCovered}; " +
+            $"requested={report.RequestedSaves}; " +
+            $"batches={report.CompletedBatches}; " +
+            $"coalesced={report.CoalescedRequests}; " +
+            $"periodic={(report.PeriodicTriggered ? 1 : 0)}; " +
+            $"gracefulExit={(report.GracefulExitFlushed ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+            $"revision={report.LoadedSnapshot?.Revision ?? 0}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; elapsedMs=" +
+            report.ElapsedMilliseconds.ToString("F2", CultureInfo.InvariantCulture) +
+            $"; result={report.Result}";
     }
 
     private static string BuildMigrationAcceptanceOutput(

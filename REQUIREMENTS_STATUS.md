@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-persistence-autosave-graceful-exit.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -36,17 +36,78 @@
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
-| E. Сохранение | `IN_PROGRESS` | SQLite foundation и backup/recovery подтверждены runtime; реализована copy migration schema `1→2` с сохранением исходника и безопасной обработкой alias/unknown content; требуется приёмка `TASK-059` |
+| E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** `TASK-054`–`TASK-057`, foundation и backup/recovery требования переведены в `VERIFIED` по чистой сборке и полному ручному сценарию `R → S → B → S → Y` с revision `1→2→1`, `atomic=1`, `quarantine=1`. В текущей итерации реализована `TASK-058`; `TASK-059` остаётся `IN_PROGRESS` до локальной сборки и `C: PASS`.
+**Вывод:** все пять технических прототипов имеют статус `VERIFIED`; ограничение на начало вертикального среза снято. `TASK-058/TASK-059` закрыты по сборке `0/0` и runtime-проверкам `C: PASS`, `X: PASS`, `Z: PASS`. Текущая итерация реализует производственный autosave/graceful-exit foundation `TASK-060`; runtime-приёмка выделена в `TASK-061`.
 
 ## 3. Результат текущей итерации от 2026-08-01
 
+### 2026-08-01 — autosave coordinator и безопасный штатный выход (`TASK-060`)
+
+**Исходный снимок:** `ProjectHorizon-main(2)(3).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-persistence-autosave-graceful-exit.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся блокированным до предоставления SHA из Git
+**Связанные требования:** разделы 22.3, 22.8, 22.9, 36.3 и критерии 10, 14, 15 раздела 41 PDF-ТЗ; `TASK-058`–`TASK-061`, `PERSIST-040`–`PERSIST-046`, `PERSIST-ACC-040`–`PERSIST-ACC-047`.
+
+**Синхронизация предыдущей приёмки:**
+
+- локальная сборка migration-редакции завершилась с `0` предупреждений и `0` ошибок;
+- HUD подтвердил `TASK-058 migration (C): PASS 1→2, source=1, aliases=1, unknown=2, roundTrip=1`;
+- регрессионный recovery завершился `TASK-056 recovery (X): PASS`, `candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`;
+- foundation regression завершилась `TASK-054 save (Z): PASS rev=2, items=3, writes=8, maxWriters=1, integrity=ok`;
+- очередь после проверок освобождалась: `pending=0`; schema оставалась `2`;
+- `TASK-058`, `TASK-059`, `PE-030`–`PE-035`, `PE-ACC-020`–`PE-ACC-026` → `VERIFIED`;
+- Прототип E и весь Этап 0 технических прототипов → `VERIFIED`.
+
+**Реализовано в `TASK-060`:**
+
+- добавлен независимый от Godot `SaveAutosaveCoordinator`; worker получает только immutable `SaveGameSnapshot`;
+- периодический autosave стартовой persistence-сцены выполняется каждые `60` секунд после появления snapshot;
+- введены типизированные причины `Periodic`, `Landing`, `Takeoff`, `Hyperspace`, `QuestCompleted`, `ShipPurchased`, `BaseChanged`, `GracefulExit`;
+- burst запросов в коротком coalescing-window объединяется в один batch, сохраняющий самый новый snapshot и полный набор причин;
+- все autosave-записи проходят через существующую последовательную writer-очередь `SaveDatabase`, транзакционную validation и backup-защиту;
+- добавлен журнал `logs/save_1.autosave.log` с revision, причинами, числом запросов и coalesced requests;
+- `SceneTree.AutoAcceptQuit` отключается для persistence-сцены; `NotificationWMCloseRequest` запускает `GracefulExit` autosave, ждёт полного flush и только после этого вызывает `SceneTree.Quit()`;
+- при ошибке graceful-exit save приложение не закрывается автоматически, состояние `FAIL` остаётся видимым;
+- HUD показывает countdown до periodic autosave, requests/batches/coalesced, последний revision и причины;
+- `F6` запускает изолированный acceptance route в `save_1.autosave-test.db`: один periodic batch и burst из шести gameplay events плюс graceful exit; ожидаются восемь trigger types, восемь requests, два batch, шесть coalesced requests, final revision `27`, exact round-trip, log и `integrity=ok`;
+- основной пользовательский slot тестом `F6` не изменяется.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Autosave.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Autosave.cs.uid`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SavePrototype.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован autosave/graceful-exit foundation и его изолированная acceptance route. Подключение причин `Landing/Takeoff/...` к реальным подсистемам вертикального среза выполняется при появлении соответствующих application/domain событий; текущая итерация предоставляет готовый типизированный контракт и проверяет его end-to-end.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ сверено по разделам 22.8, 22.9, 36.3, 39 и критериям 10, 14, 15 раздела 41;
+- официальная модель Godot quit handling сверена: `NotificationWMCloseRequest`, `SceneTree.AutoAcceptQuit=false`, явный `Quit()` после завершения пользовательской процедуры;
+- изменённые C#-файлы проверены лексически: строки, комментарии, круглые/квадратные/фигурные скобки сбалансированы;
+- проверено отсутствие Godot API в `SaveDatabase.Autosave.cs`;
+- клавиша `F6` не конфликтует с существующими hotkey текущей сцены;
+- проверены `res://`, UID, сцена, проектный XML и состав архива;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому фактическая сборка и runtime `F6` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-058`, `TASK-059`, `PE-030`–`PE-035`, `PE-ACC-020`–`PE-ACC-026` → `VERIFIED`;
+- `TASK-060`, `PERSIST-040`–`PERSIST-046` → `IMPLEMENTED`;
+- `TASK-061`, `PERSIST-ACC-040`–`PERSIST-ACC-047` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED` для текущего архива: каталог `.git` и SHA отсутствуют.
+
+**Следующий рекомендуемый шаг:** выполнить локальную сборку, `F6: PASS`, реальный 60-секундный periodic autosave и закрытие окна с последующим повторным запуском; после `TASK-061: VERIFIED` начать первую интеграционную итерацию вертикального среза.
+
 ### 2026-08-01 — copy migration и unknown-content compatibility (`TASK-058`)
 
-**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** разделы 22.1–22.5, 22.9, 36.1, 36.3 и Прототип E раздела 39 PDF-ТЗ; `TASK-056`–`TASK-059`, `PE-020`–`PE-035`, `PE-ACC-010`–`PE-ACC-026`.
 
 **Синхронизация предыдущей приёмки:**
@@ -106,9 +167,9 @@
 
 ### 2026-08-01 — hotfix ручного контура backup/recovery (`TASK-056/TASK-057`)
 
-**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** разделы 22.2, 22.3, 22.9, 36.3, Прототип E раздела 39 и пункты 10, 14, 15 раздела 41 PDF-ТЗ; `TASK-056`, `TASK-057`, `PE-020`–`PE-025`, `PE-ACC-010`–`PE-ACC-016`.
 
 **Полученное runtime-доказательство:**
@@ -168,9 +229,9 @@
 
 ### 2026-08-01 — валидированная backup и атомарное recovery (`TASK-056`)
 
-**Исходный снимок:** `ProjectHorizon-main(11).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main(11).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** разделы 22.2, 22.3, 22.9, 36.3, Прототип E раздела 39 и пункты 10, 14, 15 раздела 41 PDF-ТЗ; `TASK-054`–`TASK-057`, `PE-001`, `PE-010`–`PE-025`, `PE-ACC-001`–`PE-ACC-016`.
 
 **Синхронизация runtime-приёмки предыдущей ступени:**
@@ -253,9 +314,9 @@
 
 ### 2026-08-01 — закрытие Прототипа D и SQLite-фундамент Прототипа E (`TASK-053/TASK-054`)
 
-**Исходный снимок:** `ProjectHorizon-main(9).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-sqlite-foundation.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main(9).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-sqlite-foundation.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** разделы 22.1–22.5, 36.3 и Прототип E раздела 39 PDF-ТЗ; `TASK-051`–`TASK-056`, `PD-050`–`PD-053`, `PD-ACC-040`–`PD-ACC-045`, `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006`.
 
 **Runtime-доказательство предыдущей итерации:**
@@ -1272,102 +1333,122 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PE-ACC-014` | Валидная backup атомарно восстанавливает предыдущую ревизию | `VERIFIED` | protected=10, newer=11, recovered=10, `atomicReplace=1`, exactComparisons=2 |
 | `PE-ACC-015` | Backup остаётся исправной, primary помещается в quarantine, log записан | `VERIFIED` | primary/backup `integrity=ok`, `quarantinePreserved=1`, `logWritten=1` |
 | `PE-ACC-016` | Автоматический `X`-тест завершается PASS и ручной контур не блокируется | `VERIFIED` | `X: PASS`; затем пользователь подтвердил полный manual workflow: «ВСЁ РАБОТАЕТ!» |
-| `PE-030` | Schema-1 save мигрируется только на отдельной копии | `IMPLEMENTED` | SQLite online backup в `*.migration-candidate`; исходник не изменяется до validation |
-| `PE-031` | Валидированный migration-кандидат устанавливается атомарно | `IMPLEMENTED` | schema/snapshot/integrity validation; `File.Replace`; rollback primary и sidecars |
-| `PE-032` | Исходная старая БД сохраняется без изменения | `IMPLEMENTED` | `save_1.pre-migration.v1.db`; SHA-256 source/preserved обязаны совпасть |
-| `PE-033` | Legacy alias и неизвестные content ID обрабатываются безопасно | `IMPLEMENTED` | `resource.iron→resource.iron_ore`; placeholders `content.unknown.item/ship` |
-| `PE-034` | Исходные ID и gameplay-значения переживают повторный save/load | `IMPLEMENTED` | schema 2: `original_definition_id`, `original_template_id`; quantity/durability/health/fuel сохраняются |
-| `PE-035` | Migration диагностируется и имеет изолированную acceptance route | `IMPLEMENTED` | `logs/save_1.migration.log`; клавиша `C`; отдельная `save_1.migration-test.db` |
-| `PE-ACC-020` | Migration-редакция собирается 0/0 | `IN_PROGRESS` | Требуется локальная сборка текущего архива |
-| `PE-ACC-021` | Schema-1 fixture мигрируется в schema 2, исходник сохранён | `IN_PROGRESS` | Ожидается `fromSchema=1`, `toSchema=2`, `sourcePreserved=1`, `sourceHashUnchanged=1` |
-| `PE-ACC-022` | Migration-кандидат установлен атомарно и целостен | `IN_PROGRESS` | Ожидается `atomicReplace=1`, `integrity=ok` |
-| `PE-ACC-023` | Alias разрешён с сохранением исходного ID | `IN_PROGRESS` | Ожидается `aliases=1`, `aliasResolved=1` |
-| `PE-ACC-024` | Unknown item и удалённый ship template заменены placeholders без потери значений | `IN_PROGRESS` | Ожидается `placeholders=2`, `unknownItemPreserved=1`, `unknownShipPreserved=1` |
-| `PE-ACC-025` | Повторный save/load сохраняет compatibility metadata | `IN_PROGRESS` | Ожидается `roundTripPreserved=1`, `exactContentChecks=6` |
-| `PE-ACC-026` | `C` завершается PASS, `X` и `Z` не регрессируют | `IN_PROGRESS` | Требуются полные строки Output для `C`, затем `X` и `Z` |
+| `PE-030` | Schema-1 save мигрируется только на отдельной копии | `VERIFIED` | Runtime `C: PASS 1→2`; исходник сохранён отдельно до установки кандидата |
+| `PE-031` | Валидированный migration-кандидат устанавливается атомарно | `VERIFIED` | Runtime migration завершилась на schema `2`; последующие `X/Z` остались PASS |
+| `PE-032` | Исходная старая БД сохраняется без изменения | `VERIFIED` | `source=1`; acceptance проверила `sourcePreserved=1` и неизменность SHA-256 |
+| `PE-033` | Legacy alias и неизвестные content ID обрабатываются безопасно | `VERIFIED` | HUD: `aliases=1`, `unknown=2`; alias и placeholders подтверждены end-to-end |
+| `PE-034` | Исходные ID и gameplay-значения переживают повторный save/load | `VERIFIED` | HUD: `roundTrip=1`; regression `Z` сохранила exact snapshot на schema 2 |
+| `PE-035` | Migration диагностируется и имеет изолированную acceptance route | `VERIFIED` | `C: PASS`; основной slot и последующие `X/Z` не регрессировали |
+| `PE-ACC-020` | Migration-редакция собирается 0/0 | `VERIFIED` | Локальная сборка пользователя: `0` предупреждений, `0` ошибок |
+| `PE-ACC-021` | Schema-1 fixture мигрируется в schema 2, исходник сохранён | `VERIFIED` | `C: PASS 1→2`, `source=1` |
+| `PE-ACC-022` | Migration-кандидат установлен атомарно и целостен | `VERIFIED` | После `C` HUD: `DB: Passed`, `schema=2`; regression `X/Z` также PASS |
+| `PE-ACC-023` | Alias разрешён с сохранением исходного ID | `VERIFIED` | `aliases=1`; acceptance route завершилась PASS |
+| `PE-ACC-024` | Unknown item и удалённый ship template заменены placeholders без потери значений | `VERIFIED` | `unknown=2`; acceptance route завершилась PASS |
+| `PE-ACC-025` | Повторный save/load сохраняет compatibility metadata | `VERIFIED` | `roundTrip=1`; exact foundation regression на schema 2 завершилась PASS |
+| `PE-ACC-026` | `C` завершается PASS, `X` и `Z` не регрессируют | `VERIFIED` | Пользователь предоставил HUD с одновременными `C: PASS`, `X: PASS`, `Z: PASS` |
 
-### 8.4. Оставшаяся часть Прототипа E
+### 8.4. Производственная persistence-ступень после Прототипа E
 
-| Подсистема | Статус |
-|---|---|
-| SQLite foundation и exact round-trip | `VERIFIED` |
-| Backup и атомарная замена | `VERIFIED` |
-| Проверка повреждённой основной БД | `VERIFIED` |
-| Recovery из последней корректной backup | `VERIFIED` |
-| Runtime-приёмка backup/recovery | `VERIFIED` |
-| Copy migration schema `1→2` | `IMPLEMENTED` |
-| Alias/placeholder compatibility неизвестного контента | `IMPLEMENTED` |
-| Runtime-приёмка migration/unknown-content | `IN_PROGRESS` |
+Все обязательные требования технического Прототипа E приняты. Следующая ступень развивает его в переиспользуемую подсистему вертикального среза.
 
-Основная разработка вертикального среза не начинается до приёмки всех пяти прототипов.
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `PERSIST-040` | Autosave coordinator не зависит от Godot API и получает immutable snapshot | `IMPLEMENTED` | `SaveAutosaveCoordinator`; вход — `SaveGameSnapshot`; файл не импортирует Godot |
+| `PERSIST-041` | Периодический autosave выполняется каждые 60 секунд после появления snapshot | `IMPLEMENTED` | `AutosaveIntervalSeconds=60`; countdown и результат выводятся в HUD |
+| `PERSIST-042` | Поддержаны причины landing/takeoff/hyperspace/quest/ship/base/exit | `IMPLEMENTED` | Типизированный `AutosaveTrigger`; application integration подключается к соответствующим событиям вертикального среза |
+| `PERSIST-043` | Burst событий coalesce-ится с сохранением самого нового snapshot | `IMPLEMENTED` | Один worker, coalescing-window, агрегированный набор причин и latest snapshot |
+| `PERSIST-044` | Штатный выход ждёт активные persistence-операции и полный autosave flush | `IMPLEMENTED` | `NotificationWMCloseRequest`; `AutoAcceptQuit=false`; пустой slot не создаётся заново; `Quit()` вызывается только после завершения |
+| `PERSIST-045` | Autosave использует существующую сериализованную транзакционную запись и backup | `IMPLEMENTED` | Coordinator вызывает `SaveDatabase.SaveAsync`; сохраняются one-writer gate, transaction и previous-copy protection |
+| `PERSIST-046` | Autosave имеет журнал, HUD и изолированную acceptance route | `IMPLEMENTED` | `logs/save_1.autosave.log`; F6; отдельная `save_1.autosave-test.db` |
+| `PERSIST-ACC-040` | Autosave-редакция собирается 0/0 | `IN_PROGRESS` | Требуется локальная сборка подготовленного архива |
+| `PERSIST-ACC-041` | F6 охватывает все 8 trigger types и 8 запросов | `IN_PROGRESS` | Ожидается `triggerTypes=8`, `requested=8` |
+| `PERSIST-ACC-042` | Burst превращается в 2 batch и 6 coalesced requests | `IN_PROGRESS` | Ожидается `batches=2`, `coalesced=6` |
+| `PERSIST-ACC-043` | Periodic route и реальный 60-секундный autosave срабатывают | `IN_PROGRESS` | F6: `periodic=1`; затем отдельное ожидание 60–65 секунд в основной сцене |
+| `PERSIST-ACC-044` | Закрытие окна ждёт graceful-exit flush | `IN_PROGRESS` | Ожидается `gracefulExit=1`; при реальном закрытии строка PASS должна появиться до завершения процесса |
+| `PERSIST-ACC-045` | Последний snapshot проходит exact round-trip и integrity check | `IN_PROGRESS` | F6 ожидает revision `27`, `roundTrip=1`, `integrity=ok` |
+| `PERSIST-ACC-046` | Autosave остаётся однописательным и пишет журнал | `IN_PROGRESS` | Ожидается `maxWriters=1`, `logWritten=1` |
+| `PERSIST-ACC-047` | Migration/recovery/foundation не регрессируют | `IN_PROGRESS` | После F6 повторить `C`, `X`, `Z` и получить PASS |
+
+Все пять технических прототипов приняты; начало вертикального среза разрешено. `TASK-060` является первой производственной persistence-ступенью, а не незакрытой частью Прототипа E.
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-057`; Прототипы A, B, C и D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-059`; Прототипы A, B, C, D и E.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-059` | Выполнить runtime-приёмку migration/unknown-content | Чистая сборка; `C: PASS`; schema `1→2`; исходник неизменён; alias `1`; placeholders `2`; round-trip; `integrity=ok`; затем `X: PASS` и `Z: PASS` |
-| 2 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
+| 1 | `TASK-061` | Выполнить runtime-приёмку autosave и graceful exit | Чистая сборка; `F6: PASS`; реальный periodic через 60 секунд; закрытие окна только после flush; повторный запуск загружает последнюю revision; `C/X/Z` остаются PASS |
+| 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
+| 3 | `TASK-062` | Начать первую интеграционную итерацию вертикального среза | После `TASK-061: VERIFIED` выбрать минимальный end-to-end gameplay loop и подключить autosave trigger к реальному domain event |
 
-**Подтверждено в этой итерации:** `TASK-056`, `TASK-057`, `PE-020`–`PE-025`, `PE-ACC-010`–`PE-ACC-016`.  
-**Реализовано:** `TASK-058`, `PE-030`–`PE-035`.  
-**Текущая приёмочная задача:** `TASK-059`.
+**Подтверждено в этой итерации:** `TASK-058`, `TASK-059`, `PE-030`–`PE-035`, `PE-ACC-020`–`PE-ACC-026`.
+**Реализовано:** `TASK-060`, `PERSIST-040`–`PERSIST-046`.
+**Текущая приёмочная задача:** `TASK-061`.
 
-## 10. Runtime-приёмка `TASK-058/TASK-059`
+## 10. Runtime-приёмка `TASK-060/TASK-061`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену и дождаться `DB: Ready`. Для существующего пользовательского slot автоматическая migration может кратковременно показать `DB: Loading`; после завершения schema в HUD должна быть `2`.
-3. Нажать `C` один раз и не использовать другие клавиши до завершения. Тест работает с отдельной `save_1.migration-test.db` и не меняет основной slot.
+2. Запустить стартовую сцену, дождаться `DB: Ready` и убедиться, что slot содержит snapshot. Если он пуст, один раз нажать `S` и дождаться `Slot S/L/R: PASS save`.
+3. Нажать `F6` один раз и не использовать другие команды до завершения. Тест работает с отдельной `save_1.autosave-test.db` и не меняет основной slot.
 4. Ожидаемый compact HUD:
 
 ```text
-TASK-058 migration (C): PASS 1→2, source=1, aliases=1, unknown=2, roundTrip=1
+TASK-060 autosave (F6): PASS triggers=8, requests=8, batches=2, coalesced=6, exit=1
 ```
 
 5. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-058 SQLite migration/content acceptance PASS:
-fromSchema=1; toSchema=2; fromContent=1; toContent=2;
-sourcePreserved=1; sourceHashUnchanged=1; atomicReplace=1;
-aliases=1; placeholders=2; aliasResolved=1;
-unknownItemPreserved=1; unknownShipPreserved=1;
-roundTripPreserved=1; exactContentChecks=6;
-integrity=ok; elapsedMs=<время>;
-result=copy migration preserved the legacy source and resolved unknown content safely
+TASK-060 SQLite autosave/graceful-exit acceptance PASS: triggerTypes=8; requested=8; batches=2; coalesced=6; periodic=1; gracefulExit=1; roundTrip=1; logWritten=1; revision=27; maxWriters=1; integrity=ok; elapsedMs=<время>; result=periodic and gameplay-event autosaves coalesced; graceful exit flushed the latest snapshot
 ```
 
-6. Полный `PASS` требует одновременно:
-   - schema `1→2`, content version `1→2`;
-   - `sourcePreserved=1` и `sourceHashUnchanged=1`;
-   - `atomicReplace=1`, `integrity=ok`;
-   - `aliases=1`, `aliasResolved=1`;
-   - `placeholders=2`;
-   - `unknownItemPreserved=1`, `unknownShipPreserved=1`;
-   - `roundTripPreserved=1`, `exactContentChecks=6`.
-7. После `C: PASS` нажать `X` и дождаться прежнего `TASK-056 recovery (X): PASS`, затем нажать `Z` и дождаться `TASK-054 save (Z): PASS`. Это обязательная проверка отсутствия регрессии backup/recovery и foundation после повышения schema.
-8. В качестве доказательства прислать screenshot compact HUD после `C`, полную строку Output для `C`, итог сборки и строки `X: PASS`/`Z: PASS`.
-9. При `FAIL` прислать финальный HUD и последние 60 строк Godot Output. Если ошибка возникла при автоматической migration реального slot, дополнительно указать наличие файлов:
+6. Для реального periodic autosave оставить сцену без других операций на 60–65 секунд. Ожидается строка:
+
+```text
+Prototype E autosave PASS: revision=<N+1>; triggers=Periodic; requests=<...>; batches=<...>; coalesced=<...>
+```
+
+7. Зафиксировать текущую revision, затем закрыть окно кнопкой заголовка или `Alt+F4`. Процесс должен завершиться только после строки:
+
+```text
+Prototype E graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
+```
+
+   Для намеренно пустого slot допустима строка `saved=0; revision=0; pending=0`; закрытие не должно создавать новый snapshot.
+8. Повторно запустить сцену. HUD должен загрузить revision, записанную graceful-exit, при `integrity=ok` и `pending=0`.
+9. После этого повторить `C`, `X` и `Z`; все три ранее принятые acceptance route должны остаться PASS.
+10. В качестве доказательства прислать результат сборки, screenshot F6 PASS, строки periodic и graceful-exit PASS, screenshot после повторного запуска и результаты `C/X/Z`.
+11. При `FAIL` прислать финальный HUD и последние 60 строк Godot Output. Дополнительно указать наличие файлов:
 
 ```text
 save_1.db
-save_1.pre-migration.v1.db
-save_1.migration-candidate
-save_1.migration-failed
-logs/save_1.migration.log
+save_1.backup.db
+save_1.autosave-test.db
+logs/save_1.autosave.log
 ```
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
 
+### 2026-08-01 — `TASK-060`, autosave coordinator и graceful-exit flush
+
+**Исходный снимок:** `ProjectHorizon-main(2)(3).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-persistence-autosave-graceful-exit.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
+
+**Синхронизированная приёмка:** migration-редакция собрана `0/0`; пользователь предоставил одновременные `C: PASS`, `X: PASS`, `Z: PASS` на schema 2. `TASK-058/TASK-059`, Прототип E и все пять технических прототипов переведены в `VERIFIED`.
+
+**Реализация:** добавлены pure-.NET autosave coordinator, 60-секундный periodic trigger, типизированные gameplay/exit triggers, deterministic coalescing, журнал, HUD, F6 acceptance и перехват штатного закрытия с ожиданием активных persistence-задач и полного flush. Пустой slot при закрытии не заполняется искусственным snapshot.
+
+**Статическая проверка:** код, XML, `res://`, UID, hotkey и состав архива проверены; .NET/Godot в среде подготовки отсутствуют, поэтому `TASK-060` остаётся `IMPLEMENTED`, `TASK-061` — `IN_PROGRESS`.
+
 ### 2026-08-01 — `TASK-058`, copy migration и unknown-content compatibility
 
-**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`  
+**Исходный снимок:** `ProjectHorizon-main(1)(6).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-copy-migration.zip`
 **Git SHA:** отсутствует в архиве
 
 **Принятое runtime-доказательство предыдущей ступени:** hotfix собран `0/0`; последовательность `R → S → B → S → Y` завершилась без блокировки; revision прошла `1→2→1`; backup показала `integrity=ok`, `atomic=1`; restore показал `atomic=1`, `quarantine=1`; пользователь подтвердил полную работоспособность. `TASK-056/TASK-057` и связанные требования переведены в `VERIFIED`.
@@ -1380,8 +1461,8 @@ logs/save_1.migration.log
 
 ### 2026-08-01 — hotfix блокировки последовательных manual-команд `TASK-057`
 
-**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`  
+**Исходный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-manual-recovery-hotfix.zip`
 **Git SHA:** отсутствует в архиве
 
 **Runtime-доказательство пользователя:** исходная редакция собрана с `0` предупреждений и `0` ошибок; изолированный `X`-тест завершился `PASS` с revision `10`, `candidateRejected=1`, `backupPreserved=1`, `atomic=1`, `quarantine=1`, backup `integrity=ok`. На трёх снимках ручной проверки snapshot и счётчик оставались `rev=2`, `writes=2`, что подтвердило непринятие последующих команд после первой операции.
@@ -1396,8 +1477,8 @@ logs/save_1.migration.log
 
 ### 2026-08-01 — `TASK-056`, валидированная backup и атомарное recovery
 
-**Исходный снимок:** `ProjectHorizon-main(11).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`  
+**Исходный снимок:** `ProjectHorizon-main(11).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-e-backup-recovery.zip`
 **Git SHA:** отсутствует в архиве
 
 **Принятое runtime-доказательство:** по прямому подтверждению пользователя `TASK-054/TASK-055` и `PE-001`, `PE-010`–`PE-015`, `PE-ACC-001`–`PE-ACC-006` переведены в `VERIFIED`; зафиксированы сборка 0/0, `Z: PASS`, schema `1`, WAL/FK/NORMAL/busy_timeout, exact round-trip, `writes=8`, `maxWriters=1`, `integrity=ok`.

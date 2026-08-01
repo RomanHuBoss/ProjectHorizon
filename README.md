@@ -130,7 +130,7 @@ build: 0 warnings, 0 errors
 src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 ```
 
-### Прототип E. SQLite save, backup, recovery и migration — `IN_PROGRESS`
+### Прототип E. SQLite save, backup, recovery и migration — `VERIFIED`
 
 Текущая стартовая сцена:
 
@@ -138,65 +138,55 @@ src/Game.Client/Scenes/Ship/ShipFlightPrototype.tscn
 src/Game.Client/Scenes/Persistence/SavePrototype.tscn
 ```
 
-SQLite foundation (`TASK-054/TASK-055`) и backup/recovery
-(`TASK-056/TASK-057`) подтверждены локальной runtime-приёмкой и имеют статус
-`VERIFIED`:
+Все обязательные элементы Прототипа E подтверждены локальной runtime-приёмкой:
 
-- `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
+- SQLite через `Microsoft.Data.Sqlite 8.0.29`, без Entity Framework;
 - один slot — одна БД: `user://profiles/profile_prototype/save_1.db`;
-- обязательные PRAGMA: `journal_mode=WAL`, `foreign_keys=ON`,
-  `synchronous=NORMAL`, `busy_timeout=5000`;
-- последовательная очередь записи вне Godot main thread;
-- транзакционный snapshot игрока, корабля, inventory и посещённой планеты;
-- exact round-trip и `PRAGMA integrity_check`;
-- последняя корректная копия в `save_1.backup.db`;
-- validation backup-кандидата до `File.Replace`;
-- corruption detection, атомарное recovery, quarantine и recovery-log;
-- ручной сценарий `R → S → B → S → Y` подтверждён переходом revision
-  `1 → 2 → 1`, `atomic=1`, `quarantine=1`, при сборке `0/0`.
+- обязательные PRAGMA, последовательная очередь записи и транзакционный snapshot;
+- exact round-trip игрока, корабля, inventory и посещённой планеты;
+- валидированная предыдущая копия, атомарное recovery, quarantine и журналы;
+- copy migration schema `1→2` с byte-identical сохранением исходной БД;
+- безопасные alias/placeholder для неизвестного контента;
+- регрессионные `C: PASS`, `X: PASS` и `Z: PASS` при сборке `0/0`.
 
-В `TASK-058` реализована следующая ступень разделов 22 и 36.3 PDF-ТЗ —
-безопасная migration старого сохранения и обработка неизвестного контента:
+После приёмки всех пяти прототипов начата производственная ступень persistence.
+В `TASK-060` реализован autosave/graceful-exit foundation по разделу 22.8 и
+критерию 14 PDF-ТЗ:
 
-- текущая schema повышена с `1` до `2`, content version — до `2`;
-- старая БД не изменяется на месте: SQLite online backup создаёт отдельный
-  `*.migration-candidate`;
-- migration выполняется только над кандидатом, после чего проверяются schema,
-  snapshot и `PRAGMA integrity_check`;
-- валидированный кандидат атомарно устанавливается через `File.Replace`;
-- исходная schema-1 БД сохраняется побайтно в
-  `save_1.pre-migration.v1.db` и проверяется по SHA-256;
-- при ошибке предусмотрен rollback основной БД и её WAL/SHM sidecar-файлов;
-- migration-события записываются в
-  `user://profiles/profile_prototype/logs/save_1.migration.log`;
-- legacy alias `resource.iron` преобразуется в `resource.iron_ore`, при этом
-  исходный ID сохраняется;
-- неизвестные item/template ID заменяются безопасными placeholders
-  `content.unknown.item` и `content.unknown.ship`;
-- исходные ID, количество, durability, health и fuel переживают повторный
-  save/load без потери данных;
-- acceptance route использует отдельную `save_1.migration-test.db` и не меняет
-  пользовательский slot.
+- периодический autosave каждые `60` секунд после появления игрового snapshot;
+- типизированные причины `Landing`, `Takeoff`, `Hyperspace`,
+  `QuestCompleted`, `ShipPurchased`, `BaseChanged` и `GracefulExit`;
+- входом worker является только неизменяемый `SaveGameSnapshot`; Godot API не
+  вызывается из фоновой операции;
+- burst событий объединяется в один batch с сохранением самого нового snapshot;
+- запись проходит через существующую единственную очередь `SaveDatabase`;
+- событие и revision фиксируются в `logs/save_1.autosave.log`;
+- запрос закрытия окна перехватывается, последний snapshot записывается и очередь
+  полностью flush-ится до вызова `SceneTree.Quit()`;
+- `F6` запускает изолированный тест всех восьми trigger types, coalescing,
+  graceful-exit flush, exact round-trip и `integrity_check`.
 
 Управление:
 
 ```text
-S    сохранить snapshot; предыдущая копия защищается автоматически
-L    загрузить snapshot
-R    очистить slot, сохранив предыдущую копию
-B    создать или обновить валидированный backup
-Y    восстановить предыдущую копию с quarantine текущей БД
-Z    TASK-054 SQLite foundation acceptance
-X    TASK-056 backup/recovery acceptance в изолированной БД
-C    TASK-058 schema migration / unknown-content acceptance в изолированной БД
-H    compact / detailed / hidden HUD
+S     сохранить snapshot; предыдущая копия защищается автоматически
+L     загрузить snapshot
+R     очистить slot, сохранив предыдущую копию
+B     создать или обновить валидированный backup
+Y     восстановить предыдущую копию с quarantine текущей БД
+Z     TASK-054 SQLite foundation acceptance
+X     TASK-056 backup/recovery acceptance в изолированной БД
+C     TASK-058 schema migration / unknown-content acceptance в изолированной БД
+F6    TASK-060 autosave / graceful-exit acceptance в изолированной БД
+H     compact / detailed / hidden HUD
 ```
 
-После каждой команды необходимо дождаться `DB: Ready`. `C` создаёт schema-1
-fixture с известным item, legacy alias, неизвестным item и удалённым ship
-шаблоном; мигрирует только копию; проверяет неизменность исходника, schema
-`1→2`, alias, два placeholder, сохранность значений, повторный save/load и
-`integrity=ok`. Runtime-приёмка этой ступени выделена в `TASK-059`.
+После каждой команды необходимо дождаться завершения текущей операции. Для
+проверки реального штатного выхода сначала создайте snapshot клавишей `S`, затем
+закройте игровое окно кнопкой закрытия в заголовке или сочетанием `Alt+F4`:
+приложение должно завершиться только после строки `graceful-exit autosave PASS`.
+Если slot намеренно пуст, выход ждёт активные persistence-операции, но не создаёт
+новый snapshot.
 
 ## Состояние реализации ТЗ
 
@@ -385,16 +375,18 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - контролируемый взлёт и складывание опор — `VERIFIED`;
 - soak-test 100 последовательных посадок — `VERIFIED`.
 
-### Прототип E. Сохранение — `IN_PROGRESS`
+### Прототип E. Сохранение — `VERIFIED`
 
 - SQLite foundation, snapshot и exact round-trip — `VERIFIED`;
 - последовательная очередь записи — `VERIFIED`;
 - валидированная backup, атомарное recovery и quarantine — `VERIFIED`;
-- copy migration schema `1→2` — `IMPLEMENTED`;
-- alias/placeholder compatibility для неизвестного контента — `IMPLEMENTED`;
-- runtime-приёмка migration/unknown-content — `IN_PROGRESS`.
+- copy migration schema `1→2` — `VERIFIED`;
+- alias/placeholder compatibility для неизвестного контента — `VERIFIED`;
+- runtime-приёмка migration/unknown-content и регрессии `C/X/Z` — `VERIFIED`.
 
-Переход к основной разработке допускается после принятия всех пяти прототипов.
+Все пять технических прототипов приняты; переход к вертикальному срезу разрешён.
+Autosave/graceful-exit foundation следующей производственной ступени имеет статус
+`IMPLEMENTED` до локальной приёмки `TASK-061`.
 
 ## Правила разработки
 
