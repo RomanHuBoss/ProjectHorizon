@@ -31,6 +31,12 @@ NoiseFrequency = 0.0125
 NoiseSeed = 20260801
 GenerateCollision = true
 OrbitDegreesPerSecond = 5.0
+LodBaseLevel = 1
+LodSplitAngleDegrees = 48.0
+LodMergeAngleDegrees = 62.0
+LodUpdateIntervalSeconds = 0.2
+LodSkirtDepth = 2.0
+LodTestStepSeconds = 0.65
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_planet")
@@ -76,12 +82,12 @@ TestAllowedGroundGapSeconds = 0.12
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 1010.0
-offset_bottom = 395.0
+offset_right = 1130.0
+offset_bottom = 545.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 theme_override_styles/panel = SubResource("StyleBox_hud")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
 theme_override_font_sizes/font_size = 16
-text = "ПРОТОТИП C — FLOATING ORIGIN\nПостроение геометрии..."
+text = "ПРОТОТИП C — QUADTREE LOD\nПостроение геометрии..."

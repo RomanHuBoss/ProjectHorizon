@@ -270,7 +270,7 @@ ProjectHorizon-main-<краткое-название-итерации>.zip
 
 ```text
 Выполни следующую итерацию разработки Project Horizon по регламенту
-`docs/DEVELOPMENT_ITERATION_PROTOCOL.md`, PDF-ТЗ и `REQUIREMENTS_STATUS.md`.
+`DEVELOPMENT_ITERATION_PROTOCOL.md`, PDF-ТЗ и `REQUIREMENTS_STATUS.md`.
 
 Последняя редакция проекта, скачанная с GitHub, приложена к сообщению.
 ```

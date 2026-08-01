@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-development-iteration-protocol.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-quadtree-lod-foundation.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -34,13 +34,56 @@
 |---|---|---|
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
-| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, межгранные collision-швы и floating origin подтверждены runtime; следующий шаг — quadtree LOD граней |
+| C. Сферическая планета | `IN_PROGRESS` | Cube sphere, радиальная система, collision-швы и floating origin подтверждены runtime; начальная quadtree LOD-ступень `L1/L2` реализована и ожидает `TASK-035` |
 | D. Корабль | `NOT_STARTED` | Не начинался |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** пользователь подтвердил сборку floating-origin редакции без ошибок и предоставил итоговый screenshot `TASK-032 origin (Y): PASS shifts=4, cells=6, localMax=1809,2 м, logicalErr=0,000 м, relativeErr=0,0003 м, gap=0,00 с`. Поэтому `TASK-032`, `TASK-034`, `PC-060`–`PC-064` и `PC-ACC-030`–`PC-ACC-035` переведены в `VERIFIED`. Следующий функциональный шаг — `TASK-033`, quadtree LOD граней.
+**Вывод:** floating origin подтверждён результатом `PASS` и остаётся `VERIFIED`. В текущей итерации реализована `TASK-033`: визуальная поверхность переведена с шести монолитных граней на независимые quadtree patches `L1/L2`, добавлены skirts, hysteresis, проверка покрытия соседей и автоматический acceptance test по `U`. До локальной сборки и результата `TASK-033 LOD (U): PASS` новая функция имеет статус `IMPLEMENTED`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — реализация начальной quadtree LOD-ступени `TASK-033`
+
+**Основание:** раздел 9.3 и Прототип C раздела 39 PDF-ТЗ; предыдущие `TASK-032/TASK-034` подтверждены runtime.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/Planet/CubeSpherePatchLod.cs`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePatchLod.cs.uid`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePrototype.cs`;
+- `src/Game.Client/Scenes/Planet/CubeSpherePrototype.tscn`;
+- `src/Game.Client/Scripts/Terrain/TerrainChunkManager.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Реализовано:**
+
+- шесть граней визуально покрываются независимыми patches, каждый patch имеет сетку `33 × 33`;
+- базовый уровень `L1` создаёт 24 участка, ближайшие к игроку родители делятся на четыре дочерних участка `L2`;
+- split/merge используют разные угловые пороги, поэтому переходы имеют hysteresis;
+- геометрия общей поверхности вычисляется одной функцией по радиальному направлению и seed;
+- каждый patch получает skirts на четырёх сторонах; collision остаётся шестью стабильными полногранными поверхностями;
+- topology validator раскладывает границы до атомарных сегментов максимального уровня и проверяет полное двойное покрытие, non-manifold, `Δlod <= 1` и позиционную ошибку общих точек;
+- HUD показывает patches, `L1/L2`, split-родителей, skirts, revision, open/non-manifold, `Δlod` и `Δpos`;
+- `F1` циклически переключает диагностику граней, уровней LOD и радиальных нормалей;
+- `U` запускает маршрут фокуса через девять направлений и формирует `PASS/FAIL` по split/merge, topology changes и LOD-швам;
+- тесты `T` и `Y`, радиальная физика, collision и floating origin сохранены;
+- nullable warning `CS8600` в `TerrainChunkManager.cs:399` исправлен nullable-out переменной с явной защитой от `null`.
+
+**Статическая проверка:**
+
+- математическая симуляция маршрута: 9 topology revisions, суммарно 20 split и 16 merge событий;
+- для каждого состояния маршрута: 36 активных patches, 112 атомарных сегментов, `open=0`, `nonManifold=0`, `maxDelta=1`;
+- проверены C#-строки, комментарии, скобки, scene paths и отсутствие build/cache-каталогов;
+- Godot и .NET SDK отсутствуют в текущей среде, поэтому сборка и runtime не заявляются выполненными.
+
+**Изменения статусов:**
+
+- `TASK-033`, `PC-070`–`PC-074` → `IMPLEMENTED`;
+- `TASK-035`, `PC-ACC-040`–`PC-ACC-045` → `IN_PROGRESS` до локального `U: PASS`;
+- `DEBT-CS8600` → `IMPLEMENTED`, окончательная верификация требует чистой локальной сборки.
+
+**Следующая задача после приёмки:** `TASK-036` — расширить глубину quadtree, добавить фоновую генерацию и выгрузку невидимых patches.
 
 ### 2026-08-01 — приёмка floating origin и формализация регламента итераций
 
@@ -56,7 +99,7 @@
 
 **Документационные изменения:**
 
-- добавлен `docs/DEVELOPMENT_ITERATION_PROTOCOL.md` с обязательным порядком выбора задачи, реализации, проверки, обновления журнала, упаковки и передачи результата;
+- добавлен `DEVELOPMENT_ITERATION_PROTOCOL.md` с обязательным порядком выбора задачи, реализации, проверки, обновления журнала, упаковки и передачи результата;
 - в конце этого журнала добавлена обязательная ссылка на регламент и сокращённый стандартный запрос;
 - README дополнен разделом о регламенте итеративной разработки.
 
@@ -324,6 +367,11 @@
 | `PC-062` | Все участники локальной сцены переносятся синхронно | `VERIFIED` | Planet, PlanetaryPlayer и CameraRig получают одинаковую translation |
 | `PC-063` | Логическая позиция и сохранённые точки не меняются при rebase | `VERIFIED` | Continuity check в double; `NotifyWorldTranslated` корректирует spawn/test transforms |
 | `PC-064` | Автоматический floating-origin acceptance test | `VERIFIED` | `Y`: 4 shifts, 6 cell transitions, контроль local/logical/relative/contact и восстановление baseline |
+| `PC-070` | Независимые визуальные quadtree patches на шести гранях | `IMPLEMENTED` | Базовое покрытие `L1`: 24 участка; каждый участок строится отдельным `MeshInstance3D` |
+| `PC-071` | Локальное дробление участка возле игрока | `IMPLEMENTED` | Родитель `L1` заменяется четырьмя дочерними `L2`; split/merge имеют раздельные угловые пороги |
+| `PC-072` | Устранение щелей между соседними LOD | `IMPLEMENTED` | Одинаковая функция высоты, ограничение `Δlod <= 1`, skirts на четырёх сторонах patch |
+| `PC-073` | Диагностика покрытия и соседства LOD | `IMPLEMENTED` | Validator: atomic segments, open, non-manifold, max neighbor delta, seam position error |
+| `PC-074` | Автоматический quadtree LOD acceptance test | `IMPLEMENTED` | `U`: маршрут через 9 направлений, split/merge, topology changes, восстановление фокуса игрока |
 | `PC-ACC-001` | Проект собирается без ошибок | `VERIFIED` | Основа cube sphere запущена; последующая радиальная редакция принята пользователем |
 | `PC-ACC-002` | Сцена запускается и показывает планету | `VERIFIED` | Предоставлен screenshot текущей сцены |
 | `PC-ACC-003` | HUD показывает `6/6` и collision `6/6` | `VERIFIED` | Прямое runtime-доказательство пользователя |
@@ -347,8 +395,14 @@
 | `PC-ACC-033` | Logical coordinate непрерывна | `VERIFIED` | `logicalErr=0,000 м` |
 | `PC-ACC-034` | Относительные трансформы и контакт сохраняются | `VERIFIED` | `relativeErr=0,0003 м`, `gap=0,00 с`, ground/floor/probe подтверждены |
 | `PC-ACC-035` | После теста восстановлены baseline и предыдущие функции | `VERIFIED` | Итоговый HUD вернулся к `cell=(0,0,0)`; предыдущие системы остались в состоянии PASS |
+| `PC-ACC-040` | Редакция quadtree LOD собирается без ошибок и предупреждений | `IN_PROGRESS` | Требуется локальный `dotnet build`; одновременно проверяется устранение `CS8600` |
+| `PC-ACC-041` | HUD подтверждает независимые `L1/L2` patches | `IN_PROGRESS` | Требуется screenshot с patches, L1/L2 и split > 0 |
+| `PC-ACC-042` | Topology validator не обнаруживает отверстий | `IN_PROGRESS` | Критерии: `open=0`, `nonManifold=0`, `Δlod <= 1`, `Δpos <= 1E-03` |
+| `PC-ACC-043` | Автоматический тест выполняет split и merge | `IN_PROGRESS` | Итог `TASK-033 LOD (U): PASS`, split > 0, merge > 0, changes >= 4 |
+| `PC-ACC-044` | Визуально отсутствуют отверстия на LOD-переходах | `IN_PROGRESS` | Ручная проверка движения игрока и skirts в режиме цветов LOD |
+| `PC-ACC-045` | Collision и предыдущие тесты не регрессировали | `IN_PROGRESS` | После `U` работают WASD, Space, R, F1/F2, T и Y; ground/probe сохраняются |
 
-Ходьба через границы и floating origin приняты по runtime-доказательствам. Quadtree LOD является следующей изолированной кодовой итерацией.
+Ходьба через границы и floating origin приняты по runtime-доказательствам. Начальная quadtree LOD-ступень реализована и ожидает локальную приёмку `TASK-035`.
 
 ### 8.2. Оставшиеся прототипы
 
@@ -367,34 +421,59 @@
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-033` | Начать quadtree LOD граней и согласование соседей | Независимые patches, LOD-переходы и диагностируемые швы без отверстий |
-| 2 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
-| 3 | `DEBT-CS8600` | Устранить nullable warning в `TerrainChunkManager.cs:399` | Чистая сборка без предупреждения `CS8600` |
+| 1 | `TASK-035` | Выполнить runtime-приёмку `TASK-033` | Чистая сборка и `TASK-033 LOD (U): PASS` с `open=0`, `Δlod<=1` |
+| 2 | `TASK-036` | Расширить quadtree LOD и стриминг patches | 3+ уровня, фоновые jobs, выгрузка невидимых участков, collision LOD |
+| 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-032/TASK-034` и требования floating origin.
-**Документационная задача:** введён обязательный регламент `docs/DEVELOPMENT_ITERATION_PROTOCOL.md`.
-**Следующая функциональная задача:** `TASK-033`.
+**Реализовано в этой итерации:** `TASK-033`, `PC-070`–`PC-074`; исправление `DEBT-CS8600`.
+**Текущая приёмочная задача:** `TASK-035`.
 
-## 10. Подтверждённая runtime-приёмка floating origin
+## 10. Runtime-приёмка `TASK-033/TASK-035`
 
-`TASK-032` и `TASK-034` подтверждены пользовательским запуском:
+1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0`
+   предупреждений; прежний `CS8600` отсутствует.
+2. Запустить стартовую сцену и дождаться `ground=да`, `probe=да`, радиальной
+   системы `PASS`.
+3. Убедиться, что HUD показывает `LOD-швы: PASS`, `open: 0`, `nonManifold: 0`,
+   `Δlod <= 1`.
+4. Нажать `U` и не использовать управление 6–8 секунд.
+5. Ожидаемый итог HUD:
 
 ```text
-Сборка: 0 ошибок, 1 предупреждение CS8600
-TASK-032 origin (Y): PASS shifts=4, cells=6
-localMax=1809,2 м
-logicalErr=0,000 м
-relativeErr=0,0003 м
-gap=0,00 с
+TASK-033 LOD (U): PASS split>0, merge>0, Δlod<=1, open=0, seam<=1.00E-03
 ```
 
-Дополнительно HUD подтвердил `ground=да`, `floor=да`, `probe=да`, радиальную систему
-`PASS` и геометрические швы `388/388`. При следующей функциональной итерации новая
-инструкция приёмки формируется по правилам `docs/DEVELOPMENT_ITERATION_PROTOCOL.md`.
+6. В Output требуется итоговая строка:
+
+```text
+TASK-033 quadtree LOD acceptance PASS
+```
+
+7. Ручная проверка: оранжевые `L2` patches следуют за игроком, синие `L1`
+   остаются вдали; отверстий и провалов на переходах нет; collision не исчезает;
+   после теста работают WASD, `Space`, `R`, `F1`, `F2`, `T` и `Y`.
+8. При `FAIL` предоставить screenshot HUD, итоговую строку Output и последние
+   20–30 строк лога.
 
 ## 11. Журнал проверок
 
 Новые записи добавляются сверху.
+
+### 2026-08-01 — `TASK-033`, начальная quadtree LOD-ступень
+
+**Исходный снимок:** `ProjectHorizon-main(6).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-quadtree-lod-foundation.zip`  
+**Git SHA:** отсутствует в архиве  
+**Связанные требования:** раздел 9.3 PDF-ТЗ; `PC-070`–`PC-074`, `PC-ACC-040`–`PC-ACC-045`.
+
+**Краткий результат:** визуальные грани заменены независимыми `L1/L2` patches,
+добавлены skirts, hysteresis, topology validator и acceptance test `U`. Шесть
+collision-граней сохранены без перестроения. `TASK-033` имеет статус
+`IMPLEMENTED`, `TASK-035` ожидает локального доказательства.
+
+**Проверки в текущей среде:** математическая симуляция всех 9 состояний маршрута,
+лексический C#-контроль, scene/resource paths, ZIP hygiene. Сборка и Godot runtime
+недоступны.
 
 ### 2026-08-01 — приёмка `TASK-032/TASK-034` и добавление регламента итераций
 
@@ -413,7 +492,7 @@ gap=0,00 с
 
 **Изменённые/добавленные файлы:**
 
-- `docs/DEVELOPMENT_ITERATION_PROTOCOL.md`;
+- `DEVELOPMENT_ITERATION_PROTOCOL.md`;
 - `README.md`;
 - `REQUIREMENTS_STATUS.md`.
 
@@ -1262,7 +1341,7 @@ Verification: dotnet build; manual interaction smoke test
 
 Все последующие итерации разработки выполняются в соответствии с:
 
-`docs/DEVELOPMENT_ITERATION_PROTOCOL.md`
+`DEVELOPMENT_ITERATION_PROTOCOL.md`
 
 Последняя приложенная пользователем GitHub-редакция проекта используется как
 исходная кодовая база. По завершении каждой итерации обязательны:
@@ -1277,7 +1356,7 @@ Verification: dotnet build; manual interaction smoke test
 
 ```text
 Выполни следующую итерацию разработки Project Horizon по регламенту
-`docs/DEVELOPMENT_ITERATION_PROTOCOL.md`, PDF-ТЗ и `REQUIREMENTS_STATUS.md`.
+`DEVELOPMENT_ITERATION_PROTOCOL.md`, PDF-ТЗ и `REQUIREMENTS_STATUS.md`.
 
 Последняя редакция проекта, скачанная с GitHub, приложена к сообщению.
 ```

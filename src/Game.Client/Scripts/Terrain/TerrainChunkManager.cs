@@ -396,8 +396,13 @@ public partial class TerrainChunkManager : Node3D
 
     private void DrainCompletedJobs()
     {
-        while (_completedJobs.TryDequeue(out CompletedChunkJob completedJob))
+        while (_completedJobs.TryDequeue(out CompletedChunkJob? completedJob))
         {
+            if (completedJob is null)
+            {
+                continue;
+            }
+
             if (!_activeJobs.Remove(
                     completedJob.JobId,
                     out ActiveChunkJob activeJob))
