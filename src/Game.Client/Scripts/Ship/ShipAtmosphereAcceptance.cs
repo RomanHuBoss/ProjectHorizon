@@ -179,6 +179,7 @@ public partial class ShipFlightPrototype
         {
             if (_testState == ShipFlightTestState.Running ||
                 LandingTestRunning || TouchdownTestRunning ||
+                LandingSoakRunning ||
                 (_ship?.LandingAssistActive ?? false) ||
                 (_ship?.TouchdownSequenceActive ?? false))
             {
@@ -203,6 +204,7 @@ public partial class ShipFlightPrototype
         {
             if (_testState == ShipFlightTestState.Running || AtmosphereTestRunning ||
                 LandingTestRunning || TouchdownTestRunning ||
+                LandingSoakRunning ||
                 (_ship?.LandingAssistActive ?? false) ||
                 (_ship?.TouchdownSequenceActive ?? false))
             {

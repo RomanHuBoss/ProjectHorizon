@@ -186,7 +186,8 @@ public partial class ShipFlightPrototype
         if (physical == Key.N || logical == Key.N)
         {
             if (_testState == ShipFlightTestState.Running ||
-                AtmosphereTestRunning || TouchdownTestRunning)
+                AtmosphereTestRunning || TouchdownTestRunning ||
+                LandingSoakRunning)
             {
                 return true;
             }
@@ -209,7 +210,7 @@ public partial class ShipFlightPrototype
         {
             if (_testState == ShipFlightTestState.Running ||
                 AtmosphereTestRunning || LandingTestRunning ||
-                TouchdownTestRunning)
+                TouchdownTestRunning || LandingSoakRunning)
             {
                 return true;
             }

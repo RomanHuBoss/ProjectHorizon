@@ -114,7 +114,8 @@ public partial class ShipFlightPrototype
         }
 
         if (_testState == ShipFlightTestState.Running ||
-            AtmosphereTestRunning || LandingTestRunning)
+            AtmosphereTestRunning || LandingTestRunning ||
+            LandingSoakRunning)
         {
             return true;
         }

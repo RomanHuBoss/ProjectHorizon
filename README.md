@@ -112,9 +112,9 @@ Detailed mode прокручивается колёсиком мыши. Разм
 
 > Build hotfix от 2026-08-01: устранены дублирующие поля `_testCollisions` и `_testErrors` в partial-файле touchdown acceptance, вызывавшие `CS0102` и ошибки Godot source generator.
 
-Свободный полёт, атмосферный режим и поиск посадочной точки подтверждены
-runtime-тестами. Текущая ступень завершает посадочную последовательность раздела
-14.4 PDF-ТЗ:
+Свободный полёт, атмосферный режим, поиск посадочной точки и полный
+touchdown/takeoff цикл подтверждены runtime-тестами. Текущая ступень реализует
+нагрузочный сценарий `100 последовательных посадок` из раздела 36.4 PDF-ТЗ:
 
 - surface ray probes, slope/obstacle checks и резервирование safe point;
 - автоматическое выравнивание на высоте `12 м`;
@@ -126,7 +126,11 @@ runtime-тестами. Текущая ступень завершает пос�
 - контролируемый взлёт до clearance `12 м`;
 - автоматическое складывание опор после безопасного отрыва;
 - ручной трёхэтапный цикл по `M`;
-- автономный двухцикловый touchdown/takeoff test по `O`.
+- автономный двухцикловый touchdown/takeoff test по `O` — `VERIFIED`;
+- строка `TASK-049 touchdown (O)` теперь выводится и в compact, и в detailed HUD;
+- ускоренный, но физический soak-test 100 последовательных touchdown по `V`;
+- каждый soak-цикл выполняет реальное снижение, контакт 3/3 опор и `LANDED` lock;
+- soak контролирует counters, зависшие states, node delta и managed-memory growth.
 
 Ранее принятый атмосферный режим сохраняет `SPACE ↔ ATMOSPHERE`, simplified
 lift/minimum speed, drag, climb limit, surface-safety и entry-guidance.
@@ -164,11 +168,12 @@ J         автоматический TASK-043 free-flight test
 L         автоматический TASK-045 atmosphere test
 N         автоматический TASK-047 landing-point test
 O         автоматический TASK-049 touchdown/takeoff test
+V         TASK-051 soak: 100 последовательных физических посадок
 ```
 
 HUD показывает режим среды, высоту, atmosphere blend, радиальную скорость,
 forward airspeed, landing/touchdown state, deployment опор, число gear contacts,
-physics lock, clearance и ошибки position/orientation.
+physics lock, clearance, ошибки position/orientation и результаты `O/V`.
 
 `M` выполняет ручной цикл тремя последовательными нажатиями: поиск и alignment,
 финальное снижение до `LANDED`, затем взлёт. Повторное нажатие во время движения
@@ -297,14 +302,17 @@ src/Game.Client/project.godot
    должен перейти в `Aligned` примерно в `12 м` над surface normal. Повторное
    `M` восстанавливает baseline.
 9. Нажать `N` и дождаться `TASK-047 landing (N): PASS`.
-10. Клавиша `H` переключает compact, detailed и hidden HUD корабля.
-11. Для регрессии Прототипа C открыть
+10. Нажать `O` и убедиться, что `TASK-049 touchdown (O): PASS` виден в HUD.
+11. Нажать `V` для soak-теста 100 последовательных посадок; ожидаемая
+    продолжительность — около 2–4 минут.
+12. Клавиша `H` переключает compact, detailed и hidden HUD корабля.
+13. Для регрессии Прототипа C открыть
    `Scenes/Planet/CubeSpherePrototype.tscn` через `F6`; compact mode теперь явно
    отключает scrollbar, detailed mode сохраняет прокрутку.
-12. Для регрессии Прототипа B открыть
+14. Для регрессии Прототипа B открыть
    `Scenes/Terrain/TerrainChunkPrototype.tscn` через `F6`; `F10` запускает
    stress-test, `P` — soak-test.
-13. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
+15. Для повторной проверки Прототипа A открыть `Scenes/DebugWorld.tscn` через `F6`.
 
 ### Сборка через командную строку
 
@@ -353,8 +361,9 @@ dotnet build .\src\Game.Client\Game.Client.csproj -c Debug
 - simplified lift, minimum speed, drag и climb limit — `VERIFIED`;
 - surface-safety — `VERIFIED`;
 - поиск точки, slope/obstacle checks и alignment — `VERIFIED`;
-- touchdown, трёхточечные опоры и landed-state — `IMPLEMENTED`;
-- контролируемый взлёт и складывание опор — `IMPLEMENTED`.
+- touchdown, трёхточечные опоры и landed-state — `VERIFIED`;
+- контролируемый взлёт и складывание опор — `VERIFIED`;
+- soak-test 100 последовательных посадок — `IMPLEMENTED`.
 
 ### Прототип E. Сохранение
 

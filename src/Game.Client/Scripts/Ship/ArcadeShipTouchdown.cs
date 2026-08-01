@@ -131,6 +131,30 @@ public partial class ArcadeShipController
         return true;
     }
 
+    public bool PrepareTouchdownSoakCycle(float startClearance)
+    {
+        if (!HasLandingReservation)
+        {
+            return false;
+        }
+
+        CancelTouchdownSequence(false);
+        LandingState = ShipLandingAssistState.Aligned;
+        Vector3 normal = LandingReservedNormal.Normalized();
+        float safeStartClearance = Math.Max(
+            TouchdownGearHeight + 0.75f,
+            startClearance);
+        GlobalTransform = new Transform3D(
+            _landingTargetTransform.Basis.Orthonormalized(),
+            LandingReservedPoint + (normal * safeStartClearance));
+        Velocity = Vector3.Zero;
+        AngularVelocityLocal = Vector3.Zero;
+        _gearDeployment = 1.0f;
+        _gearDeploymentTarget = 1.0f;
+        ApplyLandingGearVisual();
+        return RequestTouchdown();
+    }
+
     public bool RequestTakeoff()
     {
         if (TouchdownState != ShipTouchdownState.Landed ||

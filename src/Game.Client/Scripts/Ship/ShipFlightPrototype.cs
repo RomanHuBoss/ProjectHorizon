@@ -142,6 +142,7 @@ public partial class ShipFlightPrototype : Node3D
         InitializeAtmospherePrototype();
         InitializeLandingPrototype();
         InitializeTouchdownPrototype();
+        InitializeLandingSoakPrototype();
         ApplyHudMode();
         UpdateHud();
         GD.Print("Prototype D flight foundation ready. Press J for acceptance test.");
@@ -160,6 +161,11 @@ public partial class ShipFlightPrototype : Node3D
         UpdateAtmospherePrototype((float)delta);
         UpdateLandingPrototype((float)delta);
         UpdateTouchdownPrototype((float)delta);
+
+        if (LandingSoakRunning)
+        {
+            UpdateLandingSoak((float)delta);
+        }
 
         if (_testState == ShipFlightTestState.Running)
         {
@@ -205,6 +211,12 @@ public partial class ShipFlightPrototype : Node3D
             return;
         }
 
+        if (HandleLandingSoakInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (HandleTouchdownInput(physical, logical))
         {
             GetViewport().SetInputAsHandled();
@@ -226,7 +238,7 @@ public partial class ShipFlightPrototype : Node3D
         if (physical == Key.J || logical == Key.J)
         {
             if (AtmosphereTestRunning || LandingTestRunning ||
-                TouchdownTestRunning ||
+                TouchdownTestRunning || LandingSoakRunning ||
                 (_ship?.LandingAssistActive ?? false) ||
                 (_ship?.TouchdownSequenceActive ?? false))
             {
@@ -251,7 +263,8 @@ public partial class ShipFlightPrototype : Node3D
     private void BeginFlightTest()
     {
         if (_ship is null || AtmosphereTestRunning || LandingTestRunning ||
-            TouchdownTestRunning || _ship.LandingAssistActive ||
+            TouchdownTestRunning || LandingSoakRunning ||
+            _ship.LandingAssistActive ||
             _ship.TouchdownSequenceActive)
         {
             return;
@@ -601,6 +614,18 @@ public partial class ShipFlightPrototype : Node3D
         _detailedMargin.CustomMinimumSize = _detailedMargin.Size;
     }
 
+    private static string FormatCompactTestState(Enum state)
+    {
+        return state.ToString().ToUpperInvariant() switch
+        {
+            "PASSED" => "PASS",
+            "FAILED" => "FAIL",
+            "CANCELLED" => "STOP",
+            "RUNNING" => "RUN",
+            _ => "READY"
+        };
+    }
+
     private void UpdateHud()
     {
         if (_ship is null || _compactLabel is null || _detailedLabel is null)
@@ -630,14 +655,16 @@ public partial class ShipFlightPrototype : Node3D
             $"ω={_ship.AngularSpeedDegrees:F1}°/с\n" +
             $"{AtmosphereCompactStatus}\n" +
             $"{LandingCompactStatus}\n" +
-            $"{FlightTestStatusText}\n" +
-            $"{AtmosphereTestStatusText}\n" +
-            $"{LandingTestStatusText}\n" +
+            $"Tests: J={FormatCompactTestState(_testState)}  " +
+            $"L={FormatCompactTestState(_atmosphereTestState)}  " +
+            $"N={FormatCompactTestState(_landingTestState)}\n" +
+            $"{TouchdownTestStatusText}\n" +
+            $"{LandingSoakStatusText}\n" +
             "W/S — тяга  •  A/D — боковая  •  Space/C — вверх/вниз  •  " +
             "мышь — тангаж/рыскание\n" +
             "Q/E — крен  •  B — форсаж  •  X — тормоз  •  " +
             "G — стабилизация  •  F2 — камера  •  P — атмосфера  •  " +
-            "M — посадка/касание/взлёт  •  J/L/N/O — тесты";
+            "M — посадка/касание/взлёт  •  J/L/N/O/V — тесты";
 
         _detailedLabel.Text =
             "ПРОТОТИП D — АРКАДНАЯ ФИЗИКА КОРАБЛЯ\n" +
@@ -665,6 +692,8 @@ public partial class ShipFlightPrototype : Node3D
             $"{FlightTestStatusText}\n" +
             $"{AtmosphereTestStatusText}\n" +
             $"{LandingTestStatusText}\n" +
+            $"{TouchdownTestStatusText}\n" +
+            $"{LandingSoakStatusText}\n" +
             $"Free-flight metrics: vmax={_maximumSpeed:F2}; " +
             $"distance={_maximumDistance:F2}; " +
             $"lateral={_maximumLateralSpeed:F2}; " +
@@ -686,6 +715,8 @@ public partial class ShipFlightPrototype : Node3D
             "J — автоматический free-flight test\n" +
             "L — автоматический atmosphere test\n" +
             "N — автоматический landing-point test\n" +
+            "O — автоматический touchdown/takeoff test\n" +
+            "V — soak test 100 последовательных посадок\n" +
             "H — compact/detailed/hidden HUD";
     }
 }

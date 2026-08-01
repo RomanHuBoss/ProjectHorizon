@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-01
-> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-touchdown-build-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-prototype-d-100-landing-soak.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -35,12 +35,57 @@
 | A. Персонаж | `VERIFIED` | Предыдущие функциональные итерации приняты пользователем по результатам локальных runtime-проверок; для репозиторной трассируемости остаётся записать SHA |
 | B. Чанк рельефа | `VERIFIED` | `TASK-025` и `TASK-026` завершены `PASS`; стриминг, LOD, выгрузка mesh/collision и managed-memory soak подтверждены runtime |
 | C. Сферическая планета | `VERIFIED` | Все критерии PDF-ТЗ подтверждены: cube sphere, гравитация к центру, ходьба, floating origin и LOD-швы; visual/collision streaming принят runtime-тестами |
-| D. Корабль | `IN_PROGRESS` | Полёт, атмосфера и landing-point alignment приняты runtime; реализованы touchdown, трёхточечные опоры, `LANDED` physics lock и взлёт, ожидающие `TASK-050` |
+| D. Корабль | `IN_PROGRESS` | Полёт, атмосфера, landing-point alignment и полный touchdown/takeoff цикл приняты runtime; реализован soak 100 последовательных посадок, ожидающий `TASK-052` |
 | E. Сохранение | `NOT_STARTED` | Не начинался |
 
-**Вывод:** `TASK-043`–`TASK-048` подтверждены: свободный полёт, атмосфера и landing-point alignment приняты. Текущая итерация реализует `TASK-049` — финальное снижение, трёхточечные опоры, `LANDED` с physics lock, контролируемый взлёт и повторяемый цикл; runtime-приёмка вынесена в `TASK-050`.
+**Вывод:** `TASK-043`–`TASK-050` подтверждены: свободный полёт, атмосфера, landing-point alignment, touchdown, `LANDED` physics lock и взлёт приняты. Текущая итерация реализует `TASK-051` — физический soak 100 последовательных посадок с контролем counters, зависших states, node delta и managed-memory growth; runtime-приёмка вынесена в `TASK-052`.
 
 ## 3. Результат текущей итерации от 2026-08-01
+
+### 2026-08-01 — приёмка `TASK-049/TASK-050` и реализация 100-landing soak `TASK-051`
+
+**Исходный снимок:** `ProjectHorizon-main(5)(1).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-prototype-d-100-landing-soak.zip`
+**Git SHA:** отсутствует в архиве
+**Связанные требования:** раздел 36.4 PDF-ТЗ (`100 последовательных посадок`); `TASK-049`–`TASK-052`, `PD-040`–`PD-053`, `PD-ACC-030`–`PD-ACC-045`.
+
+**Runtime-доказательство предыдущей итерации:**
+
+- после build-hotfix локальная сборка завершена: `0` предупреждений, `0` ошибок;
+- ручной цикл `M` подтверждён screenshots: `Aligned` на высоте `12,0 м`, `posErr=0,00 м`, `angErr=0,04°`;
+- `Landed`: высота `1,6 м`, deployment `1,00`, contacts `3/3`, linear/angular speed `0`;
+- после взлёта: `Idle`, высота `18,2 м`, deployment `0`, radial speed `16,7 м/с`;
+- Godot Output: `TASK-049 touchdown/takeoff acceptance PASS`;
+- `cycles=2`, `attempts=2`, `touchdowns=2`, `locks=2`, `takeoffs=2`, `gear=3`;
+- `touchdownSpeed=2,800 м/с`, `positionError=0,000 м`, `angularError=0,040°`, `takeoffClearance=12,00 м`;
+- `recoveries=0`, `collisions=0`, `errors=0`.
+
+**Исправлен UI-дефект:**
+
+- `TouchdownTestStatusText` добавлен в compact и detailed HUD;
+- итог `TASK-049 touchdown (O): PASS` больше не остаётся только в Godot Output.
+
+**Реализовано в `TASK-051`:**
+
+- добавлен `ShipLandingSoakAcceptance.cs`;
+- клавиша `V` запускает 100 последовательных физических touchdown-циклов;
+- первый цикл выполняет обычный поиск и alignment, последующие циклы используют сохранённую reservation и короткий стартовый clearance `3,8 м`;
+- каждый цикл реально проходит `Descending → GearContact → Landed`, требует `3/3` probes и `PhysicsLockedOnGear`;
+- прямой reposition между циклами исключает кинематографический takeoff и сокращает ожидаемое время теста до 2–4 минут, не подменяя физическое касание;
+- контролируются точные счётчики attempts/touchdowns/locks, минимальное число контактов, максимальные contact speed, position error и angular error;
+- фиксируются recoveries, collisions, runtime errors и per-cycle timeout;
+- до и после soak сравниваются число узлов SceneTree и managed memory после full GC; дополнительно контролируется peak managed growth;
+- прогресс выводится каждые 10 посадок; итог дублируется в HUD и Godot Output;
+- повторное `V` безопасно отменяет тест и восстанавливает baseline;
+- `J/L/N/O/P/M` блокируются во время soak, чтобы исключить конфликт управляющих контуров.
+
+**Изменения статусов:**
+
+- `TASK-049`, `TASK-050`, `PD-040`–`PD-045`, `PD-ACC-030`–`PD-ACC-036` → `VERIFIED`;
+- `TASK-051`, `PD-050`–`PD-053` → `IMPLEMENTED`;
+- `TASK-052`, `PD-ACC-040`–`PD-ACC-045` → `IN_PROGRESS`.
+
+**Ограничение:** Прототип D будет переведён в `VERIFIED` после локальной чистой сборки и `TASK-051 soak (V): PASS 100/100`.
 
 ### 2026-08-01 — build hotfix `TASK-049` после локальной C#-сборки
 
@@ -887,19 +932,29 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PD-ACC-025` | Корабль устойчиво выравнивается над normal | `VERIFIED` | Aligned; posErr=0,00 м; angErr=0,04° |
 | `PD-ACC-026` | Alignment не вызывает столкновений и runtime ошибок | `VERIFIED` | Скорость и angular=0; N: PASS; runtime ошибок не выявлено |
 | `PD-ACC-027` | Предыдущие режимы не регрессировали | `VERIFIED` | J остаётся PASS; ручной режим и HUD подтверждены |
-| `PD-040` | Трёхточечные выдвижные посадочные опоры | `IMPLEMENTED` | Visual gear + три RayCast3D probes; deployment диагностируется в HUD |
-| `PD-041` | Контролируемое финальное снижение | `IMPLEMENTED` | Снижение от hover 12 м к gear clearance 1,55 м; скорость ограничена 2,8 м/с |
-| `PD-042` | Подтверждение касания по опорам | `IMPLEMENTED` | Требуются 3/3 probe contacts, position/angular tolerance и безопасная контактная скорость |
-| `PD-043` | Состояние LANDED и отключение основной физики | `IMPLEMENTED` | Transform фиксируется на опорах, velocity/angular=0, flight/atmosphere branch не выполняется |
-| `PD-044` | Контролируемый взлёт и уборка опор | `IMPLEMENTED` | Подъём по normal до 12 м, gear retract после clearance 3 м, возврат ручного управления |
-| `PD-045` | Повторяемый touchdown/takeoff acceptance test | `IMPLEMENTED` | O выполняет два полных цикла и восстанавливает baseline |
-| `PD-ACC-030` | Touchdown-редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
-| `PD-ACC-031` | Ручной M выполняет alignment, touchdown и takeoff | `IN_PROGRESS` | Три последовательных этапа; gear видим; после взлёта управление восстановлено |
-| `PD-ACC-032` | Все посадочные опоры подтверждают контакт | `IN_PROGRESS` | gear contacts=3/3, deployment=1, contact speed <=3,2 м/с |
-| `PD-ACC-033` | LANDED устойчив и основная физика отключена | `IN_PROGRESS` | physicsLocked=true, speed/angular=0, posErr<=0,4 м, angErr<=2° |
-| `PD-ACC-034` | Взлёт достигает безопасного clearance | `IN_PROGRESS` | takeoff clearance>=10 м, gear retract, state возвращается Idle |
-| `PD-ACC-035` | Автоматический O-test завершается PASS | `IN_PROGRESS` | cycles>=2, touchdowns/locks/takeoffs>=2, recoveries/collisions/errors=0 |
-| `PD-ACC-036` | Предыдущие режимы не регрессировали | `IN_PROGRESS` | После O: PASS работают J/L/N/P/F2/H и ручной полёт |
+| `PD-040` | Трёхточечные выдвижные посадочные опоры | `VERIFIED` | Visual gear + три RayCast3D probes; deployment диагностируется в HUD |
+| `PD-041` | Контролируемое финальное снижение | `VERIFIED` | Снижение от hover 12 м к gear clearance 1,55 м; скорость ограничена 2,8 м/с |
+| `PD-042` | Подтверждение касания по опорам | `VERIFIED` | Требуются 3/3 probe contacts, position/angular tolerance и безопасная контактная скорость |
+| `PD-043` | Состояние LANDED и отключение основной физики | `VERIFIED` | Transform фиксируется на опорах, velocity/angular=0, flight/atmosphere branch не выполняется |
+| `PD-044` | Контролируемый взлёт и уборка опор | `VERIFIED` | Подъём по normal до 12 м, gear retract после clearance 3 м, возврат ручного управления |
+| `PD-045` | Повторяемый touchdown/takeoff acceptance test | `VERIFIED` | O выполняет два полных цикла и восстанавливает baseline |
+| `PD-ACC-030` | Touchdown-редакция собирается 0/0 | `VERIFIED` | Build-hotfix: пользовательская сборка 0 предупреждений, 0 ошибок |
+| `PD-ACC-031` | Ручной M выполняет alignment, touchdown и takeoff | `VERIFIED` | Screenshots: Aligned → Landed → Idle после takeoff |
+| `PD-ACC-032` | Все посадочные опоры подтверждают контакт | `VERIFIED` | Landed screenshot: contacts=3/3, gear=1,00; Output speed=2,800 м/с |
+| `PD-ACC-033` | LANDED устойчив и основная физика отключена | `VERIFIED` | speed/angular=0; posErr=0,000 м; angErr=0,040°; locks=2 |
+| `PD-ACC-034` | Взлёт достигает безопасного clearance | `VERIFIED` | clearance=12,00 м; gear=0; state Idle; ручное управление восстановлено |
+| `PD-ACC-035` | Автоматический O-test завершается PASS | `VERIFIED` | cycles/touchdowns/locks/takeoffs=2; recoveries/collisions/errors=0 |
+| `PD-ACC-036` | Предыдущие режимы не регрессировали | `VERIFIED` | Ручной цикл, камеры и HUD сохранены; предыдущие J/L/N результаты остаются PASS |
+| `PD-050` | Soak 100 последовательных физических посадок | `IMPLEMENTED` | V выполняет 100 реальных descent/contact/LANDED циклов после единственного search/alignment |
+| `PD-051` | Контроль целостности touchdown state и counters | `IMPLEMENTED` | attempts=touchdowns=locks=cycles; per-cycle timeout; stuck state завершает тест FAIL |
+| `PD-052` | Контроль накопления узлов и managed memory | `IMPLEMENTED` | SceneTree node delta=0; final managed growth ≤8 MiB; peak growth ≤32 MiB |
+| `PD-053` | Диагностика soak и исправленный touchdown HUD | `IMPLEMENTED` | O/V статусы видны в compact/detailed HUD; прогресс V каждые 10 циклов дублируется в Output |
+| `PD-ACC-040` | Soak-редакция собирается 0/0 | `IN_PROGRESS` | Локальная C#-сборка без предупреждений и ошибок |
+| `PD-ACC-041` | V-test завершает ровно 100 посадок | `IN_PROGRESS` | HUD/Output: PASS cycles=100, attempts=100, touchdowns=100, locks=100 |
+| `PD-ACC-042` | Все циклы подтверждают 3/3 опоры и допустимые ошибки | `IN_PROGRESS` | gearMin=3, touchdownSpeed≤3,20, posErr≤0,40 м, angErr≤2,00° |
+| `PD-ACC-043` | Нет recovery, collision, runtime error и зависших state | `IN_PROGRESS` | recoveries=0, collisions=0, errors=0; queue/state восстановлены |
+| `PD-ACC-044` | Нет накопления SceneTree/managed memory | `IN_PROGRESS` | nodeDelta=0; managedGrowth≤8 MiB; peakGrowth≤32 MiB |
+| `PD-ACC-045` | HUD показывает O/V, предыдущие режимы не регрессировали | `IN_PROGRESS` | O: PASS виден в HUD; после V работают J/L/N/O/P/M/F2/H |
 
 ### 8.3. Оставшиеся прототипы
 
@@ -914,47 +969,46 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-048`; Прототипы A, B и C; свободный, атмосферный полёт и landing-point alignment Прототипа D.
+**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-050`; Прототипы A, B и C; свободный/атмосферный полёт, landing-point alignment и touchdown/takeoff Прототипа D.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-050` | Выполнить runtime-приёмку touchdown/landed/takeoff | Чистая сборка; ручной трёхэтапный `M`; `O: PASS`; 3/3 опоры; physics lock; два цикла |
-| 2 | `TASK-051` | Добавить soak-сценарий 100 последовательных посадок | Раздел 36.4 PDF-ТЗ; отсутствие накопления ошибок, зависших states и утечек |
+| 1 | `TASK-052` | Выполнить runtime-приёмку 100-landing soak | Чистая сборка; `V: PASS 100/100`; counters exact; gearMin=3; nodeDelta=0; memory bounds; errors=0 |
+| 2 | `TASK-053` | После soak закрыть Прототип D либо устранить выявленный дефект | Все требования Прототипа D VERIFIED; регрессии J/L/N/O/P/M/F2/H отсутствуют |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | Журнал содержит Git-доказательство принятой редакции |
 
-**Подтверждено в этой итерации:** `TASK-047`, `TASK-048`, `PD-030`–`PD-035`, `PD-ACC-020`–`PD-ACC-027`.
-**Реализовано:** `TASK-049`, `PD-040`–`PD-045`.
-**Текущая приёмочная задача:** `TASK-050`.
+**Подтверждено в этой итерации:** `TASK-049`, `TASK-050`, `PD-040`–`PD-045`, `PD-ACC-030`–`PD-ACC-036`.
+**Реализовано:** `TASK-051`, `PD-050`–`PD-053`.
+**Текущая приёмочная задача:** `TASK-052`.
 
-## 10. Runtime-приёмка `TASK-049/TASK-050`
+## 10. Runtime-приёмка `TASK-051/TASK-052`
 
 1. Выполнить локальную сборку `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
-2. Запустить стартовую сцену. HUD должен показывать `TASK-049 touchdown (O): READY`; опоры в обычном полёте сложены.
-3. Выполнить ручной цикл клавишей `M`:
-   - первое нажатие: `Searching → Reserved → Aligning → Aligned`;
-   - второе нажатие после `Aligned`: `Descending → GearContact → Landed`;
-   - в `Landed` должны быть `gear contacts=3/3`, deployment≈1, speed/angular=0 и `physics locked=true`;
-   - третье нажатие: `TakingOff → Idle`, clearance не менее `10 м`, опоры складываются, ручное управление возвращается.
-4. Нажать `O` и не использовать управление. Тест выполняет два полных landing/takeoff цикла, затем восстанавливает baseline.
-5. Ожидаемый HUD:
+2. Запустить стартовую сцену. Compact HUD должен показывать обе строки: `TASK-049 touchdown (O): READY/PASS` и `TASK-051 soak (V): READY`.
+3. Нажать `V` и не использовать управление. Повторное `V` безопасно отменяет soak и восстанавливает baseline.
+4. Тест выполняет один обычный search/alignment, затем 100 физических touchdown-циклов с короткого clearance `3,8 м`. Ожидаемая длительность: 2–4 минуты; timeout: 240 секунд.
+5. Каждые 10 циклов в Godot Output выводится progress. HUD должен показывать `RUNNING n/100`.
+6. Ожидаемый HUD:
 
 ```text
-TASK-049 touchdown (O): PASS cycles=2, touchdowns=2, takeoffs=2,
-gear=3, vTouch<=3.20 м/с, posErr<=0.40 м, angErr<=2.00°, takeoff>=10 м
+TASK-051 soak (V): PASS 100/100, gear=3, vTouch<=3.20,
+memΔ<=8.00 MiB, nodesΔ=0
 ```
 
-6. Ожидаемая итоговая строка Godot Output:
+7. Ожидаемая итоговая строка Godot Output:
 
 ```text
-TASK-049 touchdown/takeoff acceptance PASS: cycles=2; attempts=2;
-touchdowns=2; locks=2; takeoffs=2; gear=3; touchdownSpeed=...;
-positionError=...; angularError=...; takeoffClearance=...;
-recoveries=0; collisions=0; errors=0
+TASK-051 100-landing soak PASS: cycles=100; attempts=100;
+touchdowns=100; locks=100; gearMin=3; touchdownSpeed=...;
+positionError=...; angularError=...; managedGrowthMiB=...;
+managedPeakGrowthMiB=...; nodeDelta=0; recoveries=0;
+collisions=0; errors=0; result=...
 ```
 
-7. После `O: PASS` повторно проверить `J`, `L`, `N`, `P`, `F2`, `H` и ручное управление.
-8. В качестве доказательства прислать результат сборки, screenshot `Landed`, screenshot `O: PASS`, полную строку Output и краткое подтверждение ручного взлёта.
-9. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: state, gear contacts, clearance, touchdown speed и physics lock.
+8. Критерии: counters точно `100/100/100/100`; `gearMin=3`; touchdown speed ≤`3,20 м/с`; position error ≤`0,40 м`; angular error ≤`2,00°`; node delta `0`; final managed growth ≤`8 MiB`; peak growth ≤`32 MiB`; recoveries/collisions/errors `0`.
+9. После `V: PASS` проверить, что работают `J`, `L`, `N`, `O`, `P`, ручной `M`, `F2` и `H`.
+10. В качестве доказательства прислать результат сборки, screenshot `V: PASS`, полную итоговую строку Output и краткое подтверждение регрессии.
+11. При `FAIL` прислать финальный HUD и последние 30 строк Output; особое внимание: cycle/phase, counter mismatch, gearMin, memory growth, nodeDelta и errors.
 
 ## 11. Журнал проверок
 
