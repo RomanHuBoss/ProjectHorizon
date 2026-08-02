@@ -70,4 +70,3 @@ fire_primary={
 [rendering]
 
 renderer/rendering_method="mobile"
-rendering_device/driver.windows="vulkan"
