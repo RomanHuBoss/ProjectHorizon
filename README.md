@@ -152,6 +152,14 @@ TASK-070 third crafting path acceptance PASS: resources=2; blockedBeforeResource
 `gameplay-slot`. `F11` выполняет Godot-независимую deterministic-приёмку таймера
 без изменения slot. `F8` необходим только для чистого ручного прогона.
 
+При замене файлов поверх уже собранной рабочей копии Godot/MSBuild может оставить
+старый `Game.Client.dll`, если `CoreCompile` помечен как актуальный. Для проверки
+hotfix persistence необходимо выполнить чистую пересборку: закрыть запущенную сцену
+и запустить `tools\clean-build-windows10.cmd` либо удалить
+`src\Game.Client\.godot\mono\temp`, после чего снова выполнить Build в Godot.
+В полном build log должна присутствовать строка `CoreCompile`; одного сообщения
+`CoreCompile пропускается` недостаточно для подтверждения новой редакции.
+
 
 ### Прототип A. Персонаж — `VERIFIED`
 

@@ -333,26 +333,28 @@ public sealed class StarterRepairSession
         string stationId,
         out string result)
     {
-        if (_secondaryRecipe is null)
+        CraftingRecipeDefinition? recipe = _secondaryRecipe;
+        if (recipe is null)
         {
             result = "secondary recipe is unavailable";
             return StationCraftResult.RecipeUnavailable;
         }
 
-        return ValidateCraft(_secondaryRecipe.RecipeId, stationId, out result);
+        return ValidateCraft(recipe.RecipeId, stationId, out result);
     }
 
     public StationCraftResult TryCraftSecondary(
         string stationId,
         out string result)
     {
-        if (_secondaryRecipe is null)
+        CraftingRecipeDefinition? recipe = _secondaryRecipe;
+        if (recipe is null)
         {
             result = "secondary recipe is unavailable";
             return StationCraftResult.RecipeUnavailable;
         }
 
-        return TryCraft(_secondaryRecipe.RecipeId, stationId, out result);
+        return TryCraft(recipe.RecipeId, stationId, out result);
     }
 
     public bool IsRecipeCrafted(string recipeId)

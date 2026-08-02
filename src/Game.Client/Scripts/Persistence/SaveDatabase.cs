@@ -406,14 +406,33 @@ public sealed partial class SaveDatabase : IDisposable
             actual.Inventory.ToDictionary(item => item.ItemId);
         foreach (InventoryItemSaveData expectedItem in expected.Inventory)
         {
-            if (!actualItems.TryGetValue(expectedItem.ItemId, out InventoryItemSaveData? actualItem) ||
-                expectedItem.DefinitionId != actualItem.DefinitionId ||
+            if (!actualItems.TryGetValue(
+                    expectedItem.ItemId,
+                    out InventoryItemSaveData? actualItem) ||
+                actualItem is null)
+            {
+                mismatch = $"inventory item {expectedItem.ItemId} is missing";
+                return false;
+            }
+
+            if (expectedItem.DefinitionId != actualItem.DefinitionId ||
                 expectedItem.OriginalDefinitionId != actualItem.OriginalDefinitionId ||
                 expectedItem.Resolution != actualItem.Resolution ||
                 expectedItem.Quantity != actualItem.Quantity ||
                 !NearlyEqual(expectedItem.Durability, actualItem.Durability))
             {
-                mismatch = $"inventory item {expectedItem.ItemId} differs";
+                mismatch =
+                    $"inventory item {expectedItem.ItemId} differs: " +
+                    $"expected(definition={expectedItem.DefinitionId}, " +
+                    $"original={expectedItem.OriginalDefinitionId}, " +
+                    $"resolution={expectedItem.Resolution}, " +
+                    $"quantity={expectedItem.Quantity}, " +
+                    $"durability={expectedItem.Durability:0.###}); " +
+                    $"actual(definition={actualItem.DefinitionId}, " +
+                    $"original={actualItem.OriginalDefinitionId}, " +
+                    $"resolution={actualItem.Resolution}, " +
+                    $"quantity={actualItem.Quantity}, " +
+                    $"durability={actualItem.Durability:0.###})";
                 return false;
             }
         }

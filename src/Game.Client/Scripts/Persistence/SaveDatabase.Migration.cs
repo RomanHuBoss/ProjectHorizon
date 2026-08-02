@@ -13,6 +13,8 @@ public sealed partial class SaveDatabase
     public const string UnknownItemPlaceholderId = "content.unknown.item";
     public const string UnknownShipPlaceholderId = "content.unknown.ship";
 
+    private static readonly object InventoryDefinitionRegistryGate = new();
+
     private static readonly HashSet<string> KnownInventoryDefinitions = new(
         StringComparer.Ordinal)
     {
@@ -32,6 +34,34 @@ public sealed partial class SaveDatabase
     {
         ["resource.iron"] = "resource.iron_ore"
     };
+
+    public static void RegisterKnownInventoryDefinitions(
+        IEnumerable<string> definitionIds)
+    {
+        ArgumentNullException.ThrowIfNull(definitionIds);
+        lock (InventoryDefinitionRegistryGate)
+        {
+            foreach (string definitionId in definitionIds)
+            {
+                if (string.IsNullOrWhiteSpace(definitionId))
+                {
+                    throw new ArgumentException(
+                        "Inventory definition ID must not be empty.",
+                        nameof(definitionIds));
+                }
+
+                KnownInventoryDefinitions.Add(definitionId);
+            }
+        }
+    }
+
+    private static bool IsKnownInventoryDefinitionCore(string definitionId)
+    {
+        lock (InventoryDefinitionRegistryGate)
+        {
+            return KnownInventoryDefinitions.Contains(definitionId);
+        }
+    }
 
     private static readonly HashSet<string> KnownShipTemplates = new(
         StringComparer.Ordinal)
@@ -585,11 +615,16 @@ public sealed partial class SaveDatabase
                 ContentResolutionState.Placeholder);
         }
 
-        if (KnownInventoryDefinitions.Contains(persistedDefinitionId))
+        if (IsKnownInventoryDefinitionCore(persistedDefinitionId))
         {
             if (!string.IsNullOrWhiteSpace(original) &&
-                InventoryDefinitionAliases.TryGetValue(original, out string target) &&
-                target == persistedDefinitionId)
+                InventoryDefinitionAliases.TryGetValue(
+                    original,
+                    out string? target) &&
+                string.Equals(
+                    target,
+                    persistedDefinitionId,
+                    StringComparison.Ordinal))
             {
                 return new ContentResolution(
                     persistedDefinitionId,
@@ -605,7 +640,8 @@ public sealed partial class SaveDatabase
 
         if (InventoryDefinitionAliases.TryGetValue(
                 persistedDefinitionId,
-                out string aliasedDefinition))
+                out string? aliasedDefinition) &&
+            !string.IsNullOrWhiteSpace(aliasedDefinition))
         {
             return new ContentResolution(
                 aliasedDefinition,

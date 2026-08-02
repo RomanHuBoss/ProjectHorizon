@@ -37,6 +37,12 @@ public static class ThirdCraftingPathAcceptanceRunner
         ArgumentNullException.ThrowIfNull(launchRecipe);
         ArgumentNullException.ThrowIfNull(navigationRecipe);
         ArgumentNullException.ThrowIfNull(resourceBindings);
+        SaveDatabase.RegisterKnownInventoryDefinitions(
+            resourceBindings
+                .Select(binding => binding.ItemDefinitionId)
+                .Concat(repairRecipe.Outputs.Select(output => output.DefinitionId))
+                .Concat(launchRecipe.Outputs.Select(output => output.DefinitionId))
+                .Concat(navigationRecipe.Outputs.Select(output => output.DefinitionId)));
         Stopwatch stopwatch = Stopwatch.StartNew();
         try
         {

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -45,7 +45,7 @@
 ### 2026-08-02 — третий resource/recipe path и multi-recipe station session (`TASK-070`)
 
 **Исходный снимок:** `ProjectHorizon-main(12).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`  
 **Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-068`–`TASK-071`, `CONTENT-030`–`CONTENT-047`, `CONTENT-ACC-030`–`CONTENT-ACC-047`.
 
@@ -104,7 +104,7 @@
 
 **Фактическая локальная проверка и hotfix `F12` (2026-08-02):**
 
-- пользователь подтвердил чистую сборку: `0` предупреждений, `0` ошибок, `00:00:01.21`; `CONTENT-ACC-040` → `VERIFIED`;
+- пользователь подтвердил успешную инкрементальную сборку: `0` предупреждений, `0` ошибок, `00:00:01.21`; startup/runtime подтверждают `CONTENT-ACC-040`, однако позднее установлено, что `CoreCompile` был пропущен;
 - startup HUD подтвердил `DB: Ready` и каталог `items=6`, `resources=3`, `recipes=3`;
 - `F12` дошёл до autosave write, но завершился `FAIL`: `InvalidDataException: Primary snapshot validation failed: inventory item ... differs`;
 - root cause: новые catalog IDs `resource.phase_fiber` и `component.ship.navigation_array` отсутствовали в persistence compatibility registry `KnownInventoryDefinitions`; при контрольном чтении они разрешались как `content.unknown.item`, поэтому exact round-trip сравнение отклоняло snapshot;
@@ -112,6 +112,30 @@
 - `TASK-070` остаётся `IMPLEMENTED`, `TASK-071` и `CONTENT-ACC-042`–`CONTENT-ACC-047` остаются `IN_PROGRESS` до повторного `F12: PASS` и регрессий.
 
 **Подготовленный hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`.
+
+**Повторная локальная проверка и усиленный hotfix `F12` (2026-08-02):**
+
+- повторный `F12` завершился тем же `FAIL`: `Primary snapshot validation failed: inventory item crafted.component.ship.navigation_array differs`; остальные показатели runner обнулены, потому что исключение возникло внутри autosave batch до формирования итогового отчёта;
+- приложенный build log формально показывает `0` предупреждений и `0` ошибок, однако `CoreCompile` был **пропущен как актуальный**, поэтому новая редакция `SaveDatabase.Migration.cs` не была гарантированно скомпилирована; runtime мог использовать прежний `Game.Client.dll`;
+- persistence registry сделан расширяемым: `SaveDatabase.RegisterKnownInventoryDefinitions(...)` регистрирует все item definition IDs текущего JSON-каталога перед инициализацией БД; `F12` дополнительно регистрирует входы и outputs используемых recipes, поэтому runner больше не зависит от порядка загрузки сцены;
+- exact snapshot diagnostics теперь выводит ожидаемые и фактические `definition/original/resolution/quantity/durability`, если round-trip снова разойдётся;
+- добавлен `tools\clean-build-windows10.cmd`, удаляющий stale `.godot\mono\temp` и запускающий реальную Debug-сборку; README дополнен обязательным clean-rebuild шагом после замены файлов поверх существующей рабочей копии;
+- устранены известные nullable `CS8600` sites: nullable-aware `TryGetValue` в `GameContentCatalog`, alias resolution в `SaveDatabase.Migration` и стабильный local capture `_secondaryRecipe` в `StarterRepairDomain`; цель повторной полной компиляции — `0 warnings / 0 errors`;
+- `TASK-070` остаётся `IMPLEMENTED`, `TASK-071` — `IN_PROGRESS` до clean build, `F12: PASS` и регрессий `F7/F9/F10/F11`.
+
+**Изменённые файлы усиленного hotfix:**
+
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/ThirdCraftingPathAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `tools/clean-build-windows10.cmd`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Подготовленный усиленный hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`.
 
 ### 2026-08-02 — исправление ошибки сборки `TASK-068` (`CS0136`)
 

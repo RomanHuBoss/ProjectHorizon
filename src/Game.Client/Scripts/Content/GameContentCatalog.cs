@@ -254,7 +254,10 @@ public sealed class GameContentCatalog
 
     public GameItemDefinition GetItem(string definitionId)
     {
-        if (!_items.TryGetValue(definitionId, out GameItemDefinition item))
+        if (!_items.TryGetValue(
+                definitionId,
+                out GameItemDefinition? item) ||
+            item is null)
         {
             throw new ContentValidationException(
                 $"Unknown item definition {definitionId}.");
@@ -266,8 +269,9 @@ public sealed class GameContentCatalog
     public GameResourceDefinition GetResource(string resourceId)
     {
         if (!_resources.TryGetValue(
-            resourceId,
-            out GameResourceDefinition resource))
+                resourceId,
+                out GameResourceDefinition? resource) ||
+            resource is null)
         {
             throw new ContentValidationException(
                 $"Unknown resource definition {resourceId}.");
@@ -279,8 +283,9 @@ public sealed class GameContentCatalog
     public CraftingRecipeDefinition GetRecipe(string recipeId)
     {
         if (!_recipes.TryGetValue(
-            recipeId,
-            out CraftingRecipeDefinition recipe))
+                recipeId,
+                out CraftingRecipeDefinition? recipe) ||
+            recipe is null)
         {
             throw new ContentValidationException(
                 $"Unknown recipe definition {recipeId}.");
@@ -436,8 +441,9 @@ public sealed class GameContentCatalog
         ValidateStableId(resource.ResourceId, "ResourceId");
         ValidateStableId(resource.ItemDefinitionId, "ItemDefinitionId");
         if (!items.TryGetValue(
-            resource.ItemDefinitionId,
-            out GameItemDefinition item))
+                resource.ItemDefinitionId,
+                out GameItemDefinition? item) ||
+            item is null)
         {
             throw new ContentValidationException(
                 $"Resource {resource.ResourceId} references missing item " +

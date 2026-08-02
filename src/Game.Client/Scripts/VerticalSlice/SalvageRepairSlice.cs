@@ -127,6 +127,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         GameContentCatalog catalog = LoadContentCatalog();
+        SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
         CraftingRecipeDefinition launchCapacitorRecipe = catalog.GetRecipe(
