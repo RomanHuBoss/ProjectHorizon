@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -45,7 +45,7 @@
 ### 2026-08-02 — третий resource/recipe path и multi-recipe station session (`TASK-070`)
 
 **Исходный снимок:** `ProjectHorizon-main(12).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`  
 **Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-068`–`TASK-071`, `CONTENT-030`–`CONTENT-047`, `CONTENT-ACC-030`–`CONTENT-ACC-047`.
 
@@ -96,10 +96,22 @@
 
 - `TASK-068`, `TASK-069`, `CONTENT-030`–`CONTENT-037`, `CONTENT-ACC-030`–`CONTENT-ACC-037` → `VERIFIED`;
 - `TASK-070`, `CONTENT-040`–`CONTENT-047` → `IMPLEMENTED`;
-- `TASK-071`, `CONTENT-ACC-040`–`CONTENT-ACC-047` → `IN_PROGRESS`;
+- `CONTENT-ACC-040` → `VERIFIED`;
+- `TASK-071`, `CONTENT-ACC-041`–`CONTENT-ACC-047` → `IN_PROGRESS`;
 - `TASK-006` → `BLOCKED`.
 
 **Следующий рекомендуемый шаг:** собрать проект `0/0`, проверить startup counts `6/3/3` и `TASK-070 ... binding PASS`, выполнить `F12: PASS`, затем повторить `F7/F9/F10/F11` и вручную подтвердить независимый navigation process, autosave и cold restart.
+
+**Фактическая локальная проверка и hotfix `F12` (2026-08-02):**
+
+- пользователь подтвердил чистую сборку: `0` предупреждений, `0` ошибок, `00:00:01.21`; `CONTENT-ACC-040` → `VERIFIED`;
+- startup HUD подтвердил `DB: Ready` и каталог `items=6`, `resources=3`, `recipes=3`;
+- `F12` дошёл до autosave write, но завершился `FAIL`: `InvalidDataException: Primary snapshot validation failed: inventory item ... differs`;
+- root cause: новые catalog IDs `resource.phase_fiber` и `component.ship.navigation_array` отсутствовали в persistence compatibility registry `KnownInventoryDefinitions`; при контрольном чтении они разрешались как `content.unknown.item`, поэтому exact round-trip сравнение отклоняло snapshot;
+- в `SaveDatabase.Migration.cs` оба стабильных ID добавлены в реестр известных inventory definitions; логика crafting, timer, autosave transaction и HUD не изменена;
+- `TASK-070` остаётся `IMPLEMENTED`, `TASK-071` и `CONTENT-ACC-042`–`CONTENT-ACC-047` остаются `IN_PROGRESS` до повторного `F12: PASS` и регрессий.
+
+**Подготовленный hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`.
 
 ### 2026-08-02 — исправление ошибки сборки `TASK-068` (`CS0136`)
 
@@ -1871,7 +1883,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `CONTENT-045` | Launch и navigation recipes независимы и могут быть изготовлены в одной session | `IMPLEMENTED` | Отдельные stable outputs и station state |
 | `CONTENT-046` | Оба crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `IMPLEMENTED` | Generic `CraftedInventory` + multi-recipe `FromSnapshot` |
 | `CONTENT-047` | F12 изолированно проверяет third path, isolation, persistence и регрессии | `IMPLEMENTED` | `ThirdCraftingPathAcceptanceRunner` и отдельная test-БД |
-| `CONTENT-ACC-040` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Требуется локальная сборка |
+| `CONTENT-ACC-040` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Сборка пользователя: `0` предупреждений, `0` ошибок, `00:00:01.21` |
 | `CONTENT-ACC-041` | Startup подтверждает counts `6/3/3`, две stations и navigation binding | `IN_PROGRESS` | Нужна строка `TASK-070 third crafting path binding PASS` |
 | `CONTENT-ACC-042` | F12 подтверждает блокировку до phase-fiber resources и timed completion | `IN_PROGRESS` | Ожидается `blockedBeforeResources=1`, `timedCompletion=1` |
 | `CONTENT-ACC-043` | F12 подтверждает recipe isolation и наличие обоих outputs | `IN_PROGRESS` | Ожидается `recipeIsolation=1`, `bothCrafted=1`, `output=1` |
@@ -2109,7 +2121,8 @@ TASK-070 third crafting path completion PASS: recipe=recipe.ship.navigation_arra
 ### 2026-08-02 — `TASK-070`, third data-driven crafting path
 
 **Исходный снимок:** `ProjectHorizon-main(12).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`  
+**Первичный подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`  
+**Hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`  
 **Git SHA:** отсутствует в исходном архиве  
 **Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-040`–`CONTENT-047`.
 
@@ -2119,9 +2132,13 @@ TASK-070 third crafting path completion PASS: recipe=recipe.ship.navigation_arra
 
 **Статическая проверка:** JSON schema/counts/cross-references, scene bindings, stable IDs, C# lexical balance, UID, `res://`, hotkey `F12`, запрещённые build/cache artifacts и ZIP integrity.
 
-**Ограничение среды:** `dotnet`/Godot недоступны, поэтому сборка и runtime здесь не выполнялись. `TASK-070` остаётся `IMPLEMENTED`, `TASK-071` — `IN_PROGRESS`.
+**Первичная runtime-проверка пользователя:** сборка завершилась с `0` предупреждений и `0` ошибок; startup показал `DB: Ready` и каталог `6/3/3`. `F12` завершился `FAIL` после autosave write с `Primary snapshot validation failed: inventory item ... differs`.
 
-**Следующая задача:** локальная сборка `0/0`, startup `6/3/3`, `F12: PASS`, регрессии `F7/F9/F10/F11`, ручной navigation process и cold restart по разделу 14.
+**Диагноз и исправление:** persistence compatibility registry не содержал `resource.phase_fiber` и `component.ship.navigation_array`; оба ID добавлены в `SaveDatabase.Migration.cs`, чтобы SQLite load сохранял их как `Known`, а не преобразовывал в `content.unknown.item`.
+
+**Ограничение среды:** `dotnet`/Godot недоступны, поэтому повторная сборка и runtime hotfix здесь не выполнялись. `TASK-070` остаётся `IMPLEMENTED`, `TASK-071` — `IN_PROGRESS`.
+
+**Следующая задача:** повторить `F12`; ожидается `PASS`, затем выполнить регрессии `F7/F9/F10/F11`, ручной navigation process и cold restart по разделу 14.
 
 ### 2026-08-01 — `TASK-068`, data-driven craft-time processing
 

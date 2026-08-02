@@ -21,6 +21,8 @@ public sealed partial class SaveDatabase
         "component.starter_hull_patch",
         "resource.conductive_crystal",
         "component.ship.launch_capacitor",
+        "resource.phase_fiber",
+        "component.ship.navigation_array",
         "component.energy_cell",
         "consumable.repair_kit"
     };
