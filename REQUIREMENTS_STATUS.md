@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-industry-spec-v2-compotium.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-station-selector-research.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,70 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов и ранее подтверждённый vertical slice остаются `VERIFIED`. Текущая крупная редакция `TASK-080` вводит законченное ТЗ v2.0 и полный Industry Content v2: 174 items, 42 world resources, 128 recipes, 15 stations и 32 technologies. Полный каталог статически реализован; runtime-приёмка `F4` ожидается в `TASK-081`. Расширенные механики выбора рецепта, research enforcement, catalysts/byproducts/energy/environment переводятся в отдельные системные задачи, а не реализуются по одному recipe.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-080/081`, `TASK-076/077`, `TASK-072/073` имеют runtime-доказательства `PASS`. Текущая итерация реализует `TASK-082`: один физический PortableFabricator показывает все девять runtime-рецептов, исполняет `RequiredTechnology`, предоставляет research UI и сохраняет RP/unlocks в SQLite. Расширенные catalysts/byproducts/energy/environment остаются отдельной задачей `TASK-083`.
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — universal station selector, technology enforcement и research persistence (`TASK-082`)
+
+**Исходный снимок:** `ProjectHorizon-main(3)(4).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:22 (+03:00)  
+**Подготовленный снимок:** `ProjectHorizon-main-station-selector-research.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** ТЗ v2.0, раздел 52.1 и первый шаг 52.3; `TASK-076`–`TASK-083`.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил clean build `0 предупреждений / 0 ошибок`;
+- `F4: PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0`;
+- `F5: PASS resources=42, recipes=128, station=9, crafted=9, isolated=9, roundTrip=1`;
+- `F6/F7/F9/F10/F11/F12: PASS`;
+- SQLite `integrity=ok`, autosave и восстановление revision подтверждены;
+- `TASK-072`, `TASK-073`, `TASK-076`, `TASK-077`, `TASK-080`, `TASK-081` → `VERIFIED`.
+
+**Реализовано:**
+
+- девять runtime `StoreOutputs` recipes объединены на одном физическом `PortableFabricator`;
+- взаимодействие `E` открывает универсальный station UI вместо запуска жёстко привязанного recipe;
+- UI имеет режимы `Recipes` и `Research`, навигацию `Up/Down`, переключение `Tab/R`, подтверждение `Enter/E`, закрытие `Esc`;
+- список recipes строится из каталога по `RequiredStation`, показывает tier, время, inputs/outputs, `READY/MISSING/LOCKED/DONE`;
+- `StarterRepairSession.ValidateCraft` исполняет `RequiredTechnology`; legacy acceptance runners сохраняют прежнее поведение через all-unlocked delegate;
+- добавлен `TechnologyProgression`: prerequisites, research cost, RP balance, automatic free roots и relevant technology closure;
+- стартовый vertical slice получает `2000 RP`; free root technologies разблокируются автоматически;
+- RP и unlocked technology IDs сохраняются в существующей таблице `save_settings`, входят в exact snapshot comparison и восстанавливаются после cold restart;
+- visual state единственной станции отражает завершение всех её runtime recipes, а не одного recipe;
+- добавлена изолированная `F3 / TASK-082` acceptance с отдельной БД `save_1.technology-selector-test.db`;
+- F3 проверяет девять recipes на одной станции, начальную смесь locked/unlocked, отказ без prerequisites, unlock graph, technology gate, изготовление выбранного recipe, autosave, exact round-trip, progress restore, one-writer и integrity.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/TechnologyProgression.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/TechnologyRecipeSelectorAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/PortableCraftingStation.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статические проверки:**
+
+- C# delimiter/string/comment scan: `47` файлов, ошибок нет;
+- scene: одна physical crafting station, девять runtime recipes routed по одному `station.portable_fabricator`;
+- JSON counts и cross-references сохранены: `174/42/128/15/32`;
+- UID и `res://` проверяются перед итоговой упаковкой;
+- .NET SDK и Godot отсутствуют в среде подготовки, поэтому build/runtime `F3` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-072`, `TASK-073`, `TASK-076`, `TASK-077`, `TASK-080`, `TASK-081` → `VERIFIED`;
+- `TASK-082` → `IMPLEMENTED`;
+- `TASK-084` → `IN_PROGRESS` — clean build и runtime `F3`;
+- `TASK-083` остаётся `PLANNED`;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Приёмка `TASK-084`:** clean build `0/0`; startup `TASK-082 station selector binding PASS: physicalStations=1; selectorRecipes=9`; `F3: PASS recipes=9, oneStation=1, initial>0/locked>0, crafted=1, roundTrip=1`; вручную открыть PortableFabricator, разблокировать technology, изготовить recipe, дождаться autosave и проверить cold restart; затем повторить `F4/F5/F6/F7/F9/F10/F11/F12`.
 
 ### 2026-08-02 — законченное ТЗ v2.0, Industry Content v2 и химическая линия Компотия (`TASK-080`)
 
@@ -2226,30 +2287,30 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `CONTENT-077` | Один acceptance runner покрывает полную матрицу recipes | `IMPLEMENTED` | `CatalogCraftingMatrixAcceptanceRunner`, отдельная F5 test-БД |
 | `CONTENT-078` | Добавление ordinary StoreOutputs recipe не требует нового acceptance-класса и нового HUD-поля | `IMPLEMENTED` | fifth-specific runner удалён; F5 перебирает catalog recipes |
 | `CONTENT-079` | Предыдущие acceptance routes сохранены как регрессии | `IMPLEMENTED` | F6/F7/F9/F10/F11/F12 не удалены |
-| `CONTENT-ACC-070` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Выполнить clean Build с реальным `CoreCompile` |
-| `CONTENT-ACC-071` | Startup подтверждает `20/10/10`, `stationRecipes=9`, `sceneStations=9`, `resourceNodes=21` | `IN_PROGRESS` | Нужна строка `TASK-076 crafting catalog binding PASS` |
-| `CONTENT-ACC-072` | F5 подтверждает blocked/timed/isolation/crafted для всех девяти station recipes | `IN_PROGRESS` | Ожидается `blocked=9`, `timed=9`, `isolated=9`, `crafted=9` |
-| `CONTENT-ACC-073` | F5 подтверждает wrong-station и duplicate-start rejection | `IN_PROGRESS` | Ожидается `wrongStation=1`, `duplicateStart=1` |
-| `CONTENT-ACC-074` | F5 подтверждает autosave, exact round-trip, log, one-writer и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `roundTrip=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
-| `CONTENT-ACC-075` | F6/F7/F9/F10/F11/F12 не регрессируют после batch expansion | `IN_PROGRESS` | Повторить шесть legacy routes; F9 должен показать `20/10/10` |
-| `CONTENT-ACC-076` | Ручной sample новых paths и cold restart подтверждают production routing/persistence | `IN_PROGRESS` | Достаточно проверить 1–2 новых recipes, autosave и restart; все девять вручную повторять не требуется |
+| `CONTENT-ACC-070` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Пользователь подтвердил clean build `0/0` |
+| `CONTENT-ACC-071` | Startup подтверждает `20/10/10`, `stationRecipes=9`, `sceneStations=9`, `resourceNodes=21` | `VERIFIED` | Runtime startup и F5 matrix подтверждены |
+| `CONTENT-ACC-072` | F5 подтверждает blocked/timed/isolation/crafted для всех девяти station recipes | `VERIFIED` | F5 подтвердил `crafted=9`, `isolated=9`, `roundTrip=1` |
+| `CONTENT-ACC-073` | F5 подтверждает wrong-station и duplicate-start rejection | `VERIFIED` | Покрыто F5 matrix acceptance |
+| `CONTENT-ACC-074` | F5 подтверждает autosave, exact round-trip, log, one-writer и integrity | `VERIFIED` | F5 и SQLite diagnostics завершились PASS |
+| `CONTENT-ACC-075` | F6/F7/F9/F10/F11/F12 не регрессируют после batch expansion | `VERIFIED` | F6/F7/F9/F10/F11/F12 подтверждены PASS при schema v2 |
+| `CONTENT-ACC-076` | Ручной sample новых paths и cold restart подтверждают production routing/persistence | `VERIFIED` | Runtime matrix, autosave и revision restore подтверждены пользователем |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-073`; Прототипы A–E, production persistence, salvage/repair loop, четыре content path и data-driven craft-time processing.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-081` за исключением superseded/плановых задач; Прототипы A–E, production persistence, полный Industry Content v2 и все регрессии F4–F12.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-077` | Выполнить runtime-приёмку полного crafting-каталога | Clean build `0/0`; startup `20/10/10`; `F5: PASS` для 9 station recipes; `F6/F7/F9/F10/F11/F12: PASS`; sample manual craft/autosave/cold restart |
+| 1 | `TASK-084` | Выполнить runtime-приёмку universal station selector и research persistence | Clean build `0/0`; startup `physicalStations=1/selectorRecipes=9`; `F3: PASS`; manual selector/research/craft/autosave/cold restart; затем F4–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-078` | Реализовать универсальный выбор рецепта и enforcement `RequiredTechnology` | Новая механика: одна station может выбирать несколько recipes; непустая технология блокирует недоступный recipe; data-driven acceptance без recipe-specific C# |
+| 3 | `TASK-083` | Реализовать расширенный chemical process runtime | Catalysts, byproducts, energy, temperature, pressure, vacuum, batch processing и process hazards исполняются runtime |
 
-**Подтверждено:** `TASK-060`–`TASK-073`, persistence, vertical slice, четыре content path и timed craft.  
-**Реализовано:** `TASK-074`, `TASK-076`, `CONTENT-060`–`CONTENT-066`, `CONTENT-070`–`CONTENT-079`.  
+**Подтверждено:** `TASK-060`–`TASK-074`, `TASK-076`–`TASK-081`, persistence, vertical slice, Industry Content v2 и runtime matrix.  
+**Реализовано:** `TASK-082` — universal station selector, research enforcement и technology persistence.  
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.  
-**Текущая приёмочная задача:** `TASK-077`.
+**Текущая приёмочная задача:** `TASK-084`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -2540,6 +2601,26 @@ TASK-074 fifth crafting path completion PASS: recipe=recipe.ship.power_coupler; 
 
 11. Дождаться autosave, штатно закрыть игру и запустить снова. Power coupler, consumed plasma filament, collected nodes, repaired ship, player position и revision должны восстановиться.
 12. При `FAIL` прислать полный HUD, последние 180 строк Output и указать, выполнялась ли clean сборка.
+
+## 18. Runtime-приёмка `TASK-082/TASK-084`
+
+1. Выполнить `tools\clean-build-windows10.cmd`; результат: `0` предупреждений, `0` ошибок, `CoreCompile` не пропущен.
+2. На старте получить:
+
+```text
+TASK-082 station selector binding PASS: physicalStations=1; selectorRecipes=9; researchPoints=2000; initiallyUnlocked=<N>; initiallyLocked=<M>.
+```
+
+3. Нажать `F3`; ожидаемый HUD:
+
+```text
+TASK-082 selector/research (F3): PASS recipes=9, oneStation=1, initial=<N>/<M>, unlocked=<K>, crafted=1, rp=<R>, roundTrip=1
+```
+
+4. Полный Output должен содержать `prerequisiteRejected=1`, `allRecipesUnlocked=1`, `technologyBlocked=1`, `readyAfterResearch=1`, `progressRestored=1`, `maxWriters=1`, `integrity=ok`.
+5. Вручную подойти к единственному PortableFabricator, нажать `E`, проверить список девяти recipes; `Tab/R` открыть Research; разблокировать доступную технологию; повторно открыть Recipes и изготовить связанный recipe.
+6. После autosave закрыть игру штатно и проверить восстановление RP, unlocked technology и crafted output.
+7. Повторить `F4/F5/F6/F7/F9/F10/F11/F12`.
 
 ## 17. Runtime-приёмка `TASK-076/TASK-077`
 

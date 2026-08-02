@@ -389,113 +389,11 @@ shape = SubResource("ShipShape")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.0, 0.8, -9.0)
 script = ExtResource("5_crafting_station")
 StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.launch_capacitor"
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/PortableFabricator"]
 mesh = SubResource("CraftingStationMesh")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PortableFabricator"]
-shape = SubResource("CraftingStationShape")
-
-[node name="NavigationFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.0, 0.8, -9.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.navigation_array"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/NavigationFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/NavigationFabricator"]
-shape = SubResource("CraftingStationShape")
-
-[node name="CoolantFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -5.8)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.coolant_regulator"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/CoolantFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CoolantFabricator"]
-shape = SubResource("CraftingStationShape")
-
-[node name="PowerFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 8.5)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.power_coupler"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/PowerFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PowerFabricator"]
-shape = SubResource("CraftingStationShape")
-
-
-[node name="SensorFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.0, 0.8, 16.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.sensor_lens"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/SensorFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/SensorFabricator"]
-shape = SubResource("CraftingStationShape")
-
-
-[node name="LifeSupportFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.0, 0.8, 16.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.life_support_filter"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/LifeSupportFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/LifeSupportFabricator"]
-shape = SubResource("CraftingStationShape")
-
-
-[node name="AttitudeFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.8, 16.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.attitude_coil"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AttitudeFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AttitudeFabricator"]
-shape = SubResource("CraftingStationShape")
-
-
-[node name="SealantFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.0, 0.8, 16.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.sealant_cartridge"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/SealantFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/SealantFabricator"]
-shape = SubResource("CraftingStationShape")
-
-
-[node name="HeatShieldFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.0, 0.8, 16.0)
-script = ExtResource("5_crafting_station")
-StationId = "station.portable_fabricator"
-RecipeId = "recipe.ship.heat_shield_tile"
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/HeatShieldFabricator"]
-mesh = SubResource("CraftingStationMesh")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/HeatShieldFabricator"]
 shape = SubResource("CraftingStationShape")
 
 [node name="Hud" type="CanvasLayer" parent="."]
@@ -517,6 +415,23 @@ custom_minimum_size = Vector2(1090, 590)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "VERTICAL SLICE 1 — initializing"
+autowrap_mode = 2
+
+[node name="RecipeSelector" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 255.0
+offset_top = 40.0
+offset_right = 1135.0
+offset_bottom = 625.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/RecipeSelector"]
+mouse_filter = 2
+custom_minimum_size = Vector2(840, 545)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "INDUSTRY TERMINAL"
 autowrap_mode = 2
 
 [node name="HiddenHint" type="PanelContainer" parent="Hud"]

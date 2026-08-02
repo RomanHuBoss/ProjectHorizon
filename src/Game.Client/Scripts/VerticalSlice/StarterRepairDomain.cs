@@ -21,7 +21,8 @@ public enum StationCraftResult
     WrongStation = 3,
     RecipeUnavailable = 4,
     ShipNotRepaired = 5,
-    Ready = 6
+    Ready = 6,
+    TechnologyLocked = 7
 }
 
 public sealed record ResourceNodeBinding(
@@ -66,6 +67,7 @@ public sealed class StarterRepairSession
     private readonly Dictionary<string, CraftingRecipeDefinition> _stationRecipes =
         new(StringComparer.Ordinal);
     private readonly CraftingRecipeDefinition? _secondaryRecipe;
+    private readonly Func<string, bool> _isTechnologyUnlocked;
     private readonly Dictionary<string, int> _craftedInventory =
         new(StringComparer.Ordinal);
     private IReadOnlyList<CraftingStackDefinition> _lastCraftedOutputs =
@@ -74,8 +76,20 @@ public sealed class StarterRepairSession
     public StarterRepairSession(
         CraftingRecipeDefinition repairRecipe,
         params CraftingRecipeDefinition[] stationRecipes)
+        : this(
+            repairRecipe,
+            static _ => true,
+            stationRecipes)
+    {
+    }
+
+    public StarterRepairSession(
+        CraftingRecipeDefinition repairRecipe,
+        Func<string, bool> isTechnologyUnlocked,
+        params CraftingRecipeDefinition[] stationRecipes)
     {
         ArgumentNullException.ThrowIfNull(repairRecipe);
+        ArgumentNullException.ThrowIfNull(isTechnologyUnlocked);
         ArgumentNullException.ThrowIfNull(stationRecipes);
         if (repairRecipe.Inputs.Count == 0)
         {
@@ -120,6 +134,7 @@ public sealed class StarterRepairSession
 
         _repairRecipe = repairRecipe;
         _secondaryRecipe = stationRecipes.FirstOrDefault();
+        _isTechnologyUnlocked = isTechnologyUnlocked;
     }
 
     public CraftingRecipeDefinition RepairRecipe => _repairRecipe;
@@ -281,6 +296,13 @@ public sealed class StarterRepairSession
             return StationCraftResult.WrongStation;
         }
 
+        if (!_isTechnologyUnlocked(recipe.RequiredTechnology))
+        {
+            result = $"recipe {recipe.RecipeId} requires technology " +
+                recipe.RequiredTechnology;
+            return StationCraftResult.TechnologyLocked;
+        }
+
         if (HasRecipeOutputs(recipe))
         {
             result = $"recipe {recipe.RecipeId} already crafted";
@@ -391,10 +413,29 @@ public sealed class StarterRepairSession
         CraftingRecipeDefinition repairRecipe,
         params CraftingRecipeDefinition[] stationRecipes)
     {
+        return FromSnapshot(
+            snapshot,
+            resourceBindings,
+            repairRecipe,
+            static _ => true,
+            stationRecipes);
+    }
+
+    public static StarterRepairSession FromSnapshot(
+        SaveGameSnapshot? snapshot,
+        IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
+        CraftingRecipeDefinition repairRecipe,
+        Func<string, bool> isTechnologyUnlocked,
+        params CraftingRecipeDefinition[] stationRecipes)
+    {
         ArgumentNullException.ThrowIfNull(resourceBindings);
         ArgumentNullException.ThrowIfNull(repairRecipe);
+        ArgumentNullException.ThrowIfNull(isTechnologyUnlocked);
         ArgumentNullException.ThrowIfNull(stationRecipes);
-        StarterRepairSession session = new(repairRecipe, stationRecipes);
+        StarterRepairSession session = new(
+            repairRecipe,
+            isTechnologyUnlocked,
+            stationRecipes);
         if (snapshot is null)
         {
             return session;
@@ -585,7 +626,8 @@ public static class StarterRepairSnapshotFactory
         StarterRepairSession session,
         double playerPositionX,
         double playerPositionY,
-        double playerPositionZ)
+        double playerPositionZ,
+        TechnologyProgressSaveData? technologyProgress = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -644,7 +686,8 @@ public static class StarterRepairSnapshotFactory
                 PlanetId,
                 SystemId,
                 updatedUtc,
-                1));
+                1),
+            technologyProgress);
     }
 }
 

@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2 и vertical slice — `IMPLEMENTED`
+### Industry Content v2, universal station selector и research — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes, но отдельно описывает и структурно валидирует полный производственный контент. Остальные 118 recipes не создают по одной физической станции в тестовой сцене: они предназначены для следующего универсального UI выбора рецепта, технологических требований и расширенного chemical runtime.
+Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Остальные 118 recipes остаются описанным контентом для последующего расширенного chemical runtime.
 
 В состав v2 входят:
 
@@ -98,8 +98,13 @@ src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 
 ```text
 WASD / Space   движение и прыжок
-E              собрать ресурс / ремонтировать / запустить рецепт станции
+E              собрать ресурс / ремонтировать / открыть станцию / подтвердить выбор
+Up / Down      выбрать рецепт или технологию в station UI
+Tab / R        переключить Recipes / Research
+Enter / E      изготовить выбранный рецепт или разблокировать технологию
+Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
+F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
 F5             TASK-076: playable runtime matrix (10 recipes)
 F6             регрессия coolant path
@@ -109,7 +114,13 @@ F9             регрессия strict JSON catalog
 F10            регрессия launch-capacitor persistence
 F11            регрессия craft-time state machine
 F12            регрессия navigation path
-Esc            освободить курсор
+```
+
+
+Ожидаемый `F3` HUD:
+
+```text
+TASK-082 selector/research (F3): PASS recipes=9, oneStation=1, initial=4/5, unlocked=9, crafted=1, rp=690, roundTrip=1
 ```
 
 Ожидаемый `F4` HUD:
@@ -118,7 +129,9 @@ Esc            освободить курсор
 TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0
 ```
 
-`F5` продолжает прогонять девять физически представленных station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
+`F3` прогоняет универсальный station selector и research graph: девять рецептов на одной физической станции, блокировку по технологиям, порядок prerequisites, расход RP, изготовление выбранного рецепта и точный SQLite round-trip прогресса исследований.
+
+`F5` продолжает прогонять девять runtime station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 

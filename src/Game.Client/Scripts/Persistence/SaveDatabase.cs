@@ -381,6 +381,34 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        TechnologyProgressSaveData? expectedProgress =
+            expected.TechnologyProgress;
+        TechnologyProgressSaveData? actualProgress =
+            actual.TechnologyProgress;
+        if ((expectedProgress is null) != (actualProgress is null))
+        {
+            mismatch = "technology_progress presence differs";
+            return false;
+        }
+
+        if (expectedProgress is not null && actualProgress is not null)
+        {
+            string[] expectedUnlocked = expectedProgress.UnlockedTechnologyIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+            string[] actualUnlocked = actualProgress.UnlockedTechnologyIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+            if (expectedProgress.ResearchPoints != actualProgress.ResearchPoints ||
+                !expectedUnlocked.SequenceEqual(
+                    actualUnlocked,
+                    StringComparer.Ordinal))
+            {
+                mismatch = "technology_progress differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -790,6 +818,33 @@ public sealed partial class SaveDatabase : IDisposable
         ExecuteNonQuery(
             connection,
             transaction,
+            "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
+            "setting_key IN ('research_points', 'unlocked_technologies');",
+            ("$slot_id", snapshot.SlotId));
+        if (snapshot.TechnologyProgress is not null)
+        {
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'research_points', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", snapshot.TechnologyProgress.ResearchPoints
+                    .ToString(CultureInfo.InvariantCulture)));
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'unlocked_technologies', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", string.Join(",",
+                    snapshot.TechnologyProgress.UnlockedTechnologyIds
+                        .OrderBy(id => id, StringComparer.Ordinal))));
+        }
+
+        ExecuteNonQuery(
+            connection,
+            transaction,
             "DELETE FROM ships WHERE slot_id = $slot_id;",
             ("$slot_id", snapshot.SlotId));
         ExecuteNonQuery(
@@ -994,6 +1049,52 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        TechnologyProgressSaveData? technologyProgress = null;
+        Dictionary<string, string> progressSettings = new(
+            StringComparer.Ordinal);
+        using (SqliteCommand command = connection.CreateCommand())
+        {
+            command.CommandText =
+                "SELECT setting_key, setting_value FROM save_settings " +
+                "WHERE slot_id = $slot_id AND setting_key IN " +
+                "('research_points', 'unlocked_technologies') " +
+                "ORDER BY setting_key;";
+            command.Parameters.AddWithValue("$slot_id", slotId);
+            using SqliteDataReader reader = command.ExecuteReader();
+            while (reader.Read())
+            {
+                progressSettings[reader.GetString(0)] = reader.GetString(1);
+            }
+        }
+
+        if (progressSettings.Count > 0)
+        {
+            int researchPoints = progressSettings.TryGetValue(
+                    "research_points",
+                    out string? researchText) &&
+                int.TryParse(
+                    researchText,
+                    NumberStyles.Integer,
+                    CultureInfo.InvariantCulture,
+                    out int parsedResearch)
+                ? Math.Max(0, parsedResearch)
+                : 0;
+            string[] unlocked = progressSettings.TryGetValue(
+                    "unlocked_technologies",
+                    out string? unlockedText)
+                ? unlockedText.Split(
+                    ',',
+                    StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(id => id, StringComparer.Ordinal)
+                    .ToArray()
+                : Array.Empty<string>();
+            technologyProgress = new TechnologyProgressSaveData(
+                researchPoints,
+                unlocked);
+        }
+
         VisitedPlanetSaveData visitedPlanet;
         using (SqliteCommand command = connection.CreateCommand())
         {
@@ -1024,7 +1125,8 @@ public sealed partial class SaveDatabase : IDisposable
             player,
             ship,
             inventory,
-            visitedPlanet);
+            visitedPlanet,
+            technologyProgress);
     }
 
     private SaveDatabaseDiagnostics ReadDiagnosticsCore(

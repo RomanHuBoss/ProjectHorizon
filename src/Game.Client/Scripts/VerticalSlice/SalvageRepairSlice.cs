@@ -26,6 +26,12 @@ public enum SalvageRepairHudMode
     Hidden = 2
 }
 
+public enum StationSelectorMode
+{
+    Recipes = 0,
+    Research = 1
+}
+
 public partial class SalvageRepairSlice : Node3D
 {
     private sealed record GracefulExitResult(
@@ -33,6 +39,8 @@ public partial class SalvageRepairSlice : Node3D
         int Revision);
 
     private const string SlotId = StarterRepairSnapshotFactory.SlotId;
+    private const int DefaultResearchPoints =
+        TechnologyRecipeSelectorAcceptanceRunner.DefaultResearchPoints;
 
     [Export(PropertyHint.Range, "5.0,600.0,5.0")]
     public double AutosaveIntervalSeconds { get; set; } = 60.0;
@@ -46,6 +54,7 @@ public partial class SalvageRepairSlice : Node3D
     private SaveDatabase? _database;
     private SaveAutosaveCoordinator? _autosave;
     private GameContentCatalog? _contentCatalog;
+    private TechnologyProgression? _technologyProgression;
     private CraftingRecipeDefinition? _repairRecipe;
     private CraftingRecipeDefinition? _launchCapacitorRecipe;
     private CraftingRecipeDefinition? _navigationArrayRecipe;
@@ -58,6 +67,8 @@ public partial class SalvageRepairSlice : Node3D
     private MarginContainer? _hudMargin;
     private Label? _hudLabel;
     private PanelContainer? _hudHiddenHint;
+    private PanelContainer? _recipeSelectorPanel;
+    private Label? _recipeSelectorLabel;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
@@ -68,6 +79,8 @@ public partial class SalvageRepairSlice : Node3D
     private Task<ThirdCraftingPathAcceptanceReport>? _thirdCraftingAcceptanceTask;
     private Task<FourthCraftingPathAcceptanceReport>? _fourthCraftingAcceptanceTask;
     private Task<CatalogCraftingMatrixAcceptanceReport>? _catalogMatrixAcceptanceTask;
+    private Task<TechnologyRecipeSelectorAcceptanceReport>?
+        _technologySelectorAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -77,6 +90,8 @@ public partial class SalvageRepairSlice : Node3D
     private ThirdCraftingPathAcceptanceReport? _thirdCraftingAcceptanceReport;
     private FourthCraftingPathAcceptanceReport? _fourthCraftingAcceptanceReport;
     private CatalogCraftingMatrixAcceptanceReport? _catalogMatrixAcceptanceReport;
+    private TechnologyRecipeSelectorAcceptanceReport?
+        _technologySelectorAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -96,6 +111,13 @@ public partial class SalvageRepairSlice : Node3D
     private string _fourthCraftingAcceptanceHud = "READY";
     private string _catalogMatrixAcceptanceHud = "READY";
     private string _industryCatalogAcceptanceHud = "READY";
+    private string _technologySelectorAcceptanceHud = "READY";
+    private PortableCraftingStation? _selectorStation;
+    private Node3D? _selectorInteractor;
+    private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
+    private int _selectorIndex;
+    private string _selectorFeedback = "";
+    private ulong _selectorOpenedTicks;
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -104,6 +126,11 @@ public partial class SalvageRepairSlice : Node3D
 
     private GameContentCatalog ContentCatalog => _contentCatalog ??
         throw new InvalidOperationException("Game content catalog is unavailable.");
+
+    private TechnologyProgression TechnologyProgress =>
+        _technologyProgression ??
+        throw new InvalidOperationException(
+            "Technology progression is unavailable.");
 
     private CraftingRecipeDefinition RepairRecipe => _repairRecipe ??
         throw new InvalidOperationException("Starter repair recipe is unavailable.");
@@ -141,11 +168,16 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/MarginContainer/PanelContainer/Label");
         _hudHiddenHint = GetNodeOrNull<PanelContainer>(
             "Hud/HiddenHint");
+        _recipeSelectorPanel = GetNodeOrNull<PanelContainer>(
+            "Hud/RecipeSelector");
+        _recipeSelectorLabel = GetNodeOrNull<Label>(
+            "Hud/RecipeSelector/Label");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
             "Gameplay/DamagedShip");
         _player = GetNodeOrNull<PlayerController>("Player");
         if (_hudMargin is null || _hudLabel is null ||
-            _hudHiddenHint is null || _shipTerminal is null ||
+            _hudHiddenHint is null || _recipeSelectorPanel is null ||
+            _recipeSelectorLabel is null || _shipTerminal is null ||
             _player is null)
         {
             throw new InvalidOperationException(
@@ -188,7 +220,11 @@ public partial class SalvageRepairSlice : Node3D
             VerticalSliceContentIds.CoolantRegulatorRecipeId);
         CraftingRecipeDefinition powerCouplerRecipe = catalog.GetRecipe(
             VerticalSliceContentIds.PowerCouplerRecipeId);
+        TechnologyProgression technologyProgression = new(
+            catalog.Technologies,
+            DefaultResearchPoints);
         _contentCatalog = catalog;
+        _technologyProgression = technologyProgression;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
         _navigationArrayRecipe = navigationArrayRecipe;
@@ -196,6 +232,7 @@ public partial class SalvageRepairSlice : Node3D
         _powerCouplerRecipe = powerCouplerRecipe;
         _session = new StarterRepairSession(
             repairRecipe,
+            technologyProgression.IsUnlocked,
             stationRecipes);
 
         foreach (Node node in GetTree().GetNodesInGroup(
@@ -222,10 +259,19 @@ public partial class SalvageRepairSlice : Node3D
                 right.ResourceNodeId,
                 StringComparison.Ordinal));
         _craftingStations.Sort(
-            (left, right) => string.Compare(
-                left.RecipeId,
-                right.RecipeId,
-                StringComparison.Ordinal));
+            (left, right) =>
+            {
+                int stationComparison = string.Compare(
+                    left.StationId,
+                    right.StationId,
+                    StringComparison.Ordinal);
+                return stationComparison != 0
+                    ? stationComparison
+                    : string.Compare(
+                        left.Name.ToString(),
+                        right.Name.ToString(),
+                        StringComparison.Ordinal);
+            });
         ValidateResourceNodeBindings();
 
         string userDirectory = ProjectSettings.GlobalizePath("user://");
@@ -257,9 +303,10 @@ public partial class SalvageRepairSlice : Node3D
             $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
             $"stationRecipes={StationRecipes.Count}; " +
             $"craftTimes={craftTimes}s. " +
-            "Press F4 for the complete Industry Content v2 structural " +
-            "acceptance, F5 for the playable runtime matrix, " +
-            "F6/F7/F9/F10/F11/F12 for regressions or F8 to reset.");
+            "Press F3 for selector/research acceptance, F4 for the " +
+            "complete Industry Content v2 structural acceptance, F5 for " +
+            "the playable runtime matrix, F6/F7/F9/F10/F11/F12 for " +
+            "regressions or F8 to reset.");
     }
 
     public override void _Notification(int what)
@@ -293,6 +340,7 @@ public partial class SalvageRepairSlice : Node3D
         PollThirdCraftingAcceptanceTask();
         PollFourthCraftingAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
+        PollTechnologySelectorAcceptanceTask();
         UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
@@ -312,6 +360,36 @@ public partial class SalvageRepairSlice : Node3D
 
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
+        if (_selectorStation is not null)
+        {
+            if (Matches(physical, logical, Key.Escape))
+            {
+                CloseRecipeSelector("recipe selector closed");
+            }
+            else if (Matches(physical, logical, Key.Up))
+            {
+                MoveSelector(-1);
+            }
+            else if (Matches(physical, logical, Key.Down))
+            {
+                MoveSelector(1);
+            }
+            else if (Matches(physical, logical, Key.Tab) ||
+                     Matches(physical, logical, Key.R))
+            {
+                ToggleSelectorMode();
+            }
+            else if (Matches(physical, logical, Key.Enter) ||
+                     (Matches(physical, logical, Key.E) &&
+                      Time.GetTicksMsec() > _selectorOpenedTicks + 120))
+            {
+                ConfirmSelectorSelection();
+            }
+
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (Matches(physical, logical, Key.H))
         {
             _hudMode = (SalvageRepairHudMode)(((int)_hudMode + 1) % 3);
@@ -321,7 +399,12 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        if (Matches(physical, logical, Key.F4) && CanStartCommand())
+        if (Matches(physical, logical, Key.F3) && CanStartCommand())
+        {
+            BeginTechnologySelectorAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F4) && CanStartCommand())
         {
             RunIndustryCatalogAcceptance();
             GetViewport().SetInputAsHandled();
@@ -366,6 +449,325 @@ public partial class SalvageRepairSlice : Node3D
             BeginThirdCraftingAcceptance();
             GetViewport().SetInputAsHandled();
         }
+    }
+
+    public void OpenRecipeSelector(
+        PortableCraftingStation station,
+        Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(station);
+        ArgumentNullException.ThrowIfNull(interactor);
+        if (_state != SalvageRepairSliceState.Ready &&
+            _state != SalvageRepairSliceState.Passed)
+        {
+            _status = "wait until the current persistence operation completes";
+            return;
+        }
+
+        if (_craftTimer.IsRunning)
+        {
+            _status = $"recipe {_craftTimer.RecipeId} is already processing";
+            return;
+        }
+
+        IReadOnlyList<CraftingRecipeDefinition> recipes =
+            GetSelectorRecipes(station.StationId);
+        if (recipes.Count == 0)
+        {
+            _status = $"station {station.StationId} has no runtime recipes";
+            return;
+        }
+
+        bool sameOpenStation = ReferenceEquals(_selectorStation, station);
+        _selectorStation = station;
+        _selectorInteractor = interactor;
+        if (!sameOpenStation)
+        {
+            _selectorMode = StationSelectorMode.Recipes;
+            _selectorIndex = 0;
+            _selectorFeedback = "";
+        }
+
+        if (!sameOpenStation)
+        {
+            _selectorOpenedTicks = Time.GetTicksMsec();
+        }
+
+        if (_recipeSelectorPanel is not null)
+        {
+            _recipeSelectorPanel.Visible = true;
+        }
+
+        UpdateRecipeSelector();
+        _status = $"recipe selector opened: {recipes.Count} recipes at " +
+            station.Name;
+    }
+
+    private void CloseRecipeSelector(string status = "")
+    {
+        _selectorStation = null;
+        _selectorInteractor = null;
+        _selectorIndex = 0;
+        _selectorFeedback = "";
+        if (_recipeSelectorPanel is not null)
+        {
+            _recipeSelectorPanel.Visible = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            _status = status;
+        }
+    }
+
+    private IReadOnlyList<CraftingRecipeDefinition> GetSelectorRecipes(
+        string stationId)
+    {
+        StationRecipeSelectorModel selector = new(
+            ContentCatalog,
+            Session,
+            TechnologyProgress);
+        return selector.GetRecipes(stationId);
+    }
+
+    private IReadOnlyList<StationRecipeSelectorEntry>
+        GetSelectorRecipeEntries(string stationId)
+    {
+        StationRecipeSelectorModel selector = new(
+            ContentCatalog,
+            Session,
+            TechnologyProgress);
+        return selector.GetRecipeEntries(stationId);
+    }
+
+    private IReadOnlyList<TechnologyDefinition> GetSelectorTechnologies(
+        string stationId)
+    {
+        StationRecipeSelectorModel selector = new(
+            ContentCatalog,
+            Session,
+            TechnologyProgress);
+        return selector.GetResearchEntries(stationId);
+    }
+
+    private void MoveSelector(int delta)
+    {
+        PortableCraftingStation? station = _selectorStation;
+        if (station is null)
+        {
+            return;
+        }
+
+        int count = _selectorMode == StationSelectorMode.Recipes
+            ? GetSelectorRecipes(station.StationId).Count
+            : GetSelectorTechnologies(station.StationId).Count;
+        if (count == 0)
+        {
+            _selectorIndex = 0;
+            return;
+        }
+
+        _selectorIndex = (_selectorIndex + delta) % count;
+        if (_selectorIndex < 0)
+        {
+            _selectorIndex += count;
+        }
+
+        _selectorFeedback = "";
+        UpdateRecipeSelector();
+    }
+
+    private void ToggleSelectorMode()
+    {
+        if (_selectorStation is null)
+        {
+            return;
+        }
+
+        _selectorMode = _selectorMode == StationSelectorMode.Recipes
+            ? StationSelectorMode.Research
+            : StationSelectorMode.Recipes;
+        _selectorIndex = 0;
+        _selectorFeedback = "";
+        UpdateRecipeSelector();
+    }
+
+    private void ConfirmSelectorSelection()
+    {
+        PortableCraftingStation? station = _selectorStation;
+        Node3D? interactor = _selectorInteractor;
+        if (station is null || interactor is null)
+        {
+            return;
+        }
+
+        if (_selectorMode == StationSelectorMode.Research)
+        {
+            IReadOnlyList<TechnologyDefinition> technologies =
+                GetSelectorTechnologies(station.StationId);
+            if (technologies.Count == 0)
+            {
+                _selectorFeedback = "No relevant technologies.";
+                UpdateRecipeSelector();
+                return;
+            }
+
+            TechnologyDefinition technology =
+                technologies[Math.Clamp(_selectorIndex, 0, technologies.Count - 1)];
+            TechnologyUnlockResult unlockResult = TechnologyProgress.TryUnlock(
+                technology.TechnologyId,
+                out string result);
+            _selectorFeedback = result;
+            _status = result;
+            if (unlockResult == TechnologyUnlockResult.Unlocked)
+            {
+                _lastDomainEvent =
+                    $"TechnologyUnlocked({technology.TechnologyId})";
+                GD.Print(
+                    "TASK-082 technology unlocked: " +
+                    $"technology={technology.TechnologyId}; " +
+                    $"tier={technology.Tier}; cost={technology.ResearchCost}; " +
+                    $"remaining={TechnologyProgress.ResearchPoints}.");
+                QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+                CloseRecipeSelector(result);
+                return;
+            }
+
+            UpdateRecipeSelector();
+            return;
+        }
+
+        IReadOnlyList<StationRecipeSelectorEntry> entries =
+            GetSelectorRecipeEntries(station.StationId);
+        if (entries.Count == 0)
+        {
+            _selectorFeedback = "No runtime recipes.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        StationRecipeSelectorEntry entry =
+            entries[Math.Clamp(_selectorIndex, 0, entries.Count - 1)];
+        if (entry.Crafted)
+        {
+            _selectorFeedback =
+                $"Recipe {entry.Recipe.RecipeId} is already completed.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!entry.TechnologyUnlocked)
+        {
+            _selectorFeedback =
+                $"LOCKED: research {entry.Recipe.RequiredTechnology}.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!entry.InputsAvailable)
+        {
+            _selectorFeedback =
+                $"Missing {entry.MissingInputQuantity} input unit(s).";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        string recipeId = entry.Recipe.RecipeId;
+        string stationId = station.StationId;
+        CloseRecipeSelector();
+        TryCraftAtStation(
+            station,
+            recipeId,
+            stationId,
+            interactor);
+    }
+
+    private void UpdateRecipeSelector()
+    {
+        PortableCraftingStation? station = _selectorStation;
+        if (_recipeSelectorLabel is null || station is null)
+        {
+            return;
+        }
+
+        string stationId = station.StationId;
+        List<string> lines = new()
+        {
+            $"INDUSTRY TERMINAL - {station.Name}",
+            $"Station: {stationId}",
+            $"Mode: {_selectorMode} | RP: {TechnologyProgress.ResearchPoints} | " +
+            $"Unlocked: {TechnologyProgress.UnlockedCount}/{ContentCatalog.Technologies.Count}",
+            ""
+        };
+
+        if (_selectorMode == StationSelectorMode.Recipes)
+        {
+            IReadOnlyList<StationRecipeSelectorEntry> entries =
+                GetSelectorRecipeEntries(stationId);
+            for (int index = 0; index < entries.Count; index++)
+            {
+                StationRecipeSelectorEntry entry = entries[index];
+                CraftingRecipeDefinition recipe = entry.Recipe;
+                string status = entry.Crafted
+                    ? "DONE"
+                    : !entry.TechnologyUnlocked
+                        ? $"LOCKED {recipe.RequiredTechnology}"
+                        : !entry.InputsAvailable
+                            ? $"MISSING {entry.MissingInputQuantity}"
+                            : "READY";
+                string inputs = string.Join(
+                    " + ",
+                    recipe.Inputs.Select(input =>
+                        $"{Session.GetAvailableQuantity(input.DefinitionId)}/" +
+                        $"{input.Quantity} {GetShortContentId(input.DefinitionId)}"));
+                string outputs = string.Join(
+                    " + ",
+                    recipe.Outputs.Select(output =>
+                        $"{output.Quantity} {GetShortContentId(output.DefinitionId)}"));
+                string cursor = index == _selectorIndex ? ">" : " ";
+                lines.Add(
+                    $"{cursor} [{status}] {GetShortContentId(recipe.RecipeId)} " +
+                    $"T{recipe.TechnologyTier} {recipe.CraftTimeSeconds:0.##}s");
+                lines.Add($"    {inputs} -> {outputs}");
+            }
+        }
+        else
+        {
+            IReadOnlyList<TechnologyDefinition> technologies =
+                GetSelectorTechnologies(stationId);
+            for (int index = 0; index < technologies.Count; index++)
+            {
+                TechnologyDefinition technology = technologies[index];
+                IReadOnlyList<string> missing =
+                    TechnologyProgress.GetMissingPrerequisites(
+                        technology.TechnologyId);
+                string status = TechnologyProgress.IsUnlocked(
+                    technology.TechnologyId)
+                    ? "UNLOCKED"
+                    : missing.Count > 0
+                        ? $"LOCKED requires {string.Join(",", missing)}"
+                        : TechnologyProgress.ResearchPoints >=
+                            technology.ResearchCost
+                            ? $"AVAILABLE {technology.ResearchCost} RP"
+                            : $"NEED {technology.ResearchCost} RP";
+                string cursor = index == _selectorIndex ? ">" : " ";
+                lines.Add(
+                    $"{cursor} [{status}] {technology.TechnologyId} " +
+                    $"(tier {technology.Tier})");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_selectorFeedback))
+        {
+            lines.Add("");
+            lines.Add($"Result: {_selectorFeedback}");
+        }
+
+        lines.Add("");
+        lines.Add(
+            "Up/Down - select | Tab/R - Recipes/Research | " +
+            "Enter/E - confirm | Esc - close");
+        _recipeSelectorLabel.Text = string.Join("\n", lines);
     }
 
     public bool TryCollectResource(
@@ -605,7 +1007,16 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        source.SetCrafted(true);
+        CraftingRecipeDefinition[] sourceRecipes = StationRecipes
+            .Where(candidate => string.Equals(
+                candidate.RequiredStation,
+                source.StationId,
+                StringComparison.Ordinal))
+            .ToArray();
+        source.SetCrafted(
+            sourceRecipes.Length > 0 &&
+            sourceRecipes.All(candidate =>
+                Session.IsRecipeCrafted(candidate.RecipeId)));
         _lastDomainEvent = BuildCraftEventName(
             recipeId,
             "Crafted");
@@ -704,42 +1115,53 @@ public partial class SalvageRepairSlice : Node3D
                 "Vertical slice has no crafting stations.");
         }
 
-        Dictionary<string, PortableCraftingStation> stationByRecipe = new(
-            StringComparer.Ordinal);
-        foreach (PortableCraftingStation station in _craftingStations)
+        CraftingRecipeDefinition[] stationRecipes = StationRecipes.ToArray();
+        string[] requiredStationIds = stationRecipes
+            .Select(recipe => recipe.RequiredStation)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        foreach (string stationId in requiredStationIds)
         {
-            if (!stationByRecipe.TryAdd(station.RecipeId, station))
+            int physicalCount = _craftingStations.Count(station =>
+                string.Equals(
+                    station.StationId,
+                    stationId,
+                    StringComparison.Ordinal));
+            if (physicalCount != 1)
             {
                 throw new InvalidOperationException(
-                    $"Duplicate crafting station recipe binding {station.RecipeId}.");
+                    $"Station {stationId} requires exactly one physical " +
+                    $"selector terminal, but scene provides {physicalCount}.");
             }
         }
 
-        CraftingRecipeDefinition[] stationRecipes =
-            StationRecipes.ToArray();
-        foreach (CraftingRecipeDefinition recipe in stationRecipes)
+        foreach (PortableCraftingStation station in _craftingStations)
         {
-            if (!stationByRecipe.TryGetValue(
-                recipe.RecipeId,
-                out PortableCraftingStation? station) ||
-                station is null ||
-                !string.Equals(
-                    station.StationId,
-                    recipe.RequiredStation,
-                    StringComparison.Ordinal))
+            if (!ContentCatalog.Stations.ContainsKey(station.StationId))
             {
                 throw new InvalidOperationException(
-                    $"Recipe {recipe.RecipeId} requires station " +
-                    $"{recipe.RequiredStation}, but the matching scene " +
-                    "station is missing or misconfigured.");
+                    $"Scene station {station.Name} references unknown " +
+                    $"{station.StationId}.");
             }
+        }
 
+        foreach (CraftingRecipeDefinition recipe in stationRecipes)
+        {
             if (!double.IsFinite(recipe.CraftTimeSeconds) ||
                 recipe.CraftTimeSeconds <= 0.0)
             {
                 throw new InvalidOperationException(
                     $"Recipe {recipe.RecipeId} must define a positive " +
                     "CraftTimeSeconds value.");
+            }
+
+            if (!ContentCatalog.Technologies.ContainsKey(
+                    recipe.RequiredTechnology))
+            {
+                throw new InvalidOperationException(
+                    $"Recipe {recipe.RecipeId} references unknown technology " +
+                    $"{recipe.RequiredTechnology}.");
             }
         }
 
@@ -753,10 +1175,8 @@ public partial class SalvageRepairSlice : Node3D
             .Select(node => node.ResourceNodeId)
             .OrderBy(id => id, StringComparer.Ordinal)
             .ToArray();
-        bool unique = actualIds
-            .Distinct(StringComparer.Ordinal)
-            .Count() == actualIds.Length;
-        if (!unique)
+        if (actualIds.Distinct(StringComparer.Ordinal).Count() !=
+            actualIds.Length)
         {
             throw new InvalidOperationException(
                 "Vertical-slice ResourceNodeId bindings contain duplicates: " +
@@ -770,12 +1190,11 @@ public partial class SalvageRepairSlice : Node3D
             GameResourceDefinition definition =
                 ContentCatalog.GetResource(node.ResourceDefinitionId);
             node.ConfigureDefinition(definition);
-            int quantity = node.Quantity;
             availableByDefinition.TryGetValue(
                 definition.ItemDefinitionId,
                 out int current);
             availableByDefinition[definition.ItemDefinitionId] =
-                current + quantity;
+                current + node.Quantity;
         }
 
         foreach (CraftingRecipeDefinition recipe in
@@ -803,7 +1222,8 @@ public partial class SalvageRepairSlice : Node3D
             : 0;
         string[] repairResourceIds = _resourceNodes
             .Where(node => string.Equals(
-                ContentCatalog.GetResource(node.ResourceDefinitionId).ItemDefinitionId,
+                ContentCatalog.GetResource(node.ResourceDefinitionId)
+                    .ItemDefinitionId,
                 Session.SalvageDefinitionId,
                 StringComparison.Ordinal))
             .Select(node => node.ResourceNodeId)
@@ -824,74 +1244,21 @@ public partial class SalvageRepairSlice : Node3D
             $"recipes={ContentCatalog.Recipes.Count}; " +
             $"station={RepairRecipe.RequiredStation}.");
 
-        CraftingStackDefinition launchInput = LaunchCapacitorRecipe.Inputs[0];
-        availableByDefinition.TryGetValue(
-            launchInput.DefinitionId,
-            out int launchAvailable);
-        GD.Print(
-            "TASK-066 crafting binding PASS: " +
-            $"recipe={LaunchCapacitorRecipe.RecipeId}; " +
-            $"resource={launchInput.DefinitionId}; " +
-            $"required={launchInput.Quantity}; " +
-            $"available={launchAvailable}; " +
-            $"station={LaunchCapacitorRecipe.RequiredStation}; " +
-            $"craftTime={LaunchCapacitorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
-            $"items={ContentCatalog.Items.Count}; " +
-            $"resources={ContentCatalog.Resources.Count}; " +
-            $"recipes={ContentCatalog.Recipes.Count}.");
-        GD.Print(
-            "TASK-068 craft-time binding PASS: " +
-            $"recipe={LaunchCapacitorRecipe.RecipeId}; " +
-            $"duration={LaunchCapacitorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
-            $"station={LaunchCapacitorRecipe.RequiredStation}; timer=DataDrivenCraftTimer.");
+        foreach (CraftingRecipeDefinition recipe in stationRecipes)
+        {
+            CraftingStackDefinition input = recipe.Inputs[0];
+            availableByDefinition.TryGetValue(
+                input.DefinitionId,
+                out int available);
+            GD.Print(
+                $"{GetCraftTaskId(recipe.RecipeId)} crafting binding PASS: " +
+                $"recipe={recipe.RecipeId}; resource={input.DefinitionId}; " +
+                $"required={input.Quantity}; available={available}; " +
+                $"station={recipe.RequiredStation}; " +
+                $"technology={recipe.RequiredTechnology}; " +
+                $"craftTime={recipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}.");
+        }
 
-        CraftingStackDefinition navigationInput = NavigationArrayRecipe.Inputs[0];
-        availableByDefinition.TryGetValue(
-            navigationInput.DefinitionId,
-            out int navigationAvailable);
-        GD.Print(
-            "TASK-070 third crafting path binding PASS: " +
-            $"recipe={NavigationArrayRecipe.RecipeId}; " +
-            $"resource={navigationInput.DefinitionId}; " +
-            $"required={navigationInput.Quantity}; " +
-            $"available={navigationAvailable}; " +
-            $"station={NavigationArrayRecipe.RequiredStation}; " +
-            $"craftTime={NavigationArrayRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
-            $"items={ContentCatalog.Items.Count}; " +
-            $"resources={ContentCatalog.Resources.Count}; " +
-            $"recipes={ContentCatalog.Recipes.Count}; stations={_craftingStations.Count}.");
-
-        CraftingStackDefinition coolantInput = CoolantRegulatorRecipe.Inputs[0];
-        availableByDefinition.TryGetValue(
-            coolantInput.DefinitionId,
-            out int coolantAvailable);
-        GD.Print(
-            "TASK-072 fourth crafting path binding PASS: " +
-            $"recipe={CoolantRegulatorRecipe.RecipeId}; " +
-            $"resource={coolantInput.DefinitionId}; " +
-            $"required={coolantInput.Quantity}; " +
-            $"available={coolantAvailable}; " +
-            $"station={CoolantRegulatorRecipe.RequiredStation}; " +
-            $"craftTime={CoolantRegulatorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
-            $"items={ContentCatalog.Items.Count}; " +
-            $"resources={ContentCatalog.Resources.Count}; " +
-            $"recipes={ContentCatalog.Recipes.Count}; stations={_craftingStations.Count}.");
-
-        CraftingStackDefinition powerInput = PowerCouplerRecipe.Inputs[0];
-        availableByDefinition.TryGetValue(
-            powerInput.DefinitionId,
-            out int powerAvailable);
-        GD.Print(
-            "TASK-074 fifth crafting path binding PASS: " +
-            $"recipe={PowerCouplerRecipe.RecipeId}; " +
-            $"resource={powerInput.DefinitionId}; " +
-            $"required={powerInput.Quantity}; " +
-            $"available={powerAvailable}; " +
-            $"station={PowerCouplerRecipe.RequiredStation}; " +
-            $"craftTime={PowerCouplerRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
-            $"items={ContentCatalog.Items.Count}; " +
-            $"resources={ContentCatalog.Resources.Count}; " +
-            $"recipes={ContentCatalog.Recipes.Count}; stations={_craftingStations.Count}.");
         GD.Print(
             "TASK-076 crafting catalog binding PASS: " +
             $"items={ContentCatalog.Items.Count}; " +
@@ -903,6 +1270,13 @@ public partial class SalvageRepairSlice : Node3D
             $"sceneStations={_craftingStations.Count}; " +
             $"resourceNodes={_resourceNodes.Count}; " +
             "allInputsCovered=1; allCraftTimesPositive=1.");
+        GD.Print(
+            "TASK-082 station selector binding PASS: " +
+            $"physicalStations={_craftingStations.Count}; " +
+            $"selectorRecipes={stationRecipes.Length}; " +
+            $"researchPoints={TechnologyProgress.ResearchPoints}; " +
+            $"initiallyUnlocked={stationRecipes.Count(recipe => TechnologyProgress.IsUnlocked(recipe.RequiredTechnology))}; " +
+            $"initiallyLocked={stationRecipes.Count(recipe => !TechnologyProgress.IsUnlocked(recipe.RequiredTechnology))}.");
     }
 
     private static GameContentCatalog LoadContentCatalog()
@@ -981,7 +1355,9 @@ public partial class SalvageRepairSlice : Node3D
             _thirdCraftingAcceptanceTask is null &&
             _fourthCraftingAcceptanceTask is null &&
             _catalogMatrixAcceptanceTask is null &&
+            _technologySelectorAcceptanceTask is null &&
             _gracefulExitTask is null &&
+            _selectorStation is null &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
             !_closeRequested;
@@ -1184,6 +1560,37 @@ public partial class SalvageRepairSlice : Node3D
                 _lifetimeCancellation.Token);
     }
 
+    private void BeginTechnologySelectorAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        CloseRecipeSelector();
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.technology-selector-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-082 station selector and research acceptance running";
+        _technologySelectorAcceptanceHud = "RUNNING";
+        _technologySelectorAcceptanceReport = null;
+        _technologySelectorAcceptanceTask =
+            TechnologyRecipeSelectorAcceptanceRunner.RunAsync(
+                testPath,
+                SlotId,
+                ContentCatalog,
+                BuildResourceBindings().Values
+                    .OrderBy(
+                        binding => binding.ResourceNodeId,
+                        StringComparer.Ordinal)
+                    .ToArray(),
+                _lifetimeCancellation.Token);
+    }
+
     private void BeginCatalogMatrixAcceptance()
     {
         if (_database is null)
@@ -1242,7 +1649,8 @@ public partial class SalvageRepairSlice : Node3D
             Session,
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
-            _player.GlobalPosition.Z);
+            _player.GlobalPosition.Z,
+            TechnologyProgress.ToSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -1271,6 +1679,7 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        CloseRecipeSelector();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -1281,6 +1690,7 @@ public partial class SalvageRepairSlice : Node3D
             _thirdCraftingAcceptanceTask is not null ||
             _fourthCraftingAcceptanceTask is not null ||
             _catalogMatrixAcceptanceTask is not null ||
+            _technologySelectorAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -1297,7 +1707,8 @@ public partial class SalvageRepairSlice : Node3D
             Session,
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
-            _player.GlobalPosition.Z);
+            _player.GlobalPosition.Z,
+            TechnologyProgress.ToSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -1305,7 +1716,9 @@ public partial class SalvageRepairSlice : Node3D
             $"revision={snapshot.Revision}; " +
             $"salvage={Session.SalvageQuantity}; " +
             $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
-            $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}.");
+            $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}; " +
+            $"researchPoints={TechnologyProgress.ResearchPoints}; " +
+            $"unlockedTech={TechnologyProgress.UnlockedCount}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -1345,10 +1758,15 @@ public partial class SalvageRepairSlice : Node3D
         try
         {
             SaveGameSnapshot? snapshot = task.GetAwaiter().GetResult();
+            _technologyProgression = TechnologyProgression.FromSaveData(
+                ContentCatalog.Technologies,
+                snapshot?.TechnologyProgress,
+                DefaultResearchPoints);
             _session = StarterRepairSession.FromSnapshot(
                 snapshot,
                 BuildResourceBindings(),
                 RepairRecipe,
+                TechnologyProgress.IsUnlocked,
                 StationRecipes.ToArray());
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
@@ -1359,6 +1777,7 @@ public partial class SalvageRepairSlice : Node3D
                     (float)snapshot.Player.PositionZ);
             }
 
+            CloseRecipeSelector();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -1372,7 +1791,9 @@ public partial class SalvageRepairSlice : Node3D
                 $"revision={_revision}; " +
                 $"salvage={Session.SalvageQuantity}; " +
                 $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
-                $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}.");
+                $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}; " +
+                $"researchPoints={TechnologyProgress.ResearchPoints}; " +
+                $"unlockedTech={TechnologyProgress.UnlockedCount}.");
         }
         catch (Exception exception)
         {
@@ -1392,11 +1813,16 @@ public partial class SalvageRepairSlice : Node3D
         try
         {
             task.GetAwaiter().GetResult();
+            _technologyProgression = new TechnologyProgression(
+                ContentCatalog.Technologies,
+                DefaultResearchPoints);
             _session = new StarterRepairSession(
                 RepairRecipe,
+                TechnologyProgress.IsUnlocked,
                 StationRecipes.ToArray());
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
+            CloseRecipeSelector();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -1722,6 +2148,72 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollTechnologySelectorAcceptanceTask()
+    {
+        if (_technologySelectorAcceptanceTask is null ||
+            !_technologySelectorAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<TechnologyRecipeSelectorAcceptanceReport> task =
+            _technologySelectorAcceptanceTask;
+        _technologySelectorAcceptanceTask = null;
+        try
+        {
+            _technologySelectorAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            TechnologyRecipeSelectorAcceptanceReport report =
+                _technologySelectorAcceptanceReport;
+            _technologySelectorAcceptanceHud = report.Passed
+                ? $"PASS recipes={report.RecipesListed}, " +
+                  $"oneStation={report.PhysicalStationsRequired}, " +
+                  $"initial={report.InitiallyUnlockedRecipes}/" +
+                  $"{report.InitiallyLockedRecipes}, " +
+                  $"unlocked={report.TechnologiesUnlocked}, " +
+                  $"crafted={(report.SelectedRecipeCrafted ? 1 : 0)}, " +
+                  $"rp={report.ResearchPointsRemaining}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _state = report.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-082 station selector and research acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"recipes={report.RecipesListed}; " +
+                $"physicalStations={report.PhysicalStationsRequired}; " +
+                $"initiallyUnlocked={report.InitiallyUnlockedRecipes}; " +
+                $"initiallyLocked={report.InitiallyLockedRecipes}; " +
+                $"prerequisiteRejected={(report.MissingPrerequisiteRejected ? 1 : 0)}; " +
+                $"technologiesUnlocked={report.TechnologiesUnlocked}; " +
+                $"allRecipesUnlocked={(report.AllRecipesUnlocked ? 1 : 0)}; " +
+                $"technologyBlocked={(report.TechnologyBlockedBeforeResearch ? 1 : 0)}; " +
+                $"readyAfterResearch={(report.CraftReadyAfterResearch ? 1 : 0)}; " +
+                $"crafted={(report.SelectedRecipeCrafted ? 1 : 0)}; " +
+                $"researchPoints={report.ResearchPointsRemaining}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"progressRestored={(report.ProgressRestored ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("technology selector acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -1813,7 +2305,16 @@ public partial class SalvageRepairSlice : Node3D
         foreach (PortableCraftingStation station in _craftingStations)
         {
             station.SetCrafting(false);
-            station.SetCrafted(Session.IsRecipeCrafted(station.RecipeId));
+            CraftingRecipeDefinition[] stationRecipes = StationRecipes
+                .Where(recipe => string.Equals(
+                    recipe.RequiredStation,
+                    station.StationId,
+                    StringComparison.Ordinal))
+                .ToArray();
+            station.SetCrafted(
+                stationRecipes.Length > 0 &&
+                stationRecipes.All(recipe =>
+                    Session.IsRecipeCrafted(recipe.RecipeId)));
         }
 
         _activeCraftingStation = null;
@@ -1852,6 +2353,11 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        if (_selectorStation is not null)
+        {
+            UpdateRecipeSelector();
+        }
+
         string databaseLine = _diagnostics is null
             ? "DB: initializing"
             : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
@@ -1863,11 +2369,8 @@ public partial class SalvageRepairSlice : Node3D
         int totalStationRecipes = StationRecipes.Count;
         CraftingRecipeDefinition? nextRecipe = StationRecipes.FirstOrDefault(
             recipe => !Session.IsRecipeCrafted(recipe.RecipeId));
-        string activeRecipeId = _craftTimer.IsRunning
-            ? _craftTimer.RecipeId
-            : "none";
         string craftProcess = _craftTimer.IsRunning
-            ? $"RUNNING {activeRecipeId} " +
+            ? $"RUNNING {_craftTimer.RecipeId} " +
               $"{_craftTimer.ElapsedSeconds:0.0}/" +
               $"{_craftTimer.DurationSeconds:0.0}s " +
               $"({_craftTimer.Progress01 * 100.0:0}%)"
@@ -1878,15 +2381,13 @@ public partial class SalvageRepairSlice : Node3D
         string objective;
         if (!Session.ShipRepaired)
         {
-            objective = $"Objective 1/{totalStationRecipes + 1}: collect salvage " +
+            objective = $"Objective: collect salvage " +
                 $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
                 "then interact with ship";
         }
         else if (_craftTimer.IsRunning)
         {
-            objective = $"Objective: fabricating {_craftTimer.RecipeId} " +
-                $"{_craftTimer.ElapsedSeconds:0.0}/" +
-                $"{_craftTimer.DurationSeconds:0.0}s";
+            objective = $"Objective: fabricating {_craftTimer.RecipeId}";
         }
         else if (nextRecipe is not null)
         {
@@ -1896,7 +2397,7 @@ public partial class SalvageRepairSlice : Node3D
         else
         {
             objective =
-                $"Objective: COMPLETE — ship repaired and all " +
+                $"Objective: COMPLETE - ship repaired and all " +
                 $"{totalStationRecipes} station components crafted";
         }
 
@@ -1912,15 +2413,20 @@ public partial class SalvageRepairSlice : Node3D
             $"recipes={ContentCatalog.Recipes.Count} • " +
             $"stations={ContentCatalog.Stations.Count} • " +
             $"tech={ContentCatalog.Technologies.Count}";
+        string technologyLine =
+            $"Research: RP={TechnologyProgress.ResearchPoints} • " +
+            $"unlocked={TechnologyProgress.UnlockedCount}/" +
+            $"{ContentCatalog.Technologies.Count} • " +
+            "interact with the fabricator to open Recipes/Research";
         string repairLine =
             $"Repair: {RepairRecipe.RecipeId} • " +
-            $"{primaryInput.Quantity}×{primaryInput.DefinitionId} → " +
-            $"{primaryOutput.Quantity}×{primaryOutput.DefinitionId}";
+            $"{primaryInput.Quantity}x{primaryInput.DefinitionId} -> " +
+            $"{primaryOutput.Quantity}x{primaryOutput.DefinitionId}";
         string matrixLine =
             $"Craft catalog: stationRecipes={totalStationRecipes} • " +
             $"crafted={craftedCount}/{totalStationRecipes} • " +
             $"pending={totalStationRecipes - craftedCount} • " +
-            $"sceneStations={_craftingStations.Count}";
+            $"physicalStations={_craftingStations.Count}";
         string pendingPreview = BuildPendingRecipePreview();
         double nextAutosave = Math.Max(
             0.0,
@@ -1937,25 +2443,27 @@ public partial class SalvageRepairSlice : Node3D
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • DATA-DRIVEN CRAFT CATALOG • H — HUD\n" +
+                "VERTICAL SLICE 1 • STATION SELECTOR + RESEARCH • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
                 $"Craft: {craftProcess}\n" +
-                $"{contentLine}\n" +
+                $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
+                $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E — interact • F4 — all 128 recipes • F5 — playable recipes • " +
-                "F6/F7/F9/F10/F11/F12 — regressions • F8 — reset";
+                "E - interact/select • F3 - selector acceptance • " +
+                "F4/F5 - catalogs • F6/F7/F9/F10/F11/F12 - regressions";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 — SALVAGE → REPAIR → DATA-DRIVEN CRAFTING → AUTOSAVE • H — HUD\n" +
+            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> AUTOSAVE • H - HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
+            technologyLine + "\n" +
             repairLine + "\n" +
             matrixLine + "\n" +
             pendingPreview + "\n" +
@@ -1967,6 +2475,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Interaction: {interaction}\n" +
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
+            $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
@@ -1976,10 +2485,10 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space — move • E — collect/repair/craft • H — HUD • " +
-            "F4 — all 128 recipes • F5 — playable matrix • " +
-            "F6/F7/F9/F10/F11/F12 — regressions • F8 — reset • " +
-            "Esc — release mouse";
+            "WASD/Space - move • E - interact/select • H - HUD • " +
+            "F3 - selector/research acceptance • F4 - all 128 recipes • " +
+            "F5 - runtime matrix • F6/F7/F9/F10/F11/F12 - regressions • " +
+            "F8 - reset • Esc - close selector/release mouse";
     }
 
     private int CountCraftedStationRecipes()
@@ -2019,15 +2528,17 @@ public partial class SalvageRepairSlice : Node3D
                 $"{input.Quantity} {GetShortContentId(input.DefinitionId)}"));
         string outputState = Session.IsRecipeCrafted(recipe.RecipeId)
             ? "READY"
-            : "MISSING";
+            : TechnologyProgress.IsUnlocked(recipe.RequiredTechnology)
+                ? "MISSING"
+                : $"LOCKED:{GetShortContentId(recipe.RequiredTechnology)}";
         string stationName = _craftingStations
             .FirstOrDefault(station => string.Equals(
-                station.RecipeId,
-                recipe.RecipeId,
+                station.StationId,
+                recipe.RequiredStation,
                 StringComparison.Ordinal))
             ?.Name.ToString() ?? recipe.RequiredStation;
         return $"{GetShortContentId(recipe.RecipeId)} " +
-            $"[{inputs} → {outputState}, {recipe.CraftTimeSeconds:0.##}s, " +
+            $"[{inputs} -> {outputState}, {recipe.CraftTimeSeconds:0.##}s, " +
             $"{stationName}]";
     }
 

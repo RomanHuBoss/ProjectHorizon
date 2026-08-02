@@ -53,6 +53,10 @@ public sealed record VisitedPlanetSaveData(
     string FirstVisitedUtc,
     int VisitCount);
 
+public sealed record TechnologyProgressSaveData(
+    int ResearchPoints,
+    IReadOnlyList<string> UnlockedTechnologyIds);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -62,7 +66,8 @@ public sealed record SaveGameSnapshot(
     PlayerSaveData Player,
     ShipSaveData Ship,
     IReadOnlyList<InventoryItemSaveData> Inventory,
-    VisitedPlanetSaveData VisitedPlanet);
+    VisitedPlanetSaveData VisitedPlanet,
+    TechnologyProgressSaveData? TechnologyProgress = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

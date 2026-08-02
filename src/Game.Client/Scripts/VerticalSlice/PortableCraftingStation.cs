@@ -6,9 +6,6 @@ public partial class PortableCraftingStation : StaticBody3D, IInteractable
     [Export]
     public string StationId { get; set; } = "station.unassigned";
 
-    [Export]
-    public string RecipeId { get; set; } = "recipe.unassigned";
-
     private MeshInstance3D? _mesh;
     private bool _crafted;
     private bool _crafting;
@@ -24,13 +21,6 @@ public partial class PortableCraftingStation : StaticBody3D, IInteractable
         {
             throw new InvalidOperationException(
                 $"Crafting station {Name} has no valid StationId.");
-        }
-
-        if (!GameContentCatalog.IsStableId(RecipeId) ||
-            string.Equals(RecipeId, "recipe.unassigned", StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Crafting station {Name} has no valid RecipeId.");
         }
 
         _mesh = GetNodeOrNull<MeshInstance3D>("MeshInstance3D");
@@ -51,7 +41,7 @@ public partial class PortableCraftingStation : StaticBody3D, IInteractable
             return;
         }
 
-        slice.TryCraftAtStation(this, RecipeId, StationId, interactor);
+        slice.OpenRecipeSelector(this, interactor);
     }
 
     public void SetCrafted(bool crafted)
