@@ -1135,8 +1135,14 @@ public sealed partial class SaveDatabase : IDisposable
 
         if (progressSettings.TryGetValue(
             "production_queue",
-            out string productionQueueJson))
+            out string? productionQueueJson))
         {
+            if (string.IsNullOrWhiteSpace(productionQueueJson))
+            {
+                throw new InvalidDataException(
+                    "production_queue setting is empty.");
+            }
+
             try
             {
                 productionQueue = JsonSerializer.Deserialize<

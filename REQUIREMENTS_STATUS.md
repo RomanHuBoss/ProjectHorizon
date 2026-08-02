@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-production-queue.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-warning-fix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,37 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` и `TASK-083/089` подтверждены clean build, автоматическими `F3/F2` и ручной проверкой station UI. Текущая итерация реализует `TASK-090`: Godot-независимая production queue поддерживает parallel slots, pause/resume, атомарные reservations, cancellation refunds и freeze-and-resume persistence активных jobs; runtime-приёмка вынесена в `TASK-091`.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` и `TASK-083/089` подтверждены clean build, автоматическими `F3/F2` и ручной проверкой station UI. Production queue подтверждена пользователем через `F1: PASS` и полный регрессионный прогон. Текущий hotfix устраняет единственное предупреждение `CS8600` в загрузке `save_settings.production_queue`; `TASK-091` ожидает повторной clean build `0/0`.
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — nullable warning hotfix для production queue (`TASK-091`)
+
+**Исходный снимок:** `ProjectHorizon-main-production-queue.zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue-warning-fix.zip`  
+**Причина:** пользователь подтвердил `F1: PASS` и все регрессии, но реальный `CoreCompile` выдал `CS8600` в `SaveDatabase.cs:1138`.
+
+**Исправлено:**
+
+- результат `Dictionary.TryGetValue` для `production_queue` принимается как `string?`, что соответствует nullable-контракту BCL;
+- перед десериализацией добавлена явная проверка пустого/null JSON;
+- повреждённое пустое значение теперь отклоняется диагностикой `InvalidDataException: production_queue setting is empty.`;
+- семантика корректного queue snapshot, exact round-trip и malformed-JSON rejection не изменена.
+
+**Подтверждённые runtime-доказательства пользователя:**
+
+- `F1 / TASK-090: PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1`;
+- `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12: PASS`;
+- Recipes/Research terminal продолжает открываться;
+- до hotfix сборка имела `0 ошибок / 1 предупреждение CS8600`.
+
+**Статусы:**
+
+- `TASK-090` → `VERIFIED`;
+- `TASK-091` остаётся `IN_PROGRESS` до повторной clean build `0 предупреждений / 0 ошибок`;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Приёмка hotfix:** выполнить clean build; ожидается реальный `CoreCompile`, `0 предупреждений / 0 ошибок`; затем достаточно повторить `F1`, поскольку gameplay-regressions уже подтверждены на той же функциональной редакции.
 
 ### 2026-08-02 — production queue и active-process lifecycle (`TASK-090`)
 
@@ -2422,20 +2450,20 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `INDUSTRY-040` | Station исполняет не более `ParallelSlots` jobs одновременно | `IMPLEMENTED` | `ProductionQueueRuntime`, F1 smelter `slots=2` |
-| `INDUSTRY-041` | Jobs сверх slot limit сохраняют FIFO queue | `IMPLEMENTED` | Третья F1 job имеет `Queued` до освобождения slot |
-| `INDUSTRY-042` | Enqueue атомарно резервирует inputs, catalysts и energy | `IMPLEMENTED` | Free inventory/energy уменьшаются до старта process |
-| `INDUSTRY-043` | Pause/resume сохраняют elapsed progress | `IMPLEMENTED` | Paused job не продвигается; resume возвращает её в FIFO |
-| `INDUSTRY-044` | Cancellation не создаёт output и полностью возвращает reservations | `IMPLEMENTED` | Full refund policy для queued/running/paused jobs |
-| `INDUSTRY-045` | Completion применяет outputs, byproducts и catalyst policy | `IMPLEMENTED` | Используется deterministic catalyst roll из TASK-083 |
-| `INDUSTRY-046` | Active jobs сохраняются и восстанавливаются без offline progress | `IMPLEMENTED` | `ProductionQueueSaveData`, freeze-and-resume policy |
-| `INDUSTRY-047` | Queue payload входит в exact snapshot comparison | `IMPLEMENTED` | `save_settings.production_queue`, `SnapshotsEqual` |
-| `INDUSTRY-ACC-040` | Clean build не содержит errors/warnings | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `INDUSTRY-ACC-041` | F1 подтверждает slots, waiting queue и pause/resume | `IN_PROGRESS` | Ожидается `slots=2`, `queued=1`, `pause=1` |
-| `INDUSTRY-ACC-042` | F1 подтверждает graceful restore и exact elapsed | `IN_PROGRESS` | Ожидается `restore=1`, `roundTrip=1` |
-| `INDUSTRY-ACC-043` | F1 подтверждает active cancellation и exact refund | `IN_PROGRESS` | Ожидается `cancel=1`, `refund=1`, energy `96` |
-| `INDUSTRY-ACC-044` | F1 завершает remaining jobs и очищает queue | `IN_PROGRESS` | Ожидается `completed=2`, `queueDrained=1` |
-| `INDUSTRY-ACC-045` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить все существующие acceptance routes |
+| `INDUSTRY-040` | Station исполняет не более `ParallelSlots` jobs одновременно | `VERIFIED` | Пользователь подтвердил F1: `slots=2` |
+| `INDUSTRY-041` | Jobs сверх slot limit сохраняют FIFO queue | `VERIFIED` | Пользователь подтвердил F1: `queued=1` |
+| `INDUSTRY-042` | Enqueue атомарно резервирует inputs, catalysts и energy | `VERIFIED` | F1 подтвердил exact cancellation refund и итоговый energy budget |
+| `INDUSTRY-043` | Pause/resume сохраняют elapsed progress | `VERIFIED` | Пользователь подтвердил F1: `pause=1`, `restore=1` |
+| `INDUSTRY-044` | Cancellation не создаёт output и полностью возвращает reservations | `VERIFIED` | Пользователь подтвердил F1: `cancel=1`, `refund=1` |
+| `INDUSTRY-045` | Completion применяет outputs, byproducts и catalyst policy | `VERIFIED` | Пользователь подтвердил F1: `completed=2`; F2 chemical runtime также PASS |
+| `INDUSTRY-046` | Active jobs сохраняются и восстанавливаются без offline progress | `VERIFIED` | Пользователь подтвердил F1: `restore=1`, `roundTrip=1` |
+| `INDUSTRY-047` | Queue payload входит в exact snapshot comparison | `VERIFIED` | Пользователь подтвердил F1: `roundTrip=1` |
+| `INDUSTRY-ACC-040` | Clean build не содержит errors/warnings | `IN_PROGRESS` | До hotfix: `0 errors / 1 warning CS8600`; повторить clean build после nullable-fix |
+| `INDUSTRY-ACC-041` | F1 подтверждает slots, waiting queue и pause/resume | `VERIFIED` | Пользователь: `slots=2`, `queued=1`, `pause=1` |
+| `INDUSTRY-ACC-042` | F1 подтверждает graceful restore и exact elapsed | `VERIFIED` | Пользователь: `restore=1`, `roundTrip=1` |
+| `INDUSTRY-ACC-043` | F1 подтверждает active cancellation и exact refund | `VERIFIED` | Пользователь: `cancel=1`, `refund=1` |
+| `INDUSTRY-ACC-044` | F1 завершает remaining jobs и очищает queue | `VERIFIED` | Пользователь: `completed=2`; итоговая строка F1 PASS |
+| `INDUSTRY-ACC-045` | F2–F12 не регрессируют | `VERIFIED` | Пользователь подтвердил PASS для F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 |
 
 ## 9. Очередь ближайших задач
 
