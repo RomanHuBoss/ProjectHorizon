@@ -83,6 +83,34 @@
         "ship",
         "navigation"
       ]
+    },
+    {
+      "recipeId": "recipe.ship.coolant_regulator",
+      "inputs": [
+        {
+          "definitionId": "resource.thermal_gel",
+          "quantity": 2
+        }
+      ],
+      "outputs": [
+        {
+          "definitionId": "component.ship.coolant_regulator",
+          "quantity": 1
+        }
+      ],
+      "requiredTechnology": "",
+      "requiredStation": "station.portable_fabricator",
+      "craftTimeSeconds": 3.5,
+      "application": {
+        "type": "StoreOutputs",
+        "targetId": "inventory.ship",
+        "resultHealth": 0.0
+      },
+      "tags": [
+        "crafting",
+        "ship",
+        "cooling"
+      ]
     }
   ]
 }

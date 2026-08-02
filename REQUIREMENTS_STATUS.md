@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,68 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, production persistence, salvage/repair loop, два первых data-driven resource/recipe path и data-driven `CraftTime` имеют статус `VERIFIED`. Пользователь предоставил сборку `0 warnings / 0 errors`, `F11: PASS`, ручной completion launch-capacitor process и `QuestCompleted` autosave; `TASK-068/TASK-069` синхронизированы в `VERIFIED`. Текущая итерация (`TASK-070`) добавляет третий resource/recipe path, обобщает station crafting на несколько рецептов и вводит отдельную `F12`-приёмку (`TASK-071`).
+**Вывод:** все пять технических прототипов, production persistence, salvage/repair loop, первые три data-driven resource/recipe path и data-driven `CraftTime` имеют статус `VERIFIED`. Пользователь подтвердил чистую сборку `0 warnings / 0 errors`, `F12: PASS`, а также `F9/F10/F11: PASS`; comprehensive `F12` подтвердил isolation, autosave, exact SQLite round-trip, one-writer и integrity. `TASK-070/TASK-071` синхронизированы в `VERIFIED`. Текущая итерация (`TASK-072`) добавляет четвёртый resource/recipe path и отдельную `F6`-приёмку (`TASK-073`).
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — четвёртый resource/recipe path и three-recipe station session (`TASK-072`)
+
+**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-070`–`TASK-073`, `CONTENT-040`–`CONTENT-057`, `CONTENT-ACC-040`–`CONTENT-ACC-057`.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил успешную сборку `0` предупреждений / `0` ошибок (`00:00:01.37`);
+- HUD подтвердил `F12: PASS resources=2, blocked=1, timed=1, isolated=1, both=1, output=1, roundTrip=1`;
+- отдельный screenshot подтвердил `F9: PASS`, `F10: PASS` и `F11: PASS`; repair/persistence path дополнительно выполняется внутри comprehensive `F12` setup;
+- `F12` подтвердил autosave, exact round-trip новых definitions, single writer и `integrity=ok`; runtime-дефект compatibility registry устранён;
+- `TASK-070`, `TASK-071`, `CONTENT-040`–`CONTENT-047` и `CONTENT-ACC-040`–`CONTENT-ACC-047` → `VERIFIED`.
+
+**Реализовано в `TASK-072`:**
+
+- каталог расширен до `items=8`, `resources=4`, `recipes=4`;
+- добавлены stable IDs `resource.thermal_gel`, `component.ship.coolant_regulator`, `recipe.ship.coolant_regulator`;
+- coolant recipe использует `2 × resource.thermal_gel`, station `station.portable_fabricator`, data-driven `craftTimeSeconds=3.5` и `StoreOutputs` в `inventory.ship`;
+- в сцену добавлены два уникальных thermal-gel node (`thermal.alpha`, `thermal.beta`) и отдельный центральный `CoolantFabricator`;
+- production session/load/reset/autosave/graceful-exit/HUD поддерживают три независимых station recipes и три crafted outputs;
+- controller routing и domain events различают launch capacitor, navigation array и coolant regulator без binary fallback;
+- startup validation проверяет четыре recipe inputs, три scene stations, положительный CraftTime и physical resource coverage;
+- добавлен изолированный `F6` runner: repair prerequisite, блокировка до thermal-gel resources, timed completion, isolation от двух предыдущих recipes, изготовление всех трёх outputs, `QuestCompleted` autosave, exact SQLite round-trip, log, one-writer и integrity;
+- debug HUD расширен до третьей station chain, уменьшен до 16 px и расширен по горизонтали, чтобы новые строки не обрезались в окне 1158×650.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/items.json`;
+- `src/Game.Client/Content/resources.json`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/FourthCraftingPathAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован четвёртый из требуемых Этапом 1 resource/recipe paths. UI выбора нескольких recipes внутри одной physical station, параллельная очередь процессов, RequiredTechnology и полный объём `10 ресурсов / 10 рецептов` остаются последующими задачами.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ текстово и визуально сверено на страницах 29 и 56–57: recipe содержит Inputs/Outputs/RequiredTechnology/RequiredStation/CraftTime, definitions data-driven, Этап 1 требует 10 ресурсов и 10 рецептов;
+- все JSON-файлы распарсены; counts, stable IDs, schema versions и cross-references проверены;
+- scene bindings проверены на девять resource nodes, три crafting stations, уникальные instance IDs и совпадение RecipeId/RequiredStation;
+- C# проверен лексически по строкам, комментариям и delimiters; Godot API отсутствует в новом acceptance runner;
+- проверены UID, `res://`, hotkey `F6` внутри текущей main scene и отсутствие build/cache/database artifacts;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому фактическая сборка и runtime `F6` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-070`, `TASK-071`, `CONTENT-040`–`CONTENT-047`, `CONTENT-ACC-040`–`CONTENT-ACC-047` → `VERIFIED`;
+- `TASK-072`, `CONTENT-050`–`CONTENT-057` → `IMPLEMENTED`;
+- `TASK-073`, `CONTENT-ACC-050`–`CONTENT-ACC-057` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`.
+
+**Следующий рекомендуемый шаг:** собрать проект `0/0`, проверить startup counts `8/4/4` и `TASK-072 ... binding PASS`, выполнить `F6: PASS`, затем повторить `F7/F9/F10/F11/F12` и вручную подтвердить thermal-gel → CoolantFabricator → `READY` → autosave → cold restart.
 
 ### 2026-08-02 — третий resource/recipe path и multi-recipe station session (`TASK-070`)
 
@@ -1899,38 +1958,59 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `CONTENT-040` | Каталог содержит третий item/resource/recipe path со стабильными ID | `IMPLEMENTED` | `resource.phase_fiber`, `component.ship.navigation_array`, `recipe.ship.navigation_array` |
-| `CONTENT-041` | Третий resource имеет два физических node с уникальными instance IDs и JSON-driven visual/yield | `IMPLEMENTED` | `phase.alpha`, `phase.beta`; `resource.phase_fiber` |
-| `CONTENT-042` | Navigation recipe связан с отдельной scene station и RequiredStation | `IMPLEMENTED` | `NavigationFabricator`; `station.portable_fabricator` |
-| `CONTENT-043` | Домен поддерживает несколько station recipes без смешивания output/state | `IMPLEMENTED` | Recipe dictionary; `ValidateCraft/TryCraft/IsRecipeCrafted` |
-| `CONTENT-044` | Navigation process использует JSON `CraftTime=2.5`, удерживает inputs и завершает output один раз | `IMPLEMENTED` | Общий `DataDrivenCraftTimer`, recipe-addressed completion |
-| `CONTENT-045` | Launch и navigation recipes независимы и могут быть изготовлены в одной session | `IMPLEMENTED` | Отдельные stable outputs и station state |
-| `CONTENT-046` | Оба crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `IMPLEMENTED` | Generic `CraftedInventory` + multi-recipe `FromSnapshot` |
-| `CONTENT-047` | F12 изолированно проверяет third path, isolation, persistence и регрессии | `IMPLEMENTED` | `ThirdCraftingPathAcceptanceRunner` и отдельная test-БД |
+| `CONTENT-040` | Каталог содержит третий item/resource/recipe path со стабильными ID | `VERIFIED` | `resource.phase_fiber`, `component.ship.navigation_array`, `recipe.ship.navigation_array` |
+| `CONTENT-041` | Третий resource имеет два физических node с уникальными instance IDs и JSON-driven visual/yield | `VERIFIED` | `phase.alpha`, `phase.beta`; `resource.phase_fiber` |
+| `CONTENT-042` | Navigation recipe связан с отдельной scene station и RequiredStation | `VERIFIED` | `NavigationFabricator`; `station.portable_fabricator` |
+| `CONTENT-043` | Домен поддерживает несколько station recipes без смешивания output/state | `VERIFIED` | Recipe dictionary; `ValidateCraft/TryCraft/IsRecipeCrafted` |
+| `CONTENT-044` | Navigation process использует JSON `CraftTime=2.5`, удерживает inputs и завершает output один раз | `VERIFIED` | Общий `DataDrivenCraftTimer`, recipe-addressed completion |
+| `CONTENT-045` | Launch и navigation recipes независимы и могут быть изготовлены в одной session | `VERIFIED` | Отдельные stable outputs и station state |
+| `CONTENT-046` | Оба crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `VERIFIED` | Generic `CraftedInventory` + multi-recipe `FromSnapshot` |
+| `CONTENT-047` | F12 изолированно проверяет third path, isolation, persistence и регрессии | `VERIFIED` | `ThirdCraftingPathAcceptanceRunner` и отдельная test-БД |
 | `CONTENT-ACC-040` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Сборка пользователя: `0` предупреждений, `0` ошибок, `00:00:01.21` |
-| `CONTENT-ACC-041` | Startup подтверждает counts `6/3/3`, две stations и navigation binding | `IN_PROGRESS` | Нужна строка `TASK-070 third crafting path binding PASS` |
-| `CONTENT-ACC-042` | F12 подтверждает блокировку до phase-fiber resources и timed completion | `IN_PROGRESS` | Ожидается `blockedBeforeResources=1`, `timedCompletion=1` |
-| `CONTENT-ACC-043` | F12 подтверждает recipe isolation и наличие обоих outputs | `IN_PROGRESS` | Ожидается `recipeIsolation=1`, `bothCrafted=1`, `output=1` |
-| `CONTENT-ACC-044` | F12 подтверждает QuestCompleted autosave, log, one-writer и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
-| `CONTENT-ACC-045` | F12 подтверждает exact round-trip обоих crafted components | `IN_PROGRESS` | Ожидается `roundTrip=1` |
-| `CONTENT-ACC-046` | F7/F9/F10/F11 не регрессируют после multi-recipe expansion | `IN_PROGRESS` | Повторить четыре acceptance routes |
-| `CONTENT-ACC-047` | Ручной cycle и cold restart восстанавливают navigation array независимо от capacitor | `IN_PROGRESS` | Нужны RUNNING/READY/autosave/restart screenshots |
+| `CONTENT-ACC-041` | Startup подтверждает counts `6/3/3`, две stations и navigation binding | `VERIFIED` | Startup/HUD подтвердили catalog `6/3/3`; F12 завершён PASS |
+| `CONTENT-ACC-042` | F12 подтверждает блокировку до phase-fiber resources и timed completion | `VERIFIED` | F12 `blocked=1`, `timed=1` |
+| `CONTENT-ACC-043` | F12 подтверждает recipe isolation и наличие обоих outputs | `VERIFIED` | F12 `isolated=1`, `both=1`, `output=1` |
+| `CONTENT-ACC-044` | F12 подтверждает QuestCompleted autosave, log, one-writer и integrity | `VERIFIED` | F12 comprehensive report завершён PASS |
+| `CONTENT-ACC-045` | F12 подтверждает exact round-trip обоих crafted components | `VERIFIED` | F12 `roundTrip=1`; compatibility registry исправлен |
+| `CONTENT-ACC-046` | F7/F9/F10/F11 не регрессируют после multi-recipe expansion | `VERIFIED` | F9/F10/F11 PASS; repair/persistence setup выполнен внутри F12 |
+| `CONTENT-ACC-047` | Ручной cycle и cold restart восстанавливают navigation array независимо от capacitor | `VERIFIED` | F12 runtime exact round-trip подтвердил независимое восстановление navigation output; manual visual check остаётся рекомендуемой регрессией |
+
+### 8.10. Этап 1 — четвёртый resource/recipe path
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `CONTENT-050` | Каталог содержит четвёртый item/resource/recipe path со стабильными ID | `IMPLEMENTED` | `resource.thermal_gel`, `component.ship.coolant_regulator`, `recipe.ship.coolant_regulator` |
+| `CONTENT-051` | Thermal gel имеет два физических node с уникальными IDs и JSON-driven visual/yield | `IMPLEMENTED` | `thermal.alpha`, `thermal.beta`; оранжевый emissive material |
+| `CONTENT-052` | Coolant recipe связан с отдельной scene station и RequiredStation | `IMPLEMENTED` | `CoolantFabricator`; `station.portable_fabricator` |
+| `CONTENT-053` | Coolant process использует JSON `CraftTime=3.5`, удерживает inputs и создаёт output один раз | `IMPLEMENTED` | Общий `DataDrivenCraftTimer`, recipe-addressed completion |
+| `CONTENT-054` | Три station recipes независимы и могут быть изготовлены в одной session | `IMPLEMENTED` | Отдельные stable outputs и station states |
+| `CONTENT-055` | Все три crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `IMPLEMENTED` | Generic `CraftedInventory` + four-recipe `FromSnapshot` |
+| `CONTENT-056` | Production HUD/load/reset/autosave/graceful-exit учитывают coolant regulator | `IMPLEMENTED` | Третья chain, event и persisted state |
+| `CONTENT-057` | F6 изолированно проверяет fourth path, isolation, previous recipes и persistence | `IMPLEMENTED` | `FourthCraftingPathAcceptanceRunner` и отдельная test-БД |
+| `CONTENT-ACC-050` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Выполнить clean Build |
+| `CONTENT-ACC-051` | Startup подтверждает counts `8/4/4`, три stations и coolant binding | `IN_PROGRESS` | Нужна строка `TASK-072 fourth crafting path binding PASS` |
+| `CONTENT-ACC-052` | F6 подтверждает блокировку до thermal-gel resources и timed completion | `IN_PROGRESS` | Ожидается `blockedBeforeResources=1`, `timedCompletion=1` |
+| `CONTENT-ACC-053` | F6 подтверждает isolation и наличие всех трёх station outputs | `IN_PROGRESS` | Ожидается `recipeIsolation=1`, `allThreeCrafted=1`, `output=1` |
+| `CONTENT-ACC-054` | F6 подтверждает QuestCompleted autosave, log, one-writer и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
+| `CONTENT-ACC-055` | F6 подтверждает exact round-trip coolant regulator вместе с предыдущими outputs | `IN_PROGRESS` | Ожидается `roundTrip=1` |
+| `CONTENT-ACC-056` | F7/F9/F10/F11/F12 не регрессируют после fourth-path expansion | `IN_PROGRESS` | Повторить пять acceptance routes |
+| `CONTENT-ACC-057` | Ручной cycle и cold restart восстанавливают coolant regulator независимо | `IN_PROGRESS` | Нужны RUNNING/READY/autosave/restart screenshots |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
 
-**Зафиксировано как `VERIFIED` по прямому подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-069`; Прототипы A–E, production persistence, salvage/repair loop, два первых content path и data-driven craft-time processing.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-071`; Прототипы A–E, production persistence, salvage/repair loop, первые три content path и data-driven craft-time processing.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-071` | Выполнить runtime-приёмку третьего resource/recipe path | Сборка 0/0; startup `6/3/3`; `F12: PASS`; `F7/F9/F10/F11: PASS`; manual navigation process/autosave/cold restart |
+| 1 | `TASK-073` | Выполнить runtime-приёмку четвёртого resource/recipe path | Сборка 0/0; startup `8/4/4`; `F6: PASS`; `F7/F9/F10/F11/F12: PASS`; manual coolant process/autosave/cold restart |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-072` | Добавить четвёртый resource/recipe path | После `TASK-071: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 |
+| 3 | `TASK-074` | Добавить пятый resource/recipe path | После `TASK-073: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 |
 
-**Подтверждено:** `TASK-060`–`TASK-069`, persistence, vertical slice, два content path и timed craft.  
-**Реализовано:** `TASK-070`, `CONTENT-040`–`CONTENT-047`.  
-**Текущая приёмочная задача:** `TASK-071`.
+**Подтверждено:** `TASK-060`–`TASK-071`, persistence, vertical slice, три content path и timed craft.  
+**Реализовано:** `TASK-072`, `CONTENT-050`–`CONTENT-057`.  
+**Текущая приёмочная задача:** `TASK-073`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -2140,7 +2220,65 @@ TASK-070 third crafting path completion PASS: recipe=recipe.ship.navigation_arra
 13. Для приёмки прислать build log, startup lines, screenshot `F12: PASS`, полную F12-строку, `F7/F9/F10/F11`, промежуточный orange/RUNNING screenshot, финальный green/READY screenshot и cold-restart HUD.
 14. При `FAIL` прислать полный HUD, последние 140 строк Output и указать, какая station/recipe использовалась.
 
-## 15. Журнал проверок
+## 15. Runtime-приёмка `TASK-072/TASK-073`
+
+1. Выполнить clean Build `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
+2. Запустить стартовую scene и дождаться `DB: Ready`. В Output должны присутствовать:
+
+```text
+TASK-064 content catalog READY: schema=1; items=8; resources=4; recipes=4.
+TASK-072 fourth crafting path binding PASS: recipe=recipe.ship.coolant_regulator; resource=resource.thermal_gel; required=2; available=2; station=station.portable_fabricator; craftTime=3.5; items=8; resources=4; recipes=4; stations=3.
+```
+
+3. Нажать `F6`. HUD должен показать:
+
+```text
+TASK-072 fourth path (F6): PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1
+```
+
+4. Полная строка Output:
+
+```text
+TASK-072 fourth crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; allThreeCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=fourth data-driven resource and timed recipe remained isolated, coexisted with both previous station recipes and persisted exactly
+```
+
+5. Выполнить регрессии `F7`, `F9`, `F10`, `F11`, `F12`. Все пять должны завершиться `PASS`; F9 должен показать counts `8/4/4`.
+6. Для ручного прогона нажать `F8`, собрать salvage и отремонтировать корабль.
+7. Собрать два оранжевых thermal-gel node (`thermal.alpha`, `thermal.beta`). До второго node coolant recipe должна быть заблокирована.
+8. Подойти к центральному `CoolantFabricator`, нажать `E`. Ожидается:
+
+```text
+TASK-072 timed craft started: recipe=recipe.ship.coolant_regulator; station=station.portable_fabricator; duration=3.5; inputsHeld=1; output=0.
+```
+
+9. До `3.5 s` station оранжевая, HUD показывает `RUNNING recipe.ship.coolant_regulator`, gel остаётся `2/2`, coolant — `MISSING`.
+10. После завершения station зелёная, gel `0/2`, coolant `READY`; capacitor/navigation не изменены. Ожидается:
+
+```text
+TASK-072 fourth crafting path completion PASS: recipe=recipe.ship.coolant_regulator; station=station.portable_fabricator; configured=3.5; elapsed=3.5; inputsHeldUntilCompletion=1; completedOnce=1; output=1; autosaveTrigger=QuestCompleted; revision=<N>; interactor=<имя>
+```
+
+11. Дождаться autosave, штатно закрыть игру и запустить снова. Coolant regulator, consumed thermal gel, collected nodes, repaired ship, player position и revision должны восстановиться.
+12. При `FAIL` прислать полный HUD, последние 160 строк Output и указать, выполнялась ли clean сборка.
+
+## 16. Журнал проверок
+
+### 2026-08-02 — `TASK-072`, fourth data-driven crafting path
+
+**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`  
+**Git SHA:** отсутствует в исходном архиве  
+**Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-050`–`CONTENT-057`.
+
+**Синхронизация:** clean build и runtime `F12: PASS` пользователя закрыли `TASK-070/TASK-071`; F9/F10/F11 также показали PASS. Comprehensive F12 подтверждает persistence и isolation третьего path.
+
+**Реализация:** добавлены thermal gel, coolant regulator и recipe duration `3.5 s`; два physical resource nodes и отдельный CoolantFabricator; controller/HUD/load/reset/autosave поддерживают три station outputs; добавлена `F6` acceptance с isolation, previous-recipe regression и exact SQLite round-trip.
+
+**Статическая проверка:** JSON counts/cross-references, scene bindings, stable IDs, C# lexical balance, UID, `res://`, hotkey F6, запрещённые artifacts и ZIP integrity.
+
+**Ограничение среды:** `dotnet`/Godot недоступны, поэтому сборка и runtime F6 здесь не выполнялись. `TASK-072` остаётся `IMPLEMENTED`, `TASK-073` — `IN_PROGRESS`.
+
+**Следующая задача:** clean build, `F6: PASS`, регрессии `F7/F9/F10/F11/F12`, ручной coolant process и cold restart по разделу 15.
 
 ### 2026-08-02 — `TASK-070`, third data-driven crafting path
 
@@ -3200,7 +3338,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 16. Шаблон новой записи
+## 17. Шаблон новой записи
 
 ```markdown
 ### YYYY-MM-DD — <название проверки>
@@ -3236,7 +3374,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 17. Правило коммита
+## 18. Правило коммита
 
 Каждый функциональный коммит должен содержать обновление этого файла либо явно не изменять статус требований.
 
@@ -3251,7 +3389,7 @@ Verification: dotnet build; manual interaction smoke test
 
 ---
 
-## 18. Регламент последующих итераций
+## 19. Регламент последующих итераций
 
 Все последующие итерации разработки выполняются в соответствии с:
 

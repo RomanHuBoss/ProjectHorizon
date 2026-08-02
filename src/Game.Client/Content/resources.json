@@ -66,6 +66,28 @@
         "fiber",
         "navigation"
       ]
+    },
+    {
+      "resourceId": "resource.thermal_gel",
+      "itemDefinitionId": "resource.thermal_gel",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "visual": {
+        "albedoR": 0.92,
+        "albedoG": 0.34,
+        "albedoB": 0.1,
+        "emissionR": 0.52,
+        "emissionG": 0.1,
+        "emissionB": 0.02,
+        "emissionEnergy": 2.1,
+        "metallic": 0.12,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "thermal",
+        "cooling"
+      ]
     }
   ]
 }

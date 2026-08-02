@@ -96,6 +96,38 @@
         "ship",
         "navigation"
       ]
+    },
+    {
+      "definitionId": "resource.thermal_gel",
+      "localizationKey": "item.resource.thermal_gel",
+      "category": "Resource",
+      "maxStack": 40,
+      "basePrice": 35.0,
+      "mass": 0.8,
+      "rarity": "Uncommon",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "thermal",
+        "gel",
+        "cooling"
+      ]
+    },
+    {
+      "definitionId": "component.ship.coolant_regulator",
+      "localizationKey": "item.component.ship.coolant_regulator",
+      "category": "Component",
+      "maxStack": 5,
+      "basePrice": 175.0,
+      "mass": 1.8,
+      "rarity": "Uncommon",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "cooling"
+      ]
     }
   ]
 }

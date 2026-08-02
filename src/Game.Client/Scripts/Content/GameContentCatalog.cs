@@ -26,6 +26,12 @@ public static class VerticalSliceContentIds
         "resource.phase_fiber";
     public const string NavigationArrayItemId =
         "component.ship.navigation_array";
+    public const string CoolantRegulatorRecipeId =
+        "recipe.ship.coolant_regulator";
+    public const string ThermalGelResourceId =
+        "resource.thermal_gel";
+    public const string CoolantRegulatorItemId =
+        "component.ship.coolant_regulator";
 }
 
 public sealed class ContentValidationException : Exception

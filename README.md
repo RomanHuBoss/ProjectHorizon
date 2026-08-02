@@ -38,11 +38,11 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Принятый цикл `salvage → repair → timed craft → autosave` расширен третьим
-resource/recipe path. `TASK-068` и runtime-приёмка `TASK-069` подтверждены
-сборкой `0 warnings / 0 errors`, `F11: PASS` и ручным прохождением с autosave.
-Текущая реализация `TASK-070` добавляет независимое изготовление navigation array
-и обобщает доменную сессию для нескольких station recipes.
+Принятый цикл `salvage → repair → timed craft → autosave` расширен четырьмя
+последовательными data-driven resource/recipe paths. `TASK-070/TASK-071`
+синхронизированы по чистой сборке и `F12: PASS`. Текущая реализация `TASK-072`
+добавляет независимое изготовление coolant regulator, третью crafting station и
+изолированную `F6`-приёмку без изменения gameplay-slot.
 
 Статические определения находятся в:
 
@@ -53,8 +53,8 @@ src/Game.Client/Content/recipes.json
 ```
 
 Каталог строго проверяет schema version, стабильные dotted-ID, неизвестные поля,
-дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит шесть item,
-три resource и три recipe definitions:
+дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит восемь item,
+четыре resource и четыре recipe definitions:
 
 ```text
 3 × resource.salvage_alloy
@@ -73,6 +73,12 @@ src/Game.Client/Content/recipes.json
 → station.portable_fabricator
 → CraftTime 2.5 s
 → StoreOutputs
+
+2 × resource.thermal_gel
+→ 1 × component.ship.coolant_regulator
+→ station.portable_fabricator
+→ CraftTime 3.5 s
+→ StoreOutputs
 ```
 
 Игровая последовательность:
@@ -84,12 +90,14 @@ src/Game.Client/Content/recipes.json
 4. собрать два зелёных phase-fiber узла и использовать левый
    `NavigationFabricator`;
 5. дождаться `2.5 s` изготовления navigation array;
-6. проверить, что каждый рецепт расходует только свои inputs, второй рецепт не
-   изменяет состояние первого, а оба outputs сохраняются в inventory;
-7. после холодного запуска восстановить collected nodes, repaired ship, оба
+6. собрать два оранжевых thermal-gel узла, использовать центральный
+   `CoolantFabricator` и дождаться `3.5 s` изготовления coolant regulator;
+7. проверить, что каждый рецепт расходует только свои inputs и не изменяет
+   состояния двух остальных outputs;
+8. после холодного запуска восстановить collected nodes, repaired ship, все три
    crafted components, позицию и revision.
 
-Оба station recipes требуют предварительного ремонта корабля. Неверная station
+Все station recipes требуют предварительного ремонта корабля. Неверная station
 ID, неизвестный recipe ID, недостаточные inputs и повторный запуск уже готового
 рецепта отклоняются доменной моделью. `StarterRepairSession` хранит словарь
 station recipes и сохраняет обратную совместимость с прежним secondary-recipe
@@ -104,6 +112,7 @@ inventory definitions и проходят SQLite round-trip. Закрытие о
 WASD / Space   движение и прыжок
 E              собрать ресурс / ремонтировать / крафтить
 H              detailed / compact / hidden HUD
+F6             TASK-072: fourth resource/recipe path и persistence
 F7             регрессия TASK-062: salvage → repair
 F8             очистить gameplay-slot
 F9             регрессия TASK-064: strict JSON/data-driven catalog
@@ -113,17 +122,18 @@ F12            TASK-070: third resource/recipe path, isolation и persistence
 Esc            освободить курсор
 ```
 
-HUD показывает обе recipe chains, текущий active recipe, progress таймера и
-состояние обоих outputs. Resource nodes обязаны иметь уникальные
-`ResourceNodeId`; scene startup проверяет, что все три рецепта обеспечены
-физическими узлами, а `StationId`/`RecipeId` обеих stations совпадают с JSON.
+HUD показывает три station recipe chains, текущий active recipe, progress таймера
+и состояние трёх outputs. Resource nodes обязаны иметь уникальные
+`ResourceNodeId`; scene startup проверяет, что все четыре рецепта обеспечены
+физическими узлами, а `StationId`/`RecipeId` трёх stations совпадают с JSON.
 Успешный запуск должен напечатать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=6; resources=3; recipes=3.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=6; resources=3; recipes=3.
+TASK-064 content catalog READY: schema=1; items=8; resources=4; recipes=4.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=8; resources=4; recipes=4.
 TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
-TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=6; resources=3; recipes=3; stations=2.
+TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=8; resources=4; recipes=4; stations=3.
+TASK-072 fourth crafting path binding PASS: recipe=recipe.ship.coolant_regulator; resource=resource.thermal_gel; required=2; available=2; station=station.portable_fabricator; craftTime=3.5; items=8; resources=4; recipes=4; stations=3.
 ```
 
 Ожидаемые acceptance-результаты:
@@ -133,7 +143,7 @@ TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=
 ```
 
 ```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=6; resources=3; recipes=3; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
+TASK-064 data-driven content acceptance PASS: schema=1; items=8; resources=4; recipes=4; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
 ```
 
 ```text
@@ -148,7 +158,11 @@ TASK-068 data-driven craft-time acceptance PASS: duration=3.0; positiveDuration=
 TASK-070 third crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; bothCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
 ```
 
-`F7`, `F9`, `F10` и `F12` используют изолированные test-БД и не изменяют
+```text
+TASK-072 fourth crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; allThreeCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
+```
+
+`F6`, `F7`, `F9`, `F10` и `F12` используют изолированные test-БД и не изменяют
 `gameplay-slot`. `F11` выполняет Godot-независимую deterministic-приёмку таймера
 без изменения slot. `F8` необходим только для чистого ручного прогона.
 

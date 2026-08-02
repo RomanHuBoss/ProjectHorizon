@@ -187,6 +187,30 @@ mesh = SubResource("ResourceMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PhaseFiberBeta"]
 shape = SubResource("ResourceShape")
 
+[node name="ThermalGelAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -10.0, 0.7, 5.5)
+script = ExtResource("3_resource")
+ResourceNodeId = "thermal.alpha"
+ResourceDefinitionId = "resource.thermal_gel"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/ThermalGelAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ThermalGelAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="ThermalGelBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.866025, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866025, 10.0, 0.7, 5.5)
+script = ExtResource("3_resource")
+ResourceNodeId = "thermal.beta"
+ResourceDefinitionId = "resource.thermal_gel"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/ThermalGelBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ThermalGelBeta"]
+shape = SubResource("ResourceShape")
+
 [node name="LandingPad" type="StaticBody3D" parent="Gameplay"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, -10)
 
@@ -231,6 +255,18 @@ mesh = SubResource("CraftingStationMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/NavigationFabricator"]
 shape = SubResource("CraftingStationShape")
 
+[node name="CoolantFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, -5.8)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.coolant_regulator"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/CoolantFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CoolantFabricator"]
+shape = SubResource("CraftingStationShape")
+
 [node name="Hud" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
@@ -248,7 +284,7 @@ theme_override_styles/panel = SubResource("HudPanel")
 mouse_filter = 2
 custom_minimum_size = Vector2(850, 510)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 16
 text = "VERTICAL SLICE 1 — initializing"
 autowrap_mode = 2
 

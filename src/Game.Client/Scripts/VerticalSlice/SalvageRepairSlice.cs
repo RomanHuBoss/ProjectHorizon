@@ -47,6 +47,7 @@ public partial class SalvageRepairSlice : Node3D
     private CraftingRecipeDefinition? _repairRecipe;
     private CraftingRecipeDefinition? _launchCapacitorRecipe;
     private CraftingRecipeDefinition? _navigationArrayRecipe;
+    private CraftingRecipeDefinition? _coolantRegulatorRecipe;
     private StarterRepairSession? _session;
     private StarterShipRepairTerminal? _shipTerminal;
     private PortableCraftingStation? _activeCraftingStation;
@@ -62,6 +63,7 @@ public partial class SalvageRepairSlice : Node3D
     private Task<CraftingExpansionAcceptanceReport>? _craftingAcceptanceTask;
     private Task<CraftTimeAcceptanceReport>? _craftTimeAcceptanceTask;
     private Task<ThirdCraftingPathAcceptanceReport>? _thirdCraftingAcceptanceTask;
+    private Task<FourthCraftingPathAcceptanceReport>? _fourthCraftingAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -69,6 +71,7 @@ public partial class SalvageRepairSlice : Node3D
     private CraftingExpansionAcceptanceReport? _craftingAcceptanceReport;
     private CraftTimeAcceptanceReport? _craftTimeAcceptanceReport;
     private ThirdCraftingPathAcceptanceReport? _thirdCraftingAcceptanceReport;
+    private FourthCraftingPathAcceptanceReport? _fourthCraftingAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -85,6 +88,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _craftingAcceptanceHud = "READY";
     private string _craftTimeAcceptanceHud = "READY";
     private string _thirdCraftingAcceptanceHud = "READY";
+    private string _fourthCraftingAcceptanceHud = "READY";
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -106,6 +110,11 @@ public partial class SalvageRepairSlice : Node3D
         _navigationArrayRecipe ??
         throw new InvalidOperationException(
             "Navigation array recipe is unavailable.");
+
+    private CraftingRecipeDefinition CoolantRegulatorRecipe =>
+        _coolantRegulatorRecipe ??
+        throw new InvalidOperationException(
+            "Coolant regulator recipe is unavailable.");
 
     public override void _Ready()
     {
@@ -134,14 +143,18 @@ public partial class SalvageRepairSlice : Node3D
             VerticalSliceContentIds.LaunchCapacitorRecipeId);
         CraftingRecipeDefinition navigationArrayRecipe = catalog.GetRecipe(
             VerticalSliceContentIds.NavigationArrayRecipeId);
+        CraftingRecipeDefinition coolantRegulatorRecipe = catalog.GetRecipe(
+            VerticalSliceContentIds.CoolantRegulatorRecipeId);
         _contentCatalog = catalog;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
         _navigationArrayRecipe = navigationArrayRecipe;
+        _coolantRegulatorRecipe = coolantRegulatorRecipe;
         _session = new StarterRepairSession(
             repairRecipe,
             launchCapacitorRecipe,
-            navigationArrayRecipe);
+            navigationArrayRecipe,
+            coolantRegulatorRecipe);
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -196,9 +209,11 @@ public partial class SalvageRepairSlice : Node3D
             $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
             $"secondRecipe={LaunchCapacitorRecipe.RecipeId}; " +
             $"thirdRecipe={NavigationArrayRecipe.RecipeId}; " +
+            $"fourthRecipe={CoolantRegulatorRecipe.RecipeId}; " +
             $"craftTimes={LaunchCapacitorRecipe.CraftTimeSeconds:0.0}/" +
-            $"{NavigationArrayRecipe.CraftTimeSeconds:0.0}s. " +
-            "Press F7/F9/F10/F11/F12 for acceptance or F8 to reset.");
+            $"{NavigationArrayRecipe.CraftTimeSeconds:0.0}/" +
+            $"{CoolantRegulatorRecipe.CraftTimeSeconds:0.0}s. " +
+            "Press F6/F7/F9/F10/F11/F12 for acceptance or F8 to reset.");
     }
 
     public override void _Notification(int what)
@@ -230,6 +245,7 @@ public partial class SalvageRepairSlice : Node3D
         PollCraftingAcceptanceTask();
         PollCraftTimeAcceptanceTask();
         PollThirdCraftingAcceptanceTask();
+        PollFourthCraftingAcceptanceTask();
         UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
@@ -258,7 +274,12 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        if (Matches(physical, logical, Key.F7) && CanStartCommand())
+        if (Matches(physical, logical, Key.F6) && CanStartCommand())
+        {
+            BeginFourthCraftingAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F7) && CanStartCommand())
         {
             BeginAcceptance();
             GetViewport().SetInputAsHandled();
@@ -436,12 +457,16 @@ public partial class SalvageRepairSlice : Node3D
         _activeCraftingStation = source;
         _craftingInteractorName = interactor.Name.ToString();
         source.SetCrafting(true);
-        _lastDomainEvent = string.Equals(
-            recipeId,
-            VerticalSliceContentIds.LaunchCapacitorRecipeId,
-            StringComparison.Ordinal)
-            ? "LaunchCapacitorCraftStarted"
-            : "NavigationArrayCraftStarted";
+        _lastDomainEvent = recipeId switch
+        {
+            VerticalSliceContentIds.LaunchCapacitorRecipeId =>
+                "LaunchCapacitorCraftStarted",
+            VerticalSliceContentIds.NavigationArrayRecipeId =>
+                "NavigationArrayCraftStarted",
+            VerticalSliceContentIds.CoolantRegulatorRecipeId =>
+                "CoolantRegulatorCraftStarted",
+            _ => "StationCraftStarted"
+        };
         _status = $"crafting {recipeId}: 0.0/" +
             $"{_craftTimer.DurationSeconds:0.0}s";
         GD.Print(
@@ -531,20 +556,30 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         source.SetCrafted(true);
-        bool launchRecipe = string.Equals(
-            recipeId,
-            VerticalSliceContentIds.LaunchCapacitorRecipeId,
-            StringComparison.Ordinal);
-        _lastDomainEvent = launchRecipe
-            ? "LaunchCapacitorCrafted"
-            : "NavigationArrayCrafted";
+        _lastDomainEvent = recipeId switch
+        {
+            VerticalSliceContentIds.LaunchCapacitorRecipeId =>
+                "LaunchCapacitorCrafted",
+            VerticalSliceContentIds.NavigationArrayRecipeId =>
+                "NavigationArrayCrafted",
+            VerticalSliceContentIds.CoolantRegulatorRecipeId =>
+                "CoolantRegulatorCrafted",
+            _ => "StationRecipeCrafted"
+        };
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
         int outputQuantity = recipe.Outputs.Sum(output => output.Quantity);
         if (timed)
         {
-            string prefix = launchRecipe
-                ? "TASK-068 timed craft completion PASS: "
-                : "TASK-070 third crafting path completion PASS: ";
+            string prefix = recipeId switch
+            {
+                VerticalSliceContentIds.LaunchCapacitorRecipeId =>
+                    "TASK-068 timed craft completion PASS: ",
+                VerticalSliceContentIds.NavigationArrayRecipeId =>
+                    "TASK-070 third crafting path completion PASS: ",
+                VerticalSliceContentIds.CoolantRegulatorRecipeId =>
+                    "TASK-072 fourth crafting path completion PASS: ",
+                _ => "Station timed craft completion PASS: "
+            };
             GD.Print(
                 prefix +
                 $"recipe={recipeId}; station={stationId}; " +
@@ -607,6 +642,15 @@ public partial class SalvageRepairSlice : Node3D
             return true;
         }
 
+        if (string.Equals(
+            recipeId,
+            CoolantRegulatorRecipe.RecipeId,
+            StringComparison.Ordinal))
+        {
+            recipe = CoolantRegulatorRecipe;
+            return true;
+        }
+
         recipe = null!;
         return false;
     }
@@ -624,12 +668,13 @@ public partial class SalvageRepairSlice : Node3D
 
     private static string GetCraftTaskId(string recipeId)
     {
-        return string.Equals(
-            recipeId,
-            VerticalSliceContentIds.LaunchCapacitorRecipeId,
-            StringComparison.Ordinal)
-            ? "TASK-068"
-            : "TASK-070";
+        return recipeId switch
+        {
+            VerticalSliceContentIds.LaunchCapacitorRecipeId => "TASK-068",
+            VerticalSliceContentIds.NavigationArrayRecipeId => "TASK-070",
+            VerticalSliceContentIds.CoolantRegulatorRecipeId => "TASK-072",
+            _ => "TASK-CRAFT"
+        };
     }
 
     private void ValidateResourceNodeBindings()
@@ -665,7 +710,8 @@ public partial class SalvageRepairSlice : Node3D
         CraftingRecipeDefinition[] stationRecipes =
         {
             LaunchCapacitorRecipe,
-            NavigationArrayRecipe
+            NavigationArrayRecipe,
+            CoolantRegulatorRecipe
         };
         foreach (CraftingRecipeDefinition recipe in stationRecipes)
         {
@@ -732,7 +778,8 @@ public partial class SalvageRepairSlice : Node3D
         {
             RepairRecipe,
             LaunchCapacitorRecipe,
-            NavigationArrayRecipe
+            NavigationArrayRecipe,
+            CoolantRegulatorRecipe
         })
         {
             foreach (CraftingStackDefinition input in recipe.Inputs)
@@ -814,6 +861,22 @@ public partial class SalvageRepairSlice : Node3D
             $"items={ContentCatalog.Items.Count}; " +
             $"resources={ContentCatalog.Resources.Count}; " +
             $"recipes={ContentCatalog.Recipes.Count}; stations={_craftingStations.Count}.");
+
+        CraftingStackDefinition coolantInput = CoolantRegulatorRecipe.Inputs[0];
+        availableByDefinition.TryGetValue(
+            coolantInput.DefinitionId,
+            out int coolantAvailable);
+        GD.Print(
+            "TASK-072 fourth crafting path binding PASS: " +
+            $"recipe={CoolantRegulatorRecipe.RecipeId}; " +
+            $"resource={coolantInput.DefinitionId}; " +
+            $"required={coolantInput.Quantity}; " +
+            $"available={coolantAvailable}; " +
+            $"station={CoolantRegulatorRecipe.RequiredStation}; " +
+            $"craftTime={CoolantRegulatorRecipe.CraftTimeSeconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"items={ContentCatalog.Items.Count}; " +
+            $"resources={ContentCatalog.Resources.Count}; " +
+            $"recipes={ContentCatalog.Recipes.Count}; stations={_craftingStations.Count}.");
     }
 
     private static GameContentCatalog LoadContentCatalog()
@@ -866,6 +929,7 @@ public partial class SalvageRepairSlice : Node3D
             _craftingAcceptanceTask is null &&
             _craftTimeAcceptanceTask is null &&
             _thirdCraftingAcceptanceTask is null &&
+            _fourthCraftingAcceptanceTask is null &&
             _gracefulExitTask is null &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -989,6 +1053,39 @@ public partial class SalvageRepairSlice : Node3D
                 _lifetimeCancellation.Token);
     }
 
+    private void BeginFourthCraftingAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.fourth-crafting-path-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-072 fourth crafting path acceptance running";
+        _fourthCraftingAcceptanceHud = "RUNNING";
+        _fourthCraftingAcceptanceReport = null;
+        _fourthCraftingAcceptanceTask =
+            FourthCraftingPathAcceptanceRunner.RunAsync(
+                testPath,
+                SlotId,
+                RepairRecipe,
+                LaunchCapacitorRecipe,
+                NavigationArrayRecipe,
+                CoolantRegulatorRecipe,
+                BuildResourceBindings().Values
+                    .OrderBy(
+                        binding => binding.ResourceNodeId,
+                        StringComparer.Ordinal)
+                    .ToArray(),
+                _lifetimeCancellation.Token);
+    }
+
     private void BeginReset()
     {
         if (_database is null)
@@ -1054,6 +1151,7 @@ public partial class SalvageRepairSlice : Node3D
             _craftingAcceptanceTask is not null ||
             _craftTimeAcceptanceTask is not null ||
             _thirdCraftingAcceptanceTask is not null ||
+            _fourthCraftingAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -1079,7 +1177,8 @@ public partial class SalvageRepairSlice : Node3D
             $"salvage={Session.SalvageQuantity}; " +
             $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
             $"launchCapacitor={(Session.IsRecipeCrafted(LaunchCapacitorRecipe.RecipeId) ? 1 : 0)}; " +
-            $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}.");
+            $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}; " +
+            $"coolantRegulator={(Session.IsRecipeCrafted(CoolantRegulatorRecipe.RecipeId) ? 1 : 0)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -1124,7 +1223,8 @@ public partial class SalvageRepairSlice : Node3D
                 BuildResourceBindings(),
                 RepairRecipe,
                 LaunchCapacitorRecipe,
-                NavigationArrayRecipe);
+                NavigationArrayRecipe,
+                CoolantRegulatorRecipe);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -1148,7 +1248,8 @@ public partial class SalvageRepairSlice : Node3D
                 $"salvage={Session.SalvageQuantity}; " +
                 $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
                 $"launchCapacitor={(Session.IsRecipeCrafted(LaunchCapacitorRecipe.RecipeId) ? 1 : 0)}; " +
-                $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}.");
+                $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}; " +
+                $"coolantRegulator={(Session.IsRecipeCrafted(CoolantRegulatorRecipe.RecipeId) ? 1 : 0)}.");
         }
         catch (Exception exception)
         {
@@ -1171,7 +1272,8 @@ public partial class SalvageRepairSlice : Node3D
             _session = new StarterRepairSession(
                 RepairRecipe,
                 LaunchCapacitorRecipe,
-                NavigationArrayRecipe);
+                NavigationArrayRecipe,
+                CoolantRegulatorRecipe);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             _craftTimer.Reset();
@@ -1410,6 +1512,51 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollFourthCraftingAcceptanceTask()
+    {
+        if (_fourthCraftingAcceptanceTask is null ||
+            !_fourthCraftingAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<FourthCraftingPathAcceptanceReport> task =
+            _fourthCraftingAcceptanceTask;
+        _fourthCraftingAcceptanceTask = null;
+        try
+        {
+            _fourthCraftingAcceptanceReport = task.GetAwaiter().GetResult();
+            _fourthCraftingAcceptanceHud =
+                _fourthCraftingAcceptanceReport.Passed
+                    ? $"PASS resources={_fourthCraftingAcceptanceReport.ResourcesCollected}, " +
+                      $"blocked={(_fourthCraftingAcceptanceReport.BlockedBeforeResources ? 1 : 0)}, " +
+                      $"timed={(_fourthCraftingAcceptanceReport.TimedCompletion ? 1 : 0)}, " +
+                      $"isolated={(_fourthCraftingAcceptanceReport.RecipeIsolation ? 1 : 0)}, " +
+                      $"all3={(_fourthCraftingAcceptanceReport.AllThreeRecipesCrafted ? 1 : 0)}, " +
+                      $"output={_fourthCraftingAcceptanceReport.CoolantOutputQuantity}, " +
+                      $"roundTrip={(_fourthCraftingAcceptanceReport.ExactRoundTrip ? 1 : 0)}"
+                    : $"FAIL {_fourthCraftingAcceptanceReport.Result}";
+            _state = _fourthCraftingAcceptanceReport.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = _fourthCraftingAcceptanceReport.Result;
+            string output = BuildFourthCraftingPathAcceptanceOutput(
+                _fourthCraftingAcceptanceReport);
+            if (_fourthCraftingAcceptanceReport.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("fourth crafting path acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -1445,7 +1592,8 @@ public partial class SalvageRepairSlice : Node3D
             $"salvage={Session.SalvageQuantity}; " +
             $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
             $"launchCapacitor={(Session.IsRecipeCrafted(LaunchCapacitorRecipe.RecipeId) ? 1 : 0)}; " +
-            $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}; pending=0");
+            $"navigationArray={(Session.IsRecipeCrafted(NavigationArrayRecipe.RecipeId) ? 1 : 0)}; " +
+            $"coolantRegulator={(Session.IsRecipeCrafted(CoolantRegulatorRecipe.RecipeId) ? 1 : 0)}; pending=0");
     }
 
     private void PollGracefulExitTask()
@@ -1528,9 +1676,9 @@ public partial class SalvageRepairSlice : Node3D
         }
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
-            _hudMargin.OffsetRight = 930.0f;
+            _hudMargin.OffsetRight = 1140.0f;
             _hudMargin.OffsetBottom = 650.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(880.0f, 595.0f);
+            _hudLabel.CustomMinimumSize = new Vector2(1090.0f, 595.0f);
         }
     }
 
@@ -1552,14 +1700,20 @@ public partial class SalvageRepairSlice : Node3D
         CraftingStackDefinition launchOutput = LaunchCapacitorRecipe.Outputs[0];
         CraftingStackDefinition navigationInput = NavigationArrayRecipe.Inputs[0];
         CraftingStackDefinition navigationOutput = NavigationArrayRecipe.Outputs[0];
+        CraftingStackDefinition coolantInput = CoolantRegulatorRecipe.Inputs[0];
+        CraftingStackDefinition coolantOutput = CoolantRegulatorRecipe.Outputs[0];
         int launchResourceQuantity = Session.GetAvailableQuantity(
             launchInput.DefinitionId);
         int navigationResourceQuantity = Session.GetAvailableQuantity(
             navigationInput.DefinitionId);
+        int coolantResourceQuantity = Session.GetAvailableQuantity(
+            coolantInput.DefinitionId);
         bool launchCrafted = Session.IsRecipeCrafted(
             LaunchCapacitorRecipe.RecipeId);
         bool navigationCrafted = Session.IsRecipeCrafted(
             NavigationArrayRecipe.RecipeId);
+        bool coolantCrafted = Session.IsRecipeCrafted(
+            CoolantRegulatorRecipe.RecipeId);
         string activeRecipeId = _craftTimer.IsRunning
             ? _craftTimer.RecipeId
             : "none";
@@ -1568,13 +1722,13 @@ public partial class SalvageRepairSlice : Node3D
               $"{_craftTimer.ElapsedSeconds:0.0}/" +
               $"{_craftTimer.DurationSeconds:0.0}s " +
               $"({_craftTimer.Progress01 * 100.0:0}%)"
-            : launchCrafted && navigationCrafted
+            : launchCrafted && navigationCrafted && coolantCrafted
                 ? "COMPLETE"
                 : "idle";
         string objective;
         if (!Session.ShipRepaired)
         {
-            objective = $"Objective 1/3: collect salvage " +
+            objective = $"Objective 1/4: collect salvage " +
                 $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
                 "then interact with ship";
         }
@@ -1584,7 +1738,7 @@ public partial class SalvageRepairSlice : Node3D
                 $"{_craftTimer.ElapsedSeconds:0.0}/" +
                 $"{_craftTimer.DurationSeconds:0.0}s";
         }
-        else if (!launchCrafted || !navigationCrafted)
+        else if (!launchCrafted || !navigationCrafted || !coolantCrafted)
         {
             string launchGoal = launchCrafted
                 ? "READY"
@@ -1592,19 +1746,24 @@ public partial class SalvageRepairSlice : Node3D
             string navigationGoal = navigationCrafted
                 ? "READY"
                 : $"{navigationResourceQuantity}/{navigationInput.Quantity}";
+            string coolantGoal = coolantCrafted
+                ? "READY"
+                : $"{coolantResourceQuantity}/{coolantInput.Quantity}";
             objective = $"Objectives: capacitor={launchGoal} at PortableFabricator • " +
-                $"navigation={navigationGoal} at NavigationFabricator";
+                $"navigation={navigationGoal} at NavigationFabricator • " +
+                $"coolant={coolantGoal} at CoolantFabricator";
         }
         else
         {
-            objective = "Objective: COMPLETE — ship repaired and both components crafted";
+            objective = "Objective: COMPLETE — ship repaired and all three components crafted";
         }
 
         string ship = !Session.ShipRepaired
             ? $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
               Session.SalvageDefinitionId
             : $"Ship: REPAIRED • capacitor={(launchCrafted ? "READY" : "MISSING")} • " +
-              $"navigation={(navigationCrafted ? "READY" : "MISSING")}";
+              $"navigation={(navigationCrafted ? "READY" : "MISSING")} • " +
+              $"coolant={(coolantCrafted ? "READY" : "MISSING")}";
         string contentLine =
             $"Content: schema={ContentCatalog.SchemaVersion} • " +
             $"items={ContentCatalog.Items.Count} • " +
@@ -1624,6 +1783,11 @@ public partial class SalvageRepairSlice : Node3D
             $"{navigationInput.Quantity}×{navigationInput.DefinitionId} → " +
             $"{navigationOutput.Quantity}×{navigationOutput.DefinitionId} • " +
             $"time={NavigationArrayRecipe.CraftTimeSeconds:0.0}s";
+        string coolantRecipeLine =
+            $"Craft C: {CoolantRegulatorRecipe.RecipeId} • " +
+            $"{coolantInput.Quantity}×{coolantInput.DefinitionId} → " +
+            $"{coolantOutput.Quantity}×{coolantOutput.DefinitionId} • " +
+            $"time={CoolantRegulatorRecipe.CraftTimeSeconds:0.0}s";
         double nextAutosave = Math.Max(
             0.0,
             AutosaveIntervalSeconds - _autosaveElapsedSeconds);
@@ -1644,16 +1808,18 @@ public partial class SalvageRepairSlice : Node3D
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"crystal={launchResourceQuantity}/{launchInput.Quantity} • " +
                 $"fiber={navigationResourceQuantity}/{navigationInput.Quantity} • " +
+                $"gel={coolantResourceQuantity}/{coolantInput.Quantity} • " +
                 $"capacitor={(launchCrafted ? "READY" : "MISSING")} • " +
-                $"navigation={(navigationCrafted ? "READY" : "MISSING")} • rev={_revision}\n" +
+                $"navigation={(navigationCrafted ? "READY" : "MISSING")} • " +
+                $"coolant={(coolantCrafted ? "READY" : "MISSING")} • rev={_revision}\n" +
                 $"Craft: {craftProcess}\n" +
                 $"Content: schema={ContentCatalog.SchemaVersion} • " +
                 $"items={ContentCatalog.Items.Count} • resources={ContentCatalog.Resources.Count} • " +
                 $"recipes={ContentCatalog.Recipes.Count}\n" +
                 $"Interaction: {interaction}\n" +
                 $"Status: {_status}\n" +
-                "E — interact • F7 — gameplay • F8 — reset • F9 — content • " +
-                "F10 — crafting • F11 — craft time • F12 — third path";
+                "E — interact • F6 — fourth path • F7 — gameplay • F8 — reset • " +
+                "F9 — content • F10 — crafting • F11 — craft time • F12 — third path";
             return;
         }
 
@@ -1664,6 +1830,7 @@ public partial class SalvageRepairSlice : Node3D
             recipeLine + "\n" +
             launchRecipeLine + "\n" +
             navigationRecipeLine + "\n" +
+            coolantRecipeLine + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
             $"{_resourceNodes.Count}\n" +
@@ -1677,10 +1844,11 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-066 crafting (F10): {_craftingAcceptanceHud}\n" +
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 third path (F12): {_thirdCraftingAcceptanceHud}\n" +
+            $"TASK-072 fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space — move • E — collect/repair/craft • H — HUD • " +
-            "F7 — gameplay • F8 — reset • F9 — content • F10 — crafting • " +
-            "F11 — craft time • F12 — third path • Esc — release mouse";
+            "F6 — fourth path • F7 — gameplay • F8 — reset • F9 — content • " +
+            "F10 — crafting • F11 — craft time • F12 — third path • Esc — release mouse";
     }
 
     private static string BuildAcceptanceOutput(
@@ -1777,6 +1945,27 @@ public partial class SalvageRepairSlice : Node3D
             $"recipeIsolation={(report.RecipeIsolation ? 1 : 0)}; " +
             $"bothCrafted={(report.BothRecipesCrafted ? 1 : 0)}; " +
             $"output={report.NavigationOutputQuantity}; " +
+            $"questAutosave={(report.QuestAutosaveObserved ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+            $"revision={report.Revision}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildFourthCraftingPathAcceptanceOutput(
+        FourthCraftingPathAcceptanceReport report)
+    {
+        return "TASK-072 fourth crafting path acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"resources={report.ResourcesCollected}; " +
+            $"blockedBeforeResources={(report.BlockedBeforeResources ? 1 : 0)}; " +
+            $"timedCompletion={(report.TimedCompletion ? 1 : 0)}; " +
+            $"recipeIsolation={(report.RecipeIsolation ? 1 : 0)}; " +
+            $"allThreeCrafted={(report.AllThreeRecipesCrafted ? 1 : 0)}; " +
+            $"output={report.CoolantOutputQuantity}; " +
             $"questAutosave={(report.QuestAutosaveObserved ? 1 : 0)}; " +
             $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
             $"logWritten={(report.LogWritten ? 1 : 0)}; " +
