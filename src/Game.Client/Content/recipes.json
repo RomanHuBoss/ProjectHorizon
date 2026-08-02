@@ -55,6 +55,34 @@
         "ship",
         "launch"
       ]
+    },
+    {
+      "recipeId": "recipe.ship.navigation_array",
+      "inputs": [
+        {
+          "definitionId": "resource.phase_fiber",
+          "quantity": 2
+        }
+      ],
+      "outputs": [
+        {
+          "definitionId": "component.ship.navigation_array",
+          "quantity": 1
+        }
+      ],
+      "requiredTechnology": "",
+      "requiredStation": "station.portable_fabricator",
+      "craftTimeSeconds": 2.5,
+      "application": {
+        "type": "StoreOutputs",
+        "targetId": "inventory.ship",
+        "resultHealth": 0.0
+      },
+      "tags": [
+        "crafting",
+        "ship",
+        "navigation"
+      ]
     }
   ]
 }

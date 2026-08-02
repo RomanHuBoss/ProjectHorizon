@@ -44,6 +44,28 @@
         "crystal",
         "starter"
       ]
+    },
+    {
+      "resourceId": "resource.phase_fiber",
+      "itemDefinitionId": "resource.phase_fiber",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "visual": {
+        "albedoR": 0.12,
+        "albedoG": 0.72,
+        "albedoB": 0.58,
+        "emissionR": 0.02,
+        "emissionG": 0.34,
+        "emissionB": 0.22,
+        "emissionEnergy": 2.0,
+        "metallic": 0.18,
+        "roughness": 0.24
+      },
+      "tags": [
+        "surface",
+        "fiber",
+        "navigation"
+      ]
     }
   ]
 }

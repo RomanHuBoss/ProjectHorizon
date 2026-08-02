@@ -63,6 +63,8 @@ public sealed class StarterRepairSession
     private readonly Dictionary<string, MutableCollectedResourceState>
         _collectedResources = new(StringComparer.Ordinal);
     private readonly CraftingRecipeDefinition _repairRecipe;
+    private readonly Dictionary<string, CraftingRecipeDefinition> _stationRecipes =
+        new(StringComparer.Ordinal);
     private readonly CraftingRecipeDefinition? _secondaryRecipe;
     private readonly Dictionary<string, int> _craftedInventory =
         new(StringComparer.Ordinal);
@@ -71,9 +73,10 @@ public sealed class StarterRepairSession
 
     public StarterRepairSession(
         CraftingRecipeDefinition repairRecipe,
-        CraftingRecipeDefinition? secondaryRecipe = null)
+        params CraftingRecipeDefinition[] stationRecipes)
     {
         ArgumentNullException.ThrowIfNull(repairRecipe);
+        ArgumentNullException.ThrowIfNull(stationRecipes);
         if (repairRecipe.Inputs.Count == 0)
         {
             throw new ArgumentException(
@@ -91,23 +94,42 @@ public sealed class StarterRepairSession
                 nameof(repairRecipe));
         }
 
-        if (secondaryRecipe is not null && !string.Equals(
-            secondaryRecipe.Application.Type,
-            "StoreOutputs",
-            StringComparison.Ordinal))
+        foreach (CraftingRecipeDefinition stationRecipe in stationRecipes)
         {
-            throw new ArgumentException(
-                "Secondary crafting recipe must use StoreOutputs application.",
-                nameof(secondaryRecipe));
+            ArgumentNullException.ThrowIfNull(stationRecipe);
+            if (!string.Equals(
+                stationRecipe.Application.Type,
+                "StoreOutputs",
+                StringComparison.Ordinal))
+            {
+                throw new ArgumentException(
+                    $"Station recipe {stationRecipe.RecipeId} must use " +
+                    "StoreOutputs application.",
+                    nameof(stationRecipes));
+            }
+
+            if (!_stationRecipes.TryAdd(
+                stationRecipe.RecipeId,
+                stationRecipe))
+            {
+                throw new ArgumentException(
+                    $"Duplicate station recipe {stationRecipe.RecipeId}.",
+                    nameof(stationRecipes));
+            }
         }
 
         _repairRecipe = repairRecipe;
-        _secondaryRecipe = secondaryRecipe;
+        _secondaryRecipe = stationRecipes.FirstOrDefault();
     }
 
     public CraftingRecipeDefinition RepairRecipe => _repairRecipe;
 
     public CraftingRecipeDefinition? SecondaryRecipe => _secondaryRecipe;
+
+    public IReadOnlyList<CraftingRecipeDefinition> StationRecipes =>
+        _stationRecipes.Values
+            .OrderBy(recipe => recipe.RecipeId, StringComparer.Ordinal)
+            .ToArray();
 
     public string SalvageDefinitionId => _repairRecipe.Inputs[0].DefinitionId;
 
@@ -142,7 +164,8 @@ public sealed class StarterRepairSession
             .ToArray();
 
     public bool SecondaryRecipeCrafted =>
-        _secondaryRecipe is not null && HasRecipeOutputs(_secondaryRecipe);
+        _secondaryRecipe is not null &&
+        IsRecipeCrafted(_secondaryRecipe.RecipeId);
 
     public double RepairedHealth => _repairRecipe.Application.ResultHealth;
 
@@ -228,40 +251,44 @@ public sealed class StarterRepairSession
         return StarterRepairResult.Repaired;
     }
 
-    public StationCraftResult ValidateSecondaryCraft(
+    public StationCraftResult ValidateCraft(
+        string recipeId,
         string stationId,
         out string result)
     {
-        if (_secondaryRecipe is null)
+        if (!_stationRecipes.TryGetValue(
+            recipeId,
+            out CraftingRecipeDefinition? recipe) ||
+            recipe is null)
         {
-            result = "secondary recipe is unavailable";
+            result = $"station recipe {recipeId} is unavailable";
             return StationCraftResult.RecipeUnavailable;
         }
 
         if (!ShipRepaired)
         {
-            result = "repair the starter ship before crafting launch components";
+            result = "repair the starter ship before crafting ship components";
             return StationCraftResult.ShipNotRepaired;
         }
 
         if (!string.Equals(
             stationId,
-            _secondaryRecipe.RequiredStation,
+            recipe.RequiredStation,
             StringComparison.Ordinal))
         {
-            result = $"recipe {_secondaryRecipe.RecipeId} requires station " +
-                _secondaryRecipe.RequiredStation;
+            result = $"recipe {recipe.RecipeId} requires station " +
+                recipe.RequiredStation;
             return StationCraftResult.WrongStation;
         }
 
-        if (HasRecipeOutputs(_secondaryRecipe))
+        if (HasRecipeOutputs(recipe))
         {
-            result = $"recipe {_secondaryRecipe.RecipeId} already crafted";
+            result = $"recipe {recipe.RecipeId} already crafted";
             return StationCraftResult.AlreadyCrafted;
         }
 
         IReadOnlyList<CraftingStackDefinition> missing =
-            GetMissingRecipeInputs(_secondaryRecipe);
+            GetMissingRecipeInputs(recipe);
         if (missing.Count > 0)
         {
             result = "missing " + string.Join(
@@ -271,15 +298,17 @@ public sealed class StarterRepairSession
             return StationCraftResult.InsufficientInputs;
         }
 
-        result = $"recipe {_secondaryRecipe.RecipeId} is ready at {stationId}";
+        result = $"recipe {recipe.RecipeId} is ready at {stationId}";
         return StationCraftResult.Ready;
     }
 
-    public StationCraftResult TryCraftSecondary(
+    public StationCraftResult TryCraft(
+        string recipeId,
         string stationId,
         out string result)
     {
-        StationCraftResult validation = ValidateSecondaryCraft(
+        StationCraftResult validation = ValidateCraft(
+            recipeId,
             stationId,
             out result);
         if (validation != StationCraftResult.Ready)
@@ -287,9 +316,7 @@ public sealed class StarterRepairSession
             return validation;
         }
 
-        CraftingRecipeDefinition recipe = _secondaryRecipe ??
-            throw new InvalidOperationException(
-                "Validated secondary recipe became unavailable.");
+        CraftingRecipeDefinition recipe = _stationRecipes[recipeId];
         foreach (CraftingStackDefinition input in recipe.Inputs)
         {
             Consume(input.DefinitionId, input.Quantity);
@@ -300,6 +327,41 @@ public sealed class StarterRepairSession
         result = $"recipe {recipe.RecipeId} crafted; " +
             $"stored in {recipe.Application.TargetId}";
         return StationCraftResult.Crafted;
+    }
+
+    public StationCraftResult ValidateSecondaryCraft(
+        string stationId,
+        out string result)
+    {
+        if (_secondaryRecipe is null)
+        {
+            result = "secondary recipe is unavailable";
+            return StationCraftResult.RecipeUnavailable;
+        }
+
+        return ValidateCraft(_secondaryRecipe.RecipeId, stationId, out result);
+    }
+
+    public StationCraftResult TryCraftSecondary(
+        string stationId,
+        out string result)
+    {
+        if (_secondaryRecipe is null)
+        {
+            result = "secondary recipe is unavailable";
+            return StationCraftResult.RecipeUnavailable;
+        }
+
+        return TryCraft(_secondaryRecipe.RecipeId, stationId, out result);
+    }
+
+    public bool IsRecipeCrafted(string recipeId)
+    {
+        return _stationRecipes.TryGetValue(
+            recipeId,
+            out CraftingRecipeDefinition? recipe) &&
+            recipe is not null &&
+            HasRecipeOutputs(recipe);
     }
 
     public int GetAvailableQuantity(string definitionId)
@@ -325,11 +387,12 @@ public sealed class StarterRepairSession
         SaveGameSnapshot? snapshot,
         IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
         CraftingRecipeDefinition repairRecipe,
-        CraftingRecipeDefinition? secondaryRecipe = null)
+        params CraftingRecipeDefinition[] stationRecipes)
     {
         ArgumentNullException.ThrowIfNull(resourceBindings);
         ArgumentNullException.ThrowIfNull(repairRecipe);
-        StarterRepairSession session = new(repairRecipe, secondaryRecipe);
+        ArgumentNullException.ThrowIfNull(stationRecipes);
+        StarterRepairSession session = new(repairRecipe, stationRecipes);
         if (snapshot is null)
         {
             return session;
@@ -346,7 +409,8 @@ public sealed class StarterRepairSession
             string nodeId = item.ItemId[itemPrefix.Length..];
             if (!resourceBindings.TryGetValue(
                 nodeId,
-                out ResourceNodeBinding binding))
+                out ResourceNodeBinding? binding) ||
+                binding is null)
             {
                 continue;
             }
@@ -373,7 +437,7 @@ public sealed class StarterRepairSession
         }
 
         HashSet<string> knownOutputs = repairRecipe.Outputs
-            .Concat(secondaryRecipe?.Outputs ?? Array.Empty<CraftingStackDefinition>())
+            .Concat(stationRecipes.SelectMany(recipe => recipe.Outputs))
             .Select(output => output.DefinitionId)
             .ToHashSet(StringComparer.Ordinal);
         foreach (InventoryItemSaveData item in snapshot.Inventory)

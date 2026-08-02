@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Data-driven salvage/repair/crafting vertical slice — `IMPLEMENTED`
+### Data-driven salvage/repair/multi-crafting vertical slice — `IMPLEMENTED`
 
 Текущая стартовая сцена:
 
@@ -38,9 +38,13 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Принятый цикл `salvage → repair` расширен вторым ресурсом, отдельным рецептом,
-самостоятельной crafting station и data-driven временем изготовления. Статические
-определения находятся в:
+Принятый цикл `salvage → repair → timed craft → autosave` расширен третьим
+resource/recipe path. `TASK-068` и runtime-приёмка `TASK-069` подтверждены
+сборкой `0 warnings / 0 errors`, `F11: PASS` и ручным прохождением с autosave.
+Текущая реализация `TASK-070` добавляет независимое изготовление navigation array
+и обобщает доменную сессию для нескольких station recipes.
+
+Статические определения находятся в:
 
 ```text
 src/Game.Client/Content/items.json
@@ -49,8 +53,8 @@ src/Game.Client/Content/recipes.json
 ```
 
 Каталог строго проверяет schema version, стабильные dotted-ID, неизвестные поля,
-дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит четыре item,
-два resource и два recipe definitions:
+дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит шесть item,
+три resource и три recipe definitions:
 
 ```text
 3 × resource.salvage_alloy
@@ -63,28 +67,36 @@ src/Game.Client/Content/recipes.json
 → station.portable_fabricator
 → CraftTime 3.0 s
 → StoreOutputs
+
+2 × resource.phase_fiber
+→ 1 × component.ship.navigation_array
+→ station.portable_fabricator
+→ CraftTime 2.5 s
+→ StoreOutputs
 ```
 
 Игровая последовательность:
 
-1. собрать три голубых salvage-узла;
-2. отремонтировать красный стартовый корабль;
-3. собрать два фиолетовых conductive-crystal узла;
-4. использовать фиолетовый `PortableFabricator`;
-5. наблюдать трёхсекундный процесс: станция становится оранжевой, HUD показывает
-   `RUNNING elapsed/3.0s`, inputs до завершения не расходуются;
-6. получить `component.ship.launch_capacitor` и production-autosave;
-7. после холодного запуска восстановить собранные узлы, repaired ship,
-   crafted component, позицию и revision.
+1. собрать три голубых salvage-узла и отремонтировать стартовый корабль;
+2. собрать два фиолетовых conductive-crystal узла и использовать правый
+   `PortableFabricator`;
+3. дождаться трёхсекундного изготовления launch capacitor;
+4. собрать два зелёных phase-fiber узла и использовать левый
+   `NavigationFabricator`;
+5. дождаться `2.5 s` изготовления navigation array;
+6. проверить, что каждый рецепт расходует только свои inputs, второй рецепт не
+   изменяет состояние первого, а оба outputs сохраняются в inventory;
+7. после холодного запуска восстановить collected nodes, repaired ship, оба
+   crafted components, позицию и revision.
 
-Крафт launch capacitor до ремонта корабля блокируется. Неверная station ID и
-недостаточное количество inputs также отклоняются доменной моделью. Оба рецепта
-используют один Godot-независимый `StarterRepairSession`. Положительный
-`craftTimeSeconds` исполняется Godot-независимым `DataDrivenCraftTimer`: повторный
-запуск во время работы отклоняется, inputs удерживаются до завершения, затем
-расходуются ровно один раз; outputs сохраняются как inventory definitions и
-проходят SQLite round-trip. Закрытие окна во время процесса безопасно отменяет
-таймер без расходования inputs.
+Оба station recipes требуют предварительного ремонта корабля. Неверная station
+ID, неизвестный recipe ID, недостаточные inputs и повторный запуск уже готового
+рецепта отклоняются доменной моделью. `StarterRepairSession` хранит словарь
+station recipes и сохраняет обратную совместимость с прежним secondary-recipe
+API. Один `DataDrivenCraftTimer` допускает только один активный процесс: inputs
+удерживаются до завершения, расходуются ровно один раз, outputs сохраняются как
+inventory definitions и проходят SQLite round-trip. Закрытие окна во время
+процесса безопасно отменяет таймер без расходования inputs.
 
 Управление стартовой сценой:
 
@@ -95,20 +107,23 @@ H              detailed / compact / hidden HUD
 F7             регрессия TASK-062: salvage → repair
 F8             очистить gameplay-slot
 F9             регрессия TASK-064: strict JSON/data-driven catalog
-F10            регрессия TASK-066: второй ресурс, crafting и persistence
-F11            TASK-068: data-driven craft-time state machine
+F10            регрессия TASK-066: launch-capacitor crafting/persistence
+F11            регрессия TASK-068: data-driven craft-time state machine
+F12            TASK-070: third resource/recipe path, isolation и persistence
 Esc            освободить курсор
 ```
 
-HUD показывает текущую цель взаимодействия (`aimed at ...` или `near ...`).
-Resource nodes обязаны иметь уникальные `ResourceNodeId`; scene startup проверяет,
-что оба рецепта обеспечены физическими узлами, а `StationId`/`RecipeId` сцены
-совпадают с JSON. Успешный запуск печатает:
+HUD показывает обе recipe chains, текущий active recipe, progress таймера и
+состояние обоих outputs. Resource nodes обязаны иметь уникальные
+`ResourceNodeId`; scene startup проверяет, что все три рецепта обеспечены
+физическими узлами, а `StationId`/`RecipeId` обеих stations совпадают с JSON.
+Успешный запуск должен напечатать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
+TASK-064 content catalog READY: schema=1; items=6; resources=3; recipes=3.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=6; resources=3; recipes=3.
 TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
+TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=6; resources=3; recipes=3; stations=2.
 ```
 
 Ожидаемые acceptance-результаты:
@@ -118,7 +133,7 @@ TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=
 ```
 
 ```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; recipes=2; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
+TASK-064 data-driven content acceptance PASS: schema=1; items=6; resources=3; recipes=3; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
 ```
 
 ```text
@@ -129,9 +144,13 @@ TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; 
 TASK-068 data-driven craft-time acceptance PASS: duration=3.0; positiveDuration=1; started=1; duplicateRejected=1; inputsHeldUntilCompletion=1; partialRunning=1; completedAtDuration=1; singleCompletion=1; output=1
 ```
 
-`F7`, `F9` и `F10` используют изолированные test-БД и не изменяют gameplay-slot.
-`F11` выполняет Godot-независимую deterministic-приёмку таймера без изменения
-slot. `F8` необходим только для чистого ручного прогона.
+```text
+TASK-070 third crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; bothCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
+```
+
+`F7`, `F9`, `F10` и `F12` используют изолированные test-БД и не изменяют
+`gameplay-slot`. `F11` выполняет Godot-независимую deterministic-приёмку таймера
+без изменения slot. `F8` необходим только для чистого ручного прогона.
 
 
 ### Прототип A. Персонаж — `VERIFIED`

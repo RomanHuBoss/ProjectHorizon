@@ -20,6 +20,12 @@ public static class VerticalSliceContentIds
         "resource.conductive_crystal";
     public const string LaunchCapacitorItemId =
         "component.ship.launch_capacitor";
+    public const string NavigationArrayRecipeId =
+        "recipe.ship.navigation_array";
+    public const string PhaseFiberResourceId =
+        "resource.phase_fiber";
+    public const string NavigationArrayItemId =
+        "component.ship.navigation_array";
 }
 
 public sealed class ContentValidationException : Exception
