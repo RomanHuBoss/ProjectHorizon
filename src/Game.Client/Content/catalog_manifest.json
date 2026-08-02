@@ -1,0 +1,19 @@
+{
+  "catalogVersion": "2.0.0",
+  "schemaVersion": 2,
+  "items": 174,
+  "worldResources": 42,
+  "recipes": 128,
+  "stations": 15,
+  "technologies": 32,
+  "runtimeEnabledRecipes": 10,
+  "chemistryRecipes": 30,
+  "compotiumRecipes": 13,
+  "paraffiniumRecipes": 5,
+  "recipesWithCatalysts": 10,
+  "recipesWithByproducts": 17,
+  "recipesWithEnvironmentControls": 32,
+  "dependencyCycles": 0,
+  "unreachableRecipes": 0,
+  "notes": "Project Horizon original industry catalog. Compotium was named by the author’s son and is canonical project lore."
+}

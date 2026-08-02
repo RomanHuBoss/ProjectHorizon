@@ -12,10 +12,10 @@ roughness = 0.92
 
 [sub_resource type="BoxMesh" id="GroundMesh"]
 material = SubResource("GroundMaterial")
-size = Vector3(30, 0.2, 30)
+size = Vector3(40, 0.2, 40)
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(30, 0.2, 30)
+size = Vector3(40, 0.2, 40)
 
 [sub_resource type="CylinderMesh" id="ResourceMesh"]
 top_radius = 0.42
@@ -211,6 +211,160 @@ mesh = SubResource("ResourceMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ThermalGelBeta"]
 shape = SubResource("ResourceShape")
 
+[node name="PlasmaFilamentAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.92388, 0, 0.382683, 0, 1, 0, -0.382683, 0, 0.92388, -10.5, 0.7, 10.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "plasma.alpha"
+ResourceDefinitionId = "resource.plasma_filament"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/PlasmaFilamentAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PlasmaFilamentAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="PlasmaFilamentBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.92388, 0, -0.382683, 0, 1, 0, 0.382683, 0, 0.92388, 10.5, 0.7, 10.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "plasma.beta"
+ResourceDefinitionId = "resource.plasma_filament"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/PlasmaFilamentBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PlasmaFilamentBeta"]
+shape = SubResource("ResourceShape")
+
+
+[node name="QuantumResinAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.965926, 0, 0.258819, 0, 1, 0, -0.258819, 0, 0.965926, -16.0, 0.7, -12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "quantum.alpha"
+ResourceDefinitionId = "resource.quantum_resin"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/QuantumResinAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/QuantumResinAlpha"]
+shape = SubResource("ResourceShape")
+
+
+[node name="QuantumResinBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.965926, 0, -0.258819, 0, 1, 0, 0.258819, 0, 0.965926, 16.0, 0.7, -12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "quantum.beta"
+ResourceDefinitionId = "resource.quantum_resin"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/QuantumResinBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/QuantumResinBeta"]
+shape = SubResource("ResourceShape")
+
+
+[node name="AerogelMatrixAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.866025, 0, 0.5, 0, 1, 0, -0.5, 0, 0.866025, -16.0, 0.7, -6.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "aerogel.alpha"
+ResourceDefinitionId = "resource.aerogel_matrix"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AerogelMatrixAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AerogelMatrixAlpha"]
+shape = SubResource("ResourceShape")
+
+
+[node name="AerogelMatrixBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.866025, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866025, 16.0, 0.7, -6.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "aerogel.beta"
+ResourceDefinitionId = "resource.aerogel_matrix"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AerogelMatrixBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AerogelMatrixBeta"]
+shape = SubResource("ResourceShape")
+
+
+[node name="MagneticOreAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.707107, 0, 0.707107, 0, 1, 0, -0.707107, 0, 0.707107, -16.0, 0.7, 0.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "magnetic.alpha"
+ResourceDefinitionId = "resource.magnetic_ore"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/MagneticOreAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/MagneticOreAlpha"]
+shape = SubResource("ResourceShape")
+
+
+[node name="MagneticOreBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.707107, 0, -0.707107, 0, 1, 0, 0.707107, 0, 0.707107, 16.0, 0.7, 0.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "magnetic.beta"
+ResourceDefinitionId = "resource.magnetic_ore"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/MagneticOreBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/MagneticOreBeta"]
+shape = SubResource("ResourceShape")
+
+
+[node name="BioPolymerAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.608761, 0, 0.793353, 0, 1, 0, -0.793353, 0, 0.608761, -16.0, 0.7, 6.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "biopolymer.alpha"
+ResourceDefinitionId = "resource.bio_polymer"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/BioPolymerAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/BioPolymerAlpha"]
+shape = SubResource("ResourceShape")
+
+
+[node name="BioPolymerBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.608761, 0, -0.793353, 0, 1, 0, 0.793353, 0, 0.608761, 16.0, 0.7, 6.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "biopolymer.beta"
+ResourceDefinitionId = "resource.bio_polymer"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/BioPolymerBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/BioPolymerBeta"]
+shape = SubResource("ResourceShape")
+
+
+[node name="CeramicCompositeAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.5, 0, 0.866025, 0, 1, 0, -0.866025, 0, 0.5, -16.0, 0.7, 12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "ceramic.alpha"
+ResourceDefinitionId = "resource.ceramic_composite"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/CeramicCompositeAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CeramicCompositeAlpha"]
+shape = SubResource("ResourceShape")
+
+
+[node name="CeramicCompositeBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(0.5, 0, -0.866025, 0, 1, 0, 0.866025, 0, 0.5, 16.0, 0.7, 12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "ceramic.beta"
+ResourceDefinitionId = "resource.ceramic_composite"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/CeramicCompositeBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CeramicCompositeBeta"]
+shape = SubResource("ResourceShape")
+
 [node name="LandingPad" type="StaticBody3D" parent="Gameplay"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, -10)
 
@@ -267,14 +421,91 @@ mesh = SubResource("CraftingStationMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CoolantFabricator"]
 shape = SubResource("CraftingStationShape")
 
+[node name="PowerFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 8.5)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.power_coupler"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/PowerFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PowerFabricator"]
+shape = SubResource("CraftingStationShape")
+
+
+[node name="SensorFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -12.0, 0.8, 16.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.sensor_lens"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/SensorFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/SensorFabricator"]
+shape = SubResource("CraftingStationShape")
+
+
+[node name="LifeSupportFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.0, 0.8, 16.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.life_support_filter"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/LifeSupportFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/LifeSupportFabricator"]
+shape = SubResource("CraftingStationShape")
+
+
+[node name="AttitudeFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0, 0.8, 16.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.attitude_coil"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AttitudeFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AttitudeFabricator"]
+shape = SubResource("CraftingStationShape")
+
+
+[node name="SealantFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.0, 0.8, 16.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.sealant_cartridge"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/SealantFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/SealantFabricator"]
+shape = SubResource("CraftingStationShape")
+
+
+[node name="HeatShieldFabricator" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.0, 0.8, 16.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.portable_fabricator"
+RecipeId = "recipe.ship.heat_shield_tile"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/HeatShieldFabricator"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/HeatShieldFabricator"]
+shape = SubResource("CraftingStationShape")
+
 [node name="Hud" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
 mouse_filter = 2
 offset_left = 16.0
 offset_top = 16.0
-offset_right = 900.0
-offset_bottom = 565.0
+offset_right = 1140.0
+offset_bottom = 645.0
 
 [node name="PanelContainer" type="PanelContainer" parent="Hud/MarginContainer"]
 mouse_filter = 2
@@ -282,9 +513,9 @@ theme_override_styles/panel = SubResource("HudPanel")
 
 [node name="Label" type="Label" parent="Hud/MarginContainer/PanelContainer"]
 mouse_filter = 2
-custom_minimum_size = Vector2(850, 510)
+custom_minimum_size = Vector2(1090, 590)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
-theme_override_font_sizes/font_size = 16
+theme_override_font_sizes/font_size = 14
 text = "VERTICAL SLICE 1 — initializing"
 autowrap_mode = 2
 

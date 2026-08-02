@@ -30,7 +30,63 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Data-driven salvage/repair/multi-crafting vertical slice — `IMPLEMENTED`
+### Industry Content v2 и vertical slice — `IMPLEMENTED`
+
+Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
+
+```text
+schemaVersion=2
+items=174
+worldResources=42
+recipes=128
+stations=15
+technologies=32
+runtimeEnabledRecipes=10
+chemistryRecipes=30
+compotiumRecipes=13
+paraffiniumRecipes=5
+dependencyCycles=0
+unreachableRecipes=0
+```
+
+Нормативные документы находятся в:
+
+```text
+Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.docx
+Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf
+Technical_Specification/2.0/Project_Horizon_Recipe_Catalog_v2.0.csv
+Technical_Specification/2.0/Project_Horizon_Industry_Content_Schema_v2.0.json
+```
+
+Каталог статических данных:
+
+```text
+src/Game.Client/Content/items.json
+src/Game.Client/Content/resources.json
+src/Game.Client/Content/recipes.json
+src/Game.Client/Content/stations.json
+src/Game.Client/Content/technologies.json
+src/Game.Client/Content/localization.ru.json
+src/Game.Client/Content/localization.en.json
+src/Game.Client/Content/catalog_manifest.json
+```
+
+Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes, но отдельно описывает и структурно валидирует полный производственный контент. Остальные 118 recipes не создают по одной физической станции в тестовой сцене: они предназначены для следующего универсального UI выбора рецепта, технологических требований и расширенного chemical runtime.
+
+В состав v2 входят:
+
+- 18 refining recipes;
+- 30 chemistry recipes;
+- 22 industrial-component recipes;
+- 18 ship-module recipes;
+- 12 equipment/consumable recipes;
+- 10 base recipes;
+- 8 drone/vehicle/exotic recipes;
+- 10 текущих repair/ship-component recipes.
+
+Химическая линия является канонической частью мира. Она включает Парафиний, добываемый сырой Компотий, растворы и концентраты Компотия, очистку, стабилизацию, катализаторы, электролит, энергетические элементы, реакторный гель и конечные экзотические модули. Название «Компотий» предложено сыном автора проекта и закреплено в ТЗ без изменения.
+
+Recipe schema v2 поддерживает несколько inputs/outputs, catalysts, byproducts, dismantle returns, station/technology tiers, craft time, energy cost, batch size, температуру, давление, вакуум, качество и hazards. `GameContentCatalog` проверяет stable IDs, все ссылки, совместимость station/category/tier, technology graph, циклы и достижимость каждого recipe от мирового сырья.
 
 Текущая стартовая сцена:
 
@@ -38,141 +94,33 @@
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```
 
-Принятый цикл `salvage → repair → timed craft → autosave` расширен четырьмя
-последовательными data-driven resource/recipe paths. `TASK-070/TASK-071`
-синхронизированы по чистой сборке и `F12: PASS`. Текущая реализация `TASK-072`
-добавляет независимое изготовление coolant regulator, третью crafting station и
-изолированную `F6`-приёмку без изменения gameplay-slot.
-
-Статические определения находятся в:
-
-```text
-src/Game.Client/Content/items.json
-src/Game.Client/Content/resources.json
-src/Game.Client/Content/recipes.json
-```
-
-Каталог строго проверяет schema version, стабильные dotted-ID, неизвестные поля,
-дубликаты, диапазоны и межфайловые ссылки. Текущий набор содержит восемь item,
-четыре resource и четыре recipe definitions:
-
-```text
-3 × resource.salvage_alloy
-→ 1 × component.starter_hull_patch
-→ station.field_repair
-→ RepairShip
-
-2 × resource.conductive_crystal
-→ 1 × component.ship.launch_capacitor
-→ station.portable_fabricator
-→ CraftTime 3.0 s
-→ StoreOutputs
-
-2 × resource.phase_fiber
-→ 1 × component.ship.navigation_array
-→ station.portable_fabricator
-→ CraftTime 2.5 s
-→ StoreOutputs
-
-2 × resource.thermal_gel
-→ 1 × component.ship.coolant_regulator
-→ station.portable_fabricator
-→ CraftTime 3.5 s
-→ StoreOutputs
-```
-
-Игровая последовательность:
-
-1. собрать три голубых salvage-узла и отремонтировать стартовый корабль;
-2. собрать два фиолетовых conductive-crystal узла и использовать правый
-   `PortableFabricator`;
-3. дождаться трёхсекундного изготовления launch capacitor;
-4. собрать два зелёных phase-fiber узла и использовать левый
-   `NavigationFabricator`;
-5. дождаться `2.5 s` изготовления navigation array;
-6. собрать два оранжевых thermal-gel узла, использовать центральный
-   `CoolantFabricator` и дождаться `3.5 s` изготовления coolant regulator;
-7. проверить, что каждый рецепт расходует только свои inputs и не изменяет
-   состояния двух остальных outputs;
-8. после холодного запуска восстановить collected nodes, repaired ship, все три
-   crafted components, позицию и revision.
-
-Все station recipes требуют предварительного ремонта корабля. Неверная station
-ID, неизвестный recipe ID, недостаточные inputs и повторный запуск уже готового
-рецепта отклоняются доменной моделью. `StarterRepairSession` хранит словарь
-station recipes и сохраняет обратную совместимость с прежним secondary-recipe
-API. Один `DataDrivenCraftTimer` допускает только один активный процесс: inputs
-удерживаются до завершения, расходуются ровно один раз, outputs сохраняются как
-inventory definitions и проходят SQLite round-trip. Закрытие окна во время
-процесса безопасно отменяет таймер без расходования inputs.
-
-Управление стартовой сценой:
+Управление:
 
 ```text
 WASD / Space   движение и прыжок
-E              собрать ресурс / ремонтировать / крафтить
+E              собрать ресурс / ремонтировать / запустить рецепт станции
 H              detailed / compact / hidden HUD
-F6             TASK-072: fourth resource/recipe path и persistence
-F7             регрессия TASK-062: salvage → repair
+F4             TASK-080: весь Industry Content v2 (128 recipes)
+F5             TASK-076: playable runtime matrix (10 recipes)
+F6             регрессия coolant path
+F7             регрессия salvage → repair
 F8             очистить gameplay-slot
-F9             регрессия TASK-064: strict JSON/data-driven catalog
-F10            регрессия TASK-066: launch-capacitor crafting/persistence
-F11            регрессия TASK-068: data-driven craft-time state machine
-F12            TASK-070: third resource/recipe path, isolation и persistence
+F9             регрессия strict JSON catalog
+F10            регрессия launch-capacitor persistence
+F11            регрессия craft-time state machine
+F12            регрессия navigation path
 Esc            освободить курсор
 ```
 
-HUD показывает три station recipe chains, текущий active recipe, progress таймера
-и состояние трёх outputs. Resource nodes обязаны иметь уникальные
-`ResourceNodeId`; scene startup проверяет, что все четыре рецепта обеспечены
-физическими узлами, а `StationId`/`RecipeId` трёх stations совпадают с JSON.
-Успешный запуск должен напечатать:
+Ожидаемый `F4` HUD:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=8; resources=4; recipes=4.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=8; resources=4; recipes=4.
-TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
-TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=8; resources=4; recipes=4; stations=3.
-TASK-072 fourth crafting path binding PASS: recipe=recipe.ship.coolant_regulator; resource=resource.thermal_gel; required=2; available=2; station=station.portable_fabricator; craftTime=3.5; items=8; resources=4; recipes=4; stations=3.
+TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0
 ```
 
-Ожидаемые acceptance-результаты:
+`F5` продолжает прогонять девять физически представленных station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
 
-```text
-TASK-062 vertical slice integration acceptance PASS: resources=3; repairBlocked=1; shipRepaired=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
-```
-
-```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=8; resources=4; recipes=4; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1
-```
-
-```text
-TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; wrongStationRejected=1; blockedBeforeResources=1; crafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
-```
-
-```text
-TASK-068 data-driven craft-time acceptance PASS: duration=3.0; positiveDuration=1; started=1; duplicateRejected=1; inputsHeldUntilCompletion=1; partialRunning=1; completedAtDuration=1; singleCompletion=1; output=1
-```
-
-```text
-TASK-070 third crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; bothCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
-```
-
-```text
-TASK-072 fourth crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; allThreeCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok
-```
-
-`F6`, `F7`, `F9`, `F10` и `F12` используют изолированные test-БД и не изменяют
-`gameplay-slot`. `F11` выполняет Godot-независимую deterministic-приёмку таймера
-без изменения slot. `F8` необходим только для чистого ручного прогона.
-
-При замене файлов поверх уже собранной рабочей копии Godot/MSBuild может оставить
-старый `Game.Client.dll`, если `CoreCompile` помечен как актуальный. Для проверки
-hotfix persistence необходимо выполнить чистую пересборку: закрыть запущенную сцену
-и запустить `tools\clean-build-windows10.cmd` либо удалить
-`src\Game.Client\.godot\mono\temp`, после чего снова выполнить Build в Godot.
-В полном build log должна присутствовать строка `CoreCompile`; одного сообщения
-`CoreCompile пропускается` недостаточно для подтверждения новой редакции.
+После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 
 
 ### Прототип A. Персонаж — `VERIFIED`

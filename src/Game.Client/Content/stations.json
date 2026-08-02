@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 2,
+  "definitions": [
+    {
+      "stationId": "station.field_repair",
+      "localizationKey": "station.field_repair",
+      "tier": 1,
+      "energyCapacity": 40,
+      "parallelSlots": 1,
+      "supportedCategories": [
+        "Repair"
+      ],
+      "tags": [
+        "industry",
+        "tier_1"
+      ]
+    },
+    {
+      "stationId": "station.portable_fabricator",
+      "localizationKey": "station.portable_fabricator",
+      "tier": 1,
+      "energyCapacity": 80,
+      "parallelSlots": 1,
+      "supportedCategories": [
+        "Consumable",
+        "ShipComponent",
+        "Tool"
+      ],
+      "tags": [
+        "industry",
+        "tier_1"
+      ]
+    },
+    {
+      "stationId": "station.smelter",
+      "localizationKey": "station.smelter",
+      "tier": 1,
+      "energyCapacity": 180,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Refining"
+      ],
+      "tags": [
+        "industry",
+        "tier_1"
+      ]
+    },
+    {
+      "stationId": "station.refinery",
+      "localizationKey": "station.refinery",
+      "tier": 2,
+      "energyCapacity": 320,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "IndustrialComponent",
+        "Refining"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.chemical_processor",
+      "localizationKey": "station.chemical_processor",
+      "tier": 1,
+      "energyCapacity": 180,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Chemistry",
+        "Consumable"
+      ],
+      "tags": [
+        "industry",
+        "tier_1"
+      ]
+    },
+    {
+      "stationId": "station.distillation_column",
+      "localizationKey": "station.distillation_column",
+      "tier": 2,
+      "energyCapacity": 300,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Chemistry",
+        "Refining"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.electrolyzer",
+      "localizationKey": "station.electrolyzer",
+      "tier": 2,
+      "energyCapacity": 260,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Chemistry"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.polymer_reactor",
+      "localizationKey": "station.polymer_reactor",
+      "tier": 2,
+      "energyCapacity": 300,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Chemistry",
+        "IndustrialComponent"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.catalytic_refinery",
+      "localizationKey": "station.catalytic_refinery",
+      "tier": 3,
+      "energyCapacity": 480,
+      "parallelSlots": 3,
+      "supportedCategories": [
+        "Chemistry",
+        "Refining"
+      ],
+      "tags": [
+        "industry",
+        "tier_3"
+      ]
+    },
+    {
+      "stationId": "station.cryogenic_separator",
+      "localizationKey": "station.cryogenic_separator",
+      "tier": 3,
+      "energyCapacity": 520,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "Chemistry",
+        "Refining"
+      ],
+      "tags": [
+        "industry",
+        "tier_3"
+      ]
+    },
+    {
+      "stationId": "station.compotium_stabilizer",
+      "localizationKey": "station.compotium_stabilizer",
+      "tier": 4,
+      "energyCapacity": 780,
+      "parallelSlots": 1,
+      "supportedCategories": [
+        "Chemistry",
+        "Exotic"
+      ],
+      "tags": [
+        "industry",
+        "tier_4"
+      ]
+    },
+    {
+      "stationId": "station.electronics_bench",
+      "localizationKey": "station.electronics_bench",
+      "tier": 2,
+      "energyCapacity": 260,
+      "parallelSlots": 2,
+      "supportedCategories": [
+        "IndustrialComponent",
+        "Tool"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.machine_shop",
+      "localizationKey": "station.machine_shop",
+      "tier": 2,
+      "energyCapacity": 360,
+      "parallelSlots": 3,
+      "supportedCategories": [
+        "Base",
+        "Consumable",
+        "IndustrialComponent",
+        "Tool",
+        "Vehicle"
+      ],
+      "tags": [
+        "industry",
+        "tier_2"
+      ]
+    },
+    {
+      "stationId": "station.shipyard_fabricator",
+      "localizationKey": "station.shipyard_fabricator",
+      "tier": 3,
+      "energyCapacity": 620,
+      "parallelSlots": 3,
+      "supportedCategories": [
+        "ShipComponent",
+        "ShipModule"
+      ],
+      "tags": [
+        "industry",
+        "tier_3"
+      ]
+    },
+    {
+      "stationId": "station.exotic_research_fabricator",
+      "localizationKey": "station.exotic_research_fabricator",
+      "tier": 4,
+      "energyCapacity": 900,
+      "parallelSlots": 1,
+      "supportedCategories": [
+        "Base",
+        "Chemistry",
+        "Drone",
+        "Exotic",
+        "ShipModule",
+        "Vehicle"
+      ],
+      "tags": [
+        "industry",
+        "tier_4"
+      ]
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-industry-spec-v2-compotium.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,204 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, production persistence, salvage/repair loop, первые три data-driven resource/recipe path и data-driven `CraftTime` имеют статус `VERIFIED`. Пользователь подтвердил чистую сборку `0 warnings / 0 errors`, `F12: PASS`, а также `F9/F10/F11: PASS`; comprehensive `F12` подтвердил isolation, autosave, exact SQLite round-trip, one-writer и integrity. `TASK-070/TASK-071` синхронизированы в `VERIFIED`. Текущая итерация (`TASK-072`) добавляет четвёртый resource/recipe path и отдельную `F6`-приёмку (`TASK-073`).
+**Вывод:** все пять технических прототипов и ранее подтверждённый vertical slice остаются `VERIFIED`. Текущая крупная редакция `TASK-080` вводит законченное ТЗ v2.0 и полный Industry Content v2: 174 items, 42 world resources, 128 recipes, 15 stations и 32 technologies. Полный каталог статически реализован; runtime-приёмка `F4` ожидается в `TASK-081`. Расширенные механики выбора рецепта, research enforcement, catalysts/byproducts/energy/environment переводятся в отдельные системные задачи, а не реализуются по одному recipe.
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — законченное ТЗ v2.0, Industry Content v2 и химическая линия Компотия (`TASK-080`)
+
+**Исходный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip` — последняя подготовленная редакция из чата  
+**Подготовленный снимок:** `ProjectHorizon-main-industry-spec-v2-compotium.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** новая нормативная редакция `Technical_Specification/2.0`, разделы 17, 23, 36, 39–41 исходного ТЗ; `TASK-076`–`TASK-083`, `INDUSTRY-001`–`INDUSTRY-032`, `CHEM-001`–`CHEM-030`.
+
+**Решение по масштабу:** ограничение в 100 recipes признано искусственным. В ТЗ v2.0 зафиксирован связный каталог из 128 recipes с пятью технологическими уровнями, 15 типами станций и 32 технологиями. Контент оригинален; из других космических и промышленных игр заимствуются только общие жанровые принципы, без копирования названий, лора, текстов, чисел и конкретных цепочек.
+
+**Каталог v2:**
+
+- `items=174`;
+- `worldResources=42`;
+- `recipes=128`;
+- `stations=15`;
+- `technologies=32`;
+- `runtimeEnabledRecipes=10`;
+- `chemistryRecipes=30`;
+- `compotiumRecipes=13`;
+- `paraffiniumRecipes=5`;
+- `recipesWithCatalysts=10`;
+- `recipesWithByproducts=17`;
+- `recipesWithEnvironmentControls=32`;
+- `dependencyCycles=0`;
+- `unreachableRecipes=0`.
+
+**Реализовано:**
+
+- создано полное ТЗ `Project_Horizon_Technical_Specification_v2.0` в DOCX и PDF;
+- создан машиночитаемый полный recipe catalog CSV и опубликована JSON-схема Industry Content v2;
+- `items.json`, `resources.json` и `recipes.json` переведены на schemaVersion 2;
+- добавлены `stations.json`, `technologies.json`, русская и английская локализация, manifest каталога;
+- recipe schema поддерживает catalysts, byproducts, dismantle returns, station/technology tiers, energy, batch size, environment, quality и hazards;
+- добавлена оригинальная химическая линия Парафиния и Компотия; название «Компотий» закреплено как каноническое по предложению сына автора проекта;
+- `GameContentCatalog` валидирует все cross-references, technology graph, station compatibility, recipe dependency cycles и достижимость;
+- playable vertical slice фильтрует только `runtimeEnabled=true`, поэтому 118 следующих recipes не требуют 118 физических станций;
+- добавлена единая structural acceptance `F4 / TASK-080`; существующая `F5` остаётся runtime matrix для текущих 10 recipes;
+- persistence заранее регистрирует все 174 item IDs каталога.
+
+**Граница итерации:** каталог, схема и ТЗ завершены как спецификация и статическая реализация. В этой итерации не заявляются полностью готовые UI/production runtime для всех 128 recipes. `runtimeEnabled=false` означает, что запись валидна и включена в технологический граф, но ожидает универсальный station recipe selector и исполнение расширенной семантики.
+
+**Изменённые и добавленные файлы:**
+
+- `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.docx`;
+- `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf`;
+- `Technical_Specification/2.0/Project_Horizon_Recipe_Catalog_v2.0.csv`;
+- `Technical_Specification/2.0/Project_Horizon_Industry_Content_Schema_v2.0.json`;
+- все восемь файлов `src/Game.Client/Content/*`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Проверки в среде подготовки:**
+
+- все пять catalog JSON распарсены и имеют schemaVersion 2;
+- проверены 174 уникальных item ID, 42 resource ID, 128 recipe ID, 15 station ID и 32 technology ID;
+- проверены все input/output/catalyst/byproduct/station/technology references;
+- station category и tier contracts согласованы;
+- technology graph ацикличен;
+- все 128 recipes достижимы от world resources, циклы отсутствуют;
+- 45 C#-файлов прошли лексическую проверку строк, комментариев и delimiters;
+- DOCX и PDF подлежат отдельному render QA перед упаковкой;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому build/runtime `F4` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-078` → `SUPERSEDED` пакетной архитектурой `TASK-080/082`;
+- `TASK-080` → `IMPLEMENTED`;
+- `TASK-081` → `IN_PROGRESS` — clean build и runtime `F4`;
+- `TASK-082` → `PLANNED` — универсальный station recipe selector, technology unlocks и research UI;
+- `TASK-083` → `PLANNED` — catalysts, byproducts, energy, pressure/temperature/vacuum и chemical process runtime;
+- `TASK-006` → `BLOCKED`.
+
+**Приёмка `TASK-081`:** clean build `0/0`, startup `schema=2; items=174; resources=42; recipes=128; stations=15; technologies=32`, затем `F4: PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0`; после этого повторить `F5/F7/F9/F10/F11/F12`.
+
+### 2026-08-02 — пакетное завершение crafting-каталога и универсальная recipe matrix (`TASK-076`)
+
+**Исходный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip` — последняя подготовленная редакция из чата  
+**Подготовленный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-074`–`TASK-078`, `CONTENT-060`–`CONTENT-079`, `CONTENT-ACC-060`–`CONTENT-ACC-077`.
+
+**Изменение стратегии итераций:** по прямому указанию пользователя прекращено добавление обычных рецептов по одному. Все оставшиеся recipes с уже поддерживаемой семантикой `StoreOutputs` обработаны одним проходом. Следующие отдельные итерации допускаются только для новой механики, а не для очередной записи JSON.
+
+**Реализовано в `TASK-076`:**
+
+- каталог доведён до `items=20`, `resources=10`, `recipes=10`, из которых один repair recipe и девять station recipes;
+- одним пакетом добавлены пять resource/component/recipe chains:
+  - `resource.quantum_resin` → `component.ship.sensor_lens`, `3.25 s`;
+  - `resource.aerogel_matrix` → `component.ship.life_support_filter`, `3.75 s`;
+  - `resource.magnetic_ore` → `component.ship.attitude_coil`, `4.25 s`;
+  - `resource.bio_polymer` → `component.ship.sealant_cartridge`, `2.75 s`;
+  - `resource.ceramic_composite` → `component.ship.heat_shield_tile`, `4.5 s`;
+- в scene добавлены десять физических resource nodes с уникальными IDs и пять соответствующих fabricator stations; итог сцены — `21` resource node и `9` station;
+- `SalvageRepairSlice` получает все `StoreOutputs` recipes из каталога и маршрутизирует interaction, timer, event, autosave, load/reset и station visual по `RecipeId`, без новой ветки C# на каждый обычный рецепт;
+- crafted outputs и восстановление session остаются словарными и принимают весь набор recipe outputs;
+- HUD строит сводку каталога и pending recipes динамически вместо отдельной строки на каждый output;
+- удалён поштучный `FifthCraftingPathAcceptanceRunner`; `F5` переподключён к универсальному `CatalogCraftingMatrixAcceptanceRunner`;
+- единый F5-runner ремонтирует корабль и в одном изолированном прогоне проверяет все девять station recipes: blocked-before-inputs, wrong station, JSON time, duplicate start, inputs held, single completion, isolation, all outputs, `QuestCompleted` autosave, exact SQLite round-trip, autosave log, `maxWriters=1` и `integrity=ok`;
+- persistence registry получает все item definition ID из каталога до инициализации БД; ручное пополнение списка для каждого нового ordinary item не требуется;
+- прежние `F6/F7/F9/F10/F11/F12` сохранены как regression routes.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/items.json`;
+- `src/Game.Client/Content/resources.json`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/CatalogCraftingMatrixAcceptance.cs` и `.uid`;
+- удалены `src/Game.Client/Scripts/VerticalSlice/FifthCraftingPathAcceptance.cs` и `.uid`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** выполнен количественный минимум Этапа 1 — `10 ресурсов / 10 рецептов`. Не реализованы новые семантики PDF-полей: непустой `RequiredTechnology`, выбор нескольких recipes внутри одной physical station, multiple-input/multiple-output recipes, очередь и параллельная работа stations. Они должны идти отдельными механическими итерациями, а не копированием текущего шаблона.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ сверено текстово и по рендерам страниц 29 и 56–57: recipe должен содержать Inputs, Outputs, RequiredTechnology, RequiredStation и CraftTime; Этап 1 требует 10 ресурсов и 10 рецептов;
+- три JSON-файла независимо распарсены; подтверждены counts `20/10/10`, уникальные stable IDs, schema version, все item/resource/recipe cross-references и положительный CraftTime девяти station recipes;
+- scene проверена на `21` resource node, `9` stations, уникальные node IDs, полное physical input coverage и точное совпадение station RecipeId/RequiredStation с JSON;
+- лексически проверены `45` C#-файлов: строки, комментарии, delimiters; ссылок на удалённый fifth-specific runner в source/scene/csproj нет;
+- проверены `45` уникальных UID, все `res://`-ссылки и отсутствие `.git`, `.godot`, `bin`, `obj`, `.vs`, локальных БД и runtime-логов;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому clean build и runtime `F5` не заявляются.
+
+**Статусы:**
+
+- `TASK-074`, `CONTENT-060`–`CONTENT-066` остаются `IMPLEMENTED`;
+- `TASK-075` и поштучные `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` универсальной матрицей;
+- `TASK-076`, `CONTENT-070`–`CONTENT-079` → `IMPLEMENTED`;
+- `TASK-077`, `CONTENT-ACC-070`–`CONTENT-ACC-076` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`.
+
+**Следующий рекомендуемый шаг:** выполнить clean build `0/0`, проверить startup `items=20/resources=10/recipes=10`, выполнить `F5: PASS` с `station=9, crafted=9, isolated=9, roundTrip=1`, затем повторить `F6/F7/F9/F10/F11/F12`. После этого переходить не к одиннадцатому простому рецепту, а к `TASK-078` — универсальному выбору рецепта и enforcement `RequiredTechnology`.
+
+### 2026-08-02 — пятый resource/recipe path и four-recipe station session (`TASK-074`)
+
+**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-072`–`TASK-075`, `CONTENT-050`–`CONTENT-067`, `CONTENT-ACC-050`–`CONTENT-ACC-067`.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил успешную сборку `0` предупреждений / `0` ошибок (`00:00:01.31`);
+- HUD подтвердил `F6: PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1`;
+- регрессии `F7`, `F9`, `F10`, `F11` и `F12` завершились `PASS`; F9 подтвердил counts `8/4/4`;
+- screenshots подтвердили `QuestCompleted` autosave и штатную работу основной session после reset/periodic save;
+- `TASK-072`, `TASK-073`, `CONTENT-050`–`CONTENT-057` и `CONTENT-ACC-050`–`CONTENT-ACC-057` → `VERIFIED`.
+
+**Реализовано в `TASK-074`:**
+
+- каталог расширен до `items=10`, `resources=5`, `recipes=5`;
+- добавлены stable IDs `resource.plasma_filament`, `component.ship.power_coupler`, `recipe.ship.power_coupler`;
+- power recipe использует `2 × resource.plasma_filament`, station `station.portable_fabricator`, data-driven `craftTimeSeconds=4.0` и `StoreOutputs` в `inventory.ship`;
+- в сцену добавлены два уникальных plasma-filament node (`plasma.alpha`, `plasma.beta`) и отдельный `PowerFabricator`;
+- production session/load/reset/autosave/graceful-exit/HUD поддерживают четыре независимых station recipes и четыре crafted outputs;
+- controller routing и domain events различают launch capacitor, navigation array, coolant regulator и power coupler;
+- startup validation проверяет пять recipe inputs, четыре scene stations, положительный CraftTime и physical resource coverage;
+- добавлен изолированный `F5` runner: repair prerequisite, блокировка до plasma resources, timed completion, isolation от трёх предыдущих recipes, изготовление всех четырёх outputs, `QuestCompleted` autosave, exact SQLite round-trip, log, one-writer и integrity;
+- debug HUD расширен до четвёртой station chain и показывает отдельный статус `TASK-074 fifth path (F5)`.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Content/items.json`;
+- `src/Game.Client/Content/resources.json`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/FifthCraftingPathAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Граница итерации:** реализован пятый из требуемых Этапом 1 resource/recipe paths. UI выбора нескольких recipes внутри одной physical station, параллельная очередь процессов, RequiredTechnology и полный объём `10 ресурсов / 10 рецептов` остаются последующими задачами.
+
+**Проверки в среде подготовки:**
+
+- PDF-ТЗ текстово и визуально сверено на страницах 29 и 56–57: recipe содержит Inputs/Outputs/RequiredTechnology/RequiredStation/CraftTime, definitions data-driven, Этап 1 требует 10 ресурсов и 10 рецептов;
+- все JSON-файлы распарсены; counts, stable IDs, schema versions и cross-references проверены;
+- scene bindings проверены на одиннадцать resource nodes, четыре crafting stations, уникальные instance IDs и совпадение RecipeId/RequiredStation;
+- C# проверен лексически по строкам, комментариям и delimiters; новый acceptance runner не зависит от Godot API;
+- проверены UID, `res://`, hotkey `F5` внутри текущей main scene и отсутствие build/cache/database artifacts;
+- .NET SDK и Godot в среде подготовки отсутствуют, поэтому фактическая сборка и runtime `F5` здесь не заявляются.
+
+**Статусы:**
+
+- `TASK-072`, `TASK-073`, `CONTENT-050`–`CONTENT-057`, `CONTENT-ACC-050`–`CONTENT-ACC-057` → `VERIFIED`;
+- `TASK-074`, `CONTENT-060`–`CONTENT-067` → `IMPLEMENTED`;
+- `TASK-075`, `CONTENT-ACC-060`–`CONTENT-ACC-067` → `IN_PROGRESS`;
+- `TASK-006` → `BLOCKED`.
+
+**Следующий рекомендуемый шаг:** выполнить clean build `0/0`, проверить startup counts `10/5/5` и `TASK-074 ... binding PASS`, выполнить `F5: PASS`, затем повторить `F6/F7/F9/F10/F11/F12` и вручную подтвердить plasma-filament → PowerFabricator → `READY` → autosave → cold restart.
 
 ### 2026-08-02 — четвёртый resource/recipe path и three-recipe station session (`TASK-072`)
 
@@ -1979,38 +2174,82 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `CONTENT-050` | Каталог содержит четвёртый item/resource/recipe path со стабильными ID | `IMPLEMENTED` | `resource.thermal_gel`, `component.ship.coolant_regulator`, `recipe.ship.coolant_regulator` |
-| `CONTENT-051` | Thermal gel имеет два физических node с уникальными IDs и JSON-driven visual/yield | `IMPLEMENTED` | `thermal.alpha`, `thermal.beta`; оранжевый emissive material |
-| `CONTENT-052` | Coolant recipe связан с отдельной scene station и RequiredStation | `IMPLEMENTED` | `CoolantFabricator`; `station.portable_fabricator` |
-| `CONTENT-053` | Coolant process использует JSON `CraftTime=3.5`, удерживает inputs и создаёт output один раз | `IMPLEMENTED` | Общий `DataDrivenCraftTimer`, recipe-addressed completion |
-| `CONTENT-054` | Три station recipes независимы и могут быть изготовлены в одной session | `IMPLEMENTED` | Отдельные stable outputs и station states |
-| `CONTENT-055` | Все три crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `IMPLEMENTED` | Generic `CraftedInventory` + four-recipe `FromSnapshot` |
-| `CONTENT-056` | Production HUD/load/reset/autosave/graceful-exit учитывают coolant regulator | `IMPLEMENTED` | Третья chain, event и persisted state |
-| `CONTENT-057` | F6 изолированно проверяет fourth path, isolation, previous recipes и persistence | `IMPLEMENTED` | `FourthCraftingPathAcceptanceRunner` и отдельная test-БД |
-| `CONTENT-ACC-050` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Выполнить clean Build |
-| `CONTENT-ACC-051` | Startup подтверждает counts `8/4/4`, три stations и coolant binding | `IN_PROGRESS` | Нужна строка `TASK-072 fourth crafting path binding PASS` |
-| `CONTENT-ACC-052` | F6 подтверждает блокировку до thermal-gel resources и timed completion | `IN_PROGRESS` | Ожидается `blockedBeforeResources=1`, `timedCompletion=1` |
-| `CONTENT-ACC-053` | F6 подтверждает isolation и наличие всех трёх station outputs | `IN_PROGRESS` | Ожидается `recipeIsolation=1`, `allThreeCrafted=1`, `output=1` |
-| `CONTENT-ACC-054` | F6 подтверждает QuestCompleted autosave, log, one-writer и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
-| `CONTENT-ACC-055` | F6 подтверждает exact round-trip coolant regulator вместе с предыдущими outputs | `IN_PROGRESS` | Ожидается `roundTrip=1` |
-| `CONTENT-ACC-056` | F7/F9/F10/F11/F12 не регрессируют после fourth-path expansion | `IN_PROGRESS` | Повторить пять acceptance routes |
-| `CONTENT-ACC-057` | Ручной cycle и cold restart восстанавливают coolant regulator независимо | `IN_PROGRESS` | Нужны RUNNING/READY/autosave/restart screenshots |
+| `CONTENT-050` | Каталог содержит четвёртый item/resource/recipe path со стабильными ID | `VERIFIED` | Runtime F9 подтвердил catalog `8/4/4`; IDs thermal/coolant загружены |
+| `CONTENT-051` | Thermal gel имеет два физических node с уникальными IDs и JSON-driven visual/yield | `VERIFIED` | F6 собрал `resources=2`; scene nodes `thermal.alpha`, `thermal.beta` |
+| `CONTENT-052` | Coolant recipe связан с отдельной scene station и RequiredStation | `VERIFIED` | F6 завершён PASS через dedicated CoolantFabricator |
+| `CONTENT-053` | Coolant process использует JSON `CraftTime=3.5`, удерживает inputs и создаёт output один раз | `VERIFIED` | F6 `timed=1`, `output=1`; HUD подтвердил configured path |
+| `CONTENT-054` | Три station recipes независимы и могут быть изготовлены в одной session | `VERIFIED` | F6 `isolated=1`, `all3=1` |
+| `CONTENT-055` | Все три crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `VERIFIED` | F6 `roundTrip=1`, DB `integrity=ok` |
+| `CONTENT-056` | Production HUD/load/reset/autosave/graceful-exit учитывают coolant regulator | `VERIFIED` | Screenshots и `QuestCompleted` autosave подтверждены runtime |
+| `CONTENT-057` | F6 изолированно проверяет fourth path, isolation, previous recipes и persistence | `VERIFIED` | `TASK-072 fourth path (F6): PASS` |
+| `CONTENT-ACC-050` | Редакция собирается с 0 предупреждений и 0 ошибок | `VERIFIED` | Build пользователя: `0 warnings / 0 errors`, `00:00:01.31` |
+| `CONTENT-ACC-051` | Startup подтверждает counts `8/4/4`, три stations и coolant binding | `VERIFIED` | HUD/runtime catalog `8/4/4`; F6 PASS |
+| `CONTENT-ACC-052` | F6 подтверждает блокировку до thermal-gel resources и timed completion | `VERIFIED` | F6 `blocked=1`, `timed=1` |
+| `CONTENT-ACC-053` | F6 подтверждает isolation и наличие всех трёх station outputs | `VERIFIED` | F6 `isolated=1`, `all3=1`, `output=1` |
+| `CONTENT-ACC-054` | F6 подтверждает QuestCompleted autosave, log, one-writer и integrity | `VERIFIED` | Comprehensive F6 report PASS; DB `integrity=ok` |
+| `CONTENT-ACC-055` | F6 подтверждает exact round-trip coolant regulator вместе с предыдущими outputs | `VERIFIED` | F6 `roundTrip=1` |
+| `CONTENT-ACC-056` | F7/F9/F10/F11/F12 не регрессируют после fourth-path expansion | `VERIFIED` | Все пять routes показали PASS |
+| `CONTENT-ACC-057` | Ручной cycle и cold restart восстанавливают coolant regulator независимо | `VERIFIED` | Runtime autosave и persistence подтверждены comprehensive F6; visual cold-restart остаётся рекомендуемой регрессией |
+
+### 8.11. Этап 1 — пятый resource/recipe path
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `CONTENT-060` | Каталог содержит пятый item/resource/recipe path со стабильными ID | `IMPLEMENTED` | `resource.plasma_filament`, `component.ship.power_coupler`, `recipe.ship.power_coupler` |
+| `CONTENT-061` | Plasma filament имеет два физических node с уникальными IDs и JSON-driven visual/yield | `IMPLEMENTED` | `plasma.alpha`, `plasma.beta`; yellow/gold emissive material |
+| `CONTENT-062` | Power recipe связан с отдельной scene station и RequiredStation | `IMPLEMENTED` | `PowerFabricator`; `station.portable_fabricator` |
+| `CONTENT-063` | Power process использует JSON `CraftTime=4.0`, удерживает inputs и создаёт output один раз | `IMPLEMENTED` | Общий `DataDrivenCraftTimer`, recipe-addressed completion |
+| `CONTENT-064` | Четыре station recipes независимы и могут быть изготовлены в одной session | `IMPLEMENTED` | Отдельные stable outputs и station states |
+| `CONTENT-065` | Все четыре crafted outputs сериализуются и восстанавливаются exact SQLite round-trip | `IMPLEMENTED` | Generic `CraftedInventory` + five-recipe `FromSnapshot` |
+| `CONTENT-066` | Production HUD/load/reset/autosave/graceful-exit учитывают power coupler | `IMPLEMENTED` | Четвёртая chain, event и persisted state |
+| `CONTENT-067` | F5 изолированно проверяет fifth path, isolation, previous recipes и persistence | `SUPERSEDED` | Поштучный runner удалён; покрытие включено в `CatalogCraftingMatrixAcceptanceRunner` (`TASK-077`) |
+| `CONTENT-ACC-060` | Редакция собирается с 0 предупреждений и 0 ошибок | `SUPERSEDED` | Выполнить clean Build |
+| `CONTENT-ACC-061` | Startup подтверждает counts `10/5/5`, четыре stations и power binding | `SUPERSEDED` | Нужна строка `TASK-074 fifth crafting path binding PASS` |
+| `CONTENT-ACC-062` | F5 подтверждает блокировку до plasma resources и timed completion | `SUPERSEDED` | Ожидается `blockedBeforeResources=1`, `timedCompletion=1` |
+| `CONTENT-ACC-063` | F5 подтверждает isolation и наличие всех четырёх station outputs | `SUPERSEDED` | Ожидается `recipeIsolation=1`, `allFourCrafted=1`, `output=1` |
+| `CONTENT-ACC-064` | F5 подтверждает QuestCompleted autosave, log, one-writer и integrity | `SUPERSEDED` | Ожидается `questAutosave=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
+| `CONTENT-ACC-065` | F5 подтверждает exact round-trip power coupler вместе с предыдущими outputs | `SUPERSEDED` | Ожидается `roundTrip=1` |
+| `CONTENT-ACC-066` | F6/F7/F9/F10/F11/F12 не регрессируют после fifth-path expansion | `SUPERSEDED` | Повторить шесть acceptance routes |
+| `CONTENT-ACC-067` | Ручной cycle и cold restart восстанавливают power coupler независимо | `SUPERSEDED` | Нужны RUNNING/READY/autosave/restart screenshots |
+
+### 8.12. Этап 1 — полный crafting-каталог и универсальный runtime
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `CONTENT-070` | Каталог содержит минимум Этапа 1: 20 item definitions, 10 resources и 10 recipes | `IMPLEMENTED` | JSON counts `20/10/10`; один repair и девять station recipes |
+| `CONTENT-071` | Все пять оставшихся ordinary resource/component/recipe chains добавлены одним пакетом | `IMPLEMENTED` | quantum resin, aerogel matrix, magnetic ore, bio polymer, ceramic composite и соответствующие outputs |
+| `CONTENT-072` | Все десять resources имеют физическое покрытие scene nodes | `IMPLEMENTED` | `21` уникальный resource node: `3` salvage + `9 × 2` station inputs |
+| `CONTENT-073` | Все девять station recipes имеют отдельную scene station с корректным binding | `IMPLEMENTED` | `9` fabricators; RecipeId set точно совпадает с catalog StoreOutputs set |
+| `CONTENT-074` | Production interaction/timer/completion/event routing не требует recipe-specific ветки для ordinary recipes | `IMPLEMENTED` | `_stationRecipes`, generic resolution и `BuildCraftEventName` по RecipeId |
+| `CONTENT-075` | HUD отображает catalog summary, active process и pending recipes динамически | `IMPLEMENTED` | counts, crafted/total и pending preview формируются по StationRecipes |
+| `CONTENT-076` | Persistence регистрирует catalog item IDs и восстанавливает все crafted outputs словарно | `IMPLEMENTED` | `RegisterKnownInventoryDefinitions(catalog.Items.Keys)` + generic `FromSnapshot` |
+| `CONTENT-077` | Один acceptance runner покрывает полную матрицу recipes | `IMPLEMENTED` | `CatalogCraftingMatrixAcceptanceRunner`, отдельная F5 test-БД |
+| `CONTENT-078` | Добавление ordinary StoreOutputs recipe не требует нового acceptance-класса и нового HUD-поля | `IMPLEMENTED` | fifth-specific runner удалён; F5 перебирает catalog recipes |
+| `CONTENT-079` | Предыдущие acceptance routes сохранены как регрессии | `IMPLEMENTED` | F6/F7/F9/F10/F11/F12 не удалены |
+| `CONTENT-ACC-070` | Редакция собирается с 0 предупреждений и 0 ошибок | `IN_PROGRESS` | Выполнить clean Build с реальным `CoreCompile` |
+| `CONTENT-ACC-071` | Startup подтверждает `20/10/10`, `stationRecipes=9`, `sceneStations=9`, `resourceNodes=21` | `IN_PROGRESS` | Нужна строка `TASK-076 crafting catalog binding PASS` |
+| `CONTENT-ACC-072` | F5 подтверждает blocked/timed/isolation/crafted для всех девяти station recipes | `IN_PROGRESS` | Ожидается `blocked=9`, `timed=9`, `isolated=9`, `crafted=9` |
+| `CONTENT-ACC-073` | F5 подтверждает wrong-station и duplicate-start rejection | `IN_PROGRESS` | Ожидается `wrongStation=1`, `duplicateStart=1` |
+| `CONTENT-ACC-074` | F5 подтверждает autosave, exact round-trip, log, one-writer и integrity | `IN_PROGRESS` | Ожидается `questAutosave=1`, `roundTrip=1`, `logWritten=1`, `maxWriters=1`, `integrity=ok` |
+| `CONTENT-ACC-075` | F6/F7/F9/F10/F11/F12 не регрессируют после batch expansion | `IN_PROGRESS` | Повторить шесть legacy routes; F9 должен показать `20/10/10` |
+| `CONTENT-ACC-076` | Ручной sample новых paths и cold restart подтверждают production routing/persistence | `IN_PROGRESS` | Достаточно проверить 1–2 новых recipes, autosave и restart; все девять вручную повторять не требуется |
 
 ## 9. Очередь ближайших задач
 
-Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`.
+Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-071`; Прототипы A–E, production persistence, salvage/repair loop, первые три content path и data-driven craft-time processing.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-073`; Прототипы A–E, production persistence, salvage/repair loop, четыре content path и data-driven craft-time processing.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-073` | Выполнить runtime-приёмку четвёртого resource/recipe path | Сборка 0/0; startup `8/4/4`; `F6: PASS`; `F7/F9/F10/F11/F12: PASS`; manual coolant process/autosave/cold restart |
+| 1 | `TASK-077` | Выполнить runtime-приёмку полного crafting-каталога | Clean build `0/0`; startup `20/10/10`; `F5: PASS` для 9 station recipes; `F6/F7/F9/F10/F11/F12: PASS`; sample manual craft/autosave/cold restart |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-074` | Добавить пятый resource/recipe path | После `TASK-073: VERIFIED` продолжить движение к 10 ресурсам/10 рецептам Этапа 1 |
+| 3 | `TASK-078` | Реализовать универсальный выбор рецепта и enforcement `RequiredTechnology` | Новая механика: одна station может выбирать несколько recipes; непустая технология блокирует недоступный recipe; data-driven acceptance без recipe-specific C# |
 
-**Подтверждено:** `TASK-060`–`TASK-071`, persistence, vertical slice, три content path и timed craft.  
-**Реализовано:** `TASK-072`, `CONTENT-050`–`CONTENT-057`.  
-**Текущая приёмочная задача:** `TASK-073`.
+**Подтверждено:** `TASK-060`–`TASK-073`, persistence, vertical slice, четыре content path и timed craft.  
+**Реализовано:** `TASK-074`, `TASK-076`, `CONTENT-060`–`CONTENT-066`, `CONTENT-070`–`CONTENT-079`.  
+**Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.  
+**Текущая приёмочная задача:** `TASK-077`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -2055,20 +2294,20 @@ Vertical slice graceful-exit autosave PASS: saved=1; revision=<N+1>; pending=0
 2. Запустить main scene и дождаться `DB: Ready`. До этого Output должен содержать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-064 content binding PASS: schema=1; recipe=recipe.ship.starter_repair; resource=resource.salvage_alloy; required=3; available=3; items=4; resources=2; recipes=2; station=station.field_repair.
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-064 content binding PASS: schema=1; recipe=recipe.ship.starter_repair; resource=resource.salvage_alloy; required=3; available=3; items=20; resources=10; recipes=10; station=station.field_repair.
 ```
 
 3. Нажать `F9` один раз. Тест занимает менее секунды и не изменяет slot/JSON. Ожидаемый HUD:
 
 ```text
-TASK-064 content (F9): PASS schema=1, items=4, resources=2, recipes=2, dataDriven=1, invalidRejected=2
+TASK-064 content (F9): PASS schema=1, items=20, resources=10, recipes=10, dataDriven=1, invalidRejected=2
 ```
 
 4. Ожидаемая полная строка Output:
 
 ```text
-TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; recipes=2; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1; elapsedMs=<время>; result=JSON catalog validated; recipe threshold changed in memory and domain behavior followed the data
+TASK-064 data-driven content acceptance PASS: schema=1; items=20; resources=10; recipes=10; recipe=recipe.ship.starter_repair; required=3; variantRequired=4; blockedBelowVariant=1; repairedAtVariant=1; outputs=1; duplicateRejected=1; missingReferenceRejected=1; stableIds=1; elapsedMs=<время>; result=JSON catalog validated; recipe threshold changed in memory and domain behavior followed the data
 ```
 
 5. Нажать `F7`: gameplay/persistence regression должна остаться `PASS`.
@@ -2084,8 +2323,8 @@ TASK-064 data-driven content acceptance PASS: schema=1; items=4; resources=2; re
 2. Запустить main scene и дождаться `DB: Ready`. Output должен содержать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=20; resources=10; recipes=10.
 ```
 
 3. Нажать `F10` один раз. Тест использует `save_1.crafting-expansion-test.db`, проверяет доменную/persistence-цепочку и не изменяет gameplay-slot.
@@ -2101,7 +2340,7 @@ TASK-066 crafting (F10): PASS resources=2, repairFirst=1, wrongStation=1, blocke
 TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; wrongStationRejected=1; blockedBeforeResources=1; crafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=second resource was collected, crafted at the dedicated station and persisted exactly
 ```
 
-6. Повторить `F9`; counts должны быть `items=4, resources=2, recipes=2`, остальные критерии — PASS.
+6. Повторить `F9`; counts должны быть `items=20, resources=10, recipes=10`, остальные критерии — PASS.
 7. Повторить `F7`; результат должен остаться `resources=3` и PASS, то есть два crystal nodes не должны ошибочно входить в repair acceptance.
 8. Нажать `F8`. До ремонта корабля подойти к фиолетовому PortableFabricator и нажать `E`: ожидается `LaunchCapacitorCraftBlocked`/сообщение о необходимости ремонта.
 9. Собрать три голубых узла, отремонтировать корабль, затем собрать два фиолетовых crystal nodes. HUD должен пройти `crystal=0/2 → 1/2 → 2/2`.
@@ -2116,8 +2355,8 @@ TASK-066 crafting expansion acceptance PASS: resources=2; repairPrerequisite=1; 
 2. Запустить main scene и дождаться `DB: Ready`. Output должен содержать все строки:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=4; resources=2; recipes=2.
-TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=4; resources=2; recipes=2.
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-066 crafting binding PASS: recipe=recipe.ship.launch_capacitor; resource=resource.conductive_crystal; required=2; available=2; station=station.portable_fabricator; craftTime=3.0; items=20; resources=10; recipes=10.
 TASK-068 craft-time binding PASS: recipe=recipe.ship.launch_capacitor; duration=3.0; station=station.portable_fabricator; timer=DataDrivenCraftTimer.
 ```
 
@@ -2183,8 +2422,8 @@ TASK-068 timed craft cancelled safely: recipe=recipe.ship.launch_capacitor; elap
 2. Запустить стартовую scene и дождаться `DB: Ready`. В Output должны присутствовать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=6; resources=3; recipes=3.
-TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=6; resources=3; recipes=3; stations=2.
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-070 third crafting path binding PASS: recipe=recipe.ship.navigation_array; resource=resource.phase_fiber; required=2; available=2; station=station.portable_fabricator; craftTime=2.5; items=20; resources=10; recipes=10; stations=9.
 ```
 
 3. Нажать `F12`. HUD должен показать:
@@ -2226,8 +2465,8 @@ TASK-070 third crafting path completion PASS: recipe=recipe.ship.navigation_arra
 2. Запустить стартовую scene и дождаться `DB: Ready`. В Output должны присутствовать:
 
 ```text
-TASK-064 content catalog READY: schema=1; items=8; resources=4; recipes=4.
-TASK-072 fourth crafting path binding PASS: recipe=recipe.ship.coolant_regulator; resource=resource.thermal_gel; required=2; available=2; station=station.portable_fabricator; craftTime=3.5; items=8; resources=4; recipes=4; stations=3.
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-072 fourth crafting path binding PASS: recipe=recipe.ship.coolant_regulator; resource=resource.thermal_gel; required=2; available=2; station=station.portable_fabricator; craftTime=3.5; items=20; resources=10; recipes=10; stations=9.
 ```
 
 3. Нажать `F6`. HUD должен показать:
@@ -2261,7 +2500,92 @@ TASK-072 fourth crafting path completion PASS: recipe=recipe.ship.coolant_regula
 11. Дождаться autosave, штатно закрыть игру и запустить снова. Coolant regulator, consumed thermal gel, collected nodes, repaired ship, player position и revision должны восстановиться.
 12. При `FAIL` прислать полный HUD, последние 160 строк Output и указать, выполнялась ли clean сборка.
 
-## 16. Журнал проверок
+## 16. Runtime-приёмка `TASK-074/TASK-075`
+
+1. Выполнить clean Build `Game.Client.csproj`. Критерий: `0` ошибок и `0` предупреждений.
+2. Запустить стартовую scene и дождаться `DB: Ready`. В Output должны присутствовать:
+
+```text
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-074 fifth crafting path binding PASS: recipe=recipe.ship.power_coupler; resource=resource.plasma_filament; required=2; available=2; station=station.portable_fabricator; craftTime=4.0; items=20; resources=10; recipes=10; stations=9.
+```
+
+3. Нажать `F5`. HUD должен показать:
+
+```text
+TASK-074 fifth path (F5): PASS resources=2, blocked=1, timed=1, isolated=1, all4=1, output=1, roundTrip=1
+```
+
+4. Полная строка Output:
+
+```text
+TASK-074 fifth crafting path acceptance PASS: resources=2; blockedBeforeResources=1; timedCompletion=1; recipeIsolation=1; allFourCrafted=1; output=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=fifth data-driven resource and timed recipe remained isolated, coexisted with all previous station recipes and persisted exactly
+```
+
+5. Выполнить регрессии `F6`, `F7`, `F9`, `F10`, `F11`, `F12`. Все шесть должны завершиться `PASS`; F9 должен показать counts `10/5/5`.
+6. Для ручного прогона нажать `F8`, собрать salvage и отремонтировать корабль.
+7. Собрать два жёлто-золотых plasma-filament node (`plasma.alpha`, `plasma.beta`). До второго node power recipe должна быть заблокирована.
+8. Подойти к `PowerFabricator` позади стартовой точки, нажать `E`. Ожидается:
+
+```text
+TASK-074 timed craft started: recipe=recipe.ship.power_coupler; station=station.portable_fabricator; duration=4.0; inputsHeld=1; output=0.
+```
+
+9. До `4.0 s` station оранжевая, HUD показывает `RUNNING recipe.ship.power_coupler`, plasma remains `2/2`, power coupler — `MISSING`.
+10. После завершения station зелёная, plasma `0/2`, power coupler `READY`; capacitor/navigation/coolant не изменены. Ожидается:
+
+```text
+TASK-074 fifth crafting path completion PASS: recipe=recipe.ship.power_coupler; station=station.portable_fabricator; configured=4.0; elapsed=4.0; inputsHeldUntilCompletion=1; completedOnce=1; output=1; autosaveTrigger=QuestCompleted; revision=<N>; interactor=<имя>
+```
+
+11. Дождаться autosave, штатно закрыть игру и запустить снова. Power coupler, consumed plasma filament, collected nodes, repaired ship, player position и revision должны восстановиться.
+12. При `FAIL` прислать полный HUD, последние 180 строк Output и указать, выполнялась ли clean сборка.
+
+## 17. Runtime-приёмка `TASK-076/TASK-077`
+
+1. Остановить сцену и выполнить `tools\clean-build-windows10.cmd`. В build log должен реально выполняться `CoreCompile`. Критерий: `0` предупреждений, `0` ошибок.
+2. Запустить main scene и дождаться `DB: Ready`. Ожидается:
+
+```text
+TASK-064 content catalog READY: schema=1; items=20; resources=10; recipes=10.
+TASK-076 crafting catalog binding PASS: items=20; resources=10; recipes=10; stationRecipes=9; sceneStations=9; resourceNodes=21; allInputsCovered=1; allCraftTimesPositive=1.
+```
+
+3. Нажать `F5` один раз и дождаться завершения изолированной test-БД. Ожидаемый HUD:
+
+```text
+TASK-076 catalog matrix (F5): PASS resources=10, recipes=10, station=9, crafted=9, isolated=9, roundTrip=1
+```
+
+4. Ожидаемая итоговая строка Output:
+
+```text
+TASK-076 catalog crafting matrix acceptance PASS: items=20; resources=10; recipes=10; stationRecipes=9; resourceNodes=21; blocked=9; timed=9; isolated=9; crafted=9; output=9; wrongStation=1; duplicateStart=1; questAutosave=1; roundTrip=1; logWritten=1; revision=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=the full crafting catalog met Stage 1 minimum coverage, was validated in one data-driven matrix, crafted independently and persisted exactly
+```
+
+5. Последовательно выполнить `F6`, `F7`, `F9`, `F10`, `F11`, `F12`. Все должны завершиться `PASS`; F9 должен показать `items=20`, `resources=10`, `recipes=10`.
+6. Для production smoke-test после `F8` отремонтировать корабль и вручную изготовить один или два новых outputs, например `sensor_lens` и `heat_shield_tile`. Проверить RUNNING, удержание inputs до таймера, READY, `QuestCompleted` autosave и cold restart. Ручное повторение всех девяти recipes не требуется: полную матрицу покрывает F5.
+7. При `FAIL` прислать полный HUD, последние 200 строк Output и полный build log. Новый runner сообщает counts failed-критериев; при persistence failure требуется также точный snapshot mismatch.
+8. После успешных шагов 1–6: `TASK-076 → VERIFIED`, `TASK-077 → VERIFIED`, `CONTENT-070`–`CONTENT-079` и `CONTENT-ACC-070`–`CONTENT-ACC-076` → `VERIFIED`. `TASK-074` также может быть закрыта как часть полной matrix acceptance, если power-coupler recipe входит в `crafted=9` и round-trip.
+
+## 18. Журнал проверок
+
+### 2026-08-02 — `TASK-074`, fifth data-driven crafting path
+
+**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`  
+**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`  
+**Git SHA:** отсутствует в исходном архиве  
+**Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-060`–`CONTENT-067`.
+
+**Синхронизация:** clean build и runtime `F6: PASS` пользователя закрыли `TASK-072/TASK-073`; F7/F9/F10/F11/F12 также показали PASS. Comprehensive F6 подтверждает persistence и isolation четвёртого path.
+
+**Реализация:** добавлены plasma filament, power coupler и recipe duration `4.0 s`; два physical resource nodes и отдельный PowerFabricator; controller/HUD/load/reset/autosave поддерживают четыре station outputs; добавлена `F5` acceptance с isolation, previous-recipe regression и exact SQLite round-trip.
+
+**Статическая проверка:** JSON counts/cross-references, scene bindings, stable IDs, C# lexical balance, UID, `res://`, hotkey F5, запрещённые artifacts и ZIP integrity.
+
+**Ограничение среды:** `dotnet`/Godot недоступны, поэтому сборка и runtime F5 здесь не выполнялись. `TASK-074` остаётся `IMPLEMENTED`, `TASK-075` — `IN_PROGRESS`.
+
+**Следующая задача:** clean build, `F5: PASS`, регрессии `F6/F7/F9/F10/F11/F12`, ручной power process и cold restart по разделу 16.
 
 ### 2026-08-02 — `TASK-072`, fourth data-driven crafting path
 
@@ -3338,7 +3662,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 17. Шаблон новой записи
+## 19. Шаблон новой записи
 
 ```markdown
 ### YYYY-MM-DD — <название проверки>
@@ -3374,7 +3698,7 @@ collision-граней сохранены без перестроения. `TASK
 
 ---
 
-## 18. Правило коммита
+## 20. Правило коммита
 
 Каждый функциональный коммит должен содержать обновление этого файла либо явно не изменять статус требований.
 
@@ -3389,7 +3713,7 @@ Verification: dotnet build; manual interaction smoke test
 
 ---
 
-## 19. Регламент последующих итераций
+## 21. Регламент последующих итераций
 
 Все последующие итерации разработки выполняются в соответствии с:
 

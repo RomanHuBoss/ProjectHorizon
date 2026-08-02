@@ -1,0 +1,434 @@
+{
+  "schemaVersion": 2,
+  "definitions": [
+    {
+      "technologyId": "tech.starter_fabrication",
+      "localizationKey": "technology.starter_fabrication",
+      "tier": 0,
+      "researchCost": 0,
+      "prerequisites": [],
+      "tags": [
+        "technology",
+        "tier_0"
+      ]
+    },
+    {
+      "technologyId": "tech.field_repair",
+      "localizationKey": "technology.field_repair",
+      "tier": 0,
+      "researchCost": 0,
+      "prerequisites": [],
+      "tags": [
+        "technology",
+        "tier_0"
+      ]
+    },
+    {
+      "technologyId": "tech.basic_refining",
+      "localizationKey": "technology.basic_refining",
+      "tier": 0,
+      "researchCost": 50,
+      "prerequisites": [
+        "tech.starter_fabrication"
+      ],
+      "tags": [
+        "technology",
+        "tier_0"
+      ]
+    },
+    {
+      "technologyId": "tech.basic_chemistry",
+      "localizationKey": "technology.basic_chemistry",
+      "tier": 0,
+      "researchCost": 60,
+      "prerequisites": [
+        "tech.starter_fabrication"
+      ],
+      "tags": [
+        "technology",
+        "tier_0"
+      ]
+    },
+    {
+      "technologyId": "tech.paraffinium_processing",
+      "localizationKey": "technology.paraffinium_processing",
+      "tier": 0,
+      "researchCost": 70,
+      "prerequisites": [
+        "tech.basic_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_0"
+      ]
+    },
+    {
+      "technologyId": "tech.metallurgy",
+      "localizationKey": "technology.metallurgy",
+      "tier": 1,
+      "researchCost": 120,
+      "prerequisites": [
+        "tech.basic_refining"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.electronics",
+      "localizationKey": "technology.electronics",
+      "tier": 1,
+      "researchCost": 140,
+      "prerequisites": [
+        "tech.starter_fabrication"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.polymer_science",
+      "localizationKey": "technology.polymer_science",
+      "tier": 1,
+      "researchCost": 130,
+      "prerequisites": [
+        "tech.basic_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.industrial_chemistry",
+      "localizationKey": "technology.industrial_chemistry",
+      "tier": 1,
+      "researchCost": 150,
+      "prerequisites": [
+        "tech.basic_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.cryogenics",
+      "localizationKey": "technology.cryogenics",
+      "tier": 1,
+      "researchCost": 160,
+      "prerequisites": [
+        "tech.basic_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.ship_systems",
+      "localizationKey": "technology.ship_systems",
+      "tier": 1,
+      "researchCost": 180,
+      "prerequisites": [
+        "tech.electronics",
+        "tech.metallurgy"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.suit_engineering",
+      "localizationKey": "technology.suit_engineering",
+      "tier": 1,
+      "researchCost": 120,
+      "prerequisites": [
+        "tech.polymer_science"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.base_construction",
+      "localizationKey": "technology.base_construction",
+      "tier": 1,
+      "researchCost": 170,
+      "prerequisites": [
+        "tech.metallurgy"
+      ],
+      "tags": [
+        "technology",
+        "tier_1"
+      ]
+    },
+    {
+      "technologyId": "tech.advanced_refining",
+      "localizationKey": "technology.advanced_refining",
+      "tier": 2,
+      "researchCost": 260,
+      "prerequisites": [
+        "tech.metallurgy",
+        "tech.industrial_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.catalysis",
+      "localizationKey": "technology.catalysis",
+      "tier": 2,
+      "researchCost": 240,
+      "prerequisites": [
+        "tech.industrial_chemistry"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.power_systems",
+      "localizationKey": "technology.power_systems",
+      "tier": 2,
+      "researchCost": 280,
+      "prerequisites": [
+        "tech.electronics",
+        "tech.ship_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.sensor_systems",
+      "localizationKey": "technology.sensor_systems",
+      "tier": 2,
+      "researchCost": 260,
+      "prerequisites": [
+        "tech.electronics"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.life_support",
+      "localizationKey": "technology.life_support",
+      "tier": 2,
+      "researchCost": 250,
+      "prerequisites": [
+        "tech.suit_engineering",
+        "tech.ship_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.drone_engineering",
+      "localizationKey": "technology.drone_engineering",
+      "tier": 2,
+      "researchCost": 300,
+      "prerequisites": [
+        "tech.electronics",
+        "tech.base_construction"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.vehicle_engineering",
+      "localizationKey": "technology.vehicle_engineering",
+      "tier": 2,
+      "researchCost": 300,
+      "prerequisites": [
+        "tech.metallurgy",
+        "tech.power_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.nuclear_materials",
+      "localizationKey": "technology.nuclear_materials",
+      "tier": 2,
+      "researchCost": 320,
+      "prerequisites": [
+        "tech.advanced_refining"
+      ],
+      "tags": [
+        "technology",
+        "tier_2"
+      ]
+    },
+    {
+      "technologyId": "tech.compotium_analysis",
+      "localizationKey": "technology.compotium_analysis",
+      "tier": 3,
+      "researchCost": 420,
+      "prerequisites": [
+        "tech.catalysis",
+        "tech.sensor_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.compotium_stabilization",
+      "localizationKey": "technology.compotium_stabilization",
+      "tier": 3,
+      "researchCost": 520,
+      "prerequisites": [
+        "tech.compotium_analysis",
+        "tech.cryogenics"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.exotic_materials",
+      "localizationKey": "technology.exotic_materials",
+      "tier": 3,
+      "researchCost": 480,
+      "prerequisites": [
+        "tech.advanced_refining",
+        "tech.compotium_analysis"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.fusion_systems",
+      "localizationKey": "technology.fusion_systems",
+      "tier": 3,
+      "researchCost": 460,
+      "prerequisites": [
+        "tech.power_systems",
+        "tech.nuclear_materials"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.hyperspace_theory",
+      "localizationKey": "technology.hyperspace_theory",
+      "tier": 3,
+      "researchCost": 600,
+      "prerequisites": [
+        "tech.sensor_systems",
+        "tech.fusion_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.orbital_industry",
+      "localizationKey": "technology.orbital_industry",
+      "tier": 3,
+      "researchCost": 450,
+      "prerequisites": [
+        "tech.base_construction",
+        "tech.vehicle_engineering"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.advanced_automation",
+      "localizationKey": "technology.advanced_automation",
+      "tier": 3,
+      "researchCost": 430,
+      "prerequisites": [
+        "tech.drone_engineering",
+        "tech.electronics"
+      ],
+      "tags": [
+        "technology",
+        "tier_3"
+      ]
+    },
+    {
+      "technologyId": "tech.compotium_energy",
+      "localizationKey": "technology.compotium_energy",
+      "tier": 4,
+      "researchCost": 800,
+      "prerequisites": [
+        "tech.compotium_stabilization",
+        "tech.fusion_systems"
+      ],
+      "tags": [
+        "technology",
+        "tier_4"
+      ]
+    },
+    {
+      "technologyId": "tech.exotic_field_control",
+      "localizationKey": "technology.exotic_field_control",
+      "tier": 4,
+      "researchCost": 900,
+      "prerequisites": [
+        "tech.exotic_materials",
+        "tech.compotium_stabilization"
+      ],
+      "tags": [
+        "technology",
+        "tier_4"
+      ]
+    },
+    {
+      "technologyId": "tech.quantum_navigation",
+      "localizationKey": "technology.quantum_navigation",
+      "tier": 4,
+      "researchCost": 850,
+      "prerequisites": [
+        "tech.hyperspace_theory",
+        "tech.exotic_field_control"
+      ],
+      "tags": [
+        "technology",
+        "tier_4"
+      ]
+    },
+    {
+      "technologyId": "tech.experimental_propulsion",
+      "localizationKey": "technology.experimental_propulsion",
+      "tier": 4,
+      "researchCost": 950,
+      "prerequisites": [
+        "tech.compotium_energy",
+        "tech.quantum_navigation"
+      ],
+      "tags": [
+        "technology",
+        "tier_4"
+      ]
+    }
+  ]
+}

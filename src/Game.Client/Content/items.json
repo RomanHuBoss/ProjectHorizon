@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "definitions": [
     {
       "definitionId": "resource.salvage_alloy",
@@ -9,6 +9,8 @@
       "basePrice": 18.0,
       "mass": 1.2,
       "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
       "icon": "",
       "worldModel": "",
       "tags": [
@@ -18,29 +20,15 @@
       ]
     },
     {
-      "definitionId": "component.starter_hull_patch",
-      "localizationKey": "item.component.starter_hull_patch",
-      "category": "Component",
-      "maxStack": 5,
-      "basePrice": 90.0,
-      "mass": 2.4,
-      "rarity": "Common",
-      "icon": "",
-      "worldModel": "",
-      "tags": [
-        "component",
-        "hull",
-        "repair"
-      ]
-    },
-    {
       "definitionId": "resource.conductive_crystal",
       "localizationKey": "item.resource.conductive_crystal",
       "category": "Resource",
-      "maxStack": 40,
+      "maxStack": 50,
       "basePrice": 32.0,
       "mass": 0.7,
       "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
       "icon": "",
       "worldModel": "",
       "tags": [
@@ -50,29 +38,15 @@
       ]
     },
     {
-      "definitionId": "component.ship.launch_capacitor",
-      "localizationKey": "item.component.ship.launch_capacitor",
-      "category": "Component",
-      "maxStack": 5,
-      "basePrice": 160.0,
-      "mass": 1.6,
-      "rarity": "Uncommon",
-      "icon": "",
-      "worldModel": "",
-      "tags": [
-        "component",
-        "ship",
-        "launch"
-      ]
-    },
-    {
       "definitionId": "resource.phase_fiber",
       "localizationKey": "item.resource.phase_fiber",
       "category": "Resource",
-      "maxStack": 40,
+      "maxStack": 50,
       "basePrice": 28.0,
       "mass": 0.5,
       "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
       "icon": "",
       "worldModel": "",
       "tags": [
@@ -82,29 +56,15 @@
       ]
     },
     {
-      "definitionId": "component.ship.navigation_array",
-      "localizationKey": "item.component.ship.navigation_array",
-      "category": "Component",
-      "maxStack": 5,
-      "basePrice": 145.0,
-      "mass": 1.3,
-      "rarity": "Uncommon",
-      "icon": "",
-      "worldModel": "",
-      "tags": [
-        "component",
-        "ship",
-        "navigation"
-      ]
-    },
-    {
       "definitionId": "resource.thermal_gel",
       "localizationKey": "item.resource.thermal_gel",
       "category": "Resource",
-      "maxStack": 40,
+      "maxStack": 50,
       "basePrice": 35.0,
       "mass": 0.8,
       "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
       "icon": "",
       "worldModel": "",
       "tags": [
@@ -114,19 +74,2917 @@
       ]
     },
     {
+      "definitionId": "resource.plasma_filament",
+      "localizationKey": "item.resource.plasma_filament",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 42.0,
+      "mass": 0.6,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "plasma",
+        "filament",
+        "power"
+      ]
+    },
+    {
+      "definitionId": "resource.quantum_resin",
+      "localizationKey": "item.resource.quantum_resin",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 48.0,
+      "mass": 0.7,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "quantum",
+        "resin",
+        "sensors"
+      ]
+    },
+    {
+      "definitionId": "resource.aerogel_matrix",
+      "localizationKey": "item.resource.aerogel_matrix",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 38.0,
+      "mass": 0.3,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "aerogel",
+        "matrix",
+        "life_support"
+      ]
+    },
+    {
+      "definitionId": "resource.magnetic_ore",
+      "localizationKey": "item.resource.magnetic_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 44.0,
+      "mass": 1.6,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "magnetic",
+        "ore",
+        "attitude"
+      ]
+    },
+    {
+      "definitionId": "resource.bio_polymer",
+      "localizationKey": "item.resource.bio_polymer",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 31.0,
+      "mass": 0.9,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "bio",
+        "polymer",
+        "sealant"
+      ]
+    },
+    {
+      "definitionId": "resource.ceramic_composite",
+      "localizationKey": "item.resource.ceramic_composite",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 52.0,
+      "mass": 1.8,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ceramic",
+        "composite",
+        "heat_shield"
+      ]
+    },
+    {
+      "definitionId": "resource.raw_compotium",
+      "localizationKey": "item.resource.raw_compotium",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 125.0,
+      "mass": 1.1,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "compotium",
+        "exotic",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.paraffinium",
+      "localizationKey": "item.resource.paraffinium",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 36.0,
+      "mass": 1.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "paraffinium",
+        "hydrocarbon",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.acidic_brine",
+      "localizationKey": "item.resource.acidic_brine",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 22.0,
+      "mass": 1.3,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "acid",
+        "brine",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.hydrocarbon_sludge",
+      "localizationKey": "item.resource.hydrocarbon_sludge",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 24.0,
+      "mass": 1.5,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "hydrocarbon",
+        "sludge",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.bio_solvent",
+      "localizationKey": "item.resource.bio_solvent",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 30.0,
+      "mass": 0.8,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "bio",
+        "solvent",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.sulfur_crystal",
+      "localizationKey": "item.resource.sulfur_crystal",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 20.0,
+      "mass": 1.0,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "sulfur",
+        "crystal",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.inert_gas",
+      "localizationKey": "item.resource.inert_gas",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 28.0,
+      "mass": 0.2,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Gas",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "gas",
+        "inert",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.catalytic_dust",
+      "localizationKey": "item.resource.catalytic_dust",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 58.0,
+      "mass": 0.3,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "catalyst",
+        "dust",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.ferric_ore",
+      "localizationKey": "item.resource.ferric_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 14.0,
+      "mass": 2.1,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "iron"
+      ]
+    },
+    {
+      "definitionId": "resource.copper_ore",
+      "localizationKey": "item.resource.copper_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 16.0,
+      "mass": 2.0,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "copper"
+      ]
+    },
+    {
+      "definitionId": "resource.titanium_ore",
+      "localizationKey": "item.resource.titanium_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 28.0,
+      "mass": 2.2,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "titanium"
+      ]
+    },
+    {
+      "definitionId": "resource.aluminum_ore",
+      "localizationKey": "item.resource.aluminum_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 15.0,
+      "mass": 1.7,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "aluminum"
+      ]
+    },
+    {
+      "definitionId": "resource.cobalt_ore",
+      "localizationKey": "item.resource.cobalt_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 30.0,
+      "mass": 2.1,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "cobalt"
+      ]
+    },
+    {
+      "definitionId": "resource.nickel_ore",
+      "localizationKey": "item.resource.nickel_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 18.0,
+      "mass": 2.0,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "metal",
+        "ore",
+        "nickel"
+      ]
+    },
+    {
+      "definitionId": "resource.silicon_crystal",
+      "localizationKey": "item.resource.silicon_crystal",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 18.0,
+      "mass": 1.2,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "silicon",
+        "crystal",
+        "electronics"
+      ]
+    },
+    {
+      "definitionId": "resource.carbonaceous_rock",
+      "localizationKey": "item.resource.carbonaceous_rock",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 12.0,
+      "mass": 1.6,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "carbon",
+        "rock",
+        "material"
+      ]
+    },
+    {
+      "definitionId": "resource.ice_water",
+      "localizationKey": "item.resource.ice_water",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 10.0,
+      "mass": 1.4,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "water",
+        "ice",
+        "volatile"
+      ]
+    },
+    {
+      "definitionId": "resource.ammonia_ice",
+      "localizationKey": "item.resource.ammonia_ice",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 20.0,
+      "mass": 1.3,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ammonia",
+        "ice",
+        "volatile"
+      ]
+    },
+    {
+      "definitionId": "resource.methane_clathrate",
+      "localizationKey": "item.resource.methane_clathrate",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 24.0,
+      "mass": 1.5,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "methane",
+        "clathrate",
+        "volatile"
+      ]
+    },
+    {
+      "definitionId": "resource.xenon_pocket",
+      "localizationKey": "item.resource.xenon_pocket",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 62.0,
+      "mass": 0.4,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Gas",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "xenon",
+        "gas",
+        "rare"
+      ]
+    },
+    {
+      "definitionId": "resource.argon_pocket",
+      "localizationKey": "item.resource.argon_pocket",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 34.0,
+      "mass": 0.4,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Gas",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "argon",
+        "gas",
+        "inert"
+      ]
+    },
+    {
+      "definitionId": "resource.lithium_salt",
+      "localizationKey": "item.resource.lithium_salt",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 35.0,
+      "mass": 1.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "lithium",
+        "salt",
+        "battery"
+      ]
+    },
+    {
+      "definitionId": "resource.sodium_salt",
+      "localizationKey": "item.resource.sodium_salt",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 14.0,
+      "mass": 1.1,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "sodium",
+        "salt",
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "resource.rare_earth_ore",
+      "localizationKey": "item.resource.rare_earth_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 55.0,
+      "mass": 2.0,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "rare_earth",
+        "ore",
+        "electronics"
+      ]
+    },
+    {
+      "definitionId": "resource.uranium_ore",
+      "localizationKey": "item.resource.uranium_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 75.0,
+      "mass": 2.4,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "uranium",
+        "ore",
+        "nuclear"
+      ]
+    },
+    {
+      "definitionId": "resource.thorium_ore",
+      "localizationKey": "item.resource.thorium_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 68.0,
+      "mass": 2.3,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "thorium",
+        "ore",
+        "nuclear"
+      ]
+    },
+    {
+      "definitionId": "resource.iridium_nodule",
+      "localizationKey": "item.resource.iridium_nodule",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 105.0,
+      "mass": 1.8,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "iridium",
+        "metal",
+        "exotic"
+      ]
+    },
+    {
+      "definitionId": "resource.tungsten_ore",
+      "localizationKey": "item.resource.tungsten_ore",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 64.0,
+      "mass": 2.5,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "tungsten",
+        "ore",
+        "high_temp"
+      ]
+    },
+    {
+      "definitionId": "resource.flora_pulp",
+      "localizationKey": "item.resource.flora_pulp",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 12.0,
+      "mass": 0.8,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "flora",
+        "organic",
+        "bio"
+      ]
+    },
+    {
+      "definitionId": "resource.fungal_spores",
+      "localizationKey": "item.resource.fungal_spores",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 22.0,
+      "mass": 0.2,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "fungal",
+        "spores",
+        "bio"
+      ]
+    },
+    {
+      "definitionId": "resource.microbe_culture",
+      "localizationKey": "item.resource.microbe_culture",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 48.0,
+      "mass": 0.4,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "microbe",
+        "culture",
+        "bio"
+      ]
+    },
+    {
+      "definitionId": "resource.volcanic_glass",
+      "localizationKey": "item.resource.volcanic_glass",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 27.0,
+      "mass": 1.4,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "glass",
+        "volcanic",
+        "optics"
+      ]
+    },
+    {
+      "definitionId": "chemical.inert_residue",
+      "localizationKey": "item.chemical.inert_residue",
+      "category": "Chemical",
+      "maxStack": 50,
+      "basePrice": 4.0,
+      "mass": 0.6,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "waste"
+      ]
+    },
+    {
+      "definitionId": "chemical.toxic_slurry",
+      "localizationKey": "item.chemical.toxic_slurry",
+      "category": "Chemical",
+      "maxStack": 50,
+      "basePrice": 2.0,
+      "mass": 0.8,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "waste",
+        "toxic"
+      ]
+    },
+    {
+      "definitionId": "chemical.spent_catalyst",
+      "localizationKey": "item.chemical.spent_catalyst",
+      "category": "Chemical",
+      "maxStack": 50,
+      "basePrice": 6.0,
+      "mass": 0.4,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "waste",
+        "catalyst"
+      ]
+    },
+    {
+      "definitionId": "resource.scrap_metal",
+      "localizationKey": "item.resource.scrap_metal",
+      "category": "Resource",
+      "maxStack": 50,
+      "basePrice": 5.0,
+      "mass": 1.0,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "scrap",
+        "recycling"
+      ]
+    },
+    {
+      "definitionId": "component.starter_hull_patch",
+      "localizationKey": "item.component.starter_hull_patch",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 90,
+      "mass": 2.4,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "hull",
+        "repair"
+      ]
+    },
+    {
+      "definitionId": "component.ship.launch_capacitor",
+      "localizationKey": "item.component.ship.launch_capacitor",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 160,
+      "mass": 1.6,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "launch"
+      ]
+    },
+    {
+      "definitionId": "component.ship.navigation_array",
+      "localizationKey": "item.component.ship.navigation_array",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 145,
+      "mass": 1.3,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "navigation"
+      ]
+    },
+    {
       "definitionId": "component.ship.coolant_regulator",
       "localizationKey": "item.component.ship.coolant_regulator",
       "category": "Component",
-      "maxStack": 5,
-      "basePrice": 175.0,
+      "maxStack": 20,
+      "basePrice": 175,
       "mass": 1.8,
       "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
       "icon": "",
       "worldModel": "",
       "tags": [
         "component",
         "ship",
         "cooling"
+      ]
+    },
+    {
+      "definitionId": "component.ship.power_coupler",
+      "localizationKey": "item.component.ship.power_coupler",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 210,
+      "mass": 1.5,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "power"
+      ]
+    },
+    {
+      "definitionId": "component.ship.sensor_lens",
+      "localizationKey": "item.component.ship.sensor_lens",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 240,
+      "mass": 1.1,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "sensors"
+      ]
+    },
+    {
+      "definitionId": "component.ship.life_support_filter",
+      "localizationKey": "item.component.ship.life_support_filter",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 190,
+      "mass": 1.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "life_support"
+      ]
+    },
+    {
+      "definitionId": "component.ship.attitude_coil",
+      "localizationKey": "item.component.ship.attitude_coil",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 225,
+      "mass": 2.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "attitude"
+      ]
+    },
+    {
+      "definitionId": "component.ship.sealant_cartridge",
+      "localizationKey": "item.component.ship.sealant_cartridge",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 155,
+      "mass": 1.4,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "sealant"
+      ]
+    },
+    {
+      "definitionId": "component.ship.heat_shield_tile",
+      "localizationKey": "item.component.ship.heat_shield_tile",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 265,
+      "mass": 2.2,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "ship",
+        "heat_shield"
+      ]
+    },
+    {
+      "definitionId": "material.refined_ferrite",
+      "localizationKey": "item.material.refined_ferrite",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 40,
+      "mass": 0.8,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.copper_ingot",
+      "localizationKey": "item.material.copper_ingot",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 48,
+      "mass": 0.85,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.titanium_ingot",
+      "localizationKey": "item.material.titanium_ingot",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 56,
+      "mass": 0.9,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.aluminum_ingot",
+      "localizationKey": "item.material.aluminum_ingot",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 64,
+      "mass": 0.95,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.cobalt_ingot",
+      "localizationKey": "item.material.cobalt_ingot",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 72,
+      "mass": 1.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.nickel_ingot",
+      "localizationKey": "item.material.nickel_ingot",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 80,
+      "mass": 1.05,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.silicon_wafer_blank",
+      "localizationKey": "item.material.silicon_wafer_blank",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 88,
+      "mass": 1.1,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.carbon_fiber_feedstock",
+      "localizationKey": "item.material.carbon_fiber_feedstock",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 96,
+      "mass": 1.15,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.purified_water",
+      "localizationKey": "item.material.purified_water",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 104,
+      "mass": 1.2,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.ammonia_solution",
+      "localizationKey": "item.material.ammonia_solution",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 112,
+      "mass": 1.25,
+      "rarity": "Uncommon",
+      "technologyTier": 0,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.methane_fraction",
+      "localizationKey": "item.material.methane_fraction",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 120,
+      "mass": 1.3,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.xenon_gas",
+      "localizationKey": "item.material.xenon_gas",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 128,
+      "mass": 1.35,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.argon_gas",
+      "localizationKey": "item.material.argon_gas",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 136,
+      "mass": 1.4,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.lithium_concentrate",
+      "localizationKey": "item.material.lithium_concentrate",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 144,
+      "mass": 1.45,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.sodium_concentrate",
+      "localizationKey": "item.material.sodium_concentrate",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 152,
+      "mass": 1.5,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.rare_earth_concentrate",
+      "localizationKey": "item.material.rare_earth_concentrate",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 160,
+      "mass": 1.55,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.uranium_concentrate",
+      "localizationKey": "item.material.uranium_concentrate",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 168,
+      "mass": 1.6,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "material.thorium_concentrate",
+      "localizationKey": "item.material.thorium_concentrate",
+      "category": "Material",
+      "maxStack": 20,
+      "basePrice": 176,
+      "mass": 1.65,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "refined",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "chemical.paraffinium_fraction",
+      "localizationKey": "item.chemical.paraffinium_fraction",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 50,
+      "mass": 0.5,
+      "rarity": "Common",
+      "technologyTier": 0,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "paraffinium"
+      ]
+    },
+    {
+      "definitionId": "chemical.synthetic_wax",
+      "localizationKey": "item.chemical.synthetic_wax",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 68,
+      "mass": 0.53,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "paraffinium"
+      ]
+    },
+    {
+      "definitionId": "chemical.paraffinium_lubricant",
+      "localizationKey": "item.chemical.paraffinium_lubricant",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 71,
+      "mass": 0.56,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "paraffinium"
+      ]
+    },
+    {
+      "definitionId": "chemical.polymer_resin",
+      "localizationKey": "item.chemical.polymer_resin",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 74,
+      "mass": 0.59,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "paraffinium"
+      ]
+    },
+    {
+      "definitionId": "chemical.sealant_gel",
+      "localizationKey": "item.chemical.sealant_gel",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 77,
+      "mass": 0.62,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "paraffinium"
+      ]
+    },
+    {
+      "definitionId": "chemical.raw_compotium_solution",
+      "localizationKey": "item.chemical.raw_compotium_solution",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 95,
+      "mass": 0.65,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_concentrate",
+      "localizationKey": "item.chemical.compotium_concentrate",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 113,
+      "mass": 0.68,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.purified_compotium",
+      "localizationKey": "item.chemical.purified_compotium",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 116,
+      "mass": 0.71,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.stabilized_compotium",
+      "localizationKey": "item.chemical.stabilized_compotium",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 119,
+      "mass": 0.74,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_catalyst",
+      "localizationKey": "item.chemical.compotium_catalyst",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 122,
+      "mass": 0.77,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_electrolyte",
+      "localizationKey": "item.chemical.compotium_electrolyte",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 140,
+      "mass": 0.8,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_energy_cell",
+      "localizationKey": "item.chemical.compotium_energy_cell",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 143,
+      "mass": 0.83,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_flux",
+      "localizationKey": "item.chemical.compotium_flux",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 131,
+      "mass": 0.86,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_crystal",
+      "localizationKey": "item.chemical.compotium_crystal",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 149,
+      "mass": 0.89,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_alloy",
+      "localizationKey": "item.chemical.compotium_alloy",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 152,
+      "mass": 0.92,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.compotium_reactor_gel",
+      "localizationKey": "item.chemical.compotium_reactor_gel",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 155,
+      "mass": 0.95,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry",
+        "compotium"
+      ]
+    },
+    {
+      "definitionId": "chemical.sulfuric_reagent",
+      "localizationKey": "item.chemical.sulfuric_reagent",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 113,
+      "mass": 0.98,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.alkaline_reagent",
+      "localizationKey": "item.chemical.alkaline_reagent",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 116,
+      "mass": 1.01,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.industrial_solvent",
+      "localizationKey": "item.chemical.industrial_solvent",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 119,
+      "mass": 1.04,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.cryogenic_coolant",
+      "localizationKey": "item.chemical.cryogenic_coolant",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 137,
+      "mass": 1.07,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.dielectric_fluid",
+      "localizationKey": "item.chemical.dielectric_fluid",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 140,
+      "mass": 1.1,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.corrosion_inhibitor",
+      "localizationKey": "item.chemical.corrosion_inhibitor",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 143,
+      "mass": 1.13,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.oxygen_compound",
+      "localizationKey": "item.chemical.oxygen_compound",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 131,
+      "mass": 1.16,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.rocket_oxidizer",
+      "localizationKey": "item.chemical.rocket_oxidizer",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 149,
+      "mass": 1.19,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.high_energy_fuel",
+      "localizationKey": "item.chemical.high_energy_fuel",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 152,
+      "mass": 1.22,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.polymer_foam",
+      "localizationKey": "item.chemical.polymer_foam",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 155,
+      "mass": 1.25,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.bio_adhesive",
+      "localizationKey": "item.chemical.bio_adhesive",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 143,
+      "mass": 1.28,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.ceramic_binder",
+      "localizationKey": "item.chemical.ceramic_binder",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 161,
+      "mass": 1.31,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.conductive_paste",
+      "localizationKey": "item.chemical.conductive_paste",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 164,
+      "mass": 1.34,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Liquid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "chemical.radiation_absorber",
+      "localizationKey": "item.chemical.radiation_absorber",
+      "category": "Chemical",
+      "maxStack": 20,
+      "basePrice": 182,
+      "mass": 1.37,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "chemistry"
+      ]
+    },
+    {
+      "definitionId": "component.steel_plate",
+      "localizationKey": "item.component.steel_plate",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 110,
+      "mass": 0.7,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.copper_wire",
+      "localizationKey": "item.component.copper_wire",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 115,
+      "mass": 0.78,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.titanium_frame",
+      "localizationKey": "item.component.titanium_frame",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 140,
+      "mass": 0.86,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.aluminum_sheet",
+      "localizationKey": "item.component.aluminum_sheet",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 125,
+      "mass": 0.94,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.cobalt_magnet",
+      "localizationKey": "item.component.cobalt_magnet",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 150,
+      "mass": 1.02,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.nickel_mesh",
+      "localizationKey": "item.component.nickel_mesh",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 135,
+      "mass": 1.1,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.silicon_circuit",
+      "localizationKey": "item.component.silicon_circuit",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 160,
+      "mass": 1.18,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.carbon_composite",
+      "localizationKey": "item.component.carbon_composite",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 165,
+      "mass": 1.26,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.pressure_vessel",
+      "localizationKey": "item.component.pressure_vessel",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 170,
+      "mass": 1.34,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.optical_glass",
+      "localizationKey": "item.component.optical_glass",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 175,
+      "mass": 1.42,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.superconducting_coil",
+      "localizationKey": "item.component.superconducting_coil",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 200,
+      "mass": 1.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.power_bus",
+      "localizationKey": "item.component.power_bus",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 185,
+      "mass": 1.58,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.microprocessor",
+      "localizationKey": "item.component.microprocessor",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 210,
+      "mass": 1.66,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.sensor_package",
+      "localizationKey": "item.component.sensor_package",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 215,
+      "mass": 1.74,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.actuator",
+      "localizationKey": "item.component.actuator",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 200,
+      "mass": 1.82,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.hydraulic_pump",
+      "localizationKey": "item.component.hydraulic_pump",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 205,
+      "mass": 1.9,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.heat_exchanger",
+      "localizationKey": "item.component.heat_exchanger",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 210,
+      "mass": 1.98,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.filtration_membrane",
+      "localizationKey": "item.component.filtration_membrane",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 215,
+      "mass": 2.06,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.radiation_shield_panel",
+      "localizationKey": "item.component.radiation_shield_panel",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 240,
+      "mass": 2.14,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.structural_joint",
+      "localizationKey": "item.component.structural_joint",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 225,
+      "mass": 2.22,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.battery_module",
+      "localizationKey": "item.component.battery_module",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 250,
+      "mass": 2.3,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "component.control_unit",
+      "localizationKey": "item.component.control_unit",
+      "category": "Component",
+      "maxStack": 20,
+      "basePrice": 255,
+      "mass": 2.38,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "component",
+        "industry"
+      ]
+    },
+    {
+      "definitionId": "module.ship.impulse_manifold",
+      "localizationKey": "item.module.ship.impulse_manifold",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 460,
+      "mass": 2.0,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.maneuvering_thruster",
+      "localizationKey": "item.module.ship.maneuvering_thruster",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 475,
+      "mass": 2.25,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.atmospheric_intake",
+      "localizationKey": "item.module.ship.atmospheric_intake",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 490,
+      "mass": 2.5,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.fusion_injector",
+      "localizationKey": "item.module.ship.fusion_injector",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 585,
+      "mass": 2.75,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.shield_emitter",
+      "localizationKey": "item.module.ship.shield_emitter",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 600,
+      "mass": 3.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.deflector_array",
+      "localizationKey": "item.module.ship.deflector_array",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 615,
+      "mass": 3.25,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.hyperspace_core",
+      "localizationKey": "item.module.ship.hyperspace_core",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 710,
+      "mass": 3.5,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.fuel_regulator",
+      "localizationKey": "item.module.ship.fuel_regulator",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 565,
+      "mass": 3.75,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.oxygen_recycler",
+      "localizationKey": "item.module.ship.oxygen_recycler",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 580,
+      "mass": 4.0,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.thermal_radiator",
+      "localizationKey": "item.module.ship.thermal_radiator",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 595,
+      "mass": 4.25,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.docking_computer",
+      "localizationKey": "item.module.ship.docking_computer",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 690,
+      "mass": 4.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.survey_scanner",
+      "localizationKey": "item.module.ship.survey_scanner",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 705,
+      "mass": 4.75,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.mining_laser_head",
+      "localizationKey": "item.module.ship.mining_laser_head",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 720,
+      "mass": 5.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.cargo_expander",
+      "localizationKey": "item.module.ship.cargo_expander",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 655,
+      "mass": 5.25,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.hull_reinforcement",
+      "localizationKey": "item.module.ship.hull_reinforcement",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 750,
+      "mass": 5.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.reactor_control_rod",
+      "localizationKey": "item.module.ship.reactor_control_rod",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 765,
+      "mass": 5.75,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.quantum_comm_array",
+      "localizationKey": "item.module.ship.quantum_comm_array",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 860,
+      "mass": 6.0,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.ship.compotium_drive_core",
+      "localizationKey": "item.module.ship.compotium_drive_core",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 875,
+      "mass": 6.25,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "ship",
+        "module"
+      ]
+    },
+    {
+      "definitionId": "module.suit.thermal_liner",
+      "localizationKey": "item.module.suit.thermal_liner",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 120,
+      "mass": 0.6,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "suit"
+      ]
+    },
+    {
+      "definitionId": "module.suit.radiation_mesh",
+      "localizationKey": "item.module.suit.radiation_mesh",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 145,
+      "mass": 0.7,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "suit"
+      ]
+    },
+    {
+      "definitionId": "module.suit.toxic_filter",
+      "localizationKey": "item.module.suit.toxic_filter",
+      "category": "Module",
+      "maxStack": 5,
+      "basePrice": 170,
+      "mass": 0.8,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "suit"
+      ]
+    },
+    {
+      "definitionId": "consumable.oxygen_canister",
+      "localizationKey": "item.consumable.oxygen_canister",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 195,
+      "mass": 0.9,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "consumable.repair_foam",
+      "localizationKey": "item.consumable.repair_foam",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 220,
+      "mass": 1.0,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "consumable.med_gel",
+      "localizationKey": "item.consumable.med_gel",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 245,
+      "mass": 1.1,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "tool.mining_drill_bit",
+      "localizationKey": "item.tool.mining_drill_bit",
+      "category": "Tool",
+      "maxStack": 5,
+      "basePrice": 270,
+      "mass": 1.2,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "tool"
+      ]
+    },
+    {
+      "definitionId": "tool.scanner_upgrade",
+      "localizationKey": "item.tool.scanner_upgrade",
+      "category": "Tool",
+      "maxStack": 5,
+      "basePrice": 295,
+      "mass": 1.3,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "tool"
+      ]
+    },
+    {
+      "definitionId": "consumable.multitool_battery",
+      "localizationKey": "item.consumable.multitool_battery",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 320,
+      "mass": 1.4,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "tool.survey_beacon",
+      "localizationKey": "item.tool.survey_beacon",
+      "category": "Tool",
+      "maxStack": 5,
+      "basePrice": 345,
+      "mass": 1.5,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "tool"
+      ]
+    },
+    {
+      "definitionId": "consumable.emergency_heater",
+      "localizationKey": "item.consumable.emergency_heater",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 370,
+      "mass": 1.6,
+      "rarity": "Uncommon",
+      "technologyTier": 1,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "consumable.chemical_oxygen_generator",
+      "localizationKey": "item.consumable.chemical_oxygen_generator",
+      "category": "Consumable",
+      "maxStack": 50,
+      "basePrice": 395,
+      "mass": 1.7,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "consumable"
+      ]
+    },
+    {
+      "definitionId": "building.base_power_node",
+      "localizationKey": "item.building.base_power_node",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 350,
+      "mass": 8.0,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.solar_array",
+      "localizationKey": "item.building.solar_array",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 395,
+      "mass": 9.5,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.battery_bank",
+      "localizationKey": "item.building.battery_bank",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 440,
+      "mass": 11.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.atmospheric_processor",
+      "localizationKey": "item.building.atmospheric_processor",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 485,
+      "mass": 12.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.water_recycler",
+      "localizationKey": "item.building.water_recycler",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 530,
+      "mass": 14.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.hydroponics_tray",
+      "localizationKey": "item.building.hydroponics_tray",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 575,
+      "mass": 15.5,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.storage_module",
+      "localizationKey": "item.building.storage_module",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 620,
+      "mass": 17.0,
+      "rarity": "Uncommon",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.landing_pad_controller",
+      "localizationKey": "item.building.landing_pad_controller",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 665,
+      "mass": 18.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.fabrication_terminal",
+      "localizationKey": "item.building.fabrication_terminal",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 710,
+      "mass": 20.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "building.research_console",
+      "localizationKey": "item.building.research_console",
+      "category": "Building",
+      "maxStack": 5,
+      "basePrice": 755,
+      "mass": 21.5,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "base",
+        "building"
+      ]
+    },
+    {
+      "definitionId": "drone.survey",
+      "localizationKey": "item.drone.survey",
+      "category": "Drone",
+      "maxStack": 3,
+      "basePrice": 700,
+      "mass": 3.0,
+      "rarity": "Rare",
+      "technologyTier": 2,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "drone",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "drone.mining",
+      "localizationKey": "item.drone.mining",
+      "category": "Drone",
+      "maxStack": 3,
+      "basePrice": 830,
+      "mass": 3.4,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "drone",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "drone.repair",
+      "localizationKey": "item.drone.repair",
+      "category": "Drone",
+      "maxStack": 3,
+      "basePrice": 860,
+      "mass": 3.8,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "drone",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "vehicle.rover_powertrain",
+      "localizationKey": "item.vehicle.rover_powertrain",
+      "category": "Vehicle",
+      "maxStack": 3,
+      "basePrice": 890,
+      "mass": 4.2,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "vehicle",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "vehicle.rover_sensor_mast",
+      "localizationKey": "item.vehicle.rover_sensor_mast",
+      "category": "Vehicle",
+      "maxStack": 3,
+      "basePrice": 920,
+      "mass": 4.6,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "vehicle",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "vehicle.orbital_probe",
+      "localizationKey": "item.vehicle.orbital_probe",
+      "category": "Vehicle",
+      "maxStack": 3,
+      "basePrice": 950,
+      "mass": 5.0,
+      "rarity": "Rare",
+      "technologyTier": 3,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "vehicle",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "exotic.field_generator",
+      "localizationKey": "item.exotic.field_generator",
+      "category": "Exotic",
+      "maxStack": 3,
+      "basePrice": 1080,
+      "mass": 5.4,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "exotic",
+        "advanced"
+      ]
+    },
+    {
+      "definitionId": "exotic.compotium_stabilization_core",
+      "localizationKey": "item.exotic.compotium_stabilization_core",
+      "category": "Exotic",
+      "maxStack": 3,
+      "basePrice": 1110,
+      "mass": 5.8,
+      "rarity": "Exotic",
+      "technologyTier": 4,
+      "stateOfMatter": "Solid",
+      "icon": "",
+      "worldModel": "",
+      "tags": [
+        "exotic",
+        "advanced"
       ]
     }
   ]

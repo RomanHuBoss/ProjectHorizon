@@ -1,0 +1,693 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://project-horizon.local/schemas/industry-content-v2.schema.json",
+  "title": "Project Horizon Industry Content Schema v2",
+  "description": "Normative schemas for the five split Industry Content v2 catalogs. Semantic cross-file checks (stable ID uniqueness, references, station/category/tier compatibility, technology DAG and recipe reachability) are additionally enforced by GameContentCatalog.",
+  "oneOf": [
+    {
+      "title": "items.json",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "definitions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/item"
+          }
+        }
+      }
+    },
+    {
+      "title": "resources.json",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "definitions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/resource"
+          }
+        }
+      }
+    },
+    {
+      "title": "recipes.json",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "definitions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/recipe"
+          }
+        }
+      }
+    },
+    {
+      "title": "stations.json",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "definitions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/station"
+          }
+        }
+      }
+    },
+    {
+      "title": "technologies.json",
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "definitions"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "definitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/technology"
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "stack": {
+      "type": "object",
+      "required": [
+        "definitionId",
+        "quantity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "definitionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "catalyst": {
+      "type": "object",
+      "required": [
+        "definitionId",
+        "quantity",
+        "consumptionChance"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "definitionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "quantity": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "consumptionChance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "item": {
+      "type": "object",
+      "required": [
+        "definitionId",
+        "localizationKey",
+        "category",
+        "maxStack",
+        "basePrice",
+        "mass",
+        "rarity",
+        "technologyTier",
+        "stateOfMatter",
+        "icon",
+        "worldModel",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "definitionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "localizationKey": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "maxStack": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "basePrice": {
+          "type": "number",
+          "minimum": 0
+        },
+        "mass": {
+          "type": "number",
+          "minimum": 0
+        },
+        "rarity": {
+          "enum": [
+            "Common",
+            "Uncommon",
+            "Rare",
+            "VeryRare",
+            "Exotic"
+          ]
+        },
+        "technologyTier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "stateOfMatter": {
+          "enum": [
+            "Solid",
+            "Liquid",
+            "Gas",
+            "Plasma"
+          ]
+        },
+        "icon": {
+          "type": "string"
+        },
+        "worldModel": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "resourceVisual": {
+      "type": "object",
+      "required": [
+        "albedoR",
+        "albedoG",
+        "albedoB",
+        "emissionR",
+        "emissionG",
+        "emissionB",
+        "emissionEnergy",
+        "metallic",
+        "roughness"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "albedoR": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "albedoG": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "albedoB": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "emissionR": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "emissionG": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "emissionB": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "metallic": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "roughness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "emissionEnergy": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "resource": {
+      "type": "object",
+      "required": [
+        "resourceId",
+        "itemDefinitionId",
+        "minimumYield",
+        "maximumYield",
+        "scanTier",
+        "extractionMethod",
+        "visual",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resourceId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "itemDefinitionId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "minimumYield": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "maximumYield": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "scanTier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "extractionMethod": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visual": {
+          "$ref": "#/$defs/resourceVisual"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "environment": {
+      "type": "object",
+      "required": [
+        "minimumTemperatureKelvin",
+        "maximumTemperatureKelvin",
+        "minimumPressureKPa",
+        "maximumPressureKPa",
+        "requiresVacuum"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "minimumTemperatureKelvin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "maximumTemperatureKelvin": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "minimumPressureKPa": {
+          "type": "number",
+          "minimum": 0
+        },
+        "maximumPressureKPa": {
+          "type": "number",
+          "minimum": 0
+        },
+        "requiresVacuum": {
+          "type": "boolean"
+        }
+      }
+    },
+    "quality": {
+      "type": "object",
+      "required": [
+        "minimum",
+        "maximum"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "minimum": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "maximum": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100
+        }
+      }
+    },
+    "application": {
+      "type": "object",
+      "required": [
+        "type",
+        "targetId",
+        "resultHealth"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "RepairShip",
+            "StoreOutputs"
+          ]
+        },
+        "targetId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "resultHealth": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "recipe": {
+      "type": "object",
+      "required": [
+        "recipeId",
+        "category",
+        "technologyTier",
+        "inputs",
+        "catalysts",
+        "outputs",
+        "byproducts",
+        "dismantleReturns",
+        "requiredTechnology",
+        "requiredStation",
+        "stationTier",
+        "craftTimeSeconds",
+        "energyCost",
+        "batchSize",
+        "runtimeEnabled",
+        "requiredTools",
+        "environment",
+        "quality",
+        "hazards",
+        "application",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "recipeId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "technologyTier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stack"
+          }
+        },
+        "catalysts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/catalyst"
+          }
+        },
+        "outputs": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/stack"
+          }
+        },
+        "byproducts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stack"
+          }
+        },
+        "dismantleReturns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/stack"
+          }
+        },
+        "requiredTechnology": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "requiredStation": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "stationTier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "craftTimeSeconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "energyCost": {
+          "type": "number",
+          "minimum": 0
+        },
+        "batchSize": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "runtimeEnabled": {
+          "type": "boolean"
+        },
+        "requiredTools": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          },
+          "uniqueItems": true
+        },
+        "environment": {
+          "$ref": "#/$defs/environment"
+        },
+        "quality": {
+          "$ref": "#/$defs/quality"
+        },
+        "hazards": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        },
+        "application": {
+          "$ref": "#/$defs/application"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "station": {
+      "type": "object",
+      "required": [
+        "stationId",
+        "localizationKey",
+        "tier",
+        "energyCapacity",
+        "parallelSlots",
+        "supportedCategories",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "stationId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "localizationKey": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "tier": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "energyCapacity": {
+          "type": "number",
+          "minimum": 0
+        },
+        "parallelSlots": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "supportedCategories": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "technology": {
+      "type": "object",
+      "required": [
+        "technologyId",
+        "localizationKey",
+        "tier",
+        "researchCost",
+        "prerequisites",
+        "tags"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "technologyId": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "localizationKey": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+        },
+        "tier": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 4
+        },
+        "researchCost": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "prerequisites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z0-9_]+)+$"
+          },
+          "uniqueItems": true
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  },
+  "x-projectHorizon": {
+    "catalogCounts": {
+      "catalogVersion": "2.0.0",
+      "schemaVersion": 2,
+      "items": 174,
+      "worldResources": 42,
+      "recipes": 128,
+      "stations": 15,
+      "technologies": 32,
+      "runtimeEnabledRecipes": 10,
+      "chemistryRecipes": 30,
+      "compotiumRecipes": 13,
+      "paraffiniumRecipes": 5,
+      "recipesWithCatalysts": 10,
+      "recipesWithByproducts": 17,
+      "recipesWithEnvironmentControls": 32,
+      "dependencyCycles": 0,
+      "unreachableRecipes": 0,
+      "notes": "Project Horizon original industry catalog. Compotium was named by the author’s son and is canonical project lore."
+    },
+    "semanticValidation": [
+      "all IDs unique and stable",
+      "all cross-file references resolve",
+      "station category/tier supports recipe",
+      "recipe technology tier is not below required technology",
+      "technology graph is acyclic",
+      "recipe graph is acyclic",
+      "all recipes are reachable from world resources",
+      "all localization keys exist in ru/en catalogs"
+    ]
+  }
+}

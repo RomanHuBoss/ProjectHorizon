@@ -1,26 +1,29 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "definitions": [
     {
       "resourceId": "resource.salvage_alloy",
       "itemDefinitionId": "resource.salvage_alloy",
       "minimumYield": 1,
       "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
       "visual": {
         "albedoR": 0.12,
         "albedoG": 0.82,
         "albedoB": 0.86,
-        "emissionR": 0.04,
-        "emissionG": 0.38,
-        "emissionB": 0.42,
-        "emissionEnergy": 1.8,
-        "metallic": 0.55,
-        "roughness": 0.28
+        "emissionR": 0.054,
+        "emissionG": 0.369,
+        "emissionB": 0.387,
+        "emissionEnergy": 1.5,
+        "metallic": 0.65,
+        "roughness": 0.22
       },
       "tags": [
         "surface",
         "salvage",
-        "starter"
+        "metal",
+        "repair"
       ]
     },
     {
@@ -28,21 +31,24 @@
       "itemDefinitionId": "resource.conductive_crystal",
       "minimumYield": 1,
       "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
       "visual": {
         "albedoR": 0.58,
         "albedoG": 0.2,
         "albedoB": 0.92,
-        "emissionR": 0.26,
-        "emissionG": 0.05,
-        "emissionB": 0.52,
-        "emissionEnergy": 2.1,
-        "metallic": 0.22,
-        "roughness": 0.18
+        "emissionR": 0.261,
+        "emissionG": 0.09000000000000001,
+        "emissionB": 0.41400000000000003,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.3
       },
       "tags": [
         "surface",
         "crystal",
-        "starter"
+        "conductive",
+        "launch"
       ]
     },
     {
@@ -50,20 +56,23 @@
       "itemDefinitionId": "resource.phase_fiber",
       "minimumYield": 1,
       "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
       "visual": {
         "albedoR": 0.12,
         "albedoG": 0.72,
         "albedoB": 0.58,
-        "emissionR": 0.02,
-        "emissionG": 0.34,
-        "emissionB": 0.22,
-        "emissionEnergy": 2.0,
-        "metallic": 0.18,
-        "roughness": 0.24
+        "emissionR": 0.054,
+        "emissionG": 0.324,
+        "emissionB": 0.261,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.38
       },
       "tags": [
         "surface",
         "fiber",
+        "phase",
         "navigation"
       ]
     },
@@ -72,21 +81,974 @@
       "itemDefinitionId": "resource.thermal_gel",
       "minimumYield": 1,
       "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
       "visual": {
         "albedoR": 0.92,
         "albedoG": 0.34,
         "albedoB": 0.1,
-        "emissionR": 0.52,
-        "emissionG": 0.1,
-        "emissionB": 0.02,
-        "emissionEnergy": 2.1,
-        "metallic": 0.12,
-        "roughness": 0.3
+        "emissionR": 0.41400000000000003,
+        "emissionG": 0.15300000000000002,
+        "emissionB": 0.045000000000000005,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
       },
       "tags": [
         "surface",
         "thermal",
+        "gel",
         "cooling"
+      ]
+    },
+    {
+      "resourceId": "resource.plasma_filament",
+      "itemDefinitionId": "resource.plasma_filament",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.82,
+        "albedoG": 0.72,
+        "albedoB": 0.12,
+        "emissionR": 0.369,
+        "emissionG": 0.324,
+        "emissionB": 0.054,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "plasma",
+        "filament",
+        "power"
+      ]
+    },
+    {
+      "resourceId": "resource.quantum_resin",
+      "itemDefinitionId": "resource.quantum_resin",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.14,
+        "albedoG": 0.58,
+        "albedoB": 0.96,
+        "emissionR": 0.06300000000000001,
+        "emissionG": 0.261,
+        "emissionB": 0.432,
+        "emissionEnergy": 1.9,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "quantum",
+        "resin",
+        "sensors"
+      ]
+    },
+    {
+      "resourceId": "resource.aerogel_matrix",
+      "itemDefinitionId": "resource.aerogel_matrix",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.76,
+        "albedoG": 0.9,
+        "albedoB": 0.98,
+        "emissionR": 0.342,
+        "emissionG": 0.405,
+        "emissionB": 0.441,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "aerogel",
+        "matrix",
+        "life_support"
+      ]
+    },
+    {
+      "resourceId": "resource.magnetic_ore",
+      "itemDefinitionId": "resource.magnetic_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.72,
+        "albedoG": 0.18,
+        "albedoB": 0.22,
+        "emissionR": 0.324,
+        "emissionG": 0.081,
+        "emissionB": 0.099,
+        "emissionEnergy": 1.7,
+        "metallic": 0.65,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "magnetic",
+        "ore",
+        "attitude"
+      ]
+    },
+    {
+      "resourceId": "resource.bio_polymer",
+      "itemDefinitionId": "resource.bio_polymer",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.68,
+        "albedoG": 0.86,
+        "albedoB": 0.18,
+        "emissionR": 0.30600000000000005,
+        "emissionG": 0.387,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "bio",
+        "polymer",
+        "sealant"
+      ]
+    },
+    {
+      "resourceId": "resource.ceramic_composite",
+      "itemDefinitionId": "resource.ceramic_composite",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.72,
+        "albedoG": 0.72,
+        "albedoB": 0.76,
+        "emissionR": 0.324,
+        "emissionG": 0.324,
+        "emissionB": 0.342,
+        "emissionEnergy": 1.9,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "ceramic",
+        "composite",
+        "heat_shield"
+      ]
+    },
+    {
+      "resourceId": "resource.raw_compotium",
+      "itemDefinitionId": "resource.raw_compotium",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 4,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.94,
+        "albedoG": 0.18,
+        "albedoB": 0.62,
+        "emissionR": 0.423,
+        "emissionG": 0.081,
+        "emissionB": 0.279,
+        "emissionEnergy": 2.3,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "compotium",
+        "exotic",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.paraffinium",
+      "itemDefinitionId": "resource.paraffinium",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.92,
+        "albedoG": 0.72,
+        "albedoB": 0.32,
+        "emissionR": 0.41400000000000003,
+        "emissionG": 0.324,
+        "emissionB": 0.14400000000000002,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "paraffinium",
+        "hydrocarbon",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.acidic_brine",
+      "itemDefinitionId": "resource.acidic_brine",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "Extractor",
+      "visual": {
+        "albedoR": 0.64,
+        "albedoG": 0.9,
+        "albedoB": 0.44,
+        "emissionR": 0.28800000000000003,
+        "emissionG": 0.405,
+        "emissionB": 0.198,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "acid",
+        "brine",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.hydrocarbon_sludge",
+      "itemDefinitionId": "resource.hydrocarbon_sludge",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "Extractor",
+      "visual": {
+        "albedoR": 0.32,
+        "albedoG": 0.24,
+        "albedoB": 0.18,
+        "emissionR": 0.14400000000000002,
+        "emissionG": 0.108,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "hydrocarbon",
+        "sludge",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.bio_solvent",
+      "itemDefinitionId": "resource.bio_solvent",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.36,
+        "albedoG": 0.82,
+        "albedoB": 0.62,
+        "emissionR": 0.162,
+        "emissionG": 0.369,
+        "emissionB": 0.279,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "bio",
+        "solvent",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.sulfur_crystal",
+      "itemDefinitionId": "resource.sulfur_crystal",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.88,
+        "albedoG": 0.8,
+        "albedoB": 0.18,
+        "emissionR": 0.396,
+        "emissionG": 0.36000000000000004,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "sulfur",
+        "crystal",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.inert_gas",
+      "itemDefinitionId": "resource.inert_gas",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "Extractor",
+      "visual": {
+        "albedoR": 0.54,
+        "albedoG": 0.68,
+        "albedoB": 0.92,
+        "emissionR": 0.24300000000000002,
+        "emissionG": 0.30600000000000005,
+        "emissionB": 0.41400000000000003,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "gas",
+        "inert",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.catalytic_dust",
+      "itemDefinitionId": "resource.catalytic_dust",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.76,
+        "albedoG": 0.46,
+        "albedoB": 0.18,
+        "emissionR": 0.342,
+        "emissionG": 0.20700000000000002,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.9,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "catalyst",
+        "dust",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.ferric_ore",
+      "itemDefinitionId": "resource.ferric_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.5,
+        "albedoG": 0.32,
+        "albedoB": 0.22,
+        "emissionR": 0.225,
+        "emissionG": 0.14400000000000002,
+        "emissionB": 0.099,
+        "emissionEnergy": 1.5,
+        "metallic": 0.65,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "iron"
+      ]
+    },
+    {
+      "resourceId": "resource.copper_ore",
+      "itemDefinitionId": "resource.copper_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.74,
+        "albedoG": 0.38,
+        "albedoB": 0.18,
+        "emissionR": 0.333,
+        "emissionG": 0.171,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.5,
+        "metallic": 0.65,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "copper"
+      ]
+    },
+    {
+      "resourceId": "resource.titanium_ore",
+      "itemDefinitionId": "resource.titanium_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.12,
+        "albedoG": 0.82,
+        "albedoB": 0.86,
+        "emissionR": 0.054,
+        "emissionG": 0.369,
+        "emissionB": 0.387,
+        "emissionEnergy": 1.7,
+        "metallic": 0.65,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "titanium"
+      ]
+    },
+    {
+      "resourceId": "resource.aluminum_ore",
+      "itemDefinitionId": "resource.aluminum_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.58,
+        "albedoG": 0.2,
+        "albedoB": 0.92,
+        "emissionR": 0.261,
+        "emissionG": 0.09000000000000001,
+        "emissionB": 0.41400000000000003,
+        "emissionEnergy": 1.5,
+        "metallic": 0.65,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "aluminum"
+      ]
+    },
+    {
+      "resourceId": "resource.cobalt_ore",
+      "itemDefinitionId": "resource.cobalt_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.12,
+        "albedoG": 0.72,
+        "albedoB": 0.58,
+        "emissionR": 0.054,
+        "emissionG": 0.324,
+        "emissionB": 0.261,
+        "emissionEnergy": 1.7,
+        "metallic": 0.65,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "cobalt"
+      ]
+    },
+    {
+      "resourceId": "resource.nickel_ore",
+      "itemDefinitionId": "resource.nickel_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.92,
+        "albedoG": 0.34,
+        "albedoB": 0.1,
+        "emissionR": 0.41400000000000003,
+        "emissionG": 0.15300000000000002,
+        "emissionB": 0.045000000000000005,
+        "emissionEnergy": 1.5,
+        "metallic": 0.65,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "metal",
+        "ore",
+        "nickel"
+      ]
+    },
+    {
+      "resourceId": "resource.silicon_crystal",
+      "itemDefinitionId": "resource.silicon_crystal",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.82,
+        "albedoG": 0.72,
+        "albedoB": 0.12,
+        "emissionR": 0.369,
+        "emissionG": 0.324,
+        "emissionB": 0.054,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "silicon",
+        "crystal",
+        "electronics"
+      ]
+    },
+    {
+      "resourceId": "resource.carbonaceous_rock",
+      "itemDefinitionId": "resource.carbonaceous_rock",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.14,
+        "albedoG": 0.58,
+        "albedoB": 0.96,
+        "emissionR": 0.06300000000000001,
+        "emissionG": 0.261,
+        "emissionB": 0.432,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "carbon",
+        "rock",
+        "material"
+      ]
+    },
+    {
+      "resourceId": "resource.ice_water",
+      "itemDefinitionId": "resource.ice_water",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.76,
+        "albedoG": 0.9,
+        "albedoB": 0.98,
+        "emissionR": 0.342,
+        "emissionG": 0.405,
+        "emissionB": 0.441,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "water",
+        "ice",
+        "volatile"
+      ]
+    },
+    {
+      "resourceId": "resource.ammonia_ice",
+      "itemDefinitionId": "resource.ammonia_ice",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.72,
+        "albedoG": 0.18,
+        "albedoB": 0.22,
+        "emissionR": 0.324,
+        "emissionG": 0.081,
+        "emissionB": 0.099,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "ammonia",
+        "ice",
+        "volatile"
+      ]
+    },
+    {
+      "resourceId": "resource.methane_clathrate",
+      "itemDefinitionId": "resource.methane_clathrate",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.68,
+        "albedoG": 0.86,
+        "albedoB": 0.18,
+        "emissionR": 0.30600000000000005,
+        "emissionG": 0.387,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "methane",
+        "clathrate",
+        "volatile"
+      ]
+    },
+    {
+      "resourceId": "resource.xenon_pocket",
+      "itemDefinitionId": "resource.xenon_pocket",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "Extractor",
+      "visual": {
+        "albedoR": 0.72,
+        "albedoG": 0.72,
+        "albedoB": 0.76,
+        "emissionR": 0.324,
+        "emissionG": 0.324,
+        "emissionB": 0.342,
+        "emissionEnergy": 1.9,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "xenon",
+        "gas",
+        "rare"
+      ]
+    },
+    {
+      "resourceId": "resource.argon_pocket",
+      "itemDefinitionId": "resource.argon_pocket",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "Extractor",
+      "visual": {
+        "albedoR": 0.94,
+        "albedoG": 0.18,
+        "albedoB": 0.62,
+        "emissionR": 0.423,
+        "emissionG": 0.081,
+        "emissionB": 0.279,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "argon",
+        "gas",
+        "inert"
+      ]
+    },
+    {
+      "resourceId": "resource.lithium_salt",
+      "itemDefinitionId": "resource.lithium_salt",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.92,
+        "albedoG": 0.72,
+        "albedoB": 0.32,
+        "emissionR": 0.41400000000000003,
+        "emissionG": 0.324,
+        "emissionB": 0.14400000000000002,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "lithium",
+        "salt",
+        "battery"
+      ]
+    },
+    {
+      "resourceId": "resource.sodium_salt",
+      "itemDefinitionId": "resource.sodium_salt",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.64,
+        "albedoG": 0.9,
+        "albedoB": 0.44,
+        "emissionR": 0.28800000000000003,
+        "emissionG": 0.405,
+        "emissionB": 0.198,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "sodium",
+        "salt",
+        "chemistry"
+      ]
+    },
+    {
+      "resourceId": "resource.rare_earth_ore",
+      "itemDefinitionId": "resource.rare_earth_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.32,
+        "albedoG": 0.24,
+        "albedoB": 0.18,
+        "emissionR": 0.14400000000000002,
+        "emissionG": 0.108,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.9,
+        "metallic": 0.65,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "rare_earth",
+        "ore",
+        "electronics"
+      ]
+    },
+    {
+      "resourceId": "resource.uranium_ore",
+      "itemDefinitionId": "resource.uranium_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.36,
+        "albedoG": 0.82,
+        "albedoB": 0.62,
+        "emissionR": 0.162,
+        "emissionG": 0.369,
+        "emissionB": 0.279,
+        "emissionEnergy": 1.9,
+        "metallic": 0.65,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "uranium",
+        "ore",
+        "nuclear"
+      ]
+    },
+    {
+      "resourceId": "resource.thorium_ore",
+      "itemDefinitionId": "resource.thorium_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.88,
+        "albedoG": 0.8,
+        "albedoB": 0.18,
+        "emissionR": 0.396,
+        "emissionG": 0.36000000000000004,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.9,
+        "metallic": 0.65,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "thorium",
+        "ore",
+        "nuclear"
+      ]
+    },
+    {
+      "resourceId": "resource.iridium_nodule",
+      "itemDefinitionId": "resource.iridium_nodule",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 4,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.54,
+        "albedoG": 0.68,
+        "albedoB": 0.92,
+        "emissionR": 0.24300000000000002,
+        "emissionG": 0.30600000000000005,
+        "emissionB": 0.41400000000000003,
+        "emissionEnergy": 2.3,
+        "metallic": 0.65,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "iridium",
+        "metal",
+        "exotic"
+      ]
+    },
+    {
+      "resourceId": "resource.tungsten_ore",
+      "itemDefinitionId": "resource.tungsten_ore",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.76,
+        "albedoG": 0.46,
+        "albedoB": 0.18,
+        "emissionR": 0.342,
+        "emissionG": 0.20700000000000002,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.9,
+        "metallic": 0.65,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "tungsten",
+        "ore",
+        "high_temp"
+      ]
+    },
+    {
+      "resourceId": "resource.flora_pulp",
+      "itemDefinitionId": "resource.flora_pulp",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 0,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.5,
+        "albedoG": 0.32,
+        "albedoB": 0.22,
+        "emissionR": 0.225,
+        "emissionG": 0.14400000000000002,
+        "emissionB": 0.099,
+        "emissionEnergy": 1.5,
+        "metallic": 0.15,
+        "roughness": 0.38
+      },
+      "tags": [
+        "surface",
+        "flora",
+        "organic",
+        "bio"
+      ]
+    },
+    {
+      "resourceId": "resource.fungal_spores",
+      "itemDefinitionId": "resource.fungal_spores",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.74,
+        "albedoG": 0.38,
+        "albedoB": 0.18,
+        "emissionR": 0.333,
+        "emissionG": 0.171,
+        "emissionB": 0.081,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.45999999999999996
+      },
+      "tags": [
+        "surface",
+        "fungal",
+        "spores",
+        "bio"
+      ]
+    },
+    {
+      "resourceId": "resource.microbe_culture",
+      "itemDefinitionId": "resource.microbe_culture",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 2,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.12,
+        "albedoG": 0.82,
+        "albedoB": 0.86,
+        "emissionR": 0.054,
+        "emissionG": 0.369,
+        "emissionB": 0.387,
+        "emissionEnergy": 1.9,
+        "metallic": 0.15,
+        "roughness": 0.22
+      },
+      "tags": [
+        "surface",
+        "microbe",
+        "culture",
+        "bio"
+      ]
+    },
+    {
+      "resourceId": "resource.volcanic_glass",
+      "itemDefinitionId": "resource.volcanic_glass",
+      "minimumYield": 1,
+      "maximumYield": 1,
+      "scanTier": 1,
+      "extractionMethod": "MiningBeam",
+      "visual": {
+        "albedoR": 0.58,
+        "albedoG": 0.2,
+        "albedoB": 0.92,
+        "emissionR": 0.261,
+        "emissionG": 0.09000000000000001,
+        "emissionB": 0.41400000000000003,
+        "emissionEnergy": 1.7,
+        "metallic": 0.15,
+        "roughness": 0.3
+      },
+      "tags": [
+        "surface",
+        "glass",
+        "volcanic",
+        "optics"
       ]
     }
   ]
