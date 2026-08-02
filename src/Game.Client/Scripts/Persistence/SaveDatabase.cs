@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 public sealed partial class SaveDatabase : IDisposable
@@ -405,6 +406,28 @@ public sealed partial class SaveDatabase : IDisposable
                     StringComparer.Ordinal))
             {
                 mismatch = "technology_progress differs";
+                return false;
+            }
+        }
+
+        ProductionQueueSaveData? expectedQueue = expected.ProductionQueue;
+        ProductionQueueSaveData? actualQueue = actual.ProductionQueue;
+        if ((expectedQueue is null) != (actualQueue is null))
+        {
+            mismatch = "production_queue presence differs";
+            return false;
+        }
+
+        if (expectedQueue is not null && actualQueue is not null)
+        {
+            string expectedQueueJson = JsonSerializer.Serialize(expectedQueue);
+            string actualQueueJson = JsonSerializer.Serialize(actualQueue);
+            if (!string.Equals(
+                expectedQueueJson,
+                actualQueueJson,
+                StringComparison.Ordinal))
+            {
+                mismatch = "production_queue differs";
                 return false;
             }
         }
@@ -819,7 +842,8 @@ public sealed partial class SaveDatabase : IDisposable
             connection,
             transaction,
             "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
-            "setting_key IN ('research_points', 'unlocked_technologies');",
+            "setting_key IN ('research_points', 'unlocked_technologies', " +
+            "'production_queue');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -840,6 +864,18 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$setting_value", string.Join(",",
                     snapshot.TechnologyProgress.UnlockedTechnologyIds
                         .OrderBy(id => id, StringComparer.Ordinal))));
+        }
+
+        if (snapshot.ProductionQueue is not null)
+        {
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'production_queue', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    snapshot.ProductionQueue)));
         }
 
         ExecuteNonQuery(
@@ -1050,6 +1086,7 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         TechnologyProgressSaveData? technologyProgress = null;
+        ProductionQueueSaveData? productionQueue = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1057,8 +1094,8 @@ public sealed partial class SaveDatabase : IDisposable
             command.CommandText =
                 "SELECT setting_key, setting_value FROM save_settings " +
                 "WHERE slot_id = $slot_id AND setting_key IN " +
-                "('research_points', 'unlocked_technologies') " +
-                "ORDER BY setting_key;";
+                "('research_points', 'unlocked_technologies', " +
+                "'production_queue') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1067,7 +1104,8 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
-        if (progressSettings.Count > 0)
+        if (progressSettings.ContainsKey("research_points") ||
+            progressSettings.ContainsKey("unlocked_technologies"))
         {
             int researchPoints = progressSettings.TryGetValue(
                     "research_points",
@@ -1093,6 +1131,25 @@ public sealed partial class SaveDatabase : IDisposable
             technologyProgress = new TechnologyProgressSaveData(
                 researchPoints,
                 unlocked);
+        }
+
+        if (progressSettings.TryGetValue(
+            "production_queue",
+            out string productionQueueJson))
+        {
+            try
+            {
+                productionQueue = JsonSerializer.Deserialize<
+                    ProductionQueueSaveData>(productionQueueJson) ??
+                    throw new InvalidDataException(
+                        "production_queue setting deserialized to null.");
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "production_queue setting contains invalid JSON.",
+                    exception);
+            }
         }
 
         VisitedPlanetSaveData visitedPlanet;
@@ -1126,7 +1183,8 @@ public sealed partial class SaveDatabase : IDisposable
             ship,
             inventory,
             visitedPlanet,
-            technologyProgress);
+            technologyProgress,
+            productionQueue);
     }
 
     private SaveDatabaseDiagnostics ReadDiagnosticsCore(

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-chemical-process-runtime.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-production-queue.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,83 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` также подтверждены clean build, автоматическим `F3` и ручной проверкой station selector/research. Текущая итерация реализует `TASK-083`: Godot-независимый chemical process runtime исполняет batch processing, energy budget, temperature/pressure/vacuum gates, catalysts, byproducts и hazards; runtime-приёмка вынесена в `TASK-089`.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` и `TASK-083/089` подтверждены clean build, автоматическими `F3/F2` и ручной проверкой station UI. Текущая итерация реализует `TASK-090`: Godot-независимая production queue поддерживает parallel slots, pause/resume, атомарные reservations, cancellation refunds и freeze-and-resume persistence активных jobs; runtime-приёмка вынесена в `TASK-091`.
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — production queue и active-process lifecycle (`TASK-090`)
+
+**Исходный снимок:** `ProjectHorizon-main(5)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 23:23 (+03:00)  
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** ТЗ v2.0 §52.1, §52.3, §53; production queue, station parallel slots, cancellation/refunds и active-process persistence.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил реальный `CoreCompile` и clean build `0 предупреждений / 0 ошибок`;
+- `F2 / TASK-083: PASS batch=2, energy=1, environment=1, vacuum=1, catalyst=1, byproduct=1, roundTrip=1`;
+- вручную подтверждено, что после F2 основной slot сохраняет `RP=690`, `unlocked=11/32`, `components=9/9`, а Recipes/Research terminal продолжает открываться;
+- `TASK-083`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-089`: `IN_PROGRESS` → `VERIFIED`.
+
+**Реализовано:**
+
+- добавлен Godot-независимый `ProductionQueueRuntime`;
+- station definition `ParallelSlots` реально ограничивает одновременно работающие jobs;
+- третий и последующие jobs сохраняют FIFO-порядок и ожидают свободного slot;
+- inputs, catalysts и energy резервируются атомарно при enqueue, поэтому параллельные jobs не могут overcommit один stack или energy budget;
+- реализованы pause/resume без изменения elapsed progress; paused job освобождает slot, resumed job возвращается в FIFO queue;
+- cancellation активной, queued или paused job возвращает все зарезервированные inputs, catalysts и energy, поскольку outputs до completion не создаются;
+- completion создаёт outputs/byproducts, применяет deterministic catalyst consumption и освобождает slot;
+- large time step корректно завершает несколько jobs и запускает следующие в пределах того же advance;
+- active jobs, slot index, elapsed/duration, environment, reservations, energy и sequences сериализуются в `save_settings.production_queue`; schema SQLite остаётся `2`;
+- graceful-exit policy — `freeze-and-resume`: offline progress отсутствует, restore продолжает с точного persisted elapsed;
+- `SaveDatabase.SnapshotsEqual` сравнивает queue payload; malformed queue JSON отклоняется как `InvalidDataException`;
+- добавлена изолированная `F1 / TASK-090` acceptance с БД `save_1.production-queue-test.db`.
+
+**F1 acceptance проверяет:**
+
+- smelter использует два parallel slots; третья job ожидает;
+- pause сохраняет elapsed, освобождает slot, resume возвращает job в очередь;
+- mid-process `GracefulExit` autosave и exact SQLite round-trip;
+- восстановление двух running и одной queued job с точным elapsed progress;
+- cancellation активной titanium job, полный refund `2 × resource.titanium_ore + 48 energy`;
+- completion оставшихся ferrite/copper jobs, два ingot outputs и два scrap byproducts;
+- финальная energy `96`, queue drained, `QuestCompleted` autosave, autosave log, one-writer и `integrity=ok`.
+
+**Проверки в среде подготовки:**
+
+- JSON Schema v2 и все пять content-файлов: `PASS`;
+- каталог: `items=174`, `resources=42`, `recipes=128`, `stations=15`, `technologies=32`;
+- выбранные smelter recipes и station bindings сверены с JSON: `slots=2`, energy capacity `180`, process energy `40/44/48`, craft time `5.0/5.35/5.7`;
+- лексически проверен `51` C#-файл: строки, комментарии и delimiters сбалансированы;
+- `51` UID уникальны;
+- `29` фактических `res://`-ссылок разрешены;
+- `.git`, `.godot`, `bin`, `obj`, `.vs`, DLL/PDB, БД и runtime-логи отсутствуют;
+- .NET build и Godot runtime в среде подготовки недоступны; успешная сборка и `F1: PASS` не заявляются.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/IndustryProcessRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-083` → `VERIFIED`;
+- `TASK-089` → `VERIFIED`;
+- `TASK-090`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-091`: `NOT_STARTED` → `IN_PROGRESS` — clean build и runtime F1;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Граница итерации:** queue domain и persistence реализованы и проверяются F1 изолированно. Интерактивное player-facing управление очередью внутри station terminal, process visualization, quality/purity/stability и dismantle returns не включены; они должны идти отдельными системными шагами.
+
+**Приёмка `TASK-091`:** clean build `0/0`; `F1: PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1`; Output должен подтвердить `maxParallel=2`, `gracefulRestore=1`, `refundExact=1`, `queueDrained=1`, `energyRemaining=96`, `maxWriters=1`, `integrity=ok`; затем повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`.
 
 ### 2026-08-02 — extended chemical process runtime (`TASK-083`)
 
@@ -2344,6 +2418,25 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `CONTENT-ACC-075` | F6/F7/F9/F10/F11/F12 не регрессируют после batch expansion | `VERIFIED` | F6/F7/F9/F10/F11/F12 подтверждены PASS при schema v2 |
 | `CONTENT-ACC-076` | Ручной sample новых paths и cold restart подтверждают production routing/persistence | `VERIFIED` | Runtime matrix, autosave и revision restore подтверждены пользователем |
 
+### 8.14. Production queue и active-process persistence
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `INDUSTRY-040` | Station исполняет не более `ParallelSlots` jobs одновременно | `IMPLEMENTED` | `ProductionQueueRuntime`, F1 smelter `slots=2` |
+| `INDUSTRY-041` | Jobs сверх slot limit сохраняют FIFO queue | `IMPLEMENTED` | Третья F1 job имеет `Queued` до освобождения slot |
+| `INDUSTRY-042` | Enqueue атомарно резервирует inputs, catalysts и energy | `IMPLEMENTED` | Free inventory/energy уменьшаются до старта process |
+| `INDUSTRY-043` | Pause/resume сохраняют elapsed progress | `IMPLEMENTED` | Paused job не продвигается; resume возвращает её в FIFO |
+| `INDUSTRY-044` | Cancellation не создаёт output и полностью возвращает reservations | `IMPLEMENTED` | Full refund policy для queued/running/paused jobs |
+| `INDUSTRY-045` | Completion применяет outputs, byproducts и catalyst policy | `IMPLEMENTED` | Используется deterministic catalyst roll из TASK-083 |
+| `INDUSTRY-046` | Active jobs сохраняются и восстанавливаются без offline progress | `IMPLEMENTED` | `ProductionQueueSaveData`, freeze-and-resume policy |
+| `INDUSTRY-047` | Queue payload входит в exact snapshot comparison | `IMPLEMENTED` | `save_settings.production_queue`, `SnapshotsEqual` |
+| `INDUSTRY-ACC-040` | Clean build не содержит errors/warnings | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `INDUSTRY-ACC-041` | F1 подтверждает slots, waiting queue и pause/resume | `IN_PROGRESS` | Ожидается `slots=2`, `queued=1`, `pause=1` |
+| `INDUSTRY-ACC-042` | F1 подтверждает graceful restore и exact elapsed | `IN_PROGRESS` | Ожидается `restore=1`, `roundTrip=1` |
+| `INDUSTRY-ACC-043` | F1 подтверждает active cancellation и exact refund | `IN_PROGRESS` | Ожидается `cancel=1`, `refund=1`, energy `96` |
+| `INDUSTRY-ACC-044` | F1 завершает remaining jobs и очищает queue | `IN_PROGRESS` | Ожидается `completed=2`, `queueDrained=1` |
+| `INDUSTRY-ACC-045` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить все существующие acceptance routes |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
@@ -2352,14 +2445,15 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-089` | Выполнить runtime-приёмку extended chemical process runtime | Clean build `0/0`; `F2: PASS`; energy/environment/vacuum/catalyst/byproduct/batch/round-trip; затем F3–F12 regressions |
+| 1 | `TASK-091` | Выполнить runtime-приёмку production queue | Clean build `0/0`; `F1: PASS`; slots/queue/pause/restore/cancel/refund/completion/round-trip; затем F2–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-090` | Реализовать production queue и active-process lifecycle | Parallel slots, cancellation, refunds, active-process persistence и graceful-exit policy по ТЗ v2.0 §52.3 |
+| 3 | `TASK-092` | Интегрировать queue controls и visualization в station terminal | Queue tab, job progress, pause/resume/cancel actions, player-facing energy/reservations |
+| 4 | `TASK-093` | Реализовать quality/purity/stability и dismantle returns | Следующая семантика ТЗ v2.0 §52.3 после queue lifecycle |
 
-**Подтверждено:** `TASK-060`–`TASK-074`, `TASK-076`–`TASK-081`, persistence, vertical slice, Industry Content v2 и runtime matrix.  
-**Реализовано:** `TASK-083` — extended atomic chemical process runtime; `TASK-082` подтверждён как `VERIFIED`.  
+**Подтверждено:** `TASK-060`–`TASK-074`, `TASK-076`–`TASK-084`, `TASK-089`, persistence, vertical slice, Industry Content v2 и runtime matrix.  
+**Реализовано:** `TASK-090` — production queue и active-process freeze-and-resume persistence.  
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.  
-**Текущая приёмочная задача:** `TASK-089`.
+**Текущая приёмочная задача:** `TASK-091`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -3811,6 +3905,27 @@ TASK-083 chemical process runtime acceptance PASS: batchRecipe=recipe.chemistry.
 
 6. Повторить `F3`, `F4`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; каждый маршрут должен завершиться `PASS`.
 7. При `FAIL` предоставить полный HUD, строку `TASK-083 ... FAIL`, последние 120 строк Godot Output и полный build log.
+
+## 18B. Runtime-приёмка `TASK-090/TASK-091`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — `0` предупреждений и `0` ошибок, в полном логе реально выполняется `CoreCompile`.
+2. Запустить vertical slice и дождаться `DB: Ready/Passed`.
+3. Нажать `F1` один раз; до завершения не запускать другие acceptance-команды. Тест использует отдельную БД `save_1.production-queue-test.db` и не изменяет gameplay-slot.
+4. Ожидаемый HUD:
+
+```text
+TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1
+```
+
+5. Ожидаемая строка Godot Output:
+
+```text
+TASK-090 production queue acceptance PASS: station=station.smelter; slots=2; maxParallel=2; thirdQueued=1; pauseResume=1; gracefulRestore=1; activeCancel=1; refundExact=1; completed=2; queueDrained=1; energyRemaining=96; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=parallel production slots queued work, freeze-and-resume persistence restored exact progress, cancellation refunded every reservation and remaining jobs completed exactly
+```
+
+6. После F1 открыть PortableFabricator клавишей `E`, переключить Recipes/Research через `Tab/R` и закрыть `Esc`; gameplay `RP`, outputs и основной save не должны измениться.
+7. Повторить `F2`, `F3`, `F4`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; каждый маршрут должен завершиться `PASS`.
+8. При `FAIL` предоставить полный HUD, строку `TASK-090 ... FAIL`, последние 120 строк Godot Output и полный build log.
 
 ## 19. Шаблон новой записи
 

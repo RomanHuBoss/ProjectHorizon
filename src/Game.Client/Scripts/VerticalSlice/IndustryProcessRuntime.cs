@@ -41,8 +41,8 @@ public sealed record IndustryProcessExecutionReport(
 
 /// <summary>
 /// Godot-independent runtime for one atomic industrial process execution.
-/// Queueing, cancellation and parallel slots intentionally remain outside this
-/// class and are handled by the next production-runtime iteration.
+/// Queueing, cancellation and parallel slots remain outside this atomic
+/// executor and are handled by <see cref="ProductionQueueRuntime"/>.
 /// </summary>
 public sealed class IndustryProcessRuntime
 {

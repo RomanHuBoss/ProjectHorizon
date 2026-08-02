@@ -57,6 +57,41 @@ public sealed record TechnologyProgressSaveData(
     int ResearchPoints,
     IReadOnlyList<string> UnlockedTechnologyIds);
 
+public enum ProductionQueueJobStatus
+{
+    Queued = 0,
+    Running = 1,
+    Paused = 2
+}
+
+public sealed record ProductionQueueStackSaveData(
+    string DefinitionId,
+    int Quantity);
+
+public sealed record ProductionQueueJobSaveData(
+    string JobId,
+    string RecipeId,
+    int RequestedBatches,
+    double DurationSeconds,
+    double ElapsedSeconds,
+    ProductionQueueJobStatus Status,
+    int SlotIndex,
+    long JobSequence,
+    long ProcessSequence,
+    double ReservedEnergy,
+    double TemperatureKelvin,
+    double PressureKPa,
+    bool IsVacuum,
+    IReadOnlyList<ProductionQueueStackSaveData> ReservedInputs,
+    IReadOnlyList<ProductionQueueStackSaveData> ReservedCatalysts);
+
+public sealed record ProductionQueueSaveData(
+    string StationId,
+    double EnergyRemaining,
+    long NextJobSequence,
+    long NextProcessSequence,
+    IReadOnlyList<ProductionQueueJobSaveData> Jobs);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -67,7 +102,8 @@ public sealed record SaveGameSnapshot(
     ShipSaveData Ship,
     IReadOnlyList<InventoryItemSaveData> Inventory,
     VisitedPlanetSaveData VisitedPlanet,
-    TechnologyProgressSaveData? TechnologyProgress = null);
+    TechnologyProgressSaveData? TechnologyProgress = null,
+    ProductionQueueSaveData? ProductionQueue = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

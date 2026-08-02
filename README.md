@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, station selector, research и chemical runtime — `IMPLEMENTED`
+### Industry Content v2, research, chemical runtime и production queue — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Для остальных recipes добавлен Godot-независимый atomic process runtime: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts и hazards. Production queue, cancellation/refunds и parallel slots остаются следующей задачей.
+Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Для остальных recipes добавлены Godot-независимые atomic process runtime и production queue: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts, hazards, parallel station slots, pause/resume, cancellation with full reservation refunds и freeze-and-resume persistence незавершённых jobs.
 
 В состав v2 входят:
 
@@ -104,6 +104,7 @@ Tab / R        переключить Recipes / Research
 Enter / E      изготовить выбранный рецепт или разблокировать технологию
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
+F1             TASK-090: production queue + active-process persistence
 F2             TASK-083: chemical process runtime
 F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
@@ -118,6 +119,14 @@ F12            регрессия navigation path
 ```
 
 
+
+Ожидаемый `F1` HUD:
+
+```text
+TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1
+```
+
+`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Используется отдельная БД `save_1.production-queue-test.db`; gameplay-slot не изменяется.
 
 Ожидаемый `F2` HUD:
 

@@ -83,6 +83,8 @@ public partial class SalvageRepairSlice : Node3D
         _technologySelectorAcceptanceTask;
     private Task<ChemicalProcessAcceptanceReport>?
         _chemicalProcessAcceptanceTask;
+    private Task<ProductionQueueAcceptanceReport>?
+        _productionQueueAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -96,6 +98,8 @@ public partial class SalvageRepairSlice : Node3D
         _technologySelectorAcceptanceReport;
     private ChemicalProcessAcceptanceReport?
         _chemicalProcessAcceptanceReport;
+    private ProductionQueueAcceptanceReport?
+        _productionQueueAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -117,6 +121,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _industryCatalogAcceptanceHud = "READY";
     private string _technologySelectorAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
+    private string _productionQueueAcceptanceHud = "READY";
     private PortableCraftingStation? _selectorStation;
     private Node3D? _selectorInteractor;
     private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
@@ -308,11 +313,21 @@ public partial class SalvageRepairSlice : Node3D
             $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
             $"stationRecipes={StationRecipes.Count}; " +
             $"craftTimes={craftTimes}s. " +
-            "Press F2 for chemical runtime acceptance, F3 for " +
+            "Press F1 for production queue acceptance, F2 for chemical " +
+            "runtime acceptance, F3 for " +
             "selector/research acceptance, F4 for the complete Industry " +
             "Content v2 structural acceptance, F5 for " +
             "the playable runtime matrix, F6/F7/F9/F10/F11/F12 for " +
             "regressions or F8 to reset.");
+        GD.Print(
+            "TASK-090 production queue READY: " +
+            $"stations={ContentCatalog.Stations.Count}; " +
+            $"parallelStations={ContentCatalog.Stations.Values.Count(
+                station => station.ParallelSlots > 1)}; " +
+            $"maxSlots={ContentCatalog.Stations.Values.Max(
+                station => station.ParallelSlots)}; " +
+            "reservation=enqueue; cancellationRefund=full; " +
+            "gracefulExit=freeze-and-resume; offlineProgress=0.");
     }
 
     public override void _Notification(int what)
@@ -348,6 +363,7 @@ public partial class SalvageRepairSlice : Node3D
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollChemicalProcessAcceptanceTask();
+        PollProductionQueueAcceptanceTask();
         UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
@@ -406,7 +422,12 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        if (Matches(physical, logical, Key.F2) && CanStartCommand())
+        if (Matches(physical, logical, Key.F1) && CanStartCommand())
+        {
+            BeginProductionQueueAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F2) && CanStartCommand())
         {
             BeginChemicalProcessAcceptance();
             GetViewport().SetInputAsHandled();
@@ -1375,6 +1396,7 @@ public partial class SalvageRepairSlice : Node3D
             _catalogMatrixAcceptanceTask is null &&
             _technologySelectorAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
+            _productionQueueAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
             !_craftTimer.IsRunning &&
@@ -1576,6 +1598,32 @@ public partial class SalvageRepairSlice : Node3D
                         binding => binding.ResourceNodeId,
                         StringComparer.Ordinal)
                     .ToArray(),
+                _lifetimeCancellation.Token);
+    }
+
+    private void BeginProductionQueueAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        CloseRecipeSelector();
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.production-queue-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-090 production queue acceptance running";
+        _productionQueueAcceptanceHud = "RUNNING";
+        _productionQueueAcceptanceReport = null;
+        _productionQueueAcceptanceTask =
+            ProductionQueueAcceptanceRunner.RunAsync(
+                testPath,
+                SlotId,
+                ContentCatalog,
                 _lifetimeCancellation.Token);
     }
 
@@ -2193,6 +2241,72 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollProductionQueueAcceptanceTask()
+    {
+        if (_productionQueueAcceptanceTask is null ||
+            !_productionQueueAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<ProductionQueueAcceptanceReport> task =
+            _productionQueueAcceptanceTask;
+        _productionQueueAcceptanceTask = null;
+        try
+        {
+            _productionQueueAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            ProductionQueueAcceptanceReport report =
+                _productionQueueAcceptanceReport;
+            _productionQueueAcceptanceHud = report.Passed
+                ? $"PASS slots={report.ParallelSlots}, " +
+                  $"queued={(report.ThirdJobQueued ? 1 : 0)}, " +
+                  $"pause={(report.PauseResumePreservedProgress ? 1 : 0)}, " +
+                  $"restore={(report.GracefulExitRestored ? 1 : 0)}, " +
+                  $"cancel={(report.ActiveCancellation ? 1 : 0)}, " +
+                  $"refund={(report.RefundExact ? 1 : 0)}, " +
+                  $"completed={report.CompletedProcesses}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _state = report.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-090 production queue acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"station={report.StationId}; " +
+                $"slots={report.ParallelSlots}; " +
+                $"maxParallel={report.MaximumParallelRunning}; " +
+                $"thirdQueued={(report.ThirdJobQueued ? 1 : 0)}; " +
+                $"pauseResume={(report.PauseResumePreservedProgress ? 1 : 0)}; " +
+                $"gracefulRestore={(report.GracefulExitRestored ? 1 : 0)}; " +
+                $"activeCancel={(report.ActiveCancellation ? 1 : 0)}; " +
+                $"refundExact={(report.RefundExact ? 1 : 0)}; " +
+                $"completed={report.CompletedProcesses}; " +
+                $"queueDrained={(report.QueueDrained ? 1 : 0)}; " +
+                $"energyRemaining={report.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("production queue acceptance", exception);
+        }
+    }
+
     private void PollChemicalProcessAcceptanceTask()
     {
         if (_chemicalProcessAcceptanceTask is null ||
@@ -2563,12 +2677,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"Craft: {craftProcess}\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
+                $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • F2 - chemical runtime • " +
+                "E - interact/select • F1 - production queue • " +
+                "F2 - chemical runtime • " +
                 "F3 - selector acceptance • F4/F5 - catalogs • " +
                 "F6/F7/F9/F10/F11/F12 - regressions";
             return;
@@ -2590,6 +2706,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Interaction: {interaction}\n" +
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
+            $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -2602,6 +2719,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space - move • E - interact/select • H - HUD • " +
+            "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +
             "F5 - runtime matrix • F6/F7/F9/F10/F11/F12 - regressions • " +
