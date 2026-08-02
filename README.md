@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, universal station selector и research — `IMPLEMENTED`
+### Industry Content v2, station selector, research и chemical runtime — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Остальные 118 recipes остаются описанным контентом для последующего расширенного chemical runtime.
+Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Для остальных recipes добавлен Godot-независимый atomic process runtime: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts и hazards. Production queue, cancellation/refunds и parallel slots остаются следующей задачей.
 
 В состав v2 входят:
 
@@ -104,6 +104,7 @@ Tab / R        переключить Recipes / Research
 Enter / E      изготовить выбранный рецепт или разблокировать технологию
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
+F2             TASK-083: chemical process runtime
 F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
 F5             TASK-076: playable runtime matrix (10 recipes)
@@ -116,6 +117,15 @@ F11            регрессия craft-time state machine
 F12            регрессия navigation path
 ```
 
+
+
+Ожидаемый `F2` HUD:
+
+```text
+TASK-083 chemical runtime (F2): PASS batch=2, energy=1, environment=1, vacuum=1, catalyst=1, byproduct=1, roundTrip=1
+```
+
+`F2` запускает изолированную chemical-runtime проверку на двух рецептах Компотия. Она подтверждает отказ при нехватке энергии и неверной среде, обязательный вакуум, batch output, deterministic catalyst retained/consumed paths, byproducts, hazards, QuestCompleted autosave и exact SQLite round-trip. Основной gameplay-slot не изменяется.
 
 Ожидаемый `F3` HUD:
 

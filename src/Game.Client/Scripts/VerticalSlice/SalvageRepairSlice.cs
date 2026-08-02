@@ -81,6 +81,8 @@ public partial class SalvageRepairSlice : Node3D
     private Task<CatalogCraftingMatrixAcceptanceReport>? _catalogMatrixAcceptanceTask;
     private Task<TechnologyRecipeSelectorAcceptanceReport>?
         _technologySelectorAcceptanceTask;
+    private Task<ChemicalProcessAcceptanceReport>?
+        _chemicalProcessAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -92,6 +94,8 @@ public partial class SalvageRepairSlice : Node3D
     private CatalogCraftingMatrixAcceptanceReport? _catalogMatrixAcceptanceReport;
     private TechnologyRecipeSelectorAcceptanceReport?
         _technologySelectorAcceptanceReport;
+    private ChemicalProcessAcceptanceReport?
+        _chemicalProcessAcceptanceReport;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -112,6 +116,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _catalogMatrixAcceptanceHud = "READY";
     private string _industryCatalogAcceptanceHud = "READY";
     private string _technologySelectorAcceptanceHud = "READY";
+    private string _chemicalProcessAcceptanceHud = "READY";
     private PortableCraftingStation? _selectorStation;
     private Node3D? _selectorInteractor;
     private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
@@ -303,8 +308,9 @@ public partial class SalvageRepairSlice : Node3D
             $"required={Session.RequiredSalvage} x {Session.SalvageDefinitionId}; " +
             $"stationRecipes={StationRecipes.Count}; " +
             $"craftTimes={craftTimes}s. " +
-            "Press F3 for selector/research acceptance, F4 for the " +
-            "complete Industry Content v2 structural acceptance, F5 for " +
+            "Press F2 for chemical runtime acceptance, F3 for " +
+            "selector/research acceptance, F4 for the complete Industry " +
+            "Content v2 structural acceptance, F5 for " +
             "the playable runtime matrix, F6/F7/F9/F10/F11/F12 for " +
             "regressions or F8 to reset.");
     }
@@ -341,6 +347,7 @@ public partial class SalvageRepairSlice : Node3D
         PollFourthCraftingAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
+        PollChemicalProcessAcceptanceTask();
         UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
@@ -399,7 +406,12 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        if (Matches(physical, logical, Key.F3) && CanStartCommand())
+        if (Matches(physical, logical, Key.F2) && CanStartCommand())
+        {
+            BeginChemicalProcessAcceptance();
+            GetViewport().SetInputAsHandled();
+        }
+        else if (Matches(physical, logical, Key.F3) && CanStartCommand())
         {
             BeginTechnologySelectorAcceptance();
             GetViewport().SetInputAsHandled();
@@ -1321,6 +1333,12 @@ public partial class SalvageRepairSlice : Node3D
             $"paraffinium={analysis.ParaffiniumRecipes}; " +
             $"cycles={analysis.DependencyCycles}; " +
             $"unreachable={analysis.UnreachableRecipes}.");
+        GD.Print(
+            "TASK-083 chemical runtime READY: " +
+            $"catalysts={analysis.RecipesWithCatalysts}; " +
+            $"byproducts={analysis.RecipesWithByproducts}; " +
+            $"environments={analysis.RecipesWithEnvironmentControls}; " +
+            "batch=enabled; energy=enabled; hazards=enabled; mode=atomic.");
         return catalog;
     }
 
@@ -1356,6 +1374,7 @@ public partial class SalvageRepairSlice : Node3D
             _fourthCraftingAcceptanceTask is null &&
             _catalogMatrixAcceptanceTask is null &&
             _technologySelectorAcceptanceTask is null &&
+            _chemicalProcessAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
             !_craftTimer.IsRunning &&
@@ -1557,6 +1576,32 @@ public partial class SalvageRepairSlice : Node3D
                         binding => binding.ResourceNodeId,
                         StringComparer.Ordinal)
                     .ToArray(),
+                _lifetimeCancellation.Token);
+    }
+
+    private void BeginChemicalProcessAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        CloseRecipeSelector();
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.chemical-process-runtime-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-083 chemical process runtime acceptance running";
+        _chemicalProcessAcceptanceHud = "RUNNING";
+        _chemicalProcessAcceptanceReport = null;
+        _chemicalProcessAcceptanceTask =
+            ChemicalProcessAcceptanceRunner.RunAsync(
+                testPath,
+                SlotId,
+                ContentCatalog,
                 _lifetimeCancellation.Token);
     }
 
@@ -2148,6 +2193,74 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollChemicalProcessAcceptanceTask()
+    {
+        if (_chemicalProcessAcceptanceTask is null ||
+            !_chemicalProcessAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<ChemicalProcessAcceptanceReport> task =
+            _chemicalProcessAcceptanceTask;
+        _chemicalProcessAcceptanceTask = null;
+        try
+        {
+            _chemicalProcessAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            ChemicalProcessAcceptanceReport report =
+                _chemicalProcessAcceptanceReport;
+            _chemicalProcessAcceptanceHud = report.Passed
+                ? $"PASS batch={report.RequestedBatches}, " +
+                  $"energy={(report.EnergyRejected ? 1 : 0)}, " +
+                  $"environment={(report.TemperatureRejected && report.PressureRejected ? 1 : 0)}, " +
+                  $"vacuum={(report.VacuumRejected ? 1 : 0)}, " +
+                  $"catalyst={(report.CatalystRetained && report.CatalystConsumed ? 1 : 0)}, " +
+                  $"byproduct={(report.ByproductsProduced ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _state = report.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-083 chemical process runtime acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"batchRecipe={report.BatchRecipeId}; " +
+                $"vacuumRecipe={report.VacuumRecipeId}; " +
+                $"batches={report.RequestedBatches}; " +
+                $"energyRejected={(report.EnergyRejected ? 1 : 0)}; " +
+                $"temperatureRejected={(report.TemperatureRejected ? 1 : 0)}; " +
+                $"pressureRejected={(report.PressureRejected ? 1 : 0)}; " +
+                $"vacuumRejected={(report.VacuumRejected ? 1 : 0)}; " +
+                $"missingCatalystRejected={(report.MissingCatalystRejected ? 1 : 0)}; " +
+                $"catalystRetained={(report.CatalystRetained ? 1 : 0)}; " +
+                $"catalystConsumed={(report.CatalystConsumed ? 1 : 0)}; " +
+                $"byproducts={(report.ByproductsProduced ? 1 : 0)}; " +
+                $"batchOutput={(report.BatchOutputCorrect ? 1 : 0)}; " +
+                $"hazards={(report.HazardsExposed ? 1 : 0)}; " +
+                $"energyConsumed={report.EnergyConsumed.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("chemical process runtime acceptance", exception);
+        }
+    }
+
     private void PollTechnologySelectorAcceptanceTask()
     {
         if (_technologySelectorAcceptanceTask is null ||
@@ -2450,12 +2563,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"Craft: {craftProcess}\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
+                $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • F3 - selector acceptance • " +
-                "F4/F5 - catalogs • F6/F7/F9/F10/F11/F12 - regressions";
+                "E - interact/select • F2 - chemical runtime • " +
+                "F3 - selector acceptance • F4/F5 - catalogs • " +
+                "F6/F7/F9/F10/F11/F12 - regressions";
             return;
         }
 
@@ -2475,6 +2590,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Interaction: {interaction}\n" +
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
+            $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
@@ -2486,6 +2602,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space - move • E - interact/select • H - HUD • " +
+            "F2 - chemical runtime acceptance • " +
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +
             "F5 - runtime matrix • F6/F7/F9/F10/F11/F12 - regressions • " +
             "F8 - reset • Esc - close selector/release mouse";

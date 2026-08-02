@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-station-selector-research.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-chemical-process-runtime.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,58 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-080/081`, `TASK-076/077`, `TASK-072/073` имеют runtime-доказательства `PASS`. Текущая итерация реализует `TASK-082`: один физический PortableFabricator показывает все девять runtime-рецептов, исполняет `RequiredTechnology`, предоставляет research UI и сохраняет RP/unlocks в SQLite. Расширенные catalysts/byproducts/energy/environment остаются отдельной задачей `TASK-083`.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` также подтверждены clean build, автоматическим `F3` и ручной проверкой station selector/research. Текущая итерация реализует `TASK-083`: Godot-независимый chemical process runtime исполняет batch processing, energy budget, temperature/pressure/vacuum gates, catalysts, byproducts и hazards; runtime-приёмка вынесена в `TASK-089`.
 
 ## 3. Результат текущей итерации от 2026-08-02
+
+### 2026-08-02 — extended chemical process runtime (`TASK-083`)
+
+**Исходный снимок:** `ProjectHorizon-main(4)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:59 (+03:00)  
+**Подготовленный снимок:** `ProjectHorizon-main-chemical-process-runtime.zip`  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Связанные требования:** ТЗ v2.0, разделы 49.4, 52.3, 53 и 54.3; chemical runtime catalysts/byproducts/energy/environment.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил реальный `CoreCompile` и clean build `0 предупреждений / 0 ошибок`;
+- `F3 / TASK-082: PASS recipes=9, oneStation=1, initial=4/5, unlocked=9, crafted=1, rp=690, roundTrip=1`;
+- вручную подтверждены открытие единственного PortableFabricator, Recipes/Research UI, список девяти recipes, research progress и изготовленные outputs;
+- `TASK-082`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-084`: `IN_PROGRESS` → `VERIFIED`.
+
+**Реализовано:**
+
+- добавлен Godot-независимый `IndustryProcessRuntime`;
+- process validation проверяет RequiredStation, station tier/category, RequiredTechnology, requested batch count, station energy capacity и доступный energy budget;
+- temperature/pressure проверяются по inclusive recipe window, `RequiresVacuum` исполняется отдельно;
+- несколько inputs расходуются пропорционально requested batches;
+- outputs масштабируются на `recipe.BatchSize × requestedBatches`;
+- byproducts масштабируются по requested batches и добавляются в inventory;
+- catalyst stack обязателен, но не масштабируется по batch count; расход определяется детерминированным stable roll по RecipeId, catalyst DefinitionId и process sequence;
+- execution report возвращает outputs, byproducts, consumed/retained catalysts, energy accounting, hazards и process sequence;
+- добавлена изолированная `F2 / TASK-083` acceptance с БД `save_1.chemical-process-runtime-test.db`;
+- F2 использует `recipe.chemistry.compotium_concentrate` для batch/byproduct/catalyst/energy/environment и `recipe.chemistry.compotium_crystal` для vacuum gate;
+- acceptance проверяет оба детерминированных пути catalyst retained/consumed, QuestCompleted autosave, exact SQLite round-trip, autosave log, one-writer и integrity.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/IndustryProcessRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ChemicalProcessAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-082` → `VERIFIED`;
+- `TASK-084` → `VERIFIED`;
+- `TASK-083`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-089`: `NOT_STARTED` → `IN_PROGRESS` — clean build и runtime `F2`;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Граница итерации:** process execution пока атомарный. Production queue, active-process persistence, parallel slots, cancellation и refunds не включены и остаются следующим системным шагом ТЗ v2.0 §52.3.
+
+**Приёмка `TASK-089`:** clean build `0/0`; `F2: PASS batch=2, energy=1, environment=1, vacuum=1, catalyst=1, byproduct=1, roundTrip=1`; Output должен подтвердить `energyConsumed=264`, `catalystRetained=1`, `catalystConsumed=1`, `hazards=1`, `maxWriters=1`, `integrity=ok`; затем повторить `F3/F4/F5/F6/F7/F9/F10/F11/F12`.
 
 ### 2026-08-02 — universal station selector, technology enforcement и research persistence (`TASK-082`)
 
@@ -2303,14 +2352,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-084` | Выполнить runtime-приёмку universal station selector и research persistence | Clean build `0/0`; startup `physicalStations=1/selectorRecipes=9`; `F3: PASS`; manual selector/research/craft/autosave/cold restart; затем F4–F12 regressions |
+| 1 | `TASK-089` | Выполнить runtime-приёмку extended chemical process runtime | Clean build `0/0`; `F2: PASS`; energy/environment/vacuum/catalyst/byproduct/batch/round-trip; затем F3–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-083` | Реализовать расширенный chemical process runtime | Catalysts, byproducts, energy, temperature, pressure, vacuum, batch processing и process hazards исполняются runtime |
+| 3 | `TASK-090` | Реализовать production queue и active-process lifecycle | Parallel slots, cancellation, refunds, active-process persistence и graceful-exit policy по ТЗ v2.0 §52.3 |
 
 **Подтверждено:** `TASK-060`–`TASK-074`, `TASK-076`–`TASK-081`, persistence, vertical slice, Industry Content v2 и runtime matrix.  
-**Реализовано:** `TASK-082` — universal station selector, research enforcement и technology persistence.  
+**Реализовано:** `TASK-083` — extended atomic chemical process runtime; `TASK-082` подтверждён как `VERIFIED`.  
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.  
-**Текущая приёмочная задача:** `TASK-084`.
+**Текущая приёмочная задача:** `TASK-089`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -3742,6 +3791,26 @@ collision-граней сохранены без перестроения. `TASK
 Первичный снимок содержал сцену и заготовку игрока, но не содержал управления, света и актуальных настроек. Эта запись сохранена как историческая контрольная точка; её выводы заменены повторным аудитом выше.
 
 ---
+
+## 18A. Runtime-приёмка `TASK-083/TASK-089`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — `0` предупреждений и `0` ошибок, в полном логе реально выполняется `CoreCompile`.
+2. Запустить vertical slice и дождаться `DB: Ready/Passed`.
+3. Нажать `F2` один раз; до завершения не запускать другие acceptance-команды. Тест использует отдельную БД и не изменяет gameplay-slot.
+4. Ожидаемый HUD:
+
+```text
+TASK-083 chemical runtime (F2): PASS batch=2, energy=1, environment=1, vacuum=1, catalyst=1, byproduct=1, roundTrip=1
+```
+
+5. Ожидаемая строка Godot Output:
+
+```text
+TASK-083 chemical process runtime acceptance PASS: batchRecipe=recipe.chemistry.compotium_concentrate; vacuumRecipe=recipe.chemistry.compotium_crystal; batches=2; energyRejected=1; temperatureRejected=1; pressureRejected=1; vacuumRejected=1; missingCatalystRejected=1; catalystRetained=1; catalystConsumed=1; byproducts=1; batchOutput=1; hazards=1; energyConsumed=264; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=extended chemical runtime enforced energy and environment, executed deterministic catalyst consumption, emitted byproducts and persisted batch outputs exactly
+```
+
+6. Повторить `F3`, `F4`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; каждый маршрут должен завершиться `PASS`.
+7. При `FAIL` предоставить полный HUD, строку `TASK-083 ... FAIL`, последние 120 строк Godot Output и полный build log.
 
 ## 19. Шаблон новой записи
 
