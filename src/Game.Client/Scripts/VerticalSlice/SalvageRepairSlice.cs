@@ -91,6 +91,8 @@ public partial class SalvageRepairSlice : Node3D
         _itemQualityDismantleAcceptanceTask;
     private Task<MultiStationIndustryAcceptanceReport>?
         _multiStationIndustryAcceptanceTask;
+    private Task<ProductionNetworkHudAcceptanceReport>?
+        _productionNetworkHudAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -110,6 +112,8 @@ public partial class SalvageRepairSlice : Node3D
         _itemQualityDismantleAcceptanceReport;
     private MultiStationIndustryAcceptanceReport?
         _multiStationIndustryAcceptanceReport;
+    private ProductionNetworkHudAcceptanceReport?
+        _productionNetworkHudAcceptanceReport;
     private ProductionNetworkRuntime? _gameplayProductionNetwork;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
@@ -136,6 +140,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _queueTerminalAcceptanceHud = "READY";
     private string _itemQualityDismantleAcceptanceHud = "READY";
     private string _multiStationIndustryAcceptanceHud = "READY";
+    private string _productionNetworkHudAcceptanceHud = "READY";
     private PortableCraftingStation? _selectorStation;
     private Node3D? _selectorInteractor;
     private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
@@ -385,6 +390,12 @@ public partial class SalvageRepairSlice : Node3D
             "starterLine=refined_ferrite,purified_water,paraffinium_fraction," +
             "paraffinium_lubricant,raw_compotium_solution," +
             "compotium_concentrate; recharge=60s-to-full.");
+        GD.Print(
+            "TASK-098 production network HUD READY: " +
+            $"stations={GameplayNetwork.StationIds.Count}; " +
+            "source=ProductionNetworkRuntime; aggregate=jobs+states+energy; " +
+            "stationDetails=enabled; legacyFallback=enabled; " +
+            "falseUnavailable=guarded.");
     }
 
     public override void _Notification(int what)
@@ -423,6 +434,7 @@ public partial class SalvageRepairSlice : Node3D
         PollProductionQueueAcceptanceTask();
         PollItemQualityDismantleAcceptanceTask();
         PollMultiStationIndustryAcceptanceTask();
+        PollProductionNetworkHudAcceptanceTask();
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
         PollAutosave();
@@ -2275,6 +2287,7 @@ public partial class SalvageRepairSlice : Node3D
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
             _multiStationIndustryAcceptanceTask is null &&
+            _productionNetworkHudAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
@@ -2495,14 +2508,16 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.production-queue-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-090/TASK-092/TASK-093/TASK-096 acceptance running";
+        _status = "TASK-090/TASK-092/TASK-093/TASK-096/TASK-098 acceptance running";
         _productionQueueAcceptanceHud = "RUNNING";
         _queueTerminalAcceptanceHud = "RUNNING";
         _itemQualityDismantleAcceptanceHud = "RUNNING";
         _multiStationIndustryAcceptanceHud = "RUNNING";
+        _productionNetworkHudAcceptanceHud = "RUNNING";
         _productionQueueAcceptanceReport = null;
         _itemQualityDismantleAcceptanceReport = null;
         _multiStationIndustryAcceptanceReport = null;
+        _productionNetworkHudAcceptanceReport = null;
         _productionQueueAcceptanceTask =
             ProductionQueueAcceptanceRunner.RunAsync(
                 testPath,
@@ -2524,6 +2539,15 @@ public partial class SalvageRepairSlice : Node3D
         _multiStationIndustryAcceptanceTask =
             MultiStationIndustryAcceptanceRunner.RunAsync(
                 multiStationTestPath,
+                SlotId,
+                ContentCatalog,
+                _lifetimeCancellation.Token);
+        string productionNetworkHudTestPath = Path.Combine(
+            directory,
+            "save_1.production-network-hud-test.db");
+        _productionNetworkHudAcceptanceTask =
+            ProductionNetworkHudAcceptanceRunner.RunAsync(
+                productionNetworkHudTestPath,
                 SlotId,
                 ContentCatalog,
                 _lifetimeCancellation.Token);
@@ -3405,6 +3429,80 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollProductionNetworkHudAcceptanceTask()
+    {
+        if (_productionNetworkHudAcceptanceTask is null ||
+            !_productionNetworkHudAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<ProductionNetworkHudAcceptanceReport> task =
+            _productionNetworkHudAcceptanceTask;
+        _productionNetworkHudAcceptanceTask = null;
+        try
+        {
+            _productionNetworkHudAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            ProductionNetworkHudAcceptanceReport report =
+                _productionNetworkHudAcceptanceReport;
+            bool aggregate = report.AggregateCounts &&
+                report.AggregateEnergy &&
+                report.SimultaneousRunning;
+            bool transitions = report.PauseResume &&
+                report.Cancel &&
+                report.Completion;
+            _productionNetworkHudAcceptanceHud = report.Passed
+                ? $"PASS stations={report.PhysicalStations}, " +
+                  $"aggregate={(aggregate ? 1 : 0)}, " +
+                  $"transitions={(transitions ? 1 : 0)}, " +
+                  $"recharge={(report.EnergyRecharge ? 1 : 0)}, " +
+                  $"restore={(report.ColdRestore ? 1 : 0)}, " +
+                  $"fallback={(report.LegacyFallback ? 1 : 0)}, " +
+                  $"unavailable={(report.FalseUnavailable ? 0 : 1)}"
+                : $"FAIL {report.Result}";
+            bool combinedPassed = report.Passed &&
+                (_productionQueueAcceptanceReport?.Passed ?? true) &&
+                (_itemQualityDismantleAcceptanceReport?.Passed ?? true) &&
+                (_multiStationIndustryAcceptanceReport?.Passed ?? true);
+            _state = combinedPassed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-098 production network HUD acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"stations={report.PhysicalStations}; " +
+                $"aggregateCounts={(report.AggregateCounts ? 1 : 0)}; " +
+                $"aggregateEnergy={(report.AggregateEnergy ? 1 : 0)}; " +
+                $"simultaneousRunning={(report.SimultaneousRunning ? 1 : 0)}; " +
+                $"pauseResume={(report.PauseResume ? 1 : 0)}; " +
+                $"cancel={(report.Cancel ? 1 : 0)}; " +
+                $"completion={(report.Completion ? 1 : 0)}; " +
+                $"recharge={(report.EnergyRecharge ? 1 : 0)}; " +
+                $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+                $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+                $"falseUnavailable={(report.FalseUnavailable ? 0 : 1)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("production network HUD acceptance", exception);
+        }
+    }
+
     private void PollChemicalProcessAcceptanceTask()
     {
         if (_chemicalProcessAcceptanceTask is null ||
@@ -3663,14 +3761,14 @@ public partial class SalvageRepairSlice : Node3D
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudMargin.OffsetRight = 850.0f;
-            _hudMargin.OffsetBottom = 380.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(800.0f, 325.0f);
+            _hudMargin.OffsetBottom = 445.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(800.0f, 390.0f);
         }
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
             _hudMargin.OffsetRight = 1140.0f;
-            _hudMargin.OffsetBottom = 650.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(1090.0f, 595.0f);
+            _hudMargin.OffsetBottom = 720.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(1090.0f, 665.0f);
         }
     }
 
@@ -3708,6 +3806,13 @@ public partial class SalvageRepairSlice : Node3D
             .FirstOrDefault(job =>
                 job.Status == ProductionQueueJobStatus.Running) ??
             queueSnapshot?.Jobs.FirstOrDefault();
+        ProductionNetworkHudSnapshot networkHud =
+            BuildGameplayProductionNetworkHudSnapshot();
+        string networkLine = ProductionNetworkHudModel.FormatAggregate(networkHud);
+        string detailedStationsLine =
+            ProductionNetworkHudModel.FormatStations(networkHud, compact: false);
+        string compactStationsLine =
+            ProductionNetworkHudModel.FormatStations(networkHud, compact: true);
         string craftProcess = activeQueueJob is not null && activeQueue is not null
             ? $"QUEUE {activeQueue.StationId} {activeQueueJob.Status} " +
               $"{activeQueueJob.RecipeId} {activeQueueJob.ProgressBar} " +
@@ -3775,13 +3880,6 @@ public partial class SalvageRepairSlice : Node3D
             $"shipObjectives={craftedCount}/{totalStationRecipes} • " +
             $"pendingObjectives={totalStationRecipes - craftedCount} • " +
             $"physicalStations={_craftingStations.Count}";
-        string queueLine = queueSnapshot is null
-            ? "Production queue: unavailable"
-            : $"Production queue: jobs={queueSnapshot.Jobs.Count} • " +
-              $"running={queueSnapshot.RunningJobs}/{queueSnapshot.ParallelSlots} • " +
-              $"queued={queueSnapshot.QueuedJobs} • paused={queueSnapshot.PausedJobs} • " +
-              $"energy={queueSnapshot.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}/" +
-              $"{queueSnapshot.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)}";
         string pendingPreview = BuildPendingRecipePreview();
         double nextAutosave = Math.Max(
             0.0,
@@ -3803,12 +3901,15 @@ public partial class SalvageRepairSlice : Node3D
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
                 $"Craft: {craftProcess}\n" +
+                networkLine + "\n" +
+                compactStationsLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
                 $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
                 $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
                 $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
+                $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -3829,7 +3930,8 @@ public partial class SalvageRepairSlice : Node3D
             technologyLine + "\n" +
             repairLine + "\n" +
             matrixLine + "\n" +
-            queueLine + "\n" +
+            networkLine + "\n" +
+            detailedStationsLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
@@ -3843,6 +3945,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
             $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
             $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
+            $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -3861,6 +3964,36 @@ public partial class SalvageRepairSlice : Node3D
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +
             "F5 - runtime matrix • F6/F7/F9/F10/F11/F12 - regressions • " +
             "F8 - reset • Esc - close selector/release mouse";
+    }
+
+    private ProductionNetworkHudSnapshot
+        BuildGameplayProductionNetworkHudSnapshot()
+    {
+        ProductionNetworkRuntime? network = _gameplayProductionNetwork;
+        if (network is null)
+        {
+            return ProductionNetworkHudSnapshot.Unavailable(
+                "runtime is not initialized");
+        }
+
+        try
+        {
+            IReadOnlyDictionary<string, string> displayNames =
+                _craftingStations
+                    .GroupBy(
+                        station => station.StationId,
+                        StringComparer.Ordinal)
+                    .ToDictionary(
+                        group => group.Key,
+                        group => group.First().Name.ToString(),
+                        StringComparer.Ordinal);
+            return ProductionNetworkHudModel.Build(network, displayNames);
+        }
+        catch (Exception exception)
+        {
+            return ProductionNetworkHudSnapshot.Unavailable(
+                $"{exception.GetType().Name}: {exception.Message}");
+        }
     }
 
     private int CountCraftedStationRecipes()

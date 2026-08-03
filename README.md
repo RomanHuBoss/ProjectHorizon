@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, research, production queue, item properties и dismantling — `IMPLEMENTED`
+### Industry Content v2, multi-station production network и aggregate HUD — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени.
+Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени. Основной HUD строится непосредственно из `ProductionNetworkRuntime`: агрегирует jobs, состояния и энергию всех пяти станций, показывает постанционную строку `[R/Q/P]` и не считает исправно инициализированную idle network недоступной.
 
 В состав v2 входят:
 
@@ -108,7 +108,7 @@ Q              во вкладке Recipes поставить рецепт в о
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
-F1             TASK-090/092/093/096: queue, terminal, properties и multi-station industry
+F1             TASK-090/092/093/096/098: queue, properties, multi-station industry и aggregate HUD
 F2             TASK-083: chemical process runtime
 F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
@@ -131,9 +131,10 @@ TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, canc
 TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1
 TASK-093 item properties (F1): PASS Q=72, P=80, S=80, dismantle=1, roundTrip=1
 TASK-096 multi-station industry (F1): PASS stations=4, recipes=6, routing=1, repeatable=1, chain=1, recharge=1, properties=1, roundTrip=1
+TASK-098 production network HUD (F1): PASS stations=5, aggregate=1, transitions=1, recharge=1, restore=1, fallback=1, unavailable=0
 ```
 
-`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Параллельный изолированный `TASK-093` проверяет детерминированные `Q/P/S`, зависимость dismantle returns от свойств предмета и exact SQLite round-trip. `TASK-096` дополнительно прогоняет четыре типа станций и шесть связанных recipes: refined ferrite, purified water, Paraffinium fraction/lubricant и raw Compotium solution/concentrate. Он проверяет wrong-station rejection, повторяемость химического процесса, межстанционную цепочку, recharge, item properties и network persistence. Используются отдельные БД `save_1.production-queue-test.db`, `save_1.item-properties-dismantle-test.db` и `save_1.multi-station-industry-test.db`; gameplay-slot не изменяется.
+`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Параллельный изолированный `TASK-093` проверяет детерминированные `Q/P/S`, зависимость dismantle returns от свойств предмета и exact SQLite round-trip. `TASK-096` прогоняет четыре специализированные station types и шесть связанных recipes: refined ferrite, purified water, Paraffinium fraction/lubricant и raw Compotium solution/concentrate. `TASK-098` строит aggregate HUD по всем пяти физическим станциям и проверяет aggregate counts/energy, одновременную работу Smelter и Refinery, pause/resume, cancel/refund, completion, recharge, exact cold restore без offline progress, legacy single-queue fallback и отсутствие ложного `unavailable`. Используются отдельные БД `save_1.production-queue-test.db`, `save_1.item-properties-dismantle-test.db`, `save_1.multi-station-industry-test.db` и `save_1.production-network-hud-test.db`; gameplay-slot не изменяется.
 
 
 ### Multi-station Paraffinium and Compotium starter line
@@ -151,6 +152,18 @@ raw_compotium + acidic_brine -> ChemicalProcessor -> raw_compotium_solution (rep
 
 Для постановки процесса подойдите к нужной station, откройте терминал `E`, исследуйте требуемую technology, выберите recipe и нажмите `Q`. Вкладки Queue относятся к конкретной станции; jobs разных станций выполняются параллельно и сохраняются одной `production_queue_network`.
 
+### Aggregate production network HUD
+
+В detailed и compact HUD отображается единая сводка, рассчитанная непосредственно из `ProductionNetworkRuntime`:
+
+```text
+Production network: stations=5 • jobs=2 • running=2 • queued=0 • paused=0 • energy=948/1060
+Stations: PortableFabricator 80/80 [0R/0Q/0P] • Smelter 140/180 [1R/0Q/0P] • Refinery 248/320 [1R/0Q/0P] • DistillationColumn 300/300 [0R/0Q/0P] • ChemicalProcessor 180/180 [0R/0Q/0P]
+```
+
+Detailed mode показывает все станции. Compact mode показывает активные stations и `+N idle stations`. Значение `Production network: unavailable (...)` допустимо только при реальном отсутствии или исключении инициализации runtime; пустая сеть с `jobs=0` остаётся доступной.
+
+Для ручной приёмки после `F8` запустите `refined_ferrite` на Smelter и `purified_water` на Refinery, добавьте queue job, выполните pause/resume и cancel, дождитесь completion, затем штатно перезапустите игру с незавершёнными running/queued/paused jobs. Сводка должна немедленно отражать каждое изменение и восстановить elapsed, states и station energy без offline progress.
 
 ### Ручная проверка Queue-вкладки
 
@@ -677,3 +690,10 @@ concentrate. The complete queue network is stored in
 `save_settings.production_queue_network`; legacy single-queue saves remain
 loadable. Gameplay energy recharges to station capacity over sixty active
 seconds and does not advance while the game is closed.
+
+`TASK-098` replaces the legacy single-queue HUD diagnostic with a read-only
+projection of the complete `ProductionNetworkRuntime`. The HUD aggregates five
+physical stations, job states and energy, shows per-station `[R/Q/P]` counters,
+and treats an initialized network with zero jobs as available. F1 validates the
+projection, transitions, recharge, cold restore, legacy fallback and SQLite
+integrity in `save_1.production-network-hud-test.db`.

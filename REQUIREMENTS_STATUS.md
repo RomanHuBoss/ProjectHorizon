@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-multi-station-compotium-line.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-production-network-hud.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,65 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-093/095` приняты по clean build `0/0`, автоматическому `F1`, ручной проверке `Q/P/S` и Dismantle UI. Текущая итерация расширяет playable runtime с девяти ship recipes до пятнадцати station recipes и вводит пять физических типов станций, shared-inventory production network и связную линию Парафиния/Компотия.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и многостанционная production network подтверждены пользователем. `TASK-096/097` приняты по clean build `0/0`, автоматическому `F1`, ручной многостанционной проверке, cold restore и регрессиям. Текущая итерация не расширяет производственный контент: она заменяет устаревшую single-queue диагностику на единую HUD-проекцию всех пяти физических станций.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — единая HUD-сводка многостанционной производственной сети (`TASK-098`)
+
+**Исходный снимок:** `ProjectHorizon-main(13).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-production-network-hud.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Граница:** только player-facing сводка и диагностика уже реализованной многостанционной сети; новые recipes, stations и production mechanics не добавляются.
+
+**Синхронизация подтверждённой приёмки:**
+
+- пользователь предоставил clean build: `0` предупреждений, `0` ошибок;
+- `TASK-096 multi-station industry (F1)` подтверждён строкой `PASS stations=4, recipes=6, routing=1, repeatable=1, chain=1, recharge=1, properties=1, roundTrip=1`;
+- ручная и автоматическая приёмка многостанционной сети завершена; `TASK-096` и `TASK-097` переведены в `VERIFIED`;
+- повторно подтверждены `TASK-090`, `TASK-092`, `TASK-093`, `TASK-083`, `TASK-082`, `TASK-080`, `TASK-076`, `TASK-072`, `TASK-062`, `TASK-064`.
+
+**Реализовано:**
+
+- добавлена Godot-independent `ProductionNetworkHudModel`, строящая сводку непосредственно из `ProductionNetworkRuntime`;
+- HUD агрегирует число физических stations, общее число jobs, `running/queued/paused`, текущую и максимальную энергию всей сети;
+- добавлена постанционная детализация `energy [R/Q/P]` для PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor;
+- detailed HUD показывает все станции, compact HUD — активные станции и `+N idle stations`;
+- idle network с нулём jobs остаётся доступной и больше не отображается как `Production queue: unavailable`;
+- projection пересчитывается каждый кадр, поэтому enqueue, queued→running, pause/resume, cancel/refund, completion, outputs/byproducts/catalysts, recharge, autosave/load, cold start и `F8` отражаются без отдельного кэша HUD;
+- persistence-формат не изменён: используются существующие `production_queue_network` и legacy `production_queue`; версия SQLite schema не повышалась;
+- `F1` расширен изолированной `TASK-098` acceptance с БД `save_1.production-network-hud-test.db`, не затрагивающей gameplay-slot;
+- acceptance проверяет пять stations, aggregate counts/energy, две одновременно работающие stations, queued/paused transitions, cancel/refund, completion, recharge, exact cold restore без offline progress, legacy fallback, SQLite round-trip, `maxWriters=1` и `integrity=ok`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/ProductionNetworkHudModel.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionNetworkHudAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-096`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-097`: `IN_PROGRESS` → `VERIFIED`;
+- `TASK-098`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-099`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F1 TASK-098, manual HUD transitions, cold restore и regression matrix;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Автоматические критерии:**
+
+```text
+TASK-098 production network HUD (F1): PASS stations=5, aggregate=1, transitions=1, recharge=1, restore=1, fallback=1, unavailable=0
+```
+
+```text
+TASK-098 production network HUD acceptance PASS: stations=5; aggregateCounts=1; aggregateEnergy=1; simultaneousRunning=1; pauseResume=1; cancel=1; completion=1; recharge=1; coldRestore=1; legacyFallback=1; falseUnavailable=0; roundTrip=1; maxWriters=1; integrity=ok; elapsedMs=<время>
+```
+
+**Проверки в среде подготовки:** JSON catalog parse и counts; C# lexical/delimiter audit; проверка уникальности `.uid`; проверка всех `res://` references сцены; поиск legacy HUD-ветки и проверка, что игровой HUD использует aggregate projection. Повторная распаковка итогового ZIP и SHA-256 фиксируются при выдаче.
+
+**Ограничение:** .NET SDK и Godot отсутствуют в среде подготовки; фактический clean build и runtime-приёмка `TASK-098` остаются за `TASK-099`, который не переводится в `VERIFIED` до локального подтверждения пользователя.
 
 ### 2026-08-03 — multi-station refining/chemistry и стартовая линия Компотия (`TASK-096`)
 
@@ -2710,21 +2766,38 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `INDUSTRY-070` | Playable runtime использует несколько physical station types по `RequiredStation` | `IMPLEMENTED` | PortableFabricator, Smelter, Refinery, DistillationColumn, ChemicalProcessor |
-| `INDUSTRY-071` | Runtime catalog содержит связный starter refining/chemistry set | `IMPLEMENTED` | Шесть recipes, `runtimeEnabledRecipes=16`, StoreOutputs matrix `15` |
-| `INDUSTRY-072` | Каждая station имеет независимые queue, slots и energy | `IMPLEMENTED` | `ProductionNetworkRuntime` содержит station-specific `ProductionQueueRuntime` |
-| `INDUSTRY-073` | Все stations используют общее согласованное player inventory | `IMPLEMENTED` | Preflight и mirror consume/grant/refund для всех station queues |
-| `INDUSTRY-074` | Intermediate outputs могут быть inputs следующей station | `IMPLEMENTED` | ferrite/fraction → lubricant; solution/water/catalyst → concentrate |
-| `INDUSTRY-075` | Refining/Chemistry processes повторяемы и не блокируются первым output | `IMPLEMENTED` | `IndustryRecipePolicy`; raw Compotium solution выполняется дважды |
-| `INDUSTRY-076` | Production network сохраняется и восстанавливается целиком | `IMPLEMENTED` | `save_settings.production_queue_network`, exact snapshot comparison, legacy fallback |
-| `INDUSTRY-077` | Gameplay energy восстанавливается без offline progress | `IMPLEMENTED` | Linear recharge до capacity за 60 s только в активной сессии |
-| `INDUSTRY-078` | Scene предоставляет raw inputs и catalyst для starter chain | `IMPLEMENTED` | ferric ore, ice water, Paraffinium, raw Compotium, acidic brine, catalytic dust |
-| `INDUSTRY-079` | Station visuals позволяют различать типы производства | `IMPLEMENTED` | Раздельные idle colors для smelter/refinery/distillation/chemical/portable |
-| `INDUSTRY-ACC-070` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `INDUSTRY-ACC-071` | F1 подтверждает routing/repeatability/chain/recharge/properties/round-trip | `IN_PROGRESS` | Ожидается `TASK-096 multi-station industry (F1): PASS ...` |
-| `INDUSTRY-ACC-072` | Ручная starter chain проходит на четырёх station types | `IN_PROGRESS` | Выполнить Paraffinium lubricant и Compotium concentrate |
-| `INDUSTRY-ACC-073` | Cold restart восстанавливает station energy, jobs и shared inventory | `IN_PROGRESS` | Сохранить jobs на разных stations, graceful exit/restart |
-| `INDUSTRY-ACC-074` | F2–F12 не регрессируют при 16 runtime recipes | `IN_PROGRESS` | Повторить существующую acceptance matrix |
+| `INDUSTRY-070` | Playable runtime использует несколько physical station types по `RequiredStation` | `VERIFIED` | PortableFabricator, Smelter, Refinery, DistillationColumn, ChemicalProcessor |
+| `INDUSTRY-071` | Runtime catalog содержит связный starter refining/chemistry set | `VERIFIED` | Шесть recipes, `runtimeEnabledRecipes=16`, StoreOutputs matrix `15` |
+| `INDUSTRY-072` | Каждая station имеет независимые queue, slots и energy | `VERIFIED` | `ProductionNetworkRuntime` содержит station-specific `ProductionQueueRuntime` |
+| `INDUSTRY-073` | Все stations используют общее согласованное player inventory | `VERIFIED` | Preflight и mirror consume/grant/refund для всех station queues |
+| `INDUSTRY-074` | Intermediate outputs могут быть inputs следующей station | `VERIFIED` | ferrite/fraction → lubricant; solution/water/catalyst → concentrate |
+| `INDUSTRY-075` | Refining/Chemistry processes повторяемы и не блокируются первым output | `VERIFIED` | `IndustryRecipePolicy`; raw Compotium solution выполняется дважды |
+| `INDUSTRY-076` | Production network сохраняется и восстанавливается целиком | `VERIFIED` | `save_settings.production_queue_network`, exact snapshot comparison, legacy fallback |
+| `INDUSTRY-077` | Gameplay energy восстанавливается без offline progress | `VERIFIED` | Linear recharge до capacity за 60 s только в активной сессии |
+| `INDUSTRY-078` | Scene предоставляет raw inputs и catalyst для starter chain | `VERIFIED` | ferric ore, ice water, Paraffinium, raw Compotium, acidic brine, catalytic dust |
+| `INDUSTRY-079` | Station visuals позволяют различать типы производства | `VERIFIED` | Раздельные idle colors для smelter/refinery/distillation/chemical/portable |
+| `INDUSTRY-ACC-070` | Clean build новой редакции `0/0` | `VERIFIED` | Пользователь: `0` warnings, `0` errors |
+| `INDUSTRY-ACC-071` | F1 подтверждает routing/repeatability/chain/recharge/properties/round-trip | `VERIFIED` | Пользователь: `TASK-096 ... PASS stations=4, recipes=6, ... roundTrip=1` |
+| `INDUSTRY-ACC-072` | Ручная starter chain проходит на четырёх station types | `VERIFIED` | Подтверждена ручная приёмка multi-station starter industry |
+| `INDUSTRY-ACC-073` | Cold restart восстанавливает station energy, jobs и shared inventory | `VERIFIED` | Подтверждена локальная cold-restore проверка |
+| `INDUSTRY-ACC-074` | F2–F12 не регрессируют при 16 runtime recipes | `VERIFIED` | Пользователь подтвердил требуемые PASS-regressions |
+
+
+### 8.18. Aggregate production network HUD
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `INDUSTRY-080` | Основной HUD получает состояние из полного `ProductionNetworkRuntime` | `IMPLEMENTED` | `ProductionNetworkHudModel.Build(network)`; single-queue availability check удалён |
+| `INDUSTRY-081` | HUD агрегирует stations/jobs/running/queued/paused и energy | `IMPLEMENTED` | `ProductionNetworkHudSnapshot` суммирует все `ProductionQueueRuntime` |
+| `INDUSTRY-082` | HUD показывает компактную постанционную детализацию | `IMPLEMENTED` | `DisplayName energy/capacity [R/Q/P]`; active-only compact mode |
+| `INDUSTRY-083` | Исправно инициализированная idle network не считается unavailable | `IMPLEMENTED` | Empty-network projection: `IsAvailable=1`, `jobs=0` |
+| `INDUSTRY-084` | Сводка восстанавливается из network и legacy single-queue save | `IMPLEMENTED` | Existing network restore + `legacySaveData`; schema unchanged |
+| `INDUSTRY-085` | HUD синхронизируется после всех production transitions | `IMPLEMENTED` | Projection пересчитывается в `UpdateHud()` каждый frame |
+| `INDUSTRY-ACC-075` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `INDUSTRY-ACC-076` | F1 подтверждает aggregate/transitions/recharge/restore/fallback | `IN_PROGRESS` | Ожидается `TASK-098 production network HUD (F1): PASS ...` |
+| `INDUSTRY-ACC-077` | Ручной HUD корректен для двух active stations и queue controls | `IN_PROGRESS` | Выполнить сценарий раздела 18F |
+| `INDUSTRY-ACC-078` | Cold restart сохраняет elapsed, states и station energy | `IN_PROGRESS` | Graceful exit/restart с running/queued/paused jobs |
+| `INDUSTRY-ACC-079` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix |
 
 ## 9. Очередь ближайших задач
 
@@ -2734,14 +2807,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-097` | Выполнить runtime-приёмку multi-station starter industry | Clean build `0/0`; F1 TASK-096; manual Paraffinium/Compotium chain; multi-station cold restore; F2–F12 regressions |
+| 1 | `TASK-099` | Выполнить runtime/build/manual acceptance aggregate production network HUD | Clean build `0/0`; F1 TASK-098; manual two-station transitions; cold restore; F2–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-098` | Расширить player-facing station coverage следующим связным кластером | Выбрать следующий технологически связный набор, не добавляя recipe-specific C# |
+| 3 | `TASK-100` | Выбрать следующий функциональный шаг после приёмки HUD | Не расширять scope до завершения `TASK-099` |
 
-**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-095`, persistence, vertical slice, Industry Content v2 и прежняя runtime matrix.
-**Реализовано:** `TASK-096` — multi-station production network и связная refining/Paraffinium/Compotium line.
+**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-097`, persistence, vertical slice, Industry Content v2 и multi-station runtime matrix.
+**Реализовано:** `TASK-098` — aggregate production network HUD без изменения production mechanics.
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-097`.
+**Текущая приёмочная задача:** `TASK-099`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4270,6 +4343,33 @@ TASK-096 multi-station industry (F1): PASS stations=4, recipes=6, routing=1, rep
 9. Поставить jobs минимум на двух разных stations, дождаться ненулевого elapsed, выполнить graceful exit/restart. Jobs, elapsed, station energy и shared free inventory должны восстановиться без offline progress.
 10. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`. F5 должен показать `station=15`, `crafted=15`, `isolated=15`, `roundTrip=1`.
 11. При `FAIL` предоставить полный build log, HUD и station tab, строку `TASK-096 ... FAIL`, последние 120 строк Output и шаг manual chain, на котором возникло расхождение.
+
+## 18F. Runtime-приёмка `TASK-098/TASK-099`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
+2. Запустить vertical slice и нажать `F1`. Вместе с TASK-090/092/093/096 ожидается:
+
+```text
+TASK-098 production network HUD (F1): PASS stations=5, aggregate=1, transitions=1, recharge=1, restore=1, fallback=1, unavailable=0
+```
+
+3. Output должен содержать:
+
+```text
+TASK-098 production network HUD acceptance PASS: stations=5; aggregateCounts=1; aggregateEnergy=1; simultaneousRunning=1; pauseResume=1; cancel=1; completion=1; recharge=1; coldRestore=1; legacyFallback=1; falseUnavailable=0; roundTrip=1; maxWriters=1; integrity=ok; elapsedMs=<время>
+```
+
+4. Убедиться, что test database называется `save_1.production-network-hud-test.db` и основной gameplay-slot не изменён.
+5. Нажать `F8`, разблокировать необходимые technologies и собрать ресурсы для `refined_ferrite` и `purified_water`.
+6. На Smelter поставить `refined_ferrite`, на Refinery — `purified_water`. HUD должен показать `stations=5`, две active stations и корректную сумму energy.
+7. Поставить дополнительную smelter job; проверить изменение `jobs/queued`.
+8. В Queue tab приостановить job, проверить `running/queued/paused`, затем возобновить её.
+9. Отменить одну job; проверить исчезновение job, возврат inputs/catalysts и reserved energy.
+10. Дождаться completion оставшейся job; проверить уменьшение jobs, outputs/byproducts, catalyst result и station energy.
+11. Оставить одновременно running, queued и paused jobs, штатно закрыть игру и запустить снова. Elapsed, states, station energy и aggregate HUD должны восстановиться без offline progress.
+12. При исправной сети строка `Production queue: unavailable` не должна появляться ни в detailed, ни в compact HUD; unavailable допустим только при фактической ошибке инициализации runtime.
+13. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
+14. При `FAIL` предоставить полный build log, detailed HUD, строку `TASK-098 ... FAIL`, последние 160 строк Output и шаг ручного сценария, на котором возникло расхождение.
 
 ## 19. Шаблон новой записи
 
