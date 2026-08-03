@@ -1,8 +1,8 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui.zip`
+> **Последняя актуализация:** 2026-08-03
+> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui-build-fix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -40,7 +40,30 @@
 
 **Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084`, `TASK-083/089` и `TASK-090/091` приняты после runtime-проверок; пользователь подтвердил исправленную nullable-редакцию формулировкой «все работает». Текущая итерация реализует player-facing Queue-вкладку промышленного терминала, управление job lifecycle и сохранение незавершённой gameplay-очереди.
 
-## 3. Результат текущей итерации от 2026-08-02
+## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — build hotfix Queue terminal (`TASK-094`)
+
+**Исходный снимок:** `ProjectHorizon-main-production-queue-terminal-ui.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui-build-fix.zip`.  
+**Причина:** реальный `CoreCompile` выявил `CS0103` в `SalvageRepairSlice.cs:2537`: в обработчик результата legacy gameplay acceptance ошибочно попал вызов `GD.PushError(terminalOutput)`, тогда как локальная переменная `terminalOutput` существует только в обработчике production queue acceptance.
+
+**Исправлено:**
+
+- удалён посторонний вызов `GD.PushError(terminalOutput)` из `PollAcceptanceTask`;
+- вывод legacy gameplay acceptance снова использует только локальный `output`;
+- формирование и вывод `TASK-092 production queue terminal acceptance` в `PollProductionQueueAcceptanceTask` не изменены;
+- runtime-семантика queue terminal, persistence и F1 acceptance не изменялась.
+
+**Статус:**
+
+- `TASK-092` остаётся `IMPLEMENTED`;
+- `TASK-094` остаётся `IN_PROGRESS` до clean build `0 предупреждений / 0 ошибок` и runtime-приёмки F1/Queue UI;
+- `TASK-006` остаётся `BLOCKED`, поскольку архив не содержит `.git`.
+
+**Контроль:** выполнены поиск всех ссылок `terminalOutput`, проверка области видимости, лексическая проверка C# и повторная упаковка без build/runtime-артефактов.
+
+## 3A. Предыдущая итерация от 2026-08-02
 
 ### 2026-08-02 — player-facing production queue terminal (`TASK-092`)
 

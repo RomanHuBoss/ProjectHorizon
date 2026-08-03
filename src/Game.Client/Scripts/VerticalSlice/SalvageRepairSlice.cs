@@ -2534,7 +2534,6 @@ public partial class SalvageRepairSlice : Node3D
             else
             {
                 GD.PushError(output);
-                GD.PushError(terminalOutput);
             }
         }
         catch (Exception exception)
