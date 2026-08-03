@@ -70,6 +70,9 @@ public sealed class StarterRepairSession
     private readonly Func<string, bool> _isTechnologyUnlocked;
     private readonly Dictionary<string, int> _craftedInventory =
         new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IndustryItemProperties> _itemProperties =
+        new(StringComparer.Ordinal);
+    private long _nextItemPropertySequence;
     private IReadOnlyList<CraftingStackDefinition> _lastCraftedOutputs =
         Array.Empty<CraftingStackDefinition>();
 
@@ -359,7 +362,12 @@ public sealed class StarterRepairSession
         }
 
         _lastCraftedOutputs = CopyOutputs(recipe.Outputs);
-        AddCraftedOutputs(_lastCraftedOutputs);
+        IndustryItemProperties properties =
+            ItemPropertyRuntime.CreateOutputProperties(
+                recipe,
+                _nextItemPropertySequence++,
+                ItemPropertyRuntime.CreateNominalEnvironment(recipe));
+        AddCraftedOutputs(_lastCraftedOutputs, properties);
         result = $"recipe {recipe.RecipeId} crafted; " +
             $"stored in {recipe.Application.TargetId}";
         return StationCraftResult.Crafted;
@@ -435,6 +443,14 @@ public sealed class StarterRepairSession
 
     public void GrantInventory(string definitionId, int quantity)
     {
+        GrantInventory(definitionId, quantity, IndustryItemProperties.Legacy);
+    }
+
+    public void GrantInventory(
+        string definitionId,
+        int quantity,
+        IndustryItemProperties properties)
+    {
         if (!GameContentCatalog.IsStableId(definitionId))
         {
             throw new ArgumentException(
@@ -449,11 +465,36 @@ public sealed class StarterRepairSession
                 "Inventory grant must be positive.");
         }
 
+        ArgumentNullException.ThrowIfNull(properties);
         _craftedInventory.TryGetValue(definitionId, out int current);
         checked
         {
             _craftedInventory[definitionId] = current + quantity;
         }
+
+        if (current <= 0 || !_itemProperties.TryGetValue(
+            definitionId,
+            out IndustryItemProperties? existing) || existing is null)
+        {
+            _itemProperties[definitionId] = properties;
+            return;
+        }
+
+        int total = checked(current + quantity);
+        _itemProperties[definitionId] = IndustryItemProperties.Create(
+            Weighted(existing.Quality, current, properties.Quality, quantity, total),
+            Weighted(existing.Purity, current, properties.Purity, quantity, total),
+            Weighted(existing.Stability, current, properties.Stability, quantity, total));
+    }
+
+    public IndustryItemProperties GetItemProperties(string definitionId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(definitionId);
+        return _itemProperties.TryGetValue(
+            definitionId,
+            out IndustryItemProperties? properties) && properties is not null
+            ? properties
+            : IndustryItemProperties.Legacy;
     }
 
     public int GetAvailableQuantity(string definitionId)
@@ -567,6 +608,8 @@ public sealed class StarterRepairSession
                 item.Quantity > 0)
             {
                 session._craftedInventory[item.DefinitionId] = item.Quantity;
+                session._itemProperties[item.DefinitionId] =
+                    IndustryItemProperties.FromSaveData(item);
             }
         }
 
@@ -647,6 +690,7 @@ public sealed class StarterRepairSession
             if (newQuantity == 0)
             {
                 _craftedInventory.Remove(definitionId);
+                _itemProperties.Remove(definitionId);
             }
             else
             {
@@ -671,13 +715,28 @@ public sealed class StarterRepairSession
     }
 
     private void AddCraftedOutputs(
-        IReadOnlyList<CraftingStackDefinition> outputs)
+        IReadOnlyList<CraftingStackDefinition> outputs,
+        IndustryItemProperties? properties = null)
     {
         foreach (CraftingStackDefinition output in outputs)
         {
-            _craftedInventory.TryGetValue(output.DefinitionId, out int current);
-            _craftedInventory[output.DefinitionId] = current + output.Quantity;
+            GrantInventory(
+                output.DefinitionId,
+                output.Quantity,
+                properties ?? IndustryItemProperties.Legacy);
         }
+    }
+
+    private static int Weighted(
+        int first,
+        int firstQuantity,
+        int second,
+        int secondQuantity,
+        int totalQuantity)
+    {
+        return (int)Math.Round(
+            (first * firstQuantity + second * secondQuantity) /
+            (double)totalQuantity);
     }
 
     private static IReadOnlyList<CraftingStackDefinition> CopyOutputs(
@@ -753,11 +812,18 @@ public static class StarterRepairSnapshotFactory
                     resource.RemainingQuantity,
                     1.0))
                 .Concat(session.CraftedInventory.Select(item =>
-                    new InventoryItemSaveData(
+                {
+                    IndustryItemProperties properties =
+                        session.GetItemProperties(item.DefinitionId);
+                    return new InventoryItemSaveData(
                         $"crafted.{item.DefinitionId}",
                         item.DefinitionId,
                         item.Quantity,
-                        1.0)))
+                        1.0,
+                        Quality: properties.Quality,
+                        Purity: properties.Purity,
+                        Stability: properties.Stability);
+                }))
                 .OrderBy(item => item.ItemId, StringComparer.Ordinal)
                 .ToArray(),
             new VisitedPlanetSaveData(

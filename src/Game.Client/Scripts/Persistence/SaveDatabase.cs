@@ -470,7 +470,10 @@ public sealed partial class SaveDatabase : IDisposable
                 expectedItem.OriginalDefinitionId != actualItem.OriginalDefinitionId ||
                 expectedItem.Resolution != actualItem.Resolution ||
                 expectedItem.Quantity != actualItem.Quantity ||
-                !NearlyEqual(expectedItem.Durability, actualItem.Durability))
+                !NearlyEqual(expectedItem.Durability, actualItem.Durability) ||
+                expectedItem.Quality != actualItem.Quality ||
+                expectedItem.Purity != actualItem.Purity ||
+                expectedItem.Stability != actualItem.Stability)
             {
                 mismatch =
                     $"inventory item {expectedItem.ItemId} differs: " +
@@ -478,12 +481,16 @@ public sealed partial class SaveDatabase : IDisposable
                     $"original={expectedItem.OriginalDefinitionId}, " +
                     $"resolution={expectedItem.Resolution}, " +
                     $"quantity={expectedItem.Quantity}, " +
-                    $"durability={expectedItem.Durability:0.###}); " +
+                    $"durability={expectedItem.Durability:0.###}, " +
+                    $"quality={expectedItem.Quality}, purity={expectedItem.Purity}, " +
+                    $"stability={expectedItem.Stability}); " +
                     $"actual(definition={actualItem.DefinitionId}, " +
                     $"original={actualItem.OriginalDefinitionId}, " +
                     $"resolution={actualItem.Resolution}, " +
                     $"quantity={actualItem.Quantity}, " +
-                    $"durability={actualItem.Durability:0.###})";
+                    $"durability={actualItem.Durability:0.###}, " +
+                    $"quality={actualItem.Quality}, purity={actualItem.Purity}, " +
+                    $"stability={actualItem.Stability})";
                 return false;
             }
         }
@@ -843,7 +850,7 @@ public sealed partial class SaveDatabase : IDisposable
             transaction,
             "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
             "setting_key IN ('research_points', 'unlocked_technologies', " +
-            "'production_queue');",
+            "'production_queue', 'inventory_properties');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -877,6 +884,33 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$setting_value", JsonSerializer.Serialize(
                     snapshot.ProductionQueue)));
         }
+
+        foreach (InventoryItemSaveData item in snapshot.Inventory)
+        {
+            if (item.Quality is < 0 or > 100 ||
+                item.Purity is < 0 or > 100 ||
+                item.Stability is < 0 or > 100)
+            {
+                throw new InvalidDataException(
+                    $"Inventory item {item.ItemId} has properties outside 0..100.");
+            }
+        }
+
+        InventoryItemPropertiesSaveData[] itemProperties = snapshot.Inventory
+            .OrderBy(item => item.ItemId, StringComparer.Ordinal)
+            .Select(item => new InventoryItemPropertiesSaveData(
+                item.ItemId,
+                item.Quality,
+                item.Purity,
+                item.Stability))
+            .ToArray();
+        ExecuteNonQuery(
+            connection,
+            transaction,
+            "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+            "VALUES($slot_id, 'inventory_properties', $setting_value);",
+            ("$slot_id", snapshot.SlotId),
+            ("$setting_value", JsonSerializer.Serialize(itemProperties)));
 
         ExecuteNonQuery(
             connection,
@@ -1095,7 +1129,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "SELECT setting_key, setting_value FROM save_settings " +
                 "WHERE slot_id = $slot_id AND setting_key IN " +
                 "('research_points', 'unlocked_technologies', " +
-                "'production_queue') ORDER BY setting_key;";
+                "'production_queue', 'inventory_properties') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1154,6 +1188,63 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "production_queue setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
+            "inventory_properties",
+            out string? inventoryPropertiesJson))
+        {
+            if (string.IsNullOrWhiteSpace(inventoryPropertiesJson))
+            {
+                throw new InvalidDataException(
+                    "inventory_properties setting is empty.");
+            }
+
+            try
+            {
+                InventoryItemPropertiesSaveData[] properties =
+                    JsonSerializer.Deserialize<InventoryItemPropertiesSaveData[]>(
+                        inventoryPropertiesJson) ??
+                    throw new InvalidDataException(
+                        "inventory_properties setting deserialized to null.");
+                Dictionary<string, InventoryItemPropertiesSaveData> byItemId =
+                    new(StringComparer.Ordinal);
+                foreach (InventoryItemPropertiesSaveData property in properties)
+                {
+                    if (!byItemId.TryAdd(property.ItemId, property) ||
+                        property.Quality is < 0 or > 100 ||
+                        property.Purity is < 0 or > 100 ||
+                        property.Stability is < 0 or > 100)
+                    {
+                        throw new InvalidDataException(
+                            "inventory_properties contains duplicate IDs or " +
+                            "scores outside 0..100.");
+                    }
+                }
+
+                for (int index = 0; index < inventory.Count; index++)
+                {
+                    InventoryItemSaveData item = inventory[index];
+                    if (byItemId.TryGetValue(
+                        item.ItemId,
+                        out InventoryItemPropertiesSaveData? property) &&
+                        property is not null)
+                    {
+                        inventory[index] = item with
+                        {
+                            Quality = property.Quality,
+                            Purity = property.Purity,
+                            Stability = property.Stability
+                        };
+                    }
+                }
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "inventory_properties setting contains invalid JSON.",
                     exception);
             }
         }

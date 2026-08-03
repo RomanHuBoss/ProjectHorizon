@@ -45,7 +45,16 @@ public sealed record InventoryItemSaveData(
     int Quantity,
     double Durability,
     string OriginalDefinitionId = "",
-    ContentResolutionState Resolution = ContentResolutionState.Known);
+    ContentResolutionState Resolution = ContentResolutionState.Known,
+    int Quality = 100,
+    int Purity = 100,
+    int Stability = 100);
+
+public sealed record InventoryItemPropertiesSaveData(
+    string ItemId,
+    int Quality,
+    int Purity,
+    int Stability);
 
 public sealed record VisitedPlanetSaveData(
     string PlanetId,

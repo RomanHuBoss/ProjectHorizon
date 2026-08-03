@@ -30,7 +30,8 @@ public enum StationSelectorMode
 {
     Recipes = 0,
     Research = 1,
-    Queue = 2
+    Queue = 2,
+    Dismantle = 3
 }
 
 public partial class SalvageRepairSlice : Node3D
@@ -86,6 +87,8 @@ public partial class SalvageRepairSlice : Node3D
         _chemicalProcessAcceptanceTask;
     private Task<ProductionQueueAcceptanceReport>?
         _productionQueueAcceptanceTask;
+    private Task<ItemQualityDismantleAcceptanceReport>?
+        _itemQualityDismantleAcceptanceTask;
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
@@ -101,6 +104,8 @@ public partial class SalvageRepairSlice : Node3D
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
         _productionQueueAcceptanceReport;
+    private ItemQualityDismantleAcceptanceReport?
+        _itemQualityDismantleAcceptanceReport;
     private ProductionQueueRuntime? _gameplayProductionQueue;
     private CraftingStationDefinition? _gameplayQueueStation;
     private SalvageRepairSliceState _state =
@@ -126,6 +131,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
     private string _queueTerminalAcceptanceHud = "READY";
+    private string _itemQualityDismantleAcceptanceHud = "READY";
     private PortableCraftingStation? _selectorStation;
     private Node3D? _selectorInteractor;
     private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
@@ -348,7 +354,7 @@ public partial class SalvageRepairSlice : Node3D
             "gracefulExit=freeze-and-resume; offlineProgress=0.");
         GD.Print(
             "TASK-092 production queue terminal READY: " +
-            "tabs=Recipes/Research/Queue; progress=bar+elapsed; " +
+            "tabs=Recipes/Research/Queue/Dismantle; progress=bar+elapsed; " +
             "actions=pause/resume/cancel; energy=visible; " +
             "reservations=visible; gameplayPersistence=enabled.");
     }
@@ -387,6 +393,7 @@ public partial class SalvageRepairSlice : Node3D
         PollTechnologySelectorAcceptanceTask();
         PollChemicalProcessAcceptanceTask();
         PollProductionQueueAcceptanceTask();
+        PollItemQualityDismantleAcceptanceTask();
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
         PollAutosave();
@@ -439,6 +446,10 @@ public partial class SalvageRepairSlice : Node3D
                 {
                     SetSelectorMode(StationSelectorMode.Queue);
                 }
+            }
+            else if (Matches(physical, logical, Key.D))
+            {
+                SetSelectorMode(StationSelectorMode.Dismantle);
             }
             else if (_selectorMode == StationSelectorMode.Queue &&
                      (Matches(physical, logical, Key.C) ||
@@ -663,6 +674,8 @@ public partial class SalvageRepairSlice : Node3D
                 GetSelectorTechnologies(stationId).Count,
             StationSelectorMode.Queue =>
                 _gameplayProductionQueue?.Jobs.Count ?? 0,
+            StationSelectorMode.Dismantle =>
+                GetDismantleRecipes(stationId).Count,
             _ => 0
         };
     }
@@ -673,6 +686,7 @@ public partial class SalvageRepairSlice : Node3D
         {
             StationSelectorMode.Recipes => StationSelectorMode.Research,
             StationSelectorMode.Research => StationSelectorMode.Queue,
+            StationSelectorMode.Queue => StationSelectorMode.Dismantle,
             _ => StationSelectorMode.Recipes
         };
         SetSelectorMode(next);
@@ -711,6 +725,12 @@ public partial class SalvageRepairSlice : Node3D
         if (_selectorMode == StationSelectorMode.Queue)
         {
             ToggleSelectedQueueJobPause();
+            return;
+        }
+
+        if (_selectorMode == StationSelectorMode.Dismantle)
+        {
+            DismantleSelectedItem();
             return;
         }
 
@@ -793,6 +813,104 @@ public partial class SalvageRepairSlice : Node3D
             recipeId,
             stationId,
             interactor);
+    }
+
+    private IReadOnlyList<CraftingRecipeDefinition> GetDismantleRecipes(
+        string stationId)
+    {
+        return GetSelectorRecipes(stationId)
+            .Where(recipe =>
+                recipe.Outputs.Count == 1 &&
+                recipe.DismantleReturns.Count > 0 &&
+                Session.GetCraftedQuantity(recipe.Outputs[0].DefinitionId) > 0)
+            .OrderBy(recipe => recipe.RecipeId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void DismantleSelectedItem()
+    {
+        PortableCraftingStation? station = _selectorStation;
+        if (station is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<CraftingRecipeDefinition> recipes =
+            GetDismantleRecipes(station.StationId);
+        if (recipes.Count == 0)
+        {
+            _selectorFeedback = "No dismantlable crafted items.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        CraftingRecipeDefinition recipe =
+            recipes[Math.Clamp(_selectorIndex, 0, recipes.Count - 1)];
+        CraftingStackDefinition output = recipe.Outputs.Single();
+        IndustryItemProperties properties =
+            Session.GetItemProperties(output.DefinitionId);
+        DismantleExecutionReport report =
+            ItemPropertyRuntime.Dismantle(recipe, properties);
+        if (!report.Succeeded)
+        {
+            _selectorFeedback = report.Result;
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!Session.TryConsumeInventory(
+            output.DefinitionId,
+            1,
+            out string consumeResult))
+        {
+            _selectorFeedback = consumeResult;
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!GameplayQueue.TryConsumeInventory(
+            output.DefinitionId,
+            1,
+            out string queueConsumeResult))
+        {
+            Session.GrantInventory(output.DefinitionId, 1, properties);
+            _selectorFeedback = queueConsumeResult;
+            UpdateRecipeSelector();
+            return;
+        }
+
+        IndustryItemProperties recoveredProperties =
+            ItemPropertyRuntime.CreateRecoveredProperties(properties);
+        foreach (CraftingStackDefinition returned in report.Returns)
+        {
+            Session.GrantInventory(
+                returned.DefinitionId,
+                returned.Quantity,
+                recoveredProperties);
+            GameplayQueue.AddInventory(
+                returned.DefinitionId,
+                returned.Quantity);
+        }
+
+        _lastDomainEvent = $"ItemDismantled({output.DefinitionId})";
+        _selectorFeedback = report.Result;
+        _status = report.Result;
+        ApplySessionToScene();
+        ApplyGameplayQueueStationState();
+        QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+        _selectorIndex = Math.Clamp(
+            _selectorIndex,
+            0,
+            Math.Max(0, GetDismantleRecipes(station.StationId).Count - 1));
+        GD.Print(
+            "TASK-093 player dismantle PASS: " +
+            $"recipe={recipe.RecipeId}; source={output.DefinitionId}; " +
+            $"quality={properties.Quality}; purity={properties.Purity}; " +
+            $"stability={properties.Stability}; " +
+            $"efficiency={report.RecoveryEfficiency.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"returns={report.Returns.Sum(item => item.Quantity)}; " +
+            $"autosaveTrigger={AutosaveTrigger.BaseChanged}.");
+        UpdateRecipeSelector();
     }
 
     private void EnqueueSelectedRecipe()
@@ -1109,7 +1227,7 @@ public partial class SalvageRepairSlice : Node3D
                     $"(tier {technology.Tier})");
             }
         }
-        else
+        else if (_selectorMode == StationSelectorMode.Queue)
         {
             lines.Add(
                 $"Queue jobs: {queueSnapshot.Jobs.Count} | " +
@@ -1136,6 +1254,42 @@ public partial class SalvageRepairSlice : Node3D
                 }
             }
         }
+        else
+        {
+            IReadOnlyList<CraftingRecipeDefinition> recipes =
+                GetDismantleRecipes(stationId);
+            lines.Add(
+                $"Dismantlable items: {recipes.Count} | returns are scaled by " +
+                "quality/purity/stability");
+            lines.Add("");
+            if (recipes.Count == 0)
+            {
+                lines.Add("  No crafted items with dismantle returns.");
+            }
+            else
+            {
+                for (int index = 0; index < recipes.Count; index++)
+                {
+                    CraftingRecipeDefinition recipe = recipes[index];
+                    CraftingStackDefinition output = recipe.Outputs.Single();
+                    IndustryItemProperties properties =
+                        Session.GetItemProperties(output.DefinitionId);
+                    DismantleExecutionReport preview =
+                        ItemPropertyRuntime.Dismantle(recipe, properties);
+                    string cursor = index == _selectorIndex ? ">" : " ";
+                    string returns = preview.Returns.Count == 0
+                        ? "no recoverable material"
+                        : string.Join(" + ", preview.Returns.Select(item =>
+                            $"{item.Quantity} {GetShortContentId(item.DefinitionId)}"));
+                    lines.Add(
+                        $"{cursor} {GetShortContentId(output.DefinitionId)} x" +
+                        $"{Session.GetCraftedQuantity(output.DefinitionId)} " +
+                        $"Q{properties.Quality}/P{properties.Purity}/S{properties.Stability}");
+                    lines.Add(
+                        $"    recovery {preview.RecoveryEfficiency * 100.0:0}% -> {returns}");
+                }
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(_selectorFeedback))
         {
@@ -1151,10 +1305,13 @@ public partial class SalvageRepairSlice : Node3D
                 "Tab - next tab | R - Research | Esc - close",
             StationSelectorMode.Research =>
                 "Up/Down - select | Enter/E - unlock | Q - Queue | " +
-                "Tab - next tab | R - Recipes | Esc - close",
-            _ =>
+                "Tab - next tab | R - Recipes | D - Dismantle | Esc - close",
+            StationSelectorMode.Queue =>
                 "Up/Down - select | Enter/E - pause/resume | C/Delete - cancel | " +
-                "Q - Queue | Tab - next tab | R - Research | Esc - close"
+                "D - Dismantle | Tab - next tab | R - Research | Esc - close",
+            _ =>
+                "Up/Down - select | Enter/E - dismantle | Tab - next tab | " +
+                "R - Research | Q - Queue | Esc - close"
         });
         _recipeSelectorLabel.Text = string.Join("\n", lines);
     }
@@ -1802,9 +1959,19 @@ public partial class SalvageRepairSlice : Node3D
                     catalyst.Quantity);
             }
 
+            CraftingRecipeDefinition completedRecipe =
+                ContentCatalog.GetRecipe(process.RecipeId);
+            IndustryItemProperties outputProperties =
+                ItemPropertyRuntime.CreateOutputProperties(
+                    completedRecipe,
+                    process.ProcessSequence,
+                    ItemPropertyRuntime.CreateNominalEnvironment(completedRecipe));
             foreach (CraftingStackDefinition output in process.Outputs)
             {
-                Session.GrantInventory(output.DefinitionId, output.Quantity);
+                Session.GrantInventory(
+                    output.DefinitionId,
+                    output.Quantity,
+                    outputProperties);
             }
 
             foreach (CraftingStackDefinition byproduct in process.Byproducts)
@@ -1935,6 +2102,7 @@ public partial class SalvageRepairSlice : Node3D
             _technologySelectorAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
+            _itemQualityDismantleAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
             (_gameplayProductionQueue?.Jobs.Count ?? 0) == 0 &&
@@ -2158,10 +2326,21 @@ public partial class SalvageRepairSlice : Node3D
         _status = "TASK-090/TASK-092 production queue acceptance running";
         _productionQueueAcceptanceHud = "RUNNING";
         _queueTerminalAcceptanceHud = "RUNNING";
+        _itemQualityDismantleAcceptanceHud = "RUNNING";
         _productionQueueAcceptanceReport = null;
+        _itemQualityDismantleAcceptanceReport = null;
         _productionQueueAcceptanceTask =
             ProductionQueueAcceptanceRunner.RunAsync(
                 testPath,
+                SlotId,
+                ContentCatalog,
+                _lifetimeCancellation.Token);
+        string propertiesTestPath = Path.Combine(
+            directory,
+            "save_1.item-properties-dismantle-test.db");
+        _itemQualityDismantleAcceptanceTask =
+            ItemQualityDismantleAcceptanceRunner.RunAsync(
+                propertiesTestPath,
                 SlotId,
                 ContentCatalog,
                 _lifetimeCancellation.Token);
@@ -2327,6 +2506,7 @@ public partial class SalvageRepairSlice : Node3D
             _technologySelectorAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
+            _itemQualityDismantleAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -2841,7 +3021,9 @@ public partial class SalvageRepairSlice : Node3D
                   $"energy={(report.TerminalEnergy ? 1 : 0)}, " +
                   $"reservations={(report.TerminalReservations ? 1 : 0)}, " +
                   $"actions={(report.TerminalActions ? 1 : 0)}";
-            _state = report.Passed
+            bool combinedPassed = report.Passed &&
+                (_itemQualityDismantleAcceptanceReport?.Passed ?? true);
+            _state = combinedPassed
                 ? SalvageRepairSliceState.Passed
                 : SalvageRepairSliceState.Failed;
             _status = report.Result;
@@ -2891,6 +3073,64 @@ public partial class SalvageRepairSlice : Node3D
         catch (Exception exception)
         {
             Fail("production queue acceptance", exception);
+        }
+    }
+
+    private void PollItemQualityDismantleAcceptanceTask()
+    {
+        if (_itemQualityDismantleAcceptanceTask is null ||
+            !_itemQualityDismantleAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<ItemQualityDismantleAcceptanceReport> task =
+            _itemQualityDismantleAcceptanceTask;
+        _itemQualityDismantleAcceptanceTask = null;
+        try
+        {
+            _itemQualityDismantleAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            ItemQualityDismantleAcceptanceReport report =
+                _itemQualityDismantleAcceptanceReport;
+            _itemQualityDismantleAcceptanceHud = report.Passed
+                ? $"PASS Q={report.Quality}, P={report.Purity}, " +
+                  $"S={report.Stability}, dismantle={report.DismantleReturns}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            bool combinedPassed = report.Passed &&
+                (_productionQueueAcceptanceReport?.Passed ?? true);
+            _state = combinedPassed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-093 item quality and dismantle acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"recipe={report.RecipeId}; quality={report.Quality}; " +
+                $"purity={report.Purity}; stability={report.Stability}; " +
+                $"deterministic={(report.Deterministic ? 1 : 0)}; " +
+                $"range={(report.InRecipeRange ? 1 : 0)}; " +
+                $"qualitySensitive={(report.QualitySensitiveReturns ? 1 : 0)}; " +
+                $"dismantleReturns={report.DismantleReturns}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("item quality and dismantle acceptance", exception);
         }
     }
 
@@ -3248,7 +3488,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Research: RP={TechnologyProgress.ResearchPoints} • " +
             $"unlocked={TechnologyProgress.UnlockedCount}/" +
             $"{ContentCatalog.Technologies.Count} • " +
-            "interact with the fabricator to open Recipes/Research/Queue";
+            "interact with the fabricator to open Recipes/Research/Queue/Dismantle";
         string repairLine =
             $"Repair: {RepairRecipe.RecipeId} • " +
             $"{primaryInput.Quantity}x{primaryInput.DefinitionId} -> " +
@@ -3290,12 +3530,13 @@ public partial class SalvageRepairSlice : Node3D
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
                 $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
+                $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • terminal: Tab tabs, Q enqueue/queue, C cancel • " +
+                "E - interact/select • terminal: Tab tabs, Q queue, D dismantle, C cancel • " +
                 "F1 - production queue • " +
                 "F2 - chemical runtime • " +
                 "F3 - selector acceptance • F4/F5 - catalogs • " +
@@ -3322,6 +3563,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Last domain event: {_lastDomainEvent}\n" +
             $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
             $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
+            $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -3334,7 +3576,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space - move • E - interact/select • H - HUD • " +
-            "terminal: Tab tabs, Q enqueue/queue, Enter pause/resume, C cancel • " +
+            "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +

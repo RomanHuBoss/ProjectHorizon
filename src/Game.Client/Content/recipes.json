@@ -68,7 +68,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.conductive_crystal",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.starter_fabrication",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -117,7 +122,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.phase_fiber",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.starter_fabrication",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -166,7 +176,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.thermal_gel",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.starter_fabrication",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -215,7 +230,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.plasma_filament",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.starter_fabrication",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -264,7 +284,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.quantum_resin",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.sensor_systems",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -313,7 +338,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.aerogel_matrix",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.life_support",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -362,7 +392,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.magnetic_ore",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.ship_systems",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -411,7 +446,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.bio_polymer",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.polymer_science",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,
@@ -460,7 +500,12 @@
         }
       ],
       "byproducts": [],
-      "dismantleReturns": [],
+      "dismantleReturns": [
+        {
+          "definitionId": "resource.ceramic_composite",
+          "quantity": 2
+        }
+      ],
       "requiredTechnology": "tech.metallurgy",
       "requiredStation": "station.portable_fabricator",
       "stationTier": 1,

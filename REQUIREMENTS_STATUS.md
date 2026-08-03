@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui-build-fix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-item-properties-dismantle.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,64 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084`, `TASK-083/089` и `TASK-090/091` приняты после runtime-проверок; пользователь подтвердил исправленную nullable-редакцию формулировкой «все работает». Текущая итерация реализует player-facing Queue-вкладку промышленного терминала, управление job lifecycle и сохранение незавершённой gameplay-очереди.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-092/094` приняты по clean build `0/0`, автоматическому `F1` и ручной проверке Queue UI. Текущая итерация реализует persistent quality/purity/stability, quality-sensitive dismantle returns и четвёртую вкладку промышленного терминала.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — quality/purity/stability и dismantle returns (`TASK-093`)
+
+**Исходный снимок:** `ProjectHorizon-main(7)(1).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-item-properties-dismantle.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** ТЗ v2.0 §20, §21, §52.3 и §53: quality range, purity/stability, `DismantleReturns[]`, persistence и station UI.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил build log `0 предупреждений / 0 ошибок`;
+- `F1 / TASK-090` и `F1 / TASK-092` завершились `PASS`;
+- вручную подтверждены Queue tab, пустое состояние, enqueue, RUNNING progress, energy/input reservations и completion;
+- `F2/F3/F4/F5/F6/F7/F9/F10/F11` подтверждены `PASS` на предоставленных экранах;
+- `TASK-092`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-094`: `IN_PROGRESS` → `VERIFIED`.
+
+**Реализовано:**
+
+- `InventoryItemSaveData` расширен полями `Quality`, `Purity`, `Stability` в диапазоне `0..100`;
+- добавлен Godot-independent `ItemPropertyRuntime` с детерминированным расчётом свойств по recipe, process sequence, environment и hazards;
+- direct craft и gameplay production queue присваивают crafted outputs рассчитанные свойства;
+- при объединении stack свойства агрегируются взвешенно по количеству;
+- metadata сохраняется в backward-compatible `save_settings.inventory_properties`; версия SQLite schema остаётся `2`;
+- старые saves без metadata загружаются как legacy `100/100/100`;
+- девять runtime ship recipes получили каталоговые `DismantleReturns`;
+- station terminal расширен до `Recipes / Research / Queue / Dismantle`; клавиша `D` открывает dismantle mode;
+- Dismantle tab показывает quantity, `Q/P/S`, recovery efficiency и preview returns;
+- `Enter/E` расходует один crafted item, возвращает целочисленную долю материалов по формуле `0.5Q + 0.3P + 0.2S`, синхронизирует queue inventory и вызывает `BaseChanged` autosave;
+- recovered materials получают сниженные свойства, исключая бесконечную переработку без потерь;
+- F1 дополнен изолированным `TASK-093` acceptance с отдельной БД `save_1.item-properties-dismantle-test.db`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/ItemPropertyRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ItemQualityDismantleAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Content/recipes.json`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-092` → `VERIFIED`;
+- `TASK-094` → `VERIFIED`;
+- `TASK-093`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-095`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F1 item-property acceptance, manual Dismantle UI и cold round-trip;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Ограничение:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой семантики остаются за `TASK-095`.
+
+## 3A. Предыдущая итерация от 2026-08-03
 
 ### 2026-08-03 — build hotfix Queue terminal (`TASK-094`)
 
@@ -63,7 +118,7 @@
 
 **Контроль:** выполнены поиск всех ссылок `terminalOutput`, проверка области видимости, лексическая проверка C# и повторная упаковка без build/runtime-артефактов.
 
-## 3A. Предыдущая итерация от 2026-08-02
+## 3B. Предыдущая итерация от 2026-08-02
 
 ### 2026-08-02 — player-facing production queue terminal (`TASK-092`)
 
@@ -2553,20 +2608,39 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `INDUSTRY-050` | Station terminal содержит вкладки Recipes, Research и Queue | `IMPLEMENTED` | `StationSelectorMode.Queue`; `Tab` циклически переключает три режима |
-| `INDUSTRY-051` | Queue UI показывает status, progress, elapsed/duration и slot state | `IMPLEMENTED` | `ProductionQueueTerminalModel`, progress bar и timing row |
-| `INDUSTRY-052` | Queue UI показывает remaining/capacity energy и точные reservations | `IMPLEMENTED` | Header energy; per-job reserved energy, inputs и catalysts |
-| `INDUSTRY-053` | Игрок может enqueue recipe из Recipes без удаления legacy direct craft | `IMPLEMENTED` | `Q` enqueue; `Enter/E` сохраняет immediate timed craft |
-| `INDUSTRY-054` | Игрок может pause/resume выбранный running/paused job | `IMPLEMENTED` | Queue `Enter/E` вызывает `Pause/Resume` |
-| `INDUSTRY-055` | Игрок может cancel job с полным возвратом reservations | `IMPLEMENTED` | Queue `C/Delete`; inputs/catalysts возвращаются в `StarterRepairSession`, energy — в runtime |
-| `INDUSTRY-056` | Gameplay queue completion применяет outputs/byproducts/catalyst policy | `IMPLEMENTED` | `UpdateGameplayProductionQueue` синхронизирует session и scene |
-| `INDUSTRY-057` | Gameplay queue сохраняется при periodic/autosave/graceful exit и cold restore | `IMPLEMENTED` | Queue payload передаётся в `StarterRepairSnapshotFactory.Create`; restore без offline progress |
-| `INDUSTRY-058` | Refund inputs и byproducts переживают SQLite round-trip | `IMPLEMENTED` | `StarterRepairSession.FromSnapshot` принимает inputs/catalysts/outputs/byproducts/dismantle IDs |
-| `INDUSTRY-ACC-050` | Clean build не содержит errors/warnings | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `INDUSTRY-ACC-051` | F1 подтверждает terminal projection | `IN_PROGRESS` | `progress=1`, `energy=1`, `reservations=1`, `actions=1` |
-| `INDUSTRY-ACC-052` | Ручной UI подтверждает enqueue, pause/resume и cancel/refund | `IN_PROGRESS` | Нужны Queue screenshots и Output lines `TASK-092 player queue ... PASS` |
-| `INDUSTRY-ACC-053` | Cold restart восстанавливает job и exact elapsed без offline progress | `IN_PROGRESS` | Поставить job, выйти штатно, перезапустить и сравнить elapsed |
-| `INDUSTRY-ACC-054` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 |
+| `INDUSTRY-050` | Station terminal содержит вкладки Recipes, Research и Queue | `VERIFIED` | Ручной экран пользователя подтверждает Queue tab и переключение режимов |
+| `INDUSTRY-051` | Queue UI показывает status, progress, elapsed/duration и slot state | `VERIFIED` | Ручной экран: RUNNING power_coupler, progress bar, `3.2/4.0s`, slot 1 |
+| `INDUSTRY-052` | Queue UI показывает remaining/capacity energy и точные reservations | `VERIFIED` | Ручной экран: `Energy 13/80`, `reserve E67`, `inputs: 2 plasma_filament` |
+| `INDUSTRY-053` | Игрок может enqueue recipe из Recipes без удаления legacy direct craft | `VERIFIED` | Пользователь поставил power_coupler через Q; legacy F10/F11 не регрессировали |
+| `INDUSTRY-054` | Игрок может pause/resume выбранный running/paused job | `VERIFIED` | F1 подтвердил `pause=1`; Queue actions acceptance `actions=1` |
+| `INDUSTRY-055` | Игрок может cancel job с полным возвратом reservations | `VERIFIED` | F1 подтвердил `cancel=1`, `refund=1` |
+| `INDUSTRY-056` | Gameplay queue completion применяет outputs/byproducts/catalyst policy | `VERIFIED` | Ручной HUD после completion и F1 `completed=2` |
+| `INDUSTRY-057` | Gameplay queue сохраняется при periodic/autosave/graceful exit и cold restore | `VERIFIED` | F1 подтвердил `restore=1`, `roundTrip=1`; build/runtime принят |
+| `INDUSTRY-058` | Refund inputs и byproducts переживают SQLite round-trip | `VERIFIED` | F1 exact round-trip и регрессионный persistence PASS |
+| `INDUSTRY-ACC-050` | Clean build не содержит errors/warnings | `VERIFIED` | Пользователь предоставил сборку `0 предупреждений / 0 ошибок` |
+| `INDUSTRY-ACC-051` | F1 подтверждает terminal projection | `VERIFIED` | `TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1` |
+| `INDUSTRY-ACC-052` | Ручной UI подтверждает enqueue, pause/resume и cancel/refund | `VERIFIED` | Предоставлены Queue screenshots; F1 actions/cancel/refund PASS |
+| `INDUSTRY-ACC-053` | Cold restart восстанавливает job и exact elapsed без offline progress | `VERIFIED` | F1 `restore=1`, `roundTrip=1`; freeze-and-resume policy подтверждена |
+| `INDUSTRY-ACC-054` | F2–F12 не регрессируют | `VERIFIED` | Пользователь предоставил PASS-экраны F2/F3/F4/F5/F6/F7/F9/F10/F11 |
+
+### 8.16. Item quality, purity, stability и dismantle returns
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `INDUSTRY-060` | Crafted output имеет `Quality`, `Purity`, `Stability` в `0..100` | `IMPLEMENTED` | `IndustryItemProperties`; recipe quality range и environment/hazard calculation |
+| `INDUSTRY-061` | Расчёт свойств детерминирован для recipe/process sequence | `IMPLEMENTED` | Stable FNV hash и Godot-independent `ItemPropertyRuntime` |
+| `INDUSTRY-062` | Properties сохраняются и восстанавливаются без schema bump | `IMPLEMENTED` | `save_settings.inventory_properties`; legacy fallback `100/100/100` |
+| `INDUSTRY-063` | Stack merge агрегирует свойства взвешенно по quantity | `IMPLEMENTED` | `StarterRepairSession.GrantInventory` |
+| `INDUSTRY-064` | Runtime recipes определяют `DismantleReturns[]` | `IMPLEMENTED` | Девять ship-component recipes возвращают соответствующее сырьё |
+| `INDUSTRY-065` | Dismantle recovery зависит от Q/P/S и целочисленно ограничен максимумом recipe | `IMPLEMENTED` | efficiency `0.5Q + 0.3P + 0.2S`; `floor(maxReturn × efficiency)` |
+| `INDUSTRY-066` | Recovered materials деградируют по свойствам | `IMPLEMENTED` | `CreateRecoveredProperties`: `-12/-8/-15` |
+| `INDUSTRY-067` | Terminal содержит Dismantle tab и preview результата | `IMPLEMENTED` | `D`, `Tab`, quantity, Q/P/S, efficiency, return preview |
+| `INDUSTRY-068` | Player dismantle синхронизирует session/queue inventory и autosave | `IMPLEMENTED` | consume/grant в обеих моделях, `BaseChanged` autosave |
+| `INDUSTRY-ACC-060` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `INDUSTRY-ACC-061` | F1 подтверждает deterministic/range/quality-sensitive returns/round-trip | `IN_PROGRESS` | Ожидается `TASK-093 item properties (F1): PASS ...` |
+| `INDUSTRY-ACC-062` | Ручной Dismantle UI и material return работают | `IN_PROGRESS` | Изготовить component, открыть `D`, выполнить dismantle |
+| `INDUSTRY-ACC-063` | Cold restart сохраняет Q/P/S и dismantle result | `IN_PROGRESS` | Проверить до и после dismantle с graceful exit |
+| `INDUSTRY-ACC-064` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить существующую матрицу |
 
 ## 9. Очередь ближайших задач
 
@@ -2576,14 +2650,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-094` | Выполнить runtime-приёмку Queue-вкладки | Clean build `0/0`; F1 terminal projection; manual enqueue/pause/resume/cancel/refund; cold restore; F2–F12 regressions |
+| 1 | `TASK-095` | Выполнить runtime-приёмку item properties и dismantling | Clean build `0/0`; F1 TASK-093; manual Dismantle; cold Q/P/S round-trip; F2–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-093` | Реализовать quality/purity/stability и dismantle returns | Следующая семантика ТЗ v2.0 §52.3 после terminal queue acceptance |
+| 3 | `TASK-096` | Расширить player runtime за пределы девяти ship recipes | Подключить station routing и property-aware production для следующего связного набора Industry Content v2 |
 
-**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-091`, persistence, vertical slice, Industry Content v2 и runtime matrix.
-**Реализовано:** `TASK-092` — player-facing Queue-вкладка, progress/actions/reservations и gameplay queue persistence.
+**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-092`, `TASK-094`, persistence, vertical slice, Industry Content v2 и runtime matrix.
+**Реализовано:** `TASK-093` — persistent Q/P/S, quality-sensitive dismantle returns и Dismantle terminal tab.
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-094`.
+**Текущая приёмочная задача:** `TASK-095`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4076,6 +4150,23 @@ TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions
 9. Дождаться completion: output появляется в inventory, station/HUD обновляются, Output содержит `TASK-092 player queue completion PASS`, выполняется `QuestCompleted` autosave.
 10. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
 11. При `FAIL` предоставить build log, полный HUD/Queue tab, строку `TASK-092 ... FAIL`, последние 120 строк Godot Output и шаг, на котором возникло расхождение.
+
+## 18D. Runtime-приёмка `TASK-093/TASK-095`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
+2. Запустить vertical slice и нажать `F1`. Вместе с TASK-090/TASK-092 ожидается:
+
+```text
+TASK-093 item properties (F1): PASS Q=<0..100>, P=<0..100>, S=<0..100>, dismantle=<N>, roundTrip=1
+```
+
+3. Output должен содержать `TASK-093 item quality and dismantle acceptance PASS` с `deterministic=1; range=1; qualitySensitive=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok`.
+4. Нажать `F8`, отремонтировать корабль, исследовать нужную технологию и изготовить любой runtime component, например `power_coupler`.
+5. Штатно выйти и снова запустить игру. Открыть PortableFabricator, нажать `D`: component должен отображаться с теми же `Q/P/S`, что до выхода.
+6. В Dismantle tab выбрать component и нажать `Enter/E`. Item исчезает, previewed materials появляются в inventory, Output содержит `TASK-093 player dismantle PASS`, выполняется `BaseChanged` autosave.
+7. Ещё раз выполнить graceful exit/restart: dismantled component не возвращается, recovered materials и их properties сохраняются.
+8. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
+9. При `FAIL` предоставить build log, полный HUD/Dismantle tab, строку `TASK-093 ... FAIL`, последние 120 строк Godot Output и шаг расхождения.
 
 ## 19. Шаблон новой записи
 
