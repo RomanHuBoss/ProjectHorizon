@@ -495,7 +495,7 @@ public static class ProductionNetworkHudAcceptanceRunner
         StarterRepairSession session = new(
             repairRecipe,
             static _ => true,
-            runtimeRecipes);
+            runtimeRecipes.ToArray());
         session.GrantInventory(
             repairRecipe.Inputs[0].DefinitionId,
             repairRecipe.Inputs[0].Quantity);
