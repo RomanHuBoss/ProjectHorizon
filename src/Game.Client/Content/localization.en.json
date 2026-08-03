@@ -349,6 +349,18 @@
     "item.exotic.field_generator": "Exotic field generator",
     "recipe.advanced.exotic_field_generator": "Exotic field generator",
     "item.exotic.compotium_stabilization_core": "Compotium stabilization core",
-    "recipe.advanced.compotium_stabilization_core": "Compotium stabilization core"
+    "recipe.advanced.compotium_stabilization_core": "Compotium stabilization core",
+    "faction.meridian_exchange": "Meridian Exchange",
+    "faction.helix_academy": "Helix Academy",
+    "faction.aegis_compact": "Aegis Compact",
+    "market.frontier_exchange": "Frontier Exchange",
+    "dialogue.trader.ilia_voss": "Ilia Voss station-services dialogue",
+    "dialogue_option.trader.open_trade": "Show me the market.",
+    "dialogue_option.trader.open_quests": "Do you have work available?",
+    "dialogue_option.trader.close": "That is all for now.",
+    "npc.trader.ilia_voss": "Ilia Voss",
+    "quest.frontier.ore_sample": "Frontier ore sample",
+    "quest.frontier.refined_ferrite": "Refined ferrite order",
+    "quest.frontier.water_trade": "Water-ice trade contract"
   }
 }

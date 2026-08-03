@@ -104,6 +104,35 @@ public sealed record ProductionQueueSaveData(
 public sealed record ProductionQueueNetworkSaveData(
     IReadOnlyList<ProductionQueueSaveData> Stations);
 
+public enum StationServiceQuestStatus
+{
+    Offered = 0,
+    Accepted = 1,
+    ReadyToClaim = 2,
+    Completed = 3
+}
+
+public sealed record StationServiceStockSaveData(
+    string DefinitionId,
+    int Quantity);
+
+public sealed record StationServiceQuestSaveData(
+    string QuestId,
+    StationServiceQuestStatus Status,
+    string CurrentNodeId,
+    int Progress);
+
+public sealed record StationServicesSaveData(
+    string MarketId,
+    string NpcId,
+    int PlayerCredits,
+    int MerchantCredits,
+    int Reputation,
+    long DayIndex,
+    long LastEconomyUpdateUnixSeconds,
+    IReadOnlyList<StationServiceStockSaveData> Stock,
+    IReadOnlyList<StationServiceQuestSaveData> Quests);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -116,7 +145,8 @@ public sealed record SaveGameSnapshot(
     VisitedPlanetSaveData VisitedPlanet,
     TechnologyProgressSaveData? TechnologyProgress = null,
     ProductionQueueSaveData? ProductionQueue = null,
-    ProductionQueueNetworkSaveData? ProductionQueueNetwork = null);
+    ProductionQueueNetworkSaveData? ProductionQueueNetwork = null,
+    StationServicesSaveData? StationServices = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

@@ -34,6 +34,14 @@ public enum StationSelectorMode
     Dismantle = 3
 }
 
+public enum StationServicesTab
+{
+    Dialogue = 0,
+    Buy = 1,
+    Sell = 2,
+    Quests = 3
+}
+
 public partial class SalvageRepairSlice : Node3D
 {
     private sealed record GracefulExitResult(
@@ -58,6 +66,8 @@ public partial class SalvageRepairSlice : Node3D
     private SaveDatabase? _database;
     private SaveAutosaveCoordinator? _autosave;
     private GameContentCatalog? _contentCatalog;
+    private StationServicesCatalog? _stationServicesCatalog;
+    private StationServicesRuntime? _stationServicesRuntime;
     private TechnologyProgression? _technologyProgression;
     private CraftingRecipeDefinition? _repairRecipe;
     private CraftingRecipeDefinition? _launchCapacitorRecipe;
@@ -66,6 +76,7 @@ public partial class SalvageRepairSlice : Node3D
     private CraftingRecipeDefinition? _powerCouplerRecipe;
     private StarterRepairSession? _session;
     private StarterShipRepairTerminal? _shipTerminal;
+    private StationServicesNpc? _stationServicesNpc;
     private PortableCraftingStation? _activeCraftingStation;
     private PlayerController? _player;
     private MarginContainer? _hudMargin;
@@ -73,6 +84,8 @@ public partial class SalvageRepairSlice : Node3D
     private PanelContainer? _hudHiddenHint;
     private PanelContainer? _recipeSelectorPanel;
     private Label? _recipeSelectorLabel;
+    private PanelContainer? _stationServicesPanel;
+    private Label? _stationServicesLabel;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
@@ -87,6 +100,8 @@ public partial class SalvageRepairSlice : Node3D
     private Task<CatalogCraftingMatrixAcceptanceReport>? _catalogMatrixAcceptanceTask;
     private Task<TechnologyRecipeSelectorAcceptanceReport>?
         _technologySelectorAcceptanceTask;
+    private Task<StationServicesAcceptanceReport>?
+        _stationServicesAcceptanceTask;
     private Task<ChemicalProcessAcceptanceReport>?
         _chemicalProcessAcceptanceTask;
     private Task<ProductionQueueAcceptanceReport>?
@@ -110,6 +125,8 @@ public partial class SalvageRepairSlice : Node3D
     private CatalogCraftingMatrixAcceptanceReport? _catalogMatrixAcceptanceReport;
     private TechnologyRecipeSelectorAcceptanceReport?
         _technologySelectorAcceptanceReport;
+    private StationServicesAcceptanceReport?
+        _stationServicesAcceptanceReport;
     private ChemicalProcessAcceptanceReport?
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
@@ -142,6 +159,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _catalogMatrixAcceptanceHud = "READY";
     private string _industryCatalogAcceptanceHud = "READY";
     private string _technologySelectorAcceptanceHud = "READY";
+    private string _stationServicesAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
     private string _queueTerminalAcceptanceHud = "READY";
@@ -154,6 +172,11 @@ public partial class SalvageRepairSlice : Node3D
     private int _selectorIndex;
     private string _selectorFeedback = "";
     private ulong _selectorOpenedTicks;
+    private bool _stationServicesOpen;
+    private StationServicesTab _stationServicesTab = StationServicesTab.Dialogue;
+    private int _stationServicesIndex;
+    private string _stationServicesFeedback = "";
+    private ulong _stationServicesOpenedTicks;
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -162,6 +185,16 @@ public partial class SalvageRepairSlice : Node3D
 
     private GameContentCatalog ContentCatalog => _contentCatalog ??
         throw new InvalidOperationException("Game content catalog is unavailable.");
+
+    private StationServicesCatalog StationServiceCatalog =>
+        _stationServicesCatalog ??
+        throw new InvalidOperationException(
+            "Station services catalog is unavailable.");
+
+    private StationServicesRuntime StationServices =>
+        _stationServicesRuntime ??
+        throw new InvalidOperationException(
+            "Station services runtime is unavailable.");
 
     private TechnologyProgression TechnologyProgress =>
         _technologyProgression ??
@@ -234,19 +267,28 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/RecipeSelector");
         _recipeSelectorLabel = GetNodeOrNull<Label>(
             "Hud/RecipeSelector/Label");
+        _stationServicesPanel = GetNodeOrNull<PanelContainer>(
+            "Hud/StationServices");
+        _stationServicesLabel = GetNodeOrNull<Label>(
+            "Hud/StationServices/Label");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
             "Gameplay/DamagedShip");
+        _stationServicesNpc = GetNodeOrNull<StationServicesNpc>(
+            "Gameplay/StationTrader");
         _player = GetNodeOrNull<PlayerController>("Player");
         if (_hudMargin is null || _hudLabel is null ||
             _hudHiddenHint is null || _recipeSelectorPanel is null ||
-            _recipeSelectorLabel is null || _shipTerminal is null ||
-            _player is null)
+            _recipeSelectorLabel is null || _stationServicesPanel is null ||
+            _stationServicesLabel is null || _shipTerminal is null ||
+            _stationServicesNpc is null || _player is null)
         {
             throw new InvalidOperationException(
                 "Vertical slice scene is missing HUD, player or ship.");
         }
 
         GameContentCatalog catalog = LoadContentCatalog();
+        StationServicesCatalog stationServicesCatalog =
+            LoadStationServicesCatalog(catalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
@@ -286,6 +328,11 @@ public partial class SalvageRepairSlice : Node3D
             catalog.Technologies,
             DefaultResearchPoints);
         _contentCatalog = catalog;
+        _stationServicesCatalog = stationServicesCatalog;
+        _stationServicesRuntime = new StationServicesRuntime(
+            catalog,
+            stationServicesCatalog,
+            StationServicesAcceptanceRunner.NpcId);
         _technologyProgression = technologyProgression;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
@@ -448,6 +495,7 @@ public partial class SalvageRepairSlice : Node3D
         PollFourthCraftingAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
+        PollStationServicesAcceptanceTask();
         PollChemicalProcessAcceptanceTask();
         PollProductionQueueAcceptanceTask();
         PollItemQualityDismantleAcceptanceTask();
@@ -473,6 +521,47 @@ public partial class SalvageRepairSlice : Node3D
 
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
+        if (_stationServicesOpen)
+        {
+            if (Matches(physical, logical, Key.Escape))
+            {
+                CloseStationServices("station services closed");
+            }
+            else if (Matches(physical, logical, Key.Up))
+            {
+                MoveStationServices(-1);
+            }
+            else if (Matches(physical, logical, Key.Down))
+            {
+                MoveStationServices(1);
+            }
+            else if (Matches(physical, logical, Key.Tab))
+            {
+                CycleStationServicesTab();
+            }
+            else if (Matches(physical, logical, Key.B))
+            {
+                SetStationServicesTab(StationServicesTab.Buy);
+            }
+            else if (Matches(physical, logical, Key.S))
+            {
+                SetStationServicesTab(StationServicesTab.Sell);
+            }
+            else if (Matches(physical, logical, Key.Q))
+            {
+                SetStationServicesTab(StationServicesTab.Quests);
+            }
+            else if (Matches(physical, logical, Key.Enter) ||
+                     (Matches(physical, logical, Key.E) &&
+                      Time.GetTicksMsec() > _stationServicesOpenedTicks + 120))
+            {
+                ConfirmStationServicesSelection();
+            }
+
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (_selectorStation is not null)
         {
             if (Matches(physical, logical, Key.Escape))
@@ -596,6 +685,480 @@ public partial class SalvageRepairSlice : Node3D
             BeginThirdCraftingAcceptance();
             GetViewport().SetInputAsHandled();
         }
+    }
+
+    public void OpenStationServices(
+        StationServicesNpc npc,
+        Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(npc);
+        ArgumentNullException.ThrowIfNull(interactor);
+        if (_state != SalvageRepairSliceState.Ready &&
+            _state != SalvageRepairSliceState.Passed)
+        {
+            _status = "wait until the current persistence operation completes";
+            return;
+        }
+
+        if (!string.Equals(
+            npc.NpcId,
+            StationServices.NpcId,
+            StringComparison.Ordinal))
+        {
+            _status = $"unknown station services NPC {npc.NpcId}";
+            return;
+        }
+
+        CloseRecipeSelector();
+        _stationServicesOpen = true;
+        _stationServicesTab = StationServicesTab.Dialogue;
+        _stationServicesIndex = 0;
+        _stationServicesFeedback = "";
+        _stationServicesOpenedTicks = Time.GetTicksMsec();
+        if (_stationServicesPanel is not null)
+        {
+            _stationServicesPanel.Visible = true;
+        }
+
+        UpdateStationServicesPanel();
+        _status = $"station services opened: {npc.Name}";
+        _lastDomainEvent = $"NpcInteraction({npc.NpcId})";
+        GD.Print(
+            "TASK-102 player NPC interaction PASS: " +
+            $"npc={npc.NpcId}; market={StationServices.MarketId}; " +
+            $"credits={StationServices.PlayerCredits}; " +
+            $"quests={StationServices.CompletedQuestCount}/" +
+            $"{StationServiceCatalog.Quests.Count}; interactor={interactor.Name}.");
+    }
+
+    private void CloseStationServices(string status = "")
+    {
+        _stationServicesOpen = false;
+        _stationServicesIndex = 0;
+        _stationServicesFeedback = "";
+        if (_stationServicesPanel is not null)
+        {
+            _stationServicesPanel.Visible = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            _status = status;
+        }
+    }
+
+    private void MoveStationServices(int delta)
+    {
+        int count = GetStationServicesItemCount();
+        if (count <= 0)
+        {
+            _stationServicesIndex = 0;
+            return;
+        }
+
+        _stationServicesIndex = (_stationServicesIndex + delta) % count;
+        if (_stationServicesIndex < 0)
+        {
+            _stationServicesIndex += count;
+        }
+
+        _stationServicesFeedback = "";
+        UpdateStationServicesPanel();
+    }
+
+    private void CycleStationServicesTab()
+    {
+        StationServicesTab next = (StationServicesTab)(
+            ((int)_stationServicesTab + 1) %
+            Enum.GetValues<StationServicesTab>().Length);
+        SetStationServicesTab(next);
+    }
+
+    private void SetStationServicesTab(StationServicesTab tab)
+    {
+        _stationServicesTab = tab;
+        _stationServicesIndex = 0;
+        _stationServicesFeedback = "";
+        UpdateStationServicesPanel();
+    }
+
+    private int GetStationServicesItemCount()
+    {
+        return _stationServicesTab switch
+        {
+            StationServicesTab.Dialogue => StationServiceCatalog.GetDialogue(
+                StationServiceCatalog.GetNpc(
+                    StationServices.NpcId).DialogueId).Options.Count,
+            StationServicesTab.Buy => StationServices.GetBuyOffers().Count,
+            StationServicesTab.Sell => StationServices.GetSellOffers(Session).Count,
+            StationServicesTab.Quests => StationServices.Quests.Count,
+            _ => 0
+        };
+    }
+
+    private void ConfirmStationServicesSelection()
+    {
+        switch (_stationServicesTab)
+        {
+            case StationServicesTab.Dialogue:
+                ExecuteSelectedDialogueAction();
+                break;
+            case StationServicesTab.Buy:
+                ExecuteSelectedTrade(isBuy: true);
+                break;
+            case StationServicesTab.Sell:
+                ExecuteSelectedTrade(isBuy: false);
+                break;
+            case StationServicesTab.Quests:
+                ExecuteSelectedQuestAction();
+                break;
+        }
+
+        UpdateStationServicesPanel();
+    }
+
+    private void ExecuteSelectedDialogueAction()
+    {
+        NpcServiceDefinition npc = StationServiceCatalog.GetNpc(
+            StationServices.NpcId);
+        DialogueServiceDefinition dialogue = StationServiceCatalog.GetDialogue(
+            npc.DialogueId);
+        if (dialogue.Options.Count == 0)
+        {
+            _stationServicesFeedback = dialogue.Greeting;
+            return;
+        }
+
+        _stationServicesIndex = Math.Clamp(
+            _stationServicesIndex,
+            0,
+            dialogue.Options.Count - 1);
+        DialogueOptionServiceDefinition option =
+            dialogue.Options[_stationServicesIndex];
+        if (StationServices.Reputation < option.MinimumReputation)
+        {
+            _stationServicesFeedback =
+                $"requires reputation {option.MinimumReputation}";
+            return;
+        }
+
+        if (option.ReputationDelta != 0)
+        {
+            StationServices.ApplyReputationDelta(option.ReputationDelta);
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+        }
+
+        _lastDomainEvent = $"DialogueOption({option.OptionId})";
+        switch (option.Action)
+        {
+            case "OpenTrade":
+                SetStationServicesTab(StationServicesTab.Buy);
+                _stationServicesFeedback = option.Text;
+                break;
+            case "OpenQuests":
+                SetStationServicesTab(StationServicesTab.Quests);
+                _stationServicesFeedback = option.Text;
+                break;
+            case "Close":
+                CloseStationServices(dialogue.Farewell);
+                break;
+            default:
+                throw new InvalidOperationException(
+                    $"Unsupported dialogue action {option.Action}.");
+        }
+    }
+
+    private void ExecuteSelectedTrade(bool isBuy)
+    {
+        EnsureGameplayProductionNetwork();
+        StationServices.RefreshEconomy(
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        MarketPriceQuote[] offers = (isBuy
+                ? StationServices.GetBuyOffers()
+                : StationServices.GetSellOffers(Session))
+            .ToArray();
+        if (offers.Length == 0)
+        {
+            _stationServicesFeedback = isBuy
+                ? "market has no available stock"
+                : "player inventory has no tradable items";
+            return;
+        }
+
+        _stationServicesIndex = Math.Clamp(
+            _stationServicesIndex,
+            0,
+            offers.Length - 1);
+        MarketPriceQuote offer = offers[_stationServicesIndex];
+        if (isBuy)
+        {
+            try
+            {
+                foreach (ProductionQueueRuntime queue in GameplayNetwork.Queues)
+                {
+                    _ = checked(queue.GetQuantity(offer.DefinitionId) + 1);
+                }
+            }
+            catch (OverflowException)
+            {
+                _stationServicesFeedback =
+                    $"inventory mirror capacity exceeded for {offer.DefinitionId}";
+                _lastDomainEvent = "TradeBuyBlocked";
+                return;
+            }
+        }
+        else
+        {
+            ProductionQueueRuntime? missingMirror = GameplayNetwork.Queues
+                .FirstOrDefault(queue =>
+                    queue.GetQuantity(offer.DefinitionId) < 1);
+            if (missingMirror is not null)
+            {
+                _stationServicesFeedback =
+                    $"inventory mirror {missingMirror.StationId} is missing " +
+                    offer.DefinitionId;
+                _lastDomainEvent = "TradeSellBlocked";
+                return;
+            }
+        }
+
+        StationServiceTradeResult trade = isBuy
+            ? StationServices.TryBuy(offer.DefinitionId, 1, Session)
+            : StationServices.TrySell(offer.DefinitionId, 1, Session);
+        _stationServicesFeedback = trade.Result;
+        if (!trade.Succeeded)
+        {
+            _lastDomainEvent = isBuy ? "TradeBuyBlocked" : "TradeSellBlocked";
+            return;
+        }
+
+        if (isBuy)
+        {
+            GameplayNetwork.AddInventoryAll(offer.DefinitionId, 1);
+        }
+        else if (!GameplayNetwork.TryConsumeInventoryAll(
+            offer.DefinitionId,
+            1,
+            out string mirrorResult))
+        {
+            throw new InvalidOperationException(
+                $"Trade inventory mirror desynchronized: {mirrorResult}.");
+        }
+
+        _lastDomainEvent = isBuy
+            ? $"TradeBought({offer.DefinitionId})"
+            : $"TradeSold({offer.DefinitionId})";
+        QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+        GD.Print(
+            $"TASK-102 player trade {(isBuy ? "buy" : "sell")} PASS: " +
+            $"definition={offer.DefinitionId}; quantity=1; " +
+            $"total={trade.TotalCredits}; credits={trade.PlayerCredits}; " +
+            $"merchantCredits={trade.MerchantCredits}; " +
+            $"stock={StationServices.Quote(offer.DefinitionId).Stock}; " +
+            "inventoryMirrors=1.");
+        int count = GetStationServicesItemCount();
+        _stationServicesIndex = count == 0
+            ? 0
+            : Math.Min(_stationServicesIndex, count - 1);
+    }
+
+    private void ExecuteSelectedQuestAction()
+    {
+        StationServiceQuestView[] quests = StationServices.Quests.ToArray();
+        if (quests.Length == 0)
+        {
+            _stationServicesFeedback = "no quests available";
+            return;
+        }
+
+        _stationServicesIndex = Math.Clamp(
+            _stationServicesIndex,
+            0,
+            quests.Length - 1);
+        StationServiceQuestView quest = quests[_stationServicesIndex];
+        bool changed;
+        AutosaveTrigger trigger;
+        if (quest.Status == StationServiceQuestStatus.Offered)
+        {
+            changed = StationServices.TryAcceptQuest(
+                quest.Definition.QuestId,
+                out _stationServicesFeedback);
+            trigger = AutosaveTrigger.BaseChanged;
+        }
+        else if (quest.Status == StationServiceQuestStatus.ReadyToClaim)
+        {
+            changed = StationServices.TryClaimQuest(
+                quest.Definition.QuestId,
+                out _stationServicesFeedback);
+            trigger = AutosaveTrigger.QuestCompleted;
+        }
+        else
+        {
+            changed = false;
+            trigger = AutosaveTrigger.BaseChanged;
+            _stationServicesFeedback = quest.Status ==
+                StationServiceQuestStatus.Completed
+                ? "quest already completed"
+                : $"quest progress {quest.ClampedProgress}/" +
+                  quest.CurrentNode.RequiredQuantity;
+        }
+
+        if (!changed)
+        {
+            return;
+        }
+
+        _lastDomainEvent = quest.Status == StationServiceQuestStatus.Offered
+            ? $"QuestAccepted({quest.Definition.QuestId})"
+            : $"QuestCompleted({quest.Definition.QuestId})";
+        QueueCurrentSnapshot(trigger);
+        GD.Print(
+            "TASK-102 player quest action PASS: " +
+            $"quest={quest.Definition.QuestId}; action=" +
+            $"{(trigger == AutosaveTrigger.QuestCompleted ? "claim" : "accept")}; " +
+            $"credits={StationServices.PlayerCredits}; " +
+            $"reputation={StationServices.Reputation}; " +
+            $"completed={StationServices.CompletedQuestCount}/" +
+            $"{StationServiceCatalog.Quests.Count}.");
+    }
+
+    private void UpdateStationServicesPanel()
+    {
+        if (!_stationServicesOpen || _stationServicesLabel is null)
+        {
+            return;
+        }
+
+        long economyDays = StationServices.RefreshEconomy(
+            DateTimeOffset.UtcNow.ToUnixTimeSeconds());
+        if (economyDays > 0)
+        {
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+        }
+
+        NpcServiceDefinition npc = StationServiceCatalog.GetNpc(
+            StationServices.NpcId);
+        DialogueServiceDefinition dialogue = StationServiceCatalog.GetDialogue(
+            npc.DialogueId);
+        List<string> lines = new()
+        {
+            "STATION SERVICES — FRONTIER EXCHANGE",
+            $"NPC: {npc.NpcId} • type={npc.NpcType} • faction={npc.FactionId}",
+            $"Wallet: {StationServices.PlayerCredits} credits • " +
+            $"Reputation: {StationServices.Reputation} • " +
+            $"Completed quests: {StationServices.CompletedQuestCount}/" +
+            $"{StationServiceCatalog.Quests.Count}",
+            "Tabs: " + string.Join(" | ", Enum.GetValues<StationServicesTab>()
+                .Select(tab => tab == _stationServicesTab
+                    ? $"[{tab}]"
+                    : tab.ToString())),
+            ""
+        };
+
+        if (_stationServicesTab == StationServicesTab.Dialogue)
+        {
+            lines.Add(dialogue.Greeting);
+            lines.Add("");
+            _stationServicesIndex = dialogue.Options.Count == 0
+                ? 0
+                : Math.Clamp(
+                    _stationServicesIndex,
+                    0,
+                    dialogue.Options.Count - 1);
+            for (int index = 0; index < dialogue.Options.Count; index++)
+            {
+                DialogueOptionServiceDefinition option = dialogue.Options[index];
+                string cursor = index == _stationServicesIndex ? ">" : " ";
+                lines.Add(
+                    $"{cursor} {option.Text} [{option.Action}] " +
+                    $"minRep={option.MinimumReputation}");
+            }
+
+            lines.Add("");
+            lines.Add("Price = BasePrice × system × supply/demand × faction × " +
+                "reputation × deterministic daily modifier.");
+            lines.Add($"Market coverage: {StationServices.TradableItemCount}/" +
+                $"{ContentCatalog.Items.Count} catalog items • " +
+                $"economy day={StationServices.DayIndex}.");
+        }
+        else if (_stationServicesTab is StationServicesTab.Buy or
+                 StationServicesTab.Sell)
+        {
+            MarketPriceQuote[] offers = (_stationServicesTab ==
+                    StationServicesTab.Buy
+                    ? StationServices.GetBuyOffers()
+                    : StationServices.GetSellOffers(Session))
+                .ToArray();
+            if (offers.Length == 0)
+            {
+                lines.Add(_stationServicesTab == StationServicesTab.Buy
+                    ? "No market stock."
+                    : "No tradable player inventory.");
+            }
+            else
+            {
+                _stationServicesIndex = Math.Clamp(
+                    _stationServicesIndex,
+                    0,
+                    offers.Length - 1);
+                int first = Math.Max(0, _stationServicesIndex - 5);
+                int last = Math.Min(offers.Length, first + 11);
+                first = Math.Max(0, last - 11);
+                for (int index = first; index < last; index++)
+                {
+                    MarketPriceQuote quote = offers[index];
+                    string cursor = index == _stationServicesIndex ? ">" : " ";
+                    int playerQuantity = Session.GetAvailableQuantity(
+                        quote.DefinitionId);
+                    lines.Add(
+                        $"{cursor} {GetShortContentId(quote.DefinitionId),-34} " +
+                        $"buy={quote.BuyPrice,5} sell={quote.SellPrice,5} " +
+                        $"stock={quote.Stock,3} inv={playerQuantity,3}");
+                }
+
+                MarketPriceQuote selected = offers[_stationServicesIndex];
+                lines.Add("");
+                lines.Add(
+                    $"Selected factors: base={selected.BasePrice:0.##} • " +
+                    $"system={selected.SystemEconomyModifier:0.###} • " +
+                    $"supply={selected.SupplyDemandModifier:0.###} • " +
+                    $"faction={selected.FactionModifier:0.###} • " +
+                    $"reputation={selected.ReputationModifier:0.###} • " +
+                    $"daily={selected.RandomDailyModifier:0.###}");
+            }
+        }
+        else
+        {
+            StationServiceQuestView[] quests = StationServices.Quests.ToArray();
+            _stationServicesIndex = quests.Length == 0
+                ? 0
+                : Math.Clamp(_stationServicesIndex, 0, quests.Length - 1);
+            for (int index = 0; index < quests.Length; index++)
+            {
+                StationServiceQuestView quest = quests[index];
+                string cursor = index == _stationServicesIndex ? ">" : " ";
+                lines.Add(
+                    $"{cursor} {GetShortContentId(quest.Definition.QuestId)} " +
+                    $"[{quest.Status}] {quest.ClampedProgress}/" +
+                    $"{quest.CurrentNode.RequiredQuantity}");
+                lines.Add(
+                    $"    {quest.CurrentNode.ObjectiveType}: " +
+                    $"{quest.CurrentNode.TargetDefinitionId} • reward=" +
+                    $"{quest.Definition.RewardCredits}cr +" +
+                    $"{quest.Definition.ReputationReward} rep");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_stationServicesFeedback))
+        {
+            lines.Add("");
+            lines.Add($"Result: {_stationServicesFeedback}");
+        }
+
+        lines.Add("");
+        lines.Add("Up/Down - select • Tab - next tab • B - Buy • S - Sell • " +
+            "Q - Quests • Enter/E - action • Esc - close");
+        _stationServicesLabel.Text = string.Join("\n", lines);
     }
 
     public void OpenRecipeSelector(
@@ -1438,6 +2001,10 @@ public partial class SalvageRepairSlice : Node3D
 
         EnsureGameplayProductionNetwork();
         GameplayNetwork.AddInventoryAll(definitionId, quantity);
+        int questUpdates = StationServices.RecordObjective(
+            StationServiceObjectiveType.CollectResource,
+            definitionId,
+            quantity);
         _lastDomainEvent =
             $"ResourceCollected({resourceNodeId}, definition={definitionId}, " +
             $"quantity={quantity})";
@@ -1445,7 +2012,7 @@ public partial class SalvageRepairSlice : Node3D
         GD.Print(
             $"Vertical slice domain event: {_lastDomainEvent}; " +
             $"available={Session.GetAvailableQuantity(definitionId)}; " +
-            $"interactor={interactor.Name}");
+            $"questUpdates={questUpdates}; interactor={interactor.Name}");
         return true;
     }
 
@@ -1662,6 +2229,14 @@ public partial class SalvageRepairSlice : Node3D
 
         MirrorSessionConsumptionToGameplayNetwork(recipe.Inputs);
         MirrorSessionGrantToGameplayNetwork(recipe.Outputs);
+        foreach (CraftingStackDefinition output in recipe.Outputs)
+        {
+            StationServices.RecordObjective(
+                StationServiceObjectiveType.CraftItem,
+                output.DefinitionId,
+                output.Quantity);
+        }
+
         CraftingRecipeDefinition[] sourceRecipes = StationRecipes
             .Where(candidate => string.Equals(
                 candidate.RequiredStation,
@@ -2067,6 +2642,23 @@ public partial class SalvageRepairSlice : Node3D
             $"initiallyUnlocked={portableRecipes.Count(recipe => TechnologyProgress.IsUnlocked(recipe.RequiredTechnology))}; " +
             $"initiallyLocked={portableRecipes.Count(recipe => !TechnologyProgress.IsUnlocked(recipe.RequiredTechnology))}.");
         GD.Print(
+            "TASK-102 station services binding PASS: " +
+            $"economies={StationServiceCatalog.EconomyTypes.Count}; " +
+            $"factions={StationServiceCatalog.Factions.Count}; " +
+            $"npcs={StationServiceCatalog.Npcs.Count}; " +
+            $"dialogueOptions={StationServiceCatalog.Dialogues.Values.Sum(dialogue => dialogue.Options.Count)}; " +
+            $"quests={StationServiceCatalog.Quests.Count}; " +
+            $"questNodes={StationServiceCatalog.Quests.Values.Sum(quest => quest.Nodes.Count)}; " +
+            $"tradable={StationServices.TradableItemCount}; " +
+            "priceFormula=6-factors; trade=atomic; questGraph=validated; " +
+            "persistence=enabled.");
+        GD.Print(
+            "TASK-102 station services READY: " +
+            $"npc={StationServices.NpcId}; market={StationServices.MarketId}; " +
+            $"credits={StationServices.PlayerCredits}; " +
+            $"reputation={StationServices.Reputation}; " +
+            "tabs=Dialogue/Buy/Sell/Quests; F3=acceptance.");
+        GD.Print(
             "TASK-096 multi-station industry binding PASS: " +
             $"physicalStations={_craftingStations.Count}; " +
             $"stationTypes={requiredStationIds.Length}; " +
@@ -2126,6 +2718,26 @@ public partial class SalvageRepairSlice : Node3D
             $"byproducts={analysis.RecipesWithByproducts}; " +
             $"environments={analysis.RecipesWithEnvironmentControls}; " +
             "batch=enabled; energy=enabled; hazards=enabled; mode=atomic.");
+        return catalog;
+    }
+
+    private static StationServicesCatalog LoadStationServicesCatalog(
+        GameContentCatalog contentCatalog)
+    {
+        const string path = "res://Content/station_services.json";
+        string json = Godot.FileAccess.GetFileAsString(path);
+        StationServicesCatalog catalog = StationServicesCatalog.LoadFromJson(
+            json,
+            contentCatalog);
+        GD.Print(
+            "TASK-102 station services catalog READY: " +
+            $"schema={catalog.SchemaVersion}; " +
+            $"factions={catalog.Factions.Count}; " +
+            $"markets={catalog.Markets.Count}; " +
+            $"npcs={catalog.Npcs.Count}; " +
+            $"dialogues={catalog.Dialogues.Count}; " +
+            $"quests={catalog.Quests.Count}; " +
+            $"tradable={contentCatalog.Items.Count}.");
         return catalog;
     }
 
@@ -2220,6 +2832,10 @@ public partial class SalvageRepairSlice : Node3D
                         outputProperties);
                     network.AddInventoryAllExcept(
                         queue.StationId,
+                        output.DefinitionId,
+                        output.Quantity);
+                    StationServices.RecordObjective(
+                        StationServiceObjectiveType.CraftItem,
                         output.DefinitionId,
                         output.Quantity);
                 }
@@ -2412,6 +3028,7 @@ public partial class SalvageRepairSlice : Node3D
             _fourthCraftingAcceptanceTask is null &&
             _catalogMatrixAcceptanceTask is null &&
             _technologySelectorAcceptanceTask is null &&
+            _stationServicesAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -2419,6 +3036,7 @@ public partial class SalvageRepairSlice : Node3D
             _productionNetworkHudAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
+            !_stationServicesOpen &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -2753,6 +3371,21 @@ public partial class SalvageRepairSlice : Node3D
                         StringComparer.Ordinal)
                     .ToArray(),
                 _lifetimeCancellation.Token);
+        string servicesTestPath = Path.Combine(
+            directory,
+            "save_1.station-services-test.db");
+        _stationServicesAcceptanceHud = "RUNNING";
+        _stationServicesAcceptanceReport = null;
+        _stationServicesAcceptanceTask =
+            StationServicesAcceptanceRunner.RunAsync(
+                servicesTestPath,
+                SlotId,
+                ContentCatalog,
+                StationServiceCatalog,
+                RepairRecipe,
+                _lifetimeCancellation.Token);
+        _status =
+            "TASK-082/TASK-102 research and station services acceptance running";
     }
 
     private void BeginCatalogMatrixAcceptance()
@@ -2817,7 +3450,8 @@ public partial class SalvageRepairSlice : Node3D
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
-                _gameplayProductionNetwork?.CreateSaveData());
+                _gameplayProductionNetwork?.CreateSaveData(),
+            stationServices: StationServices.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -2847,6 +3481,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         CloseRecipeSelector();
+        CloseStationServices();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -2858,6 +3493,7 @@ public partial class SalvageRepairSlice : Node3D
             _fourthCraftingAcceptanceTask is not null ||
             _catalogMatrixAcceptanceTask is not null ||
             _technologySelectorAcceptanceTask is not null ||
+            _stationServicesAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -2882,7 +3518,8 @@ public partial class SalvageRepairSlice : Node3D
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
-                _gameplayProductionNetwork?.CreateSaveData());
+                _gameplayProductionNetwork?.CreateSaveData(),
+            stationServices: StationServices.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -2950,6 +3587,11 @@ public partial class SalvageRepairSlice : Node3D
             InitializeGameplayProductionNetwork(
                 snapshot?.ProductionQueueNetwork,
                 snapshot?.ProductionQueue);
+            _stationServicesRuntime = new StationServicesRuntime(
+                ContentCatalog,
+                StationServiceCatalog,
+                StationServicesAcceptanceRunner.NpcId,
+                snapshot?.StationServices);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -2960,6 +3602,7 @@ public partial class SalvageRepairSlice : Node3D
             }
 
             CloseRecipeSelector();
+            CloseStationServices();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -2976,6 +3619,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"crafted={CountCraftedStationRecipes()}/{ObjectiveRecipes.Count}; " +
                 $"researchPoints={TechnologyProgress.ResearchPoints}; " +
                 $"unlockedTech={TechnologyProgress.UnlockedCount}.");
+            GD.Print(
+                "TASK-102 station services restore PASS: " +
+                $"credits={StationServices.PlayerCredits}; " +
+                $"merchantCredits={StationServices.MerchantCredits}; " +
+                $"reputation={StationServices.Reputation}; " +
+                $"completedQuests={StationServices.CompletedQuestCount}; " +
+                $"activeQuests={StationServices.ActiveQuestCount}; " +
+                $"legacyFallback={(snapshot?.StationServices is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -3031,9 +3682,14 @@ public partial class SalvageRepairSlice : Node3D
             InitializeGameplayProductionNetwork(
                 saveData: null,
                 legacySaveData: null);
+            _stationServicesRuntime = new StationServicesRuntime(
+                ContentCatalog,
+                StationServiceCatalog,
+                StationServicesAcceptanceRunner.NpcId);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
+            CloseStationServices();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -3852,6 +4508,79 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void PollStationServicesAcceptanceTask()
+    {
+        if (_stationServicesAcceptanceTask is null ||
+            !_stationServicesAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<StationServicesAcceptanceReport> task =
+            _stationServicesAcceptanceTask;
+        _stationServicesAcceptanceTask = null;
+        try
+        {
+            _stationServicesAcceptanceReport = task.GetAwaiter().GetResult();
+            StationServicesAcceptanceReport report =
+                _stationServicesAcceptanceReport;
+            _stationServicesAcceptanceHud = report.Passed
+                ? $"PASS economies={report.EconomyTypes}, factions={report.Factions}, " +
+                  $"npc={report.Npcs}, quests={report.Quests}, " +
+                  $"tradable={report.TradableItems}, " +
+                  $"price={(report.PriceFormula ? 1 : 0)}, " +
+                  $"daily={(report.DeterministicDaily ? 1 : 0)}, " +
+                  $"trade={(report.BuySell ? 1 : 0)}, " +
+                  $"graph={(report.QuestGraph ? 1 : 0)}, " +
+                  $"restore={(report.ColdRestore ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _state = report.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-102 station services acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"economies={report.EconomyTypes}; " +
+                $"factions={report.Factions}; npcs={report.Npcs}; " +
+                $"dialogueOptions={report.DialogueOptions}; " +
+                $"quests={report.Quests}; questNodes={report.QuestNodes}; " +
+                $"tradable={report.TradableItems}; " +
+                $"priceFormula={(report.PriceFormula ? 1 : 0)}; " +
+                $"deterministicDaily={(report.DeterministicDaily ? 1 : 0)}; " +
+                $"offlineEconomy={(report.OfflineEconomy ? 1 : 0)}; " +
+                $"supplyDemand={(report.SupplyDemandRepriced ? 1 : 0)}; " +
+                $"buySell={(report.BuySell ? 1 : 0)}; " +
+                $"atomicRejected={(report.AtomicRejected ? 1 : 0)}; " +
+                $"creditConservation={(report.CreditConservation ? 1 : 0)}; " +
+                $"questGraph={(report.QuestGraph ? 1 : 0)}; " +
+                $"questFeasibility={(report.QuestFeasibility ? 1 : 0)}; " +
+                $"questFlow={(report.QuestFlow ? 1 : 0)}; " +
+                $"reputation={(report.Reputation ? 1 : 0)}; " +
+                $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+                $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("station services acceptance", exception);
+        }
+    }
+
     private void PollAutosave()
     {
         if (_autosave is null)
@@ -4107,17 +4836,21 @@ public partial class SalvageRepairSlice : Node3D
               $"next={nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)}s";
         string interaction = _player?.GetInteractionPrompt() ??
             "interaction unavailable";
+        string stationServicesLine =
+            $"Station services: {StationServices.BuildSummary()} • " +
+            $"NPC={StationServices.NpcId}";
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • INDUSTRY TERMINAL + QUEUE • H - HUD\n" +
+                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
                 $"Craft: {craftProcess}\n" +
                 networkLine + "\n" +
                 compactStationsLine + "\n" +
+                stationServicesLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -4128,19 +4861,20 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
+                $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • terminal: Tab tabs, Q queue, D dismantle, C cancel • " +
-                "F1 - production queue • " +
+                "E - interact/select • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - selector acceptance • F4/F5 - catalogs • " +
+                "F3 - research + station services • F4/F5 - catalogs • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> AUTOSAVE • H - HUD\n" +
+            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> AUTOSAVE • H - HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
             technologyLine + "\n" +
@@ -4148,6 +4882,7 @@ public partial class SalvageRepairSlice : Node3D
             matrixLine + "\n" +
             networkLine + "\n" +
             detailedStationsLine + "\n" +
+            stationServicesLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -4167,6 +4902,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
+            $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
@@ -4178,9 +4914,10 @@ public partial class SalvageRepairSlice : Node3D
             $"Status: {_status}\n" +
             "WASD/Space - move • E - interact/select • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
+            "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
-            "F3 - selector/research acceptance • F4 - all 128 recipes • " +
+            "F3 - research + station services acceptance • F4 - all 128 recipes • " +
             "F5 - runtime matrix • F6/F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • Esc - close selector/release mouse";
     }

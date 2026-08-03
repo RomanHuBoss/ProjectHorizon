@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2 и production network — `VERIFIED`; полный resource lifecycle — `IMPLEMENTED`
+### Industry Content v2, production network и resource lifecycle — `VERIFIED`; station services — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -66,12 +66,15 @@ src/Game.Client/Content/resources.json
 src/Game.Client/Content/recipes.json
 src/Game.Client/Content/stations.json
 src/Game.Client/Content/technologies.json
+src/Game.Client/Content/station_services.json
 src/Game.Client/Content/localization.ru.json
 src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
 Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени. Основной HUD строится непосредственно из `ProductionNetworkRuntime`: агрегирует jobs, состояния и энергию всех пяти станций, показывает постанционную строку `[R/Q/P]` и не считает исправно инициализированную idle network недоступной. Resource layer vertical slice теперь физически покрывает все 42 world-resource definitions: 32 ранее созданных узла сохранены, а для 26 отсутствовавших типов создаётся детерминированное data-driven поле. Всего в сцене доступно 58 узлов; сбор, duplicate protection, расход, зеркала inventory производственной сети, depletion, autosave/cold restore и `F8` reset используют единый generic lifecycle.
+
+Станционные услуги Этапа 1 реализованы отдельным data-driven слоем `station_services.json`. В vertical slice размещён один trader NPC `npc.trader.ilia_voss` с template dialogue и вкладками Dialogue/Buy/Sell/Quests. Каталог задаёт ровно шесть economy types, три factions с relations и три persistent quest graphs. Все 174 items доступны рынку; цена вычисляется из base price, economy, supply/demand, faction, reputation и deterministic daily factor. Credits, reputation, market stock/day и quest state сохраняются в optional SQLite setting `station_services` без повышения schema 2; старые saves используют legacy fallback. Trade синхронизирует основной inventory и все пять production mirrors.
 
 В состав v2 входят:
 
@@ -98,19 +101,20 @@ src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 
 ```text
 WASD / Space   движение и прыжок
-E              собрать ресурс / ремонтировать / открыть станцию / подтвердить выбор
-Up / Down      выбрать рецепт, технологию или queue job
-Tab            циклически переключить Recipes / Research / Queue / Dismantle
-R              переключить Recipes / Research
-D              открыть Dismantle из любой вкладки
-Enter / E      craft/unlock; Queue — pause/resume; Dismantle — разобрать item
-Q              во вкладке Recipes поставить рецепт в очередь; открыть Queue из других вкладок
+E              собрать ресурс / ремонтировать / открыть station или trader / подтвердить выбор
+Up / Down      выбрать recipe, technology, queue job, market item или quest
+Tab            station: Recipes/Research/Queue/Dismantle; services: Dialogue/Buy/Sell/Quests
+R              station terminal: переключить Recipes / Research
+D              station terminal: открыть Dismantle
+B / S / Q      station services: Buy / Sell / Quests
+Enter / E      выполнить выбранное station/service действие
+Q              station Recipes: поставить recipe в очередь; из других station tabs открыть Queue
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
 F1             TASK-090/092/093/096/098: queue, properties, multi-station industry и aggregate HUD
 F2             TASK-083: chemical process runtime
-F3             TASK-082: universal selector + research + persistence
+F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080: весь Industry Content v2 (128 recipes)
 F5             TASK-076: playable runtime matrix (16 recipes / 15 station recipes)
 F6             регрессия coolant path
@@ -173,6 +177,30 @@ Detailed mode показывает все станции. Compact mode пока�
 
 Для ручной приёмки после `F8` запустите `refined_ferrite` на Smelter и `purified_water` на Refinery, добавьте queue job, выполните pause/resume и cancel, дождитесь completion, затем штатно перезапустите игру с незавершёнными running/queued/paused jobs. Сводка должна немедленно отражать каждое изменение и восстановить elapsed, states и station energy без offline progress.
 
+### Stage 1 station services: economy, trader and quests
+
+Синий `StationTrader` расположен на тестовой площадке примерно в точке `x=14, z=12`. Подойдите и нажмите `E`. Dialogue предлагает открыть market, contracts или завершить разговор. Внутри панели:
+
+```text
+Up/Down       выбор
+Tab           Dialogue / Buy / Sell / Quests
+B / S / Q     быстрый переход Buy / Sell / Quests
+Enter / E     buy/sell/accept/claim/dialogue action
+Esc           закрыть
+```
+
+Market покрывает все `174` item definitions. Для выбранного item показываются buy/sell, stock, player inventory и все шесть факторов цены. Buy уменьшает player credits и stock, Sell увеличивает их; обе операции синхронизируют inventory основной session и пяти production queues. Economy day и deterministic daily modifier обновляются после значимого time delta.
+
+Три стартовых contracts:
+
+```text
+CollectResource: 2 x resource.ferric_ore        -> 180 credits, +4 reputation
+CraftItem:      1 x material.refined_ferrite    -> 260 credits, +6 reputation
+TradeItem:      1 x resource.ice_water          -> 220 credits, +5 reputation
+```
+
+Quest нужно принять до соответствующего действия. После достижения objective статус становится `ReadyToClaim`; claim выдаёт credits/reputation и сохраняется. Для smoke-test нажмите `F8`, примите все три quests, соберите ferric ore и ice water, изготовьте refined ferrite на Smelter, продайте ice water и claim contracts. После штатного restart credits, reputation, stock и quest states должны восстановиться; `F8` возвращает `2400` credits, `0` reputation, stock `6` и quests `Offered`.
+
 ### Catalog-wide resource lifecycle
 
 При старте `CatalogResourceFieldPlanner` сравнивает `Content/resources.json` с hand-authored узлами сцены. Для каждого отсутствующего типа создаётся один `SalvageResourceNode` со стабильным ID `catalog.<resource>`, детерминированной позицией и материалом из `ResourceVisualDefinition`. Текущая контрольная конфигурация:
@@ -210,6 +238,7 @@ TASK-083 chemical runtime (F2): PASS batch=2, energy=1, environment=1, vacuum=1,
 
 ```text
 TASK-082 selector/research (F3): PASS recipes=9, oneStation=1, initial=4/5, unlocked=9, crafted=1, rp=690, roundTrip=1
+TASK-102 station services (F3): PASS economies=6, factions=3, npc=1, quests=3, tradable=174, price=1, daily=1, trade=1, graph=1, restore=1, roundTrip=1
 ```
 
 Ожидаемый `F4` HUD:
@@ -218,7 +247,7 @@ TASK-082 selector/research (F3): PASS recipes=9, oneStation=1, initial=4/5, unlo
 TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0
 ```
 
-`F3` прогоняет универсальный station selector и research graph: девять рецептов на одной физической станции, блокировку по технологиям, порядок prerequisites, расход RP, изготовление выбранного рецепта и точный SQLite round-trip прогресса исследований.
+`F3` параллельно прогоняет две изолированные проверки. `TASK-082` сохраняет universal station selector и research graph. `TASK-102` проверяет точный baseline station services `6 economies / 3 factions / 1 NPC / 3 dialogue options / 3 quests / 174 tradable items`, шестимножительную price formula, daily/offline economy, atomic buy/sell, credit conservation, quest graph feasibility, rewards/reputation, cold restore, legacy fallback, one-writer и SQLite integrity. Используется отдельная БД `save_1.station-services-test.db`; gameplay-slot не изменяется.
 
 `F5` прогоняет все пятнадцать runtime station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
 
@@ -726,3 +755,8 @@ integrity in `save_1.production-network-hud-test.db`.
 ## Catalog-wide resource lifecycle closure
 
 `TASK-100` closes the vertical-slice resource subsystem against the fixed v2 baseline. Every one of the 42 world-resource definitions is represented by a physical generic node. Missing scene types are generated deterministically, while existing authored nodes and their stable IDs remain unchanged for save compatibility. Collection, duplicate rejection, available inventory, station mirrors, depletion, cold restore and reset are covered by the isolated F7 acceptance database `save_1.resource-lifecycle-test.db`. No SQLite schema migration is introduced. After `TASK-101` runtime acceptance, further functional iterations may consume the established resource API but should not add separate resource-lifecycle mechanics unless a confirmed defect requires it.
+
+## Stage 1 station-services closure
+
+`TASK-102` adds the complete Stage 1 station-services vertical-slice block: six economy types, three data-driven factions, one physical trader, template dialogue, catalog-wide market pricing, credits and reputation, and three persistent quest graphs. Every one of the 174 catalog items is quotable through the six-factor price formula. Buy/sell operations synchronize the player session and all five production inventory mirrors. The optional `station_services` SQLite setting stores credits, reputation, economy day, stock and quest-node state without increasing schema version 2; legacy saves remain loadable. F3 runs the isolated `save_1.station-services-test.db` acceptance alongside the existing research test. Full galaxy NPC populations, procedural quest generation and inter-system economies remain later-stage features, not unfinished work in this Stage 1 subsystem.
+

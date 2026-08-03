@@ -462,6 +462,30 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        StationServicesSaveData? expectedServices = expected.StationServices;
+        StationServicesSaveData? actualServices = actual.StationServices;
+        if ((expectedServices is null) != (actualServices is null))
+        {
+            mismatch = "station_services presence differs";
+            return false;
+        }
+
+        if (expectedServices is not null && actualServices is not null)
+        {
+            StationServicesSaveData orderedExpected = CanonicalizeStationServices(
+                expectedServices);
+            StationServicesSaveData orderedActual = CanonicalizeStationServices(
+                actualServices);
+            if (!string.Equals(
+                JsonSerializer.Serialize(orderedExpected),
+                JsonSerializer.Serialize(orderedActual),
+                StringComparison.Ordinal))
+            {
+                mismatch = "station_services differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -881,7 +905,7 @@ public sealed partial class SaveDatabase : IDisposable
             "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
             "setting_key IN ('research_points', 'unlocked_technologies', " +
             "'production_queue', 'production_queue_network', " +
-            "'inventory_properties');",
+            "'inventory_properties', 'station_services');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -932,6 +956,19 @@ public sealed partial class SaveDatabase : IDisposable
                                 queue => queue.StationId,
                                 StringComparer.Ordinal)
                             .ToArray()))));
+        }
+
+        if (snapshot.StationServices is not null)
+        {
+            ValidateStationServices(snapshot.StationServices);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'station_services', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeStationServices(snapshot.StationServices))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1171,6 +1208,7 @@ public sealed partial class SaveDatabase : IDisposable
         TechnologyProgressSaveData? technologyProgress = null;
         ProductionQueueSaveData? productionQueue = null;
         ProductionQueueNetworkSaveData? productionQueueNetwork = null;
+        StationServicesSaveData? stationServices = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1180,7 +1218,8 @@ public sealed partial class SaveDatabase : IDisposable
                 "WHERE slot_id = $slot_id AND setting_key IN " +
                 "('research_points', 'unlocked_technologies', " +
                 "'production_queue', 'production_queue_network', " +
-                "'inventory_properties') ORDER BY setting_key;";
+                "'inventory_properties', 'station_services') " +
+                "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1266,6 +1305,32 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "production_queue_network setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
+            "station_services",
+            out string? stationServicesJson))
+        {
+            if (string.IsNullOrWhiteSpace(stationServicesJson))
+            {
+                throw new InvalidDataException(
+                    "station_services setting is empty.");
+            }
+
+            try
+            {
+                stationServices = JsonSerializer.Deserialize<
+                    StationServicesSaveData>(stationServicesJson) ??
+                    throw new InvalidDataException(
+                        "station_services setting deserialized to null.");
+                ValidateStationServices(stationServices);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "station_services setting contains invalid JSON.",
                     exception);
             }
         }
@@ -1360,7 +1425,67 @@ public sealed partial class SaveDatabase : IDisposable
             visitedPlanet,
             technologyProgress,
             productionQueue,
-            productionQueueNetwork);
+            productionQueueNetwork,
+            stationServices);
+    }
+
+    private static StationServicesSaveData CanonicalizeStationServices(
+        StationServicesSaveData services)
+    {
+        return services with
+        {
+            Stock = services.Stock
+                .OrderBy(stock => stock.DefinitionId, StringComparer.Ordinal)
+                .ToArray(),
+            Quests = services.Quests
+                .OrderBy(quest => quest.QuestId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateStationServices(
+        StationServicesSaveData services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        if (!GameContentCatalog.IsStableId(services.MarketId) ||
+            !GameContentCatalog.IsStableId(services.NpcId) ||
+            services.PlayerCredits < 0 ||
+            services.MerchantCredits < 0 ||
+            services.Reputation is < -100 or > 100 ||
+            services.DayIndex < 0 ||
+            services.LastEconomyUpdateUnixSeconds < 0 ||
+            services.Stock is null ||
+            services.Quests is null)
+        {
+            throw new InvalidDataException(
+                "station_services contains invalid identity or scalar values.");
+        }
+
+        HashSet<string> stockIds = new(StringComparer.Ordinal);
+        foreach (StationServiceStockSaveData stock in services.Stock)
+        {
+            if (!GameContentCatalog.IsStableId(stock.DefinitionId) ||
+                stock.Quantity < 0 ||
+                !stockIds.Add(stock.DefinitionId))
+            {
+                throw new InvalidDataException(
+                    "station_services contains invalid or duplicate stock.");
+            }
+        }
+
+        HashSet<string> questIds = new(StringComparer.Ordinal);
+        foreach (StationServiceQuestSaveData quest in services.Quests)
+        {
+            if (!GameContentCatalog.IsStableId(quest.QuestId) ||
+                !GameContentCatalog.IsStableId(quest.CurrentNodeId) ||
+                quest.Progress < 0 ||
+                !questIds.Add(quest.QuestId) ||
+                !Enum.IsDefined(quest.Status))
+            {
+                throw new InvalidDataException(
+                    "station_services contains invalid quest state.");
+            }
+        }
     }
 
     private static void ValidateProductionQueueNetwork(

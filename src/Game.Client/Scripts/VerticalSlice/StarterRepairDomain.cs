@@ -766,7 +766,8 @@ public static class StarterRepairSnapshotFactory
         double playerPositionZ,
         TechnologyProgressSaveData? technologyProgress = null,
         ProductionQueueSaveData? productionQueue = null,
-        ProductionQueueNetworkSaveData? productionQueueNetwork = null)
+        ProductionQueueNetworkSaveData? productionQueueNetwork = null,
+        StationServicesSaveData? stationServices = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -835,7 +836,8 @@ public static class StarterRepairSnapshotFactory
                 1),
             technologyProgress,
             productionQueue,
-            productionQueueNetwork);
+            productionQueueNetwork,
+            stationServices);
     }
 }
 

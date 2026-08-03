@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://e62resnode001" path="res://Scripts/VerticalSlice/SalvageResourceNode.cs" id="3_resource"]
 [ext_resource type="Script" uid="uid://f62shipterm01" path="res://Scripts/VerticalSlice/StarterShipRepairTerminal.cs" id="4_ship"]
 [ext_resource type="Script" uid="uid://g66craftstation1" path="res://Scripts/VerticalSlice/PortableCraftingStation.cs" id="5_crafting_station"]
+[ext_resource type="Script" uid="uid://e5a25ca5e3f210e8" path="res://Scripts/VerticalSlice/StationServicesNpc.cs" id="6_station_services_npc"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -572,6 +573,17 @@ mesh = SubResource("CraftingStationMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/PortableFabricator"]
 shape = SubResource("CraftingStationShape")
 
+[node name="StationTrader" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_station_services"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.0, 0.9, 12.0)
+script = ExtResource("6_station_services_npc")
+NpcId = "npc.trader.ilia_voss"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/StationTrader"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/StationTrader"]
+shape = SubResource("CraftingStationShape")
+
 [node name="Hud" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
@@ -608,6 +620,23 @@ custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
 text = "INDUSTRY TERMINAL"
+autowrap_mode = 2
+
+[node name="StationServices" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 255.0
+offset_top = 40.0
+offset_right = 1135.0
+offset_bottom = 625.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/StationServices"]
+mouse_filter = 2
+custom_minimum_size = Vector2(840, 545)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "FRONTIER EXCHANGE"
 autowrap_mode = 2
 
 [node name="HiddenHint" type="PanelContainer" parent="Hud"]

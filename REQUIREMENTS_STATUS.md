@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-resource-lifecycle-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-station-services-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,79 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network и aggregate HUD подтверждены пользователем. `TASK-098/099` приняты по фактическому запуску Godot 4.7.1, строке `TASK-098 ... PASS`, корректной HUD-сводке пяти stations и ручному выполнению jobs на Smelter/Refinery. Текущая итерация закрывает ресурсную подсистему vertical slice по фиксированному baseline v2.0: все 42 world resources получают физическое представление, единый collection/depletion/persistence lifecycle и изолированную F7-приёмку.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD и catalog-wide resource lifecycle подтверждены пользователем. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API. Текущая mega-итерация закрывает связную подсистему станционных услуг Этапа 1: data-driven factions/economies, один физический trader NPC, template dialogue, catalog-wide market, credits/reputation и три persistent quest graphs.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — mega-итерация станционных услуг Этапа 1 (`TASK-102`)
+
+**Исходный снимок:** `ProjectHorizon-main(2)(5).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-station-services-closure.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** ТЗ v2.0 §16 (factions, NPC, template dialogue), §18 (шесть типов экономики и шестимножительная цена), §19 (quest state graph и feasibility validation), §40 Этап 1 (торговля, один NPC, три quests), §41 (ручная приёмка торговли, NPC, quests и persistence).
+
+**Синхронизация подтверждённой ресурсной приёмки:**
+
+- пользователь выполнил локальную сборку Godot 4.7.1 Mono: `Предупреждений: 0`, `Ошибок: 0`;
+- startup подтвердил `catalog=42; physicalTypes=42; nodes=58; authored=32; generated=26; unique=1; deterministicYield=1; maxStack=1; coverage=1`;
+- `TASK-100 catalog resource lifecycle acceptance PASS`: `collectedTypes=42; collectedNodes=58; duplicateRejected=1; mirrors=1; depletion=1; coldRestore=1; reset=1; roundTrip=1; maxWriters=1; integrity=ok`;
+- вручную подтверждены generic collection generated nodes, autosave и graceful-exit persistence;
+- `TASK-100` и `TASK-101` переведены в `VERIFIED`; `RESOURCE-090`–`RESOURCE-098` и `RESOURCE-ACC-090`–`RESOURCE-ACC-093` синхронизированы как `VERIFIED`.
+
+**Реализовано:**
+
+- добавлен строгий `station_services.json` schema 1: ровно шесть economy types (`Mining`, `Industrial`, `Technology`, `Trading`, `Scientific`, `Military`), три factions с preferred goods, quest types, visual style, name pool и полной матрицей relations;
+- добавлен один физический trader NPC `npc.trader.ilia_voss` в vertical slice и template dialogue с условиями reputation, вариантами `OpenTrade`, `OpenQuests`, `Close` и последствиями;
+- весь catalog из 174 items доступен рынку; цена рассчитывается по формуле `BasePrice × SystemEconomyModifier × SupplyDemandModifier × FactionModifier × ReputationModifier × RandomDailyModifier`, после чего применяются buy/sell spread;
+- market stock, player/merchant credits, supply-demand repricing и deterministic daily modifier работают независимо от Godot UI; economy day обновляется при возврате к услугам, trade и после значимого offline time delta;
+- buy/sell выполняются с preflight-проверками stock, funds и shared inventory; player session и все пять production inventory mirrors синхронизируются, credits сохраняются как замкнутый баланс до quest rewards;
+- реализованы три persistent quest graphs: `CollectResource`, `CraftItem`, `TradeItem`; catalog validation проверяет stable IDs, ссылки, reachability, отсутствие cycles, допустимый `MaxStack` и фактическую feasibility objective;
+- quest progress подключён к generic resource collection, immediate/timed craft, production queue completion и trade; accept/claim, credit reward и faction reputation сохраняются;
+- в SQLite schema 2 без migration добавлен optional `station_services` setting: market identity, credits, reputation, economy day/time, stock всех 174 items, current quest node/status/progress; old saves без блока загружаются через legacy fallback;
+- добавлен station-services Panel UI: Dialogue/Buy/Sell/Quests, factor diagnostics, stock/inventory, quest node/progress/reward; HUD показывает credits, reputation, quest completion, market type/day и coverage;
+- `F3` сохраняет прежнюю `TASK-082` acceptance и параллельно запускает изолированную `TASK-102` acceptance в `save_1.station-services-test.db`; gameplay-slot не изменяется;
+- acceptance проверяет точные counts `6/3/1/3/3/174`, шестимножительную формулу, deterministic daily/offline economy, supply-demand repricing, atomic rejection, buy/sell, credit conservation, graph/feasibility, все три quest flows, reputation rewards, exact SQLite round-trip, cold restore, legacy fallback, autosave log, `maxWriters=1` и `integrity=ok`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Content/station_services.json`;
+- `src/Game.Client/Content/localization.en.json`;
+- `src/Game.Client/Content/localization.ru.json`;
+- `src/Game.Client/Scripts/VerticalSlice/StationServicesCatalog.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StationServicesRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StationServicesNpc.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StationServicesAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-100`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-101`: `IN_PROGRESS` → `VERIFIED`;
+- `TASK-102`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-103`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F3 acceptance, manual NPC/dialogue/trade/three-quest flow, cold restart/F8 и regressions;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Ожидаемый F3 HUD:**
+
+```text
+TASK-102 station services (F3): PASS economies=6, factions=3, npc=1, quests=3, tradable=174, price=1, daily=1, trade=1, graph=1, restore=1, roundTrip=1
+```
+
+**Ожидаемая строка Output:**
+
+```text
+TASK-102 station services acceptance PASS: economies=6; factions=3; npcs=1; dialogueOptions=3; quests=3; questNodes=3; tradable=174; priceFormula=1; deterministicDaily=1; offlineEconomy=1; supplyDemand=1; buySell=1; atomicRejected=1; creditConservation=1; questGraph=1; questFeasibility=1; questFlow=1; reputation=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** итерация закрывает самостоятельную подсистему **станционных услуг Этапа 1**: один trader NPC, data-driven dialogue, market, credits/reputation и три quest graphs. Полный galaxy-scale NPC population, все 15 objective types, procedural quest generation, 20+ quests, faction wars и межсистемная economy относятся к последующим этапам ТЗ и не считаются незавершённостью этого vertical-slice блока. Ресурсная подсистема не расширялась: новые функции только потребляют ранее закрытый generic inventory API.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-103`.
 
 ### 2026-08-03 — закрытие catalog-wide resource lifecycle (`TASK-100`)
 
@@ -2862,19 +2932,38 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `RESOURCE-090` | Все 42 world-resource definitions имеют физическое представление в vertical slice | `IMPLEMENTED` | 32 authored + 26 deterministic generated nodes; `physicalTypes=42` |
-| `RESOURCE-091` | Generated resource IDs и позиции стабильны, уникальны и не пересекаются | `IMPLEMENTED` | `CatalogResourceFieldPlanner`; stable IDs `catalog.*`; deterministic acceptance |
-| `RESOURCE-092` | Yield, `MaxStack`, `ExtractionMethod`, `ScanTier` и visual metadata валидируются из catalog | `IMPLEMENTED` | Startup validation и F7 `metadata=1; placement=1; unique=1` |
-| `RESOURCE-093` | Generic `E` collection поддерживает все типы и запрещает duplicate collection | `IMPLEMENTED` | Один `SalvageResourceNode`/`StarterRepairSession`; F7 `collectedTypes=42; collectedNodes=58; duplicateRejected=1` |
-| `RESOURCE-094` | Available inventory синхронизирован со всеми production station mirrors | `IMPLEMENTED` | `AddInventoryAll`/`TryConsumeInventoryAll`; F7 `mirrors=1` |
-| `RESOURCE-095` | Расход и depletion сохраняются без двойного списания/возврата | `IMPLEMENTED` | Session/network consumption + exact snapshot comparison; F7 `depletion=1` |
-| `RESOURCE-096` | Cold restore скрывает собранные nodes и восстанавливает остатки | `IMPLEMENTED` | Stable node IDs + snapshot restore; F7 `coldRestore=1` |
-| `RESOURCE-097` | `F8` очищает slot и возвращает все physical resources | `IMPLEMENTED` | `ResetSlotAsync` + null-session reconstruction; F7 `reset=1` |
-| `RESOURCE-098` | Legacy saves и schema 2 остаются совместимыми | `IMPLEMENTED` | Existing authored IDs unchanged; no schema bump; static definitions remain JSON |
-| `RESOURCE-ACC-090` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `RESOURCE-ACC-091` | F7 подтверждает точные counts и полный lifecycle | `IN_PROGRESS` | Ожидается `TASK-100 ... PASS catalog=42 ... integrity=ok` |
-| `RESOURCE-ACC-092` | Manual generated-node collect/cold restore/F8 reset | `IN_PROGRESS` | Выполнить сценарий раздела 18G |
-| `RESOURCE-ACC-093` | F1–F12 regressions не нарушены | `IN_PROGRESS` | Повторить acceptance matrix после F7 |
+| `RESOURCE-090` | Все 42 world-resource definitions имеют физическое представление в vertical slice | `VERIFIED` | 32 authored + 26 deterministic generated nodes; `physicalTypes=42` |
+| `RESOURCE-091` | Generated resource IDs и позиции стабильны, уникальны и не пересекаются | `VERIFIED` | `CatalogResourceFieldPlanner`; stable IDs `catalog.*`; deterministic acceptance |
+| `RESOURCE-092` | Yield, `MaxStack`, `ExtractionMethod`, `ScanTier` и visual metadata валидируются из catalog | `VERIFIED` | Startup validation и F7 `metadata=1; placement=1; unique=1` |
+| `RESOURCE-093` | Generic `E` collection поддерживает все типы и запрещает duplicate collection | `VERIFIED` | Один `SalvageResourceNode`/`StarterRepairSession`; F7 `collectedTypes=42; collectedNodes=58; duplicateRejected=1` |
+| `RESOURCE-094` | Available inventory синхронизирован со всеми production station mirrors | `VERIFIED` | `AddInventoryAll`/`TryConsumeInventoryAll`; F7 `mirrors=1` |
+| `RESOURCE-095` | Расход и depletion сохраняются без двойного списания/возврата | `VERIFIED` | Session/network consumption + exact snapshot comparison; F7 `depletion=1` |
+| `RESOURCE-096` | Cold restore скрывает собранные nodes и восстанавливает остатки | `VERIFIED` | Stable node IDs + snapshot restore; F7 `coldRestore=1` |
+| `RESOURCE-097` | `F8` очищает slot и возвращает все physical resources | `VERIFIED` | `ResetSlotAsync` + null-session reconstruction; F7 `reset=1` |
+| `RESOURCE-098` | Legacy saves и schema 2 остаются совместимыми | `VERIFIED` | Existing authored IDs unchanged; no schema bump; static definitions remain JSON |
+| `RESOURCE-ACC-090` | Clean build новой редакции `0/0` | `VERIFIED` | User build: `0` warnings, `0` errors |
+| `RESOURCE-ACC-091` | F7 подтверждает точные counts и полный lifecycle | `VERIFIED` | User runtime: `TASK-100 ... PASS`; `maxWriters=1`; `integrity=ok` |
+| `RESOURCE-ACC-092` | Manual generated-node collect/cold restore/F8 reset | `VERIFIED` | User manual collection/graceful-exit evidence provided |
+| `RESOURCE-ACC-093` | F1–F12 regressions не нарушены | `VERIFIED` | F1–F12 regression output provided; applicable routes PASS |
+
+### 8.20. Станционные услуги Этапа 1 — economy, NPC, dialogue, trade и quests
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `SERVICES-100` | Ровно шесть типов экономики | `IMPLEMENTED` | Strict catalog validation: Mining/Industrial/Technology/Trading/Scientific/Military |
+| `SERVICES-101` | Три factions содержат interests, preferred goods, quest types, visual style, name pool и relations | `IMPLEMENTED` | `station_services.json`; полная relation matrix 3×3 |
+| `SERVICES-102` | Один физический trader NPC Этапа 1 | `IMPLEMENTED` | `Gameplay/StationTrader`, `npc.trader.ilia_voss`, generic `IInteractable` |
+| `SERVICES-103` | Template dialogue поддерживает conditions/options/consequences/trade/quests | `IMPLEMENTED` | Dialogue/Buy/Sell/Quests UI; min reputation, reputation delta, actions |
+| `SERVICES-104` | Все 174 items tradable по шестимножительной динамической цене | `IMPLEMENTED` | Market quote projection, daily/supply/reputation factors, buy/sell spread |
+| `SERVICES-105` | Buy/sell атомарны и синхронизированы с shared production inventory | `IMPLEMENTED` | Stock/funds/inventory preflight; session + 5 station mirrors; credit conservation |
+| `SERVICES-106` | Три quests представлены persistent state graphs | `IMPLEMENTED` | CollectResource/CraftItem/TradeItem; accept/progress/claim/rewards |
+| `SERVICES-107` | Quest graphs валидируются на stable IDs, feasibility, reachability и cycles | `IMPLEMENTED` | Strict startup validation + isolated F3 acceptance |
+| `SERVICES-108` | Credits, reputation, market day/stock и quest state сохраняются без schema bump | `IMPLEMENTED` | Optional `save_settings.station_services`; schema 2; legacy null fallback |
+| `SERVICES-109` | Player-facing HUD/UI показывает economy, prices, factors, inventory и quest state | `IMPLEMENTED` | StationServices panel + detailed/compact HUD summary |
+| `SERVICES-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd`; убедиться в реальном `CoreCompile` |
+| `SERVICES-ACC-101` | F3 подтверждает exact baseline и persistence | `IN_PROGRESS` | Ожидается полная строка `TASK-102 ... PASS` |
+| `SERVICES-ACC-102` | Manual NPC/dialogue/buy/sell/three quests/cold restore/F8 | `IN_PROGRESS` | Выполнить сценарий раздела 18H |
+| `SERVICES-ACC-103` | F1/F2/F4–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F3 |
 
 ## 9. Очередь ближайших задач
 
@@ -2884,14 +2973,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-101` | Выполнить build/runtime/manual acceptance catalog-wide resource lifecycle | Clean build `0/0`; F7 TASK-062+100; generated-node cold restore; F8 reset; F1–F12 regressions |
+| 1 | `TASK-103` | Выполнить build/runtime/manual acceptance станционных услуг Этапа 1 | Clean build `0/0`; F3 TASK-082+102; NPC/dialogue/trade/3 quests; cold restore/F8; F1–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-102` | Выбрать следующий **нересурсный** функциональный шаг | После `TASK-101` resource lifecycle frozen; выбрать торговлю/NPC/quests или иной следующий раздел ТЗ |
+| 3 | `TASK-104` | Выбрать следующий связный блок вне закрытых resources и station services | Рассмотреть base construction/ship systems/world exploration по зависимостям ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-099`, persistence, vertical slice, Industry Content v2, multi-station runtime matrix и aggregate HUD.
-**Реализовано:** `TASK-100` — полное физическое покрытие 42 world resources и generic collection/depletion/persistence lifecycle.
+**Подтверждено:** `TASK-060`–`TASK-101`, persistence, vertical slice, Industry Content v2, production network, aggregate HUD и catalog-wide resource lifecycle.
+**Реализовано:** `TASK-102` — станционные услуги Этапа 1: economy/factions, trader NPC, dialogue, catalog-wide trade и три persistent quests.
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-101`. После её закрытия отдельные итерации ресурсной подсистемы не планируются.
+**Текущая приёмочная задача:** `TASK-103`. После её закрытия отдельные итерации Stage 1 station-services subsystem не планируются.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4481,6 +4570,41 @@ TASK-100 catalog resource lifecycle acceptance PASS: catalog=42; physicalTypes=4
 13. При `FAIL` предоставить полный build log, строки `TASK-100 ... FAIL`, последние 180 строк Godot Output, detailed HUD и шаг ручного сценария.
 
 После выполнения этих критериев установить `TASK-100 → VERIFIED`, `TASK-101 → VERIFIED` и считать resource lifecycle vertical slice закрытым.
+
+## 18H. Runtime-приёмка `TASK-102/TASK-103`
+
+1. Выполнить `tools\clean-build-windows10.cmd`. В build log должен реально выполняться `CoreCompile`; критерий — `Предупреждений: 0`, `Ошибок: 0`.
+2. Запустить `SalvageRepairSlice` и дождаться startup строк:
+
+```text
+TASK-102 station services catalog READY: schema=1; factions=3; markets=1; npcs=1; dialogues=1; quests=3; tradable=174.
+TASK-102 station services binding PASS: economies=6; factions=3; npcs=1; dialogueOptions=3; quests=3; questNodes=3; tradable=174; priceFormula=6-factors; trade=atomic; questGraph=validated; persistence=enabled.
+TASK-102 station services READY: npc=npc.trader.ilia_voss; market=market.frontier_exchange; credits=2400; reputation=0; tabs=Dialogue/Buy/Sell/Quests; F3=acceptance.
+```
+
+3. Нажать `F3` и не выполнять других действий до завершения обеих параллельных проверок. `TASK-082` должен остаться `PASS`; новая строка HUD:
+
+```text
+TASK-102 station services (F3): PASS economies=6, factions=3, npc=1, quests=3, tradable=174, price=1, daily=1, trade=1, graph=1, restore=1, roundTrip=1
+```
+
+4. Godot Output должен содержать полную строку `TASK-102 station services acceptance PASS` с `priceFormula=1; deterministicDaily=1; offlineEconomy=1; supplyDemand=1; buySell=1; atomicRejected=1; creditConservation=1; questGraph=1; questFeasibility=1; questFlow=1; reputation=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok`.
+5. Убедиться, что acceptance использует `save_1.station-services-test.db` и не изменяет gameplay `save_1.db`.
+6. Нажать `F8`. Найти синий `StationTrader` около координат `x=14, z=12`, подойти и нажать `E`. Должна открыться вкладка Dialogue; Output — `TASK-102 player NPC interaction PASS`.
+7. Проверить три dialogue options: переход в Buy, переход в Quests и Close. `Tab` циклически переключает Dialogue/Buy/Sell/Quests; `B/S/Q` открывают соответствующую вкладку.
+8. Во вкладке Quests сначала принять все три contracts: ore sample, refined ferrite order и water-ice trade. Это гарантирует, что последующие gameplay-события учитываются их objective graph.
+9. Собрать `2 × resource.ferric_ore` и `2 × resource.ice_water`; quest `CollectResource` должен перейти в `ReadyToClaim` на `2/2`. При необходимости исследовать `tech.basic_refining`.
+10. В Buy выбрать любой item, не используемый текущими quest objectives, и купить одну единицу. Проверить уменьшение credits/stock и увеличение player inventory на всех station mirrors; Output — `TASK-102 player trade buy PASS`.
+11. На Smelter изготовить `material.refined_ferrite`; quest `CraftItem` должен перейти в `ReadyToClaim` после completion.
+12. Во вкладке Sell продать одну единицу `resource.ice_water`; quest `TradeItem` должен перейти в `ReadyToClaim`, credits увеличиться, stock измениться, inventory mirrors остаться синхронными.
+13. Во вкладке Quests последовательно claim все три quests. Проверить итоговые rewards `+660 credits` и `+15 reputation` относительно состояния перед claims; Output должен содержать три `TASK-102 player quest action PASS`.
+14. Запомнить credits, reputation, stock выбранного item и quest statuses. Штатно закрыть игру и запустить снова. Output `TASK-102 station services restore PASS` должен восстановить те же данные; offline time может изменить только economy day/daily price, но не терять stock/credits/quests.
+15. Нажать `F8`: credits должны вернуться к `2400`, reputation к `0`, stock — к initial value `6`, все quests — в `Offered`.
+16. Повторить `F1`, `F2`, `F4`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Повторный `F3` также должен быть `PASS` для `TASK-082` и `TASK-102`.
+17. Для приёмки прислать: build summary, screenshot Dialogue, screenshot Buy/Sell с factors, screenshot Quests после трёх claims, screenshot HUD F3 PASS и полную строку Output `TASK-102 ... PASS`.
+18. При `FAIL` предоставить полный build log, строки `TASK-102 ... FAIL`, последние 200 строк Godot Output, screenshot активной station-services tab, значения credits/reputation/stock/quest state и точный шаг сценария.
+
+После выполнения критериев установить `TASK-102 → VERIFIED`, `TASK-103 → VERIFIED` и считать station-services subsystem Этапа 1 закрытой.
 
 ## 19. Шаблон новой записи
 

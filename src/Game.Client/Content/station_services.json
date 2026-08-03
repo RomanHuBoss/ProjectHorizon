@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "economyTypes": [
+    "Mining",
+    "Industrial",
+    "Technology",
+    "Trading",
+    "Scientific",
+    "Military"
+  ],
+  "factions": [
+    {
+      "factionId": "faction.meridian_exchange",
+      "localizationKey": "faction.meridian_exchange",
+      "economyType": "Trading",
+      "preferredTags": ["trade", "resource", "component"],
+      "questTypes": ["TradeItem", "CollectResource", "CraftItem"],
+      "visualStyle": "cyan_corporate",
+      "namePool": ["Ilia Voss", "Mara Quill", "Soren Vale"],
+      "relations": {
+        "faction.meridian_exchange": 100,
+        "faction.helix_academy": 25,
+        "faction.aegis_compact": 10
+      }
+    },
+    {
+      "factionId": "faction.helix_academy",
+      "localizationKey": "faction.helix_academy",
+      "economyType": "Scientific",
+      "preferredTags": ["science", "chemical", "technology"],
+      "questTypes": ["CollectResource", "CraftItem", "ScanObject"],
+      "visualStyle": "white_violet_research",
+      "namePool": ["Dr. Eren Sol", "Talia Nox", "Yun Ardent"],
+      "relations": {
+        "faction.meridian_exchange": 25,
+        "faction.helix_academy": 100,
+        "faction.aegis_compact": 5
+      }
+    },
+    {
+      "factionId": "faction.aegis_compact",
+      "localizationKey": "faction.aegis_compact",
+      "economyType": "Military",
+      "preferredTags": ["ship", "tool", "defense"],
+      "questTypes": ["ProtectTarget", "RepairObject", "DeliverItem"],
+      "visualStyle": "graphite_red_military",
+      "namePool": ["Commander Rook", "Vera Kane", "Dax Orlov"],
+      "relations": {
+        "faction.meridian_exchange": 10,
+        "faction.helix_academy": 5,
+        "faction.aegis_compact": 100
+      }
+    }
+  ],
+  "markets": [
+    {
+      "marketId": "market.frontier_exchange",
+      "localizationKey": "market.frontier_exchange",
+      "economyType": "Trading",
+      "factionId": "faction.meridian_exchange",
+      "systemEconomyModifier": 1.04,
+      "factionModifier": 0.98,
+      "buyMarkup": 1.08,
+      "sellMarkdown": 0.72,
+      "dailySeed": 7319,
+      "initialStockPerItem": 6,
+      "targetStockPerItem": 8,
+      "playerStartingCredits": 2400,
+      "merchantStartingCredits": 50000
+    }
+  ],
+  "dialogues": [
+    {
+      "dialogueId": "dialogue.trader.ilia_voss",
+      "localizationKey": "dialogue.trader.ilia_voss",
+      "greeting": "Frontier Exchange online. Trade, contracts and local market data are available.",
+      "farewell": "Safe travels. The market will remember every transaction.",
+      "options": [
+        {
+          "optionId": "dialogue_option.trader.open_trade",
+          "localizationKey": "dialogue_option.trader.open_trade",
+          "text": "Show me the market.",
+          "action": "OpenTrade",
+          "minimumReputation": -100,
+          "reputationDelta": 0
+        },
+        {
+          "optionId": "dialogue_option.trader.open_quests",
+          "localizationKey": "dialogue_option.trader.open_quests",
+          "text": "Do you have work available?",
+          "action": "OpenQuests",
+          "minimumReputation": -100,
+          "reputationDelta": 0
+        },
+        {
+          "optionId": "dialogue_option.trader.close",
+          "localizationKey": "dialogue_option.trader.close",
+          "text": "That is all for now.",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0
+        }
+      ]
+    }
+  ],
+  "npcs": [
+    {
+      "npcId": "npc.trader.ilia_voss",
+      "localizationKey": "npc.trader.ilia_voss",
+      "npcType": "Trader",
+      "factionId": "faction.meridian_exchange",
+      "marketId": "market.frontier_exchange",
+      "dialogueId": "dialogue.trader.ilia_voss"
+    }
+  ],
+  "quests": [
+    {
+      "questId": "quest.frontier.ore_sample",
+      "localizationKey": "quest.frontier.ore_sample",
+      "giverNpcId": "npc.trader.ilia_voss",
+      "startNodeId": "quest_node.frontier.ore_sample.collect",
+      "nodes": [
+        {
+          "nodeId": "quest_node.frontier.ore_sample.collect",
+          "objectiveType": "CollectResource",
+          "targetDefinitionId": "resource.ferric_ore",
+          "requiredQuantity": 2,
+          "nextNodeIds": []
+        }
+      ],
+      "rewardCredits": 180,
+      "reputationReward": 4
+    },
+    {
+      "questId": "quest.frontier.refined_ferrite",
+      "localizationKey": "quest.frontier.refined_ferrite",
+      "giverNpcId": "npc.trader.ilia_voss",
+      "startNodeId": "quest_node.frontier.refined_ferrite.craft",
+      "nodes": [
+        {
+          "nodeId": "quest_node.frontier.refined_ferrite.craft",
+          "objectiveType": "CraftItem",
+          "targetDefinitionId": "material.refined_ferrite",
+          "requiredQuantity": 1,
+          "nextNodeIds": []
+        }
+      ],
+      "rewardCredits": 260,
+      "reputationReward": 6
+    },
+    {
+      "questId": "quest.frontier.water_trade",
+      "localizationKey": "quest.frontier.water_trade",
+      "giverNpcId": "npc.trader.ilia_voss",
+      "startNodeId": "quest_node.frontier.water_trade.trade",
+      "nodes": [
+        {
+          "nodeId": "quest_node.frontier.water_trade.trade",
+          "objectiveType": "TradeItem",
+          "targetDefinitionId": "resource.ice_water",
+          "requiredQuantity": 1,
+          "nextNodeIds": []
+        }
+      ],
+      "rewardCredits": 220,
+      "reputationReward": 5
+    }
+  ]
+}

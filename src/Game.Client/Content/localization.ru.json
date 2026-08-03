@@ -349,6 +349,18 @@
     "item.exotic.field_generator": "Генератор экзотического поля",
     "recipe.advanced.exotic_field_generator": "Генератор экзотического поля",
     "item.exotic.compotium_stabilization_core": "Ядро стабилизации Компотия",
-    "recipe.advanced.compotium_stabilization_core": "Ядро стабилизации Компотия"
+    "recipe.advanced.compotium_stabilization_core": "Ядро стабилизации Компотия",
+    "faction.meridian_exchange": "Биржа «Меридиан»",
+    "faction.helix_academy": "Академия «Геликс»",
+    "faction.aegis_compact": "Компакт «Эгида»",
+    "market.frontier_exchange": "Пограничная биржа",
+    "dialogue.trader.ilia_voss": "Диалог станционных служб Илии Восс",
+    "dialogue_option.trader.open_trade": "Покажите доступные товары.",
+    "dialogue_option.trader.open_quests": "Есть доступная работа?",
+    "dialogue_option.trader.close": "На этом всё.",
+    "npc.trader.ilia_voss": "Илия Восс",
+    "quest.frontier.ore_sample": "Проба пограничной руды",
+    "quest.frontier.refined_ferrite": "Заказ на очищенный феррит",
+    "quest.frontier.water_trade": "Контракт на торговлю водяным льдом"
   }
 }
