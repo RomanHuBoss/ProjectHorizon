@@ -76,6 +76,8 @@ src/Game.Client/Content/catalog_manifest.json
 
 Станционные услуги Этапа 1 реализованы отдельным data-driven слоем `station_services.json`. В vertical slice размещён один trader NPC `npc.trader.ilia_voss` с template dialogue и вкладками Dialogue/Buy/Sell/Quests. Каталог задаёт ровно шесть economy types, три factions с relations и три persistent quest graphs. Все 174 items доступны рынку; цена вычисляется из base price, economy, supply/demand, faction, reputation и deterministic daily factor. Credits, reputation, market stock/day и quest state сохраняются в optional SQLite setting `station_services` без повышения schema 2; старые saves используют legacy fallback. Trade синхронизирует основной inventory и все пять production mirrors.
 
+В правом нижнем углу постоянно отображается компактный индикатор `PLAYER POS` с мировыми координатами `X/Y/Z` из `Player.GlobalPosition` с точностью до 0,1. Индикатор обновляется каждый кадр и остаётся видимым во всех режимах основной HUD-панели, включая `Hidden`, а также при открытых station и trader интерфейсах.
+
 В состав v2 входят:
 
 - 18 refining recipes;
@@ -111,7 +113,7 @@ Enter / E      выполнить выбранное station/service дейст�
 Q              station Recipes: поставить recipe в очередь; из других station tabs открыть Queue
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
-H              detailed / compact / hidden HUD
+H              detailed / compact / hidden main HUD; player coordinates remain visible
 F1             TASK-090/092/093/096/098: queue, properties, multi-station industry и aggregate HUD
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
@@ -163,6 +165,16 @@ raw_compotium + acidic_brine -> ChemicalProcessor -> raw_compotium_solution (rep
 ```
 
 Для постановки процесса подойдите к нужной station, откройте терминал `E`, исследуйте требуемую technology, выберите recipe и нажмите `Q`. Вкладки Queue относятся к конкретной станции; jobs разных станций выполняются параллельно и сохраняются одной `production_queue_network`.
+
+### Player position HUD
+
+В правом нижнем углу отображается независимый от основной панели индикатор:
+
+```text
+PLAYER POS  X=14.2  Y=1.0  Z=11.8
+```
+
+Источник — `Player.GlobalPosition`; координаты обновляются каждый кадр с точностью до `0.1`. Переключение `H` скрывает только основную диагностическую панель: координаты остаются на экране, чтобы можно было находить станции, trader и generated resource field по указанным в документации позициям. При перемещении по площадке должны изменяться прежде всего `X` и `Z`; `Y` отражает высоту игрока.
 
 ### Aggregate production network HUD
 
@@ -759,4 +771,7 @@ integrity in `save_1.production-network-hud-test.db`.
 ## Stage 1 station-services closure
 
 `TASK-102` adds the complete Stage 1 station-services vertical-slice block: six economy types, three data-driven factions, one physical trader, template dialogue, catalog-wide market pricing, credits and reputation, and three persistent quest graphs. Every one of the 174 catalog items is quotable through the six-factor price formula. Buy/sell operations synchronize the player session and all five production inventory mirrors. The optional `station_services` SQLite setting stores credits, reputation, economy day, stock and quest-node state without increasing schema version 2; legacy saves remain loadable. F3 runs the isolated `save_1.station-services-test.db` acceptance alongside the existing research test. Full galaxy NPC populations, procedural quest generation and inter-system economies remain later-stage features, not unfinished work in this Stage 1 subsystem.
+## Persistent player-coordinate overlay
+
+`TASK-104` adds a bottom-right `PLAYER POS` overlay sourced from `Player.GlobalPosition`. It displays X/Y/Z with one-decimal precision, updates every frame, and remains visible while the main HUD cycles through Detailed, Compact and Hidden modes or while a station-services/production panel is open.
 

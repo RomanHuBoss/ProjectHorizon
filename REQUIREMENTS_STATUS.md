@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-station-services-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-player-coordinate-hud.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,59 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD и catalog-wide resource lifecycle подтверждены пользователем. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API. Текущая mega-итерация закрывает связную подсистему станционных услуг Этапа 1: data-driven factions/economies, один физический trader NPC, template dialogue, catalog-wide market, credits/reputation и три persistent quest graphs.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и станционные услуги Этапа 1 подтверждены пользователем. Ресурсная и station-services подсистемы закрыты в своих Stage 1 границах. Текущая корректирующая итерация добавляет постоянный индикатор мировых координат игрока, необходимый для навигации по тестовой площадке.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — post-acceptance HUD hotfix: координаты игрока (`TASK-104`)
+
+**Исходный снимок:** `ProjectHorizon-main-station-services-closure.zip` — подготовленная и локально проверенная пользователем редакция.  
+**Подготовленный снимок:** `ProjectHorizon-main-player-coordinate-hud.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Причина:** пользователь подтвердил работоспособность station-services mega-итерации, но выявил отсутствие координат игрока на тестовой площадке.
+
+**Синхронизация приёмки `TASK-102/TASK-103`:**
+
+- локальная сборка Godot 4.7.1 Mono завершена: `Предупреждений: 0`, `Ошибок: 0`;
+- startup: `economies=6; factions=3; npcs=1; dialogueOptions=3; quests=3; questNodes=3; tradable=174`;
+- `TASK-102 station services acceptance PASS`: `priceFormula=1; deterministicDaily=1; offlineEconomy=1; supplyDemand=1; buySell=1; atomicRejected=1; creditConservation=1; questGraph=1; questFeasibility=1; questFlow=1; reputation=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
+- повторные F1/F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 завершены `PASS`;
+- пользователь сообщил, что ручной контур работает; subsystem station services Этапа 1 закрыта.
+
+**Реализовано:**
+
+- в `Hud` добавлена отдельная bottom-right панель `PlayerCoordinates`;
+- источник координат — `Player.GlobalPosition`; показываются `X`, `Y`, `Z` с точностью `0.1`;
+- значение пересчитывается каждый кадр, без persistence и без изменения gameplay state;
+- overlay остаётся видимым в режимах `Detailed`, `Compact`, `Hidden`, а также при открытом production terminal или station-services UI;
+- отсутствующий/удалённый Player безопасно отображается как `PLAYER POS unavailable`;
+- startup выводит диагностическую строку `TASK-104 player coordinate HUD READY`.
+
+**Изменённые файлы:**
+
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-102`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-103`: `IN_PROGRESS` → `VERIFIED`;
+- `SERVICES-100`–`SERVICES-109`, `SERVICES-ACC-100`–`SERVICES-ACC-103`: → `VERIFIED`;
+- `TASK-104`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-105`: `NOT_STARTED` → `IN_PROGRESS` — clean build и ручная проверка динамического overlay;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Ожидаемая startup-строка:**
+
+```text
+TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; axes=XYZ; precision=0.1; corner=bottom-right; visibleInModes=Detailed/Compact/Hidden.
+```
+
+**Граница:** только отображение позиции существующего Player. Карта, компас, waypoint, minimap, navmesh и новые world/resource механики не добавляются.
+
+**Ограничение среды:** фактическая Godot/.NET runtime-проверка новой панели выполняется пользователем в `TASK-105`.
 
 ### 2026-08-03 — mega-итерация станционных услуг Этапа 1 (`TASK-102`)
 
@@ -2950,37 +3000,47 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `SERVICES-100` | Ровно шесть типов экономики | `IMPLEMENTED` | Strict catalog validation: Mining/Industrial/Technology/Trading/Scientific/Military |
-| `SERVICES-101` | Три factions содержат interests, preferred goods, quest types, visual style, name pool и relations | `IMPLEMENTED` | `station_services.json`; полная relation matrix 3×3 |
-| `SERVICES-102` | Один физический trader NPC Этапа 1 | `IMPLEMENTED` | `Gameplay/StationTrader`, `npc.trader.ilia_voss`, generic `IInteractable` |
-| `SERVICES-103` | Template dialogue поддерживает conditions/options/consequences/trade/quests | `IMPLEMENTED` | Dialogue/Buy/Sell/Quests UI; min reputation, reputation delta, actions |
-| `SERVICES-104` | Все 174 items tradable по шестимножительной динамической цене | `IMPLEMENTED` | Market quote projection, daily/supply/reputation factors, buy/sell spread |
-| `SERVICES-105` | Buy/sell атомарны и синхронизированы с shared production inventory | `IMPLEMENTED` | Stock/funds/inventory preflight; session + 5 station mirrors; credit conservation |
-| `SERVICES-106` | Три quests представлены persistent state graphs | `IMPLEMENTED` | CollectResource/CraftItem/TradeItem; accept/progress/claim/rewards |
-| `SERVICES-107` | Quest graphs валидируются на stable IDs, feasibility, reachability и cycles | `IMPLEMENTED` | Strict startup validation + isolated F3 acceptance |
-| `SERVICES-108` | Credits, reputation, market day/stock и quest state сохраняются без schema bump | `IMPLEMENTED` | Optional `save_settings.station_services`; schema 2; legacy null fallback |
-| `SERVICES-109` | Player-facing HUD/UI показывает economy, prices, factors, inventory и quest state | `IMPLEMENTED` | StationServices panel + detailed/compact HUD summary |
-| `SERVICES-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd`; убедиться в реальном `CoreCompile` |
-| `SERVICES-ACC-101` | F3 подтверждает exact baseline и persistence | `IN_PROGRESS` | Ожидается полная строка `TASK-102 ... PASS` |
-| `SERVICES-ACC-102` | Manual NPC/dialogue/buy/sell/three quests/cold restore/F8 | `IN_PROGRESS` | Выполнить сценарий раздела 18H |
-| `SERVICES-ACC-103` | F1/F2/F4–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F3 |
+| `SERVICES-100` | Ровно шесть типов экономики | `VERIFIED` | Strict catalog validation: Mining/Industrial/Technology/Trading/Scientific/Military |
+| `SERVICES-101` | Три factions содержат interests, preferred goods, quest types, visual style, name pool и relations | `VERIFIED` | `station_services.json`; полная relation matrix 3×3 |
+| `SERVICES-102` | Один физический trader NPC Этапа 1 | `VERIFIED` | `Gameplay/StationTrader`, `npc.trader.ilia_voss`, generic `IInteractable` |
+| `SERVICES-103` | Template dialogue поддерживает conditions/options/consequences/trade/quests | `VERIFIED` | Dialogue/Buy/Sell/Quests UI; min reputation, reputation delta, actions |
+| `SERVICES-104` | Все 174 items tradable по шестимножительной динамической цене | `VERIFIED` | Market quote projection, daily/supply/reputation factors, buy/sell spread |
+| `SERVICES-105` | Buy/sell атомарны и синхронизированы с shared production inventory | `VERIFIED` | Stock/funds/inventory preflight; session + 5 station mirrors; credit conservation |
+| `SERVICES-106` | Три quests представлены persistent state graphs | `VERIFIED` | CollectResource/CraftItem/TradeItem; accept/progress/claim/rewards |
+| `SERVICES-107` | Quest graphs валидируются на stable IDs, feasibility, reachability и cycles | `VERIFIED` | Strict startup validation + isolated F3 acceptance |
+| `SERVICES-108` | Credits, reputation, market day/stock и quest state сохраняются без schema bump | `VERIFIED` | Optional `save_settings.station_services`; schema 2; legacy null fallback |
+| `SERVICES-109` | Player-facing HUD/UI показывает economy, prices, factors, inventory и quest state | `VERIFIED` | StationServices panel + detailed/compact HUD summary |
+| `SERVICES-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build Godot 4.7.1 Mono: 0 warnings, 0 errors |
+| `SERVICES-ACC-101` | F3 подтверждает exact baseline и persistence | `VERIFIED` | User runtime: полная строка `TASK-102 ... PASS`; `maxWriters=1`; `integrity=ok` |
+| `SERVICES-ACC-102` | Manual NPC/dialogue/buy/sell/three quests/cold restore/F8 | `VERIFIED` | Пользователь сообщил, что функциональность работает; runtime restore и quest flow acceptance PASS |
+| `SERVICES-ACC-103` | F1/F2/F4–F12 не регрессируют | `VERIFIED` | Предоставленный Output: все применимые acceptance routes PASS |
+
+### 8.21. Постоянный HUD координат игрока
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `HUD-110` | В углу экрана отображаются мировые координаты игрока X/Y/Z | `IMPLEMENTED` | `Hud/PlayerCoordinates`, источник `Player.GlobalPosition`, precision `0.1` |
+| `HUD-111` | Координаты обновляются во время движения | `IMPLEMENTED` | `UpdatePlayerCoordinatesHud()` вызывается из `_Process` через `UpdateHud()` |
+| `HUD-112` | Индикатор не скрывается режимом HIDDEN основной панели | `IMPLEMENTED` | Overlay является отдельным CanvasLayer child и не затрагивается `ApplyHudMode()` |
+| `HUD-113` | Координаты остаются видимыми при station/trader UI | `IMPLEMENTED` | Отдельная bottom-right panel, UI panels не меняют её visibility |
+| `HUD-ACC-110` | Clean build `0/0` | `IN_PROGRESS` | Выполнить сборку с реальным `CoreCompile` |
+| `HUD-ACC-111` | Manual movement изменяет X/Z и H не скрывает overlay | `IN_PROGRESS` | Проверить сценарий раздела 18I |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-081` за исключением superseded/плановых задач; Прототипы A–E, production persistence, полный Industry Content v2 и все регрессии F4–F12.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-103` за исключением superseded/плановых задач; Прототипы A–E, production persistence, Industry Content v2, resources и Stage 1 station services.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-103` | Выполнить build/runtime/manual acceptance станционных услуг Этапа 1 | Clean build `0/0`; F3 TASK-082+102; NPC/dialogue/trade/3 quests; cold restore/F8; F1–F12 regressions |
+| 1 | `TASK-105` | Выполнить build/runtime/manual acceptance постоянного coordinate overlay | Clean build `0/0`; startup READY; X/Z меняются при движении; overlay виден в Detailed/Compact/Hidden и поверх station/trader UI |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-104` | Выбрать следующий связный блок вне закрытых resources и station services | Рассмотреть base construction/ship systems/world exploration по зависимостям ТЗ |
+| 3 | `TASK-106` | Выбрать следующий связный блок вне закрытых resources и station services | Рассмотреть base construction/ship systems/world exploration по зависимостям ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-101`, persistence, vertical slice, Industry Content v2, production network, aggregate HUD и catalog-wide resource lifecycle.
-**Реализовано:** `TASK-102` — станционные услуги Этапа 1: economy/factions, trader NPC, dialogue, catalog-wide trade и три persistent quests.
-**Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-103`. После её закрытия отдельные итерации Stage 1 station-services subsystem не планируются.
+**Подтверждено:** `TASK-060`–`TASK-103`, persistence, vertical slice, Industry Content v2, production network, aggregate HUD, catalog-wide resources и station services Этапа 1.
+**Реализовано:** `TASK-104` — постоянный bottom-right HUD мировых координат игрока.
+**Текущая приёмочная задача:** `TASK-105`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4605,6 +4665,26 @@ TASK-102 station services (F3): PASS economies=6, factions=3, npc=1, quests=3, t
 18. При `FAIL` предоставить полный build log, строки `TASK-102 ... FAIL`, последние 200 строк Godot Output, screenshot активной station-services tab, значения credits/reputation/stock/quest state и точный шаг сценария.
 
 После выполнения критериев установить `TASK-102 → VERIFIED`, `TASK-103 → VERIFIED` и считать station-services subsystem Этапа 1 закрытой.
+
+## 18I. Runtime-приёмка `TASK-104/TASK-105`
+
+1. Выполнить clean build `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
+2. Запустить `SalvageRepairSlice`; Output должен содержать:
+
+```text
+TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; axes=XYZ; precision=0.1; corner=bottom-right; visibleInModes=Detailed/Compact/Hidden.
+```
+
+3. В правом нижнем углу должна быть строка формата `PLAYER POS  X=<...>  Y=<...>  Z=<...>`.
+4. Не двигаясь, запомнить значения. Пройти вперёд/назад и влево/вправо: `X` и/или `Z` должны изменяться плавно с шагом отображения `0.1`; при прыжке временно меняется `Y`.
+5. Нажать `H` три раза. Overlay должен оставаться видимым в `Compact`, `Hidden` и `Detailed`; основная HUD-панель продолжает переключаться как раньше.
+6. Открыть `PortableFabricator` и `StationTrader`; координаты должны оставаться видимыми и обновляться после закрытия UI.
+7. Нажать `F8`: coordinate overlay не должен сбрасывать, сохранять или изменять gameplay state; после reposition/reset он просто отражает текущую `GlobalPosition`.
+8. Повторить `F3`; `TASK-082` и `TASK-102` должны остаться `PASS`.
+9. Для приёмки прислать screenshot с coordinate overlay в режиме `Hidden`, startup-строку `TASK-104 ... READY` и build summary.
+10. При дефекте предоставить screenshot, viewport resolution, режим HUD, значения до/после движения и последние 80 строк Output.
+
+После выполнения критериев установить `TASK-104 → VERIFIED`, `TASK-105 → VERIFIED`.
 
 ## 19. Шаблон новой записи
 

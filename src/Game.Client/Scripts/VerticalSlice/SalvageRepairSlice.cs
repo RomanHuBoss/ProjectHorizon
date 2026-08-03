@@ -82,6 +82,7 @@ public partial class SalvageRepairSlice : Node3D
     private MarginContainer? _hudMargin;
     private Label? _hudLabel;
     private PanelContainer? _hudHiddenHint;
+    private Label? _playerCoordinatesLabel;
     private PanelContainer? _recipeSelectorPanel;
     private Label? _recipeSelectorLabel;
     private PanelContainer? _stationServicesPanel;
@@ -263,6 +264,8 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/MarginContainer/PanelContainer/Label");
         _hudHiddenHint = GetNodeOrNull<PanelContainer>(
             "Hud/HiddenHint");
+        _playerCoordinatesLabel = GetNodeOrNull<Label>(
+            "Hud/PlayerCoordinates/Label");
         _recipeSelectorPanel = GetNodeOrNull<PanelContainer>(
             "Hud/RecipeSelector");
         _recipeSelectorLabel = GetNodeOrNull<Label>(
@@ -277,7 +280,8 @@ public partial class SalvageRepairSlice : Node3D
             "Gameplay/StationTrader");
         _player = GetNodeOrNull<PlayerController>("Player");
         if (_hudMargin is null || _hudLabel is null ||
-            _hudHiddenHint is null || _recipeSelectorPanel is null ||
+            _hudHiddenHint is null || _playerCoordinatesLabel is null ||
+            _recipeSelectorPanel is null ||
             _recipeSelectorLabel is null || _stationServicesPanel is null ||
             _stationServicesLabel is null || _shipTerminal is null ||
             _stationServicesNpc is null || _player is null)
@@ -460,6 +464,11 @@ public partial class SalvageRepairSlice : Node3D
             $"generated={_generatedResourcePlacements.Count}; " +
             "genericCollection=enabled; mirrors=enabled; " +
             "depletionPersistence=enabled; reset=enabled.");
+        GD.Print(
+            "TASK-104 player coordinate HUD READY: " +
+            "source=Player.GlobalPosition; axes=XYZ; precision=0.1; " +
+            "corner=bottom-right; " +
+            "visibleInModes=Detailed/Compact/Hidden.");
     }
 
     public override void _Notification(int what)
@@ -4716,8 +4725,31 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void UpdatePlayerCoordinatesHud()
+    {
+        if (_playerCoordinatesLabel is null)
+        {
+            return;
+        }
+
+        PlayerController? player = _player;
+        if (player is null || !GodotObject.IsInstanceValid(player))
+        {
+            _playerCoordinatesLabel.Text = "PLAYER POS  unavailable";
+            return;
+        }
+
+        Vector3 position = player.GlobalPosition;
+        _playerCoordinatesLabel.Text =
+            "PLAYER POS  " +
+            $"X={position.X.ToString("0.0", CultureInfo.InvariantCulture)}  " +
+            $"Y={position.Y.ToString("0.0", CultureInfo.InvariantCulture)}  " +
+            $"Z={position.Z.ToString("0.0", CultureInfo.InvariantCulture)}";
+    }
+
     private void UpdateHud()
     {
+        UpdatePlayerCoordinatesHud();
         if (_hudLabel is null)
         {
             return;
