@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-item-properties-dismantle.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-multi-station-compotium-line.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,73 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-092/094` приняты по clean build `0/0`, автоматическому `F1` и ручной проверке Queue UI. Текущая итерация реализует persistent quality/purity/stability, quality-sensitive dismantle returns и четвёртую вкладку промышленного терминала.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-093/095` приняты по clean build `0/0`, автоматическому `F1`, ручной проверке `Q/P/S` и Dismantle UI. Текущая итерация расширяет playable runtime с девяти ship recipes до пятнадцати station recipes и вводит пять физических типов станций, shared-inventory production network и связную линию Парафиния/Компотия.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — multi-station refining/chemistry и стартовая линия Компотия (`TASK-096`)
+
+**Исходный снимок:** `ProjectHorizon-main(9)(1).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-multi-station-compotium-line.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** ТЗ v2.0: data-driven station routing, `RequiredStation`, multiple physical station types, energy, intermediate products, production persistence, Парафиний и каноническая химическая линия Компотия.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь предоставил build log `0 предупреждений / 0 ошибок`;
+- `F1 / TASK-093` завершился `PASS Q=72, P=80, S=80, dismantle=1, roundTrip=1`;
+- вручную подтверждены отображение `Q/P/S`, recovery preview, разбор `attitude_coil`, возврат `magnetic_ore` и исчезновение разобранного item;
+- существующие `F2/F3/F4/F5/F6/F7/F9/F10/F11` завершились `PASS`;
+- `TASK-093`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-095`: `IN_PROGRESS` → `VERIFIED`;
+- `INDUSTRY-060`–`INDUSTRY-068` и `INDUSTRY-ACC-060`–`INDUSTRY-ACC-064` → `VERIFIED`.
+
+**Реализовано:**
+
+- runtime-enabled catalog расширен с `10` до `16` recipes; playable StoreOutputs matrix — с `9` до `15` recipes;
+- подключены шесть связанных processes: `refined_ferrite`, `purified_water`, `paraffinium_fraction`, `paraffinium_lubricant`, `raw_compotium_solution`, `compotium_concentrate`;
+- в сцену добавлены физические `Smelter`, `Refinery`, `DistillationColumn`, `ChemicalProcessor` и необходимые raw-resource nodes, включая `catalytic_dust`;
+- обычная логика станции остаётся data-driven по `RequiredStation`; один C# runner на recipe не добавляется;
+- добавлен `ProductionNetworkRuntime`: отдельная queue/energy/slots на каждую physical station при общем синхронизированном player inventory;
+- refining и chemistry recipes объявлены повторяемыми и не входят в одноразовую ship-component objective;
+- outputs одной станции становятся inputs другой; reservations, refund, outputs, byproducts и retained catalysts синхронизируются между session и всеми station mirrors;
+- сеть очередей сохраняется в backward-compatible `save_settings.production_queue_network`; legacy `production_queue` продолжает загружаться;
+- energy каждой gameplay station восстанавливается линейно до capacity за `60 s`; offline progress и offline recharge отсутствуют;
+- F1 дополнен изолированным `TASK-096` acceptance на четырёх station types и шести recipes с отдельной БД `save_1.multi-station-industry-test.db`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/IndustryRecipePolicy.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionNetworkRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/MultiStationIndustryAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/TechnologyProgression.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/TechnologyRecipeSelectorAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/CatalogCraftingMatrixAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/PortableCraftingStation.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/Content/recipes.json`;
+- `src/Game.Client/Content/catalog_manifest.json`;
+- `src/Game.Client/Scripts/Content/GameContentCatalog.cs`;
+- `Technical_Specification/2.0/Project_Horizon_Industry_Content_Schema_v2.0.json`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-093` → `VERIFIED`;
+- `TASK-095` → `VERIFIED`;
+- `TASK-096`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-097`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F1 multi-station acceptance, manual station chain, cold network restore и F2–F12 regressions;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Проверки в среде подготовки:** JSON parse и JSON Schema v2 — PASS; counts `174/42/128/15/32`, runtime `16`, StoreOutputs `15`; station/category/tier и technology references — PASS; scene содержит `32` уникальных resource nodes и `5` требуемых crafting station types; C# lexical/delimiter audit — PASS; `res://` и UID проверяются перед упаковкой.
+
+**Ограничение:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой network-семантики остаются за `TASK-097`.
 
 ### 2026-08-03 — quality/purity/stability и dismantle returns (`TASK-093`)
 
@@ -2627,20 +2691,40 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `INDUSTRY-060` | Crafted output имеет `Quality`, `Purity`, `Stability` в `0..100` | `IMPLEMENTED` | `IndustryItemProperties`; recipe quality range и environment/hazard calculation |
-| `INDUSTRY-061` | Расчёт свойств детерминирован для recipe/process sequence | `IMPLEMENTED` | Stable FNV hash и Godot-independent `ItemPropertyRuntime` |
-| `INDUSTRY-062` | Properties сохраняются и восстанавливаются без schema bump | `IMPLEMENTED` | `save_settings.inventory_properties`; legacy fallback `100/100/100` |
-| `INDUSTRY-063` | Stack merge агрегирует свойства взвешенно по quantity | `IMPLEMENTED` | `StarterRepairSession.GrantInventory` |
-| `INDUSTRY-064` | Runtime recipes определяют `DismantleReturns[]` | `IMPLEMENTED` | Девять ship-component recipes возвращают соответствующее сырьё |
-| `INDUSTRY-065` | Dismantle recovery зависит от Q/P/S и целочисленно ограничен максимумом recipe | `IMPLEMENTED` | efficiency `0.5Q + 0.3P + 0.2S`; `floor(maxReturn × efficiency)` |
-| `INDUSTRY-066` | Recovered materials деградируют по свойствам | `IMPLEMENTED` | `CreateRecoveredProperties`: `-12/-8/-15` |
-| `INDUSTRY-067` | Terminal содержит Dismantle tab и preview результата | `IMPLEMENTED` | `D`, `Tab`, quantity, Q/P/S, efficiency, return preview |
-| `INDUSTRY-068` | Player dismantle синхронизирует session/queue inventory и autosave | `IMPLEMENTED` | consume/grant в обеих моделях, `BaseChanged` autosave |
-| `INDUSTRY-ACC-060` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `INDUSTRY-ACC-061` | F1 подтверждает deterministic/range/quality-sensitive returns/round-trip | `IN_PROGRESS` | Ожидается `TASK-093 item properties (F1): PASS ...` |
-| `INDUSTRY-ACC-062` | Ручной Dismantle UI и material return работают | `IN_PROGRESS` | Изготовить component, открыть `D`, выполнить dismantle |
-| `INDUSTRY-ACC-063` | Cold restart сохраняет Q/P/S и dismantle result | `IN_PROGRESS` | Проверить до и после dismantle с graceful exit |
-| `INDUSTRY-ACC-064` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить существующую матрицу |
+| `INDUSTRY-060` | Crafted output имеет `Quality`, `Purity`, `Stability` в `0..100` | `VERIFIED` | `IndustryItemProperties`; recipe quality range и environment/hazard calculation |
+| `INDUSTRY-061` | Расчёт свойств детерминирован для recipe/process sequence | `VERIFIED` | Stable FNV hash и Godot-independent `ItemPropertyRuntime` |
+| `INDUSTRY-062` | Properties сохраняются и восстанавливаются без schema bump | `VERIFIED` | `save_settings.inventory_properties`; legacy fallback `100/100/100` |
+| `INDUSTRY-063` | Stack merge агрегирует свойства взвешенно по quantity | `VERIFIED` | `StarterRepairSession.GrantInventory` |
+| `INDUSTRY-064` | Runtime recipes определяют `DismantleReturns[]` | `VERIFIED` | Девять ship-component recipes возвращают соответствующее сырьё |
+| `INDUSTRY-065` | Dismantle recovery зависит от Q/P/S и целочисленно ограничен максимумом recipe | `VERIFIED` | efficiency `0.5Q + 0.3P + 0.2S`; `floor(maxReturn × efficiency)` |
+| `INDUSTRY-066` | Recovered materials деградируют по свойствам | `VERIFIED` | `CreateRecoveredProperties`: `-12/-8/-15` |
+| `INDUSTRY-067` | Terminal содержит Dismantle tab и preview результата | `VERIFIED` | `D`, `Tab`, quantity, Q/P/S, efficiency, return preview |
+| `INDUSTRY-068` | Player dismantle синхронизирует session/queue inventory и autosave | `VERIFIED` | consume/grant в обеих моделях, `BaseChanged` autosave |
+| `INDUSTRY-ACC-060` | Clean build новой редакции `0/0` | `VERIFIED` | Пользователь предоставил сборку: `0` warnings, `0` errors |
+| `INDUSTRY-ACC-061` | F1 подтверждает deterministic/range/quality-sensitive returns/round-trip | `VERIFIED` | Пользователь: `PASS Q=72, P=80, S=80, dismantle=1, roundTrip=1` |
+| `INDUSTRY-ACC-062` | Ручной Dismantle UI и material return работают | `VERIFIED` | Экран: `attitude_coil Q70/P79/S79`, recovery `75%`, return `1 magnetic_ore` |
+| `INDUSTRY-ACC-063` | Cold restart сохраняет Q/P/S и dismantle result | `VERIFIED` | Пользователь подтвердил восстановление и отсутствие разобранного item |
+| `INDUSTRY-ACC-064` | F2–F12 не регрессируют | `VERIFIED` | Предоставлены PASS-экраны F2/F3/F4/F5/F6/F7/F9/F10/F11 |
+
+### 8.17. Multi-station playable industry и линия Парафиния/Компотия
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `INDUSTRY-070` | Playable runtime использует несколько physical station types по `RequiredStation` | `IMPLEMENTED` | PortableFabricator, Smelter, Refinery, DistillationColumn, ChemicalProcessor |
+| `INDUSTRY-071` | Runtime catalog содержит связный starter refining/chemistry set | `IMPLEMENTED` | Шесть recipes, `runtimeEnabledRecipes=16`, StoreOutputs matrix `15` |
+| `INDUSTRY-072` | Каждая station имеет независимые queue, slots и energy | `IMPLEMENTED` | `ProductionNetworkRuntime` содержит station-specific `ProductionQueueRuntime` |
+| `INDUSTRY-073` | Все stations используют общее согласованное player inventory | `IMPLEMENTED` | Preflight и mirror consume/grant/refund для всех station queues |
+| `INDUSTRY-074` | Intermediate outputs могут быть inputs следующей station | `IMPLEMENTED` | ferrite/fraction → lubricant; solution/water/catalyst → concentrate |
+| `INDUSTRY-075` | Refining/Chemistry processes повторяемы и не блокируются первым output | `IMPLEMENTED` | `IndustryRecipePolicy`; raw Compotium solution выполняется дважды |
+| `INDUSTRY-076` | Production network сохраняется и восстанавливается целиком | `IMPLEMENTED` | `save_settings.production_queue_network`, exact snapshot comparison, legacy fallback |
+| `INDUSTRY-077` | Gameplay energy восстанавливается без offline progress | `IMPLEMENTED` | Linear recharge до capacity за 60 s только в активной сессии |
+| `INDUSTRY-078` | Scene предоставляет raw inputs и catalyst для starter chain | `IMPLEMENTED` | ferric ore, ice water, Paraffinium, raw Compotium, acidic brine, catalytic dust |
+| `INDUSTRY-079` | Station visuals позволяют различать типы производства | `IMPLEMENTED` | Раздельные idle colors для smelter/refinery/distillation/chemical/portable |
+| `INDUSTRY-ACC-070` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `INDUSTRY-ACC-071` | F1 подтверждает routing/repeatability/chain/recharge/properties/round-trip | `IN_PROGRESS` | Ожидается `TASK-096 multi-station industry (F1): PASS ...` |
+| `INDUSTRY-ACC-072` | Ручная starter chain проходит на четырёх station types | `IN_PROGRESS` | Выполнить Paraffinium lubricant и Compotium concentrate |
+| `INDUSTRY-ACC-073` | Cold restart восстанавливает station energy, jobs и shared inventory | `IN_PROGRESS` | Сохранить jobs на разных stations, graceful exit/restart |
+| `INDUSTRY-ACC-074` | F2–F12 не регрессируют при 16 runtime recipes | `IN_PROGRESS` | Повторить существующую acceptance matrix |
 
 ## 9. Очередь ближайших задач
 
@@ -2650,14 +2734,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-095` | Выполнить runtime-приёмку item properties и dismantling | Clean build `0/0`; F1 TASK-093; manual Dismantle; cold Q/P/S round-trip; F2–F12 regressions |
+| 1 | `TASK-097` | Выполнить runtime-приёмку multi-station starter industry | Clean build `0/0`; F1 TASK-096; manual Paraffinium/Compotium chain; multi-station cold restore; F2–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-096` | Расширить player runtime за пределы девяти ship recipes | Подключить station routing и property-aware production для следующего связного набора Industry Content v2 |
+| 3 | `TASK-098` | Расширить player-facing station coverage следующим связным кластером | Выбрать следующий технологически связный набор, не добавляя recipe-specific C# |
 
-**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-092`, `TASK-094`, persistence, vertical slice, Industry Content v2 и runtime matrix.
-**Реализовано:** `TASK-093` — persistent Q/P/S, quality-sensitive dismantle returns и Dismantle terminal tab.
+**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-095`, persistence, vertical slice, Industry Content v2 и прежняя runtime matrix.
+**Реализовано:** `TASK-096` — multi-station production network и связная refining/Paraffinium/Compotium line.
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-095`.
+**Текущая приёмочная задача:** `TASK-097`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4167,6 +4251,25 @@ TASK-093 item properties (F1): PASS Q=<0..100>, P=<0..100>, S=<0..100>, dismantl
 7. Ещё раз выполнить graceful exit/restart: dismantled component не возвращается, recovered materials и их properties сохраняются.
 8. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
 9. При `FAIL` предоставить build log, полный HUD/Dismantle tab, строку `TASK-093 ... FAIL`, последние 120 строк Godot Output и шаг расхождения.
+
+## 18E. Runtime-приёмка `TASK-096/TASK-097`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
+2. Запустить vertical slice и нажать `F1`. Вместе с TASK-090/092/093 ожидается:
+
+```text
+TASK-096 multi-station industry (F1): PASS stations=4, recipes=6, routing=1, repeatable=1, chain=1, recharge=1, properties=1, roundTrip=1
+```
+
+3. Output должен содержать `TASK-096 multi-station industry acceptance PASS` с `physicalStations=4; recipes=6; wrongStation=1; repeatable=1; chain=1; recharge=1; properties=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok`.
+4. Нажать `F8`, собрать три salvage и отремонтировать корабль. Исследовать `basic_refining`, `paraffinium_processing`, `industrial_chemistry` и prerequisite-ветку `compotium_analysis`.
+5. Собрать два `ferric_ore`, два `ice_water`, два `paraffinium`, два `raw_compotium`, два `acidic_brine` и один `catalytic_dust`.
+6. На Smelter изготовить `refined_ferrite`; на Refinery — `purified_water`; на DistillationColumn — `paraffinium_fraction`.
+7. На ChemicalProcessor изготовить `paraffinium_lubricant`, затем дважды `raw_compotium_solution`. При нехватке energy дождаться recharge и повторить enqueue.
+8. На DistillationColumn изготовить `compotium_concentrate`. Проверить Q/P/S output, byproducts и расход/сохранение catalyst.
+9. Поставить jobs минимум на двух разных stations, дождаться ненулевого elapsed, выполнить graceful exit/restart. Jobs, elapsed, station energy и shared free inventory должны восстановиться без offline progress.
+10. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`. F5 должен показать `station=15`, `crafted=15`, `isolated=15`, `roundTrip=1`.
+11. При `FAIL` предоставить полный build log, HUD и station tab, строку `TASK-096 ... FAIL`, последние 120 строк Output и шаг manual chain, на котором возникло расхождение.
 
 ## 19. Шаблон новой записи
 

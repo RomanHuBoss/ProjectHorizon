@@ -1459,7 +1459,7 @@ public static class IndustryCatalogAcceptanceRunner
     public const int MinimumChemistryRecipes = 30;
     public const int MinimumCompotiumRecipes = 12;
     public const int MinimumParaffiniumRecipes = 5;
-    public const int ExpectedRuntimeEnabledRecipes = 10;
+    public const int ExpectedRuntimeEnabledRecipes = 16;
 
     public static IndustryCatalogAcceptanceReport Run(
         GameContentCatalog catalog)

@@ -44,19 +44,20 @@ public static class TechnologyRecipeSelectorAcceptanceRunner
         Stopwatch stopwatch = Stopwatch.StartNew();
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
+        const string stationId = "station.portable_fabricator";
         CraftingRecipeDefinition[] stationRecipes = catalog.Recipes.Values
             .Where(recipe =>
                 recipe.RuntimeEnabled &&
                 string.Equals(
                     recipe.Application.Type,
                     "StoreOutputs",
+                    StringComparison.Ordinal) &&
+                string.Equals(
+                    recipe.RequiredStation,
+                    stationId,
                     StringComparison.Ordinal))
             .OrderBy(recipe => recipe.RecipeId, StringComparer.Ordinal)
             .ToArray();
-        string stationId = stationRecipes
-            .Select(recipe => recipe.RequiredStation)
-            .Distinct(StringComparer.Ordinal)
-            .Single();
 
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         try

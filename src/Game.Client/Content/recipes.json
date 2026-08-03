@@ -566,7 +566,7 @@
       "craftTimeSeconds": 5.0,
       "energyCost": 40.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 273.0,
@@ -975,7 +975,7 @@
       "craftTimeSeconds": 7.8,
       "energyCost": 72.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 273.0,
@@ -1460,7 +1460,7 @@
       "craftTimeSeconds": 7.0,
       "energyCost": 60.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 230.0,
@@ -1562,7 +1562,7 @@
       "craftTimeSeconds": 7.9,
       "energyCost": 84.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 240.0,
@@ -1733,7 +1733,7 @@
       "craftTimeSeconds": 9.25,
       "energyCost": 120.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 255.0,
@@ -1800,7 +1800,7 @@
       "craftTimeSeconds": 9.7,
       "energyCost": 132.0,
       "batchSize": 1,
-      "runtimeEnabled": false,
+      "runtimeEnabled": true,
       "requiredTools": [],
       "environment": {
         "minimumTemperatureKelvin": 260.0,

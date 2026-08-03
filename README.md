@@ -41,7 +41,7 @@ worldResources=42
 recipes=128
 stations=15
 technologies=32
-runtimeEnabledRecipes=10
+runtimeEnabledRecipes=16
 chemistryRecipes=30
 compotiumRecipes=13
 paraffiniumRecipes=5
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes выбираются на одном физическом PortableFabricator через универсальный терминал с вкладками Recipes, Research, Queue и Dismantle. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и незавершённые player-facing production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Для остальных recipes сохранены Godot-независимые atomic process runtime и production queue: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts, hazards, parallel station slots и freeze-and-resume persistence.
+Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени.
 
 В состав v2 входят:
 
@@ -108,11 +108,11 @@ Q              во вкладке Recipes поставить рецепт в о
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
-F1             TASK-090: production queue + active-process persistence
+F1             TASK-090/092/093/096: queue, terminal, properties и multi-station industry
 F2             TASK-083: chemical process runtime
 F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
-F5             TASK-076: playable runtime matrix (10 recipes)
+F5             TASK-076: playable runtime matrix (16 recipes / 15 station recipes)
 F6             регрессия coolant path
 F7             регрессия salvage → repair
 F8             очистить gameplay-slot
@@ -130,9 +130,26 @@ F12            регрессия navigation path
 TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1
 TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1
 TASK-093 item properties (F1): PASS Q=72, P=80, S=80, dismantle=1, roundTrip=1
+TASK-096 multi-station industry (F1): PASS stations=4, recipes=6, routing=1, repeatable=1, chain=1, recharge=1, properties=1, roundTrip=1
 ```
 
-`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Параллельный изолированный `TASK-093` проверяет детерминированные `Q/P/S`, зависимость dismantle returns от свойств предмета и exact SQLite round-trip. Используются отдельные БД `save_1.production-queue-test.db` и `save_1.item-properties-dismantle-test.db`; gameplay-slot не изменяется.
+`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Параллельный изолированный `TASK-093` проверяет детерминированные `Q/P/S`, зависимость dismantle returns от свойств предмета и exact SQLite round-trip. `TASK-096` дополнительно прогоняет четыре типа станций и шесть связанных recipes: refined ferrite, purified water, Paraffinium fraction/lubricant и raw Compotium solution/concentrate. Он проверяет wrong-station rejection, повторяемость химического процесса, межстанционную цепочку, recharge, item properties и network persistence. Используются отдельные БД `save_1.production-queue-test.db`, `save_1.item-properties-dismantle-test.db` и `save_1.multi-station-industry-test.db`; gameplay-slot не изменяется.
+
+
+### Multi-station Paraffinium and Compotium starter line
+
+После `F8` в мире доступны дополнительные добываемые узлы и четыре отдельные станции. Линия выполняется последовательно:
+
+```text
+2 ferric_ore -> Smelter -> refined_ferrite
+2 ice_water -> Refinery -> purified_water
+2 paraffinium -> DistillationColumn -> paraffinium_fraction
+paraffinium_fraction + refined_ferrite -> ChemicalProcessor -> paraffinium_lubricant
+raw_compotium + acidic_brine -> ChemicalProcessor -> raw_compotium_solution (repeatable, выполнить дважды)
+2 raw_compotium_solution + purified_water + catalytic_dust -> DistillationColumn -> compotium_concentrate
+```
+
+Для постановки процесса подойдите к нужной station, откройте терминал `E`, исследуйте требуемую technology, выберите recipe и нажмите `Q`. Вкладки Queue относятся к конкретной станции; jobs разных станций выполняются параллельно и сохраняются одной `production_queue_network`.
 
 
 ### Ручная проверка Queue-вкладки
@@ -166,7 +183,7 @@ TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, st
 
 `F3` прогоняет универсальный station selector и research graph: девять рецептов на одной физической станции, блокировку по технологиям, порядок prerequisites, расход RP, изготовление выбранного рецепта и точный SQLite round-trip прогресса исследований.
 
-`F5` продолжает прогонять девять runtime station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
+`F5` прогоняет все пятнадцать runtime station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 
@@ -645,3 +662,18 @@ The nine runtime ship-component recipes now define dismantle returns. F1 runs
 an additional isolated `TASK-093` acceptance using
 `save_1.item-properties-dismantle-test.db`; it checks deterministic property
 generation, quality-sensitive partial recovery and exact SQLite round-trip.
+
+## Multi-station refining and Compotium starter line
+
+`TASK-096` expands the playable catalog to sixteen runtime-enabled recipes and
+five physical station types. The PortableFabricator keeps the nine one-time
+ship-component recipes, while Smelter, Refinery, DistillationColumn and
+ChemicalProcessor execute six repeatable refining/chemistry recipes.
+
+All station queues have independent slots and energy, but mirror one shared
+player inventory. Intermediate products can move through the chain from
+refined ferrite and purified water to Paraffinium lubricant and Compotium
+concentrate. The complete queue network is stored in
+`save_settings.production_queue_network`; legacy single-queue saves remain
+loadable. Gameplay energy recharges to station capacity over sixty active
+seconds and does not advance while the game is closed.

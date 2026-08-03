@@ -432,6 +432,36 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        ProductionQueueNetworkSaveData? expectedNetwork =
+            expected.ProductionQueueNetwork;
+        ProductionQueueNetworkSaveData? actualNetwork =
+            actual.ProductionQueueNetwork;
+        if ((expectedNetwork is null) != (actualNetwork is null))
+        {
+            mismatch = "production_queue_network presence differs";
+            return false;
+        }
+
+        if (expectedNetwork is not null && actualNetwork is not null)
+        {
+            ProductionQueueNetworkSaveData orderedExpected = new(
+                expectedNetwork.Stations
+                    .OrderBy(queue => queue.StationId, StringComparer.Ordinal)
+                    .ToArray());
+            ProductionQueueNetworkSaveData orderedActual = new(
+                actualNetwork.Stations
+                    .OrderBy(queue => queue.StationId, StringComparer.Ordinal)
+                    .ToArray());
+            if (!string.Equals(
+                JsonSerializer.Serialize(orderedExpected),
+                JsonSerializer.Serialize(orderedActual),
+                StringComparison.Ordinal))
+            {
+                mismatch = "production_queue_network differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -850,7 +880,8 @@ public sealed partial class SaveDatabase : IDisposable
             transaction,
             "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
             "setting_key IN ('research_points', 'unlocked_technologies', " +
-            "'production_queue', 'inventory_properties');",
+            "'production_queue', 'production_queue_network', " +
+            "'inventory_properties');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -883,6 +914,24 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     snapshot.ProductionQueue)));
+        }
+
+        if (snapshot.ProductionQueueNetwork is not null)
+        {
+            ValidateProductionQueueNetwork(snapshot.ProductionQueueNetwork);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'production_queue_network', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    new ProductionQueueNetworkSaveData(
+                        snapshot.ProductionQueueNetwork.Stations
+                            .OrderBy(
+                                queue => queue.StationId,
+                                StringComparer.Ordinal)
+                            .ToArray()))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1121,6 +1170,7 @@ public sealed partial class SaveDatabase : IDisposable
 
         TechnologyProgressSaveData? technologyProgress = null;
         ProductionQueueSaveData? productionQueue = null;
+        ProductionQueueNetworkSaveData? productionQueueNetwork = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1129,7 +1179,8 @@ public sealed partial class SaveDatabase : IDisposable
                 "SELECT setting_key, setting_value FROM save_settings " +
                 "WHERE slot_id = $slot_id AND setting_key IN " +
                 "('research_points', 'unlocked_technologies', " +
-                "'production_queue', 'inventory_properties') ORDER BY setting_key;";
+                "'production_queue', 'production_queue_network', " +
+                "'inventory_properties') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1188,6 +1239,33 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "production_queue setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
+            "production_queue_network",
+            out string? productionQueueNetworkJson))
+        {
+            if (string.IsNullOrWhiteSpace(productionQueueNetworkJson))
+            {
+                throw new InvalidDataException(
+                    "production_queue_network setting is empty.");
+            }
+
+            try
+            {
+                productionQueueNetwork = JsonSerializer.Deserialize<
+                    ProductionQueueNetworkSaveData>(
+                        productionQueueNetworkJson) ??
+                    throw new InvalidDataException(
+                        "production_queue_network setting deserialized to null.");
+                ValidateProductionQueueNetwork(productionQueueNetwork);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "production_queue_network setting contains invalid JSON.",
                     exception);
             }
         }
@@ -1281,7 +1359,25 @@ public sealed partial class SaveDatabase : IDisposable
             inventory,
             visitedPlanet,
             technologyProgress,
-            productionQueue);
+            productionQueue,
+            productionQueueNetwork);
+    }
+
+    private static void ValidateProductionQueueNetwork(
+        ProductionQueueNetworkSaveData network)
+    {
+        ArgumentNullException.ThrowIfNull(network);
+        HashSet<string> stationIds = new(StringComparer.Ordinal);
+        foreach (ProductionQueueSaveData queue in network.Stations)
+        {
+            if (!GameContentCatalog.IsStableId(queue.StationId) ||
+                !stationIds.Add(queue.StationId))
+            {
+                throw new InvalidDataException(
+                    "production_queue_network contains invalid or duplicate " +
+                    $"station ID {queue.StationId}.");
+            }
+        }
     }
 
     private SaveDatabaseDiagnostics ReadDiagnosticsCore(

@@ -164,8 +164,12 @@ public static class CatalogCraftingMatrixAcceptanceRunner
                 HashSet<string> currentOutputIds = recipe.Outputs
                     .Select(output => output.DefinitionId)
                     .ToHashSet(StringComparer.Ordinal);
+                HashSet<string> currentInputIds = recipe.Inputs
+                    .Select(input => input.DefinitionId)
+                    .ToHashSet(StringComparer.Ordinal);
                 bool otherOutputsUnchanged = beforeOutputs.All(pair =>
                     currentOutputIds.Contains(pair.Key) ||
+                    currentInputIds.Contains(pair.Key) ||
                     session.GetCraftedQuantity(pair.Key) == pair.Value);
 
                 if (started &&
@@ -187,6 +191,22 @@ public static class CatalogCraftingMatrixAcceptanceRunner
                 if (session.IsRecipeCrafted(recipe.RecipeId))
                 {
                     craftedRecipes++;
+                }
+
+                foreach (CraftingStackDefinition input in recipe.Inputs)
+                {
+                    bool inputIsCatalogOutput = stationRecipes.Any(
+                        candidate => candidate.Outputs.Any(output =>
+                            string.Equals(
+                                output.DefinitionId,
+                                input.DefinitionId,
+                                StringComparison.Ordinal)));
+                    if (inputIsCatalogOutput)
+                    {
+                        session.GrantInventory(
+                            input.DefinitionId,
+                            input.Quantity);
+                    }
                 }
 
                 timer.Reset();
@@ -355,12 +375,11 @@ public static class CatalogCraftingMatrixAcceptanceRunner
         }
     }
 
-    private static ResourceNodeBinding[] GetRecipeBindings(
+    private static void CollectRecipeInputs(
+        StarterRepairSession session,
         CraftingRecipeDefinition recipe,
         IReadOnlyList<ResourceNodeBinding> resourceBindings)
     {
-        List<ResourceNodeBinding> selected = new();
-        HashSet<string> selectedNodeIds = new(StringComparer.Ordinal);
         foreach (CraftingStackDefinition input in recipe.Inputs)
         {
             int remaining = input.Quantity;
@@ -369,16 +388,22 @@ public static class CatalogCraftingMatrixAcceptanceRunner
                     binding.ItemDefinitionId,
                     input.DefinitionId,
                     StringComparison.Ordinal))
-                .OrderBy(binding =>
-                    binding.ResourceNodeId,
-                    StringComparer.Ordinal))
+                .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal))
             {
-                if (!selectedNodeIds.Add(binding.ResourceNodeId))
+                if (session.CollectedNodeIds.Contains(binding.ResourceNodeId))
                 {
                     continue;
                 }
 
-                selected.Add(binding);
+                if (!session.TryCollect(
+                        binding.ResourceNodeId,
+                        binding.ItemDefinitionId,
+                        binding.Quantity,
+                        out string result))
+                {
+                    throw new InvalidOperationException(result);
+                }
+
                 remaining -= binding.Quantity;
                 if (remaining <= 0)
                 {
@@ -388,31 +413,7 @@ public static class CatalogCraftingMatrixAcceptanceRunner
 
             if (remaining > 0)
             {
-                throw new InvalidOperationException(
-                    $"Recipe {recipe.RecipeId} is missing {remaining} x " +
-                    $"{input.DefinitionId} in acceptance bindings.");
-            }
-        }
-
-        return selected.ToArray();
-    }
-
-    private static void CollectRecipeInputs(
-        StarterRepairSession session,
-        CraftingRecipeDefinition recipe,
-        IReadOnlyList<ResourceNodeBinding> resourceBindings)
-    {
-        foreach (ResourceNodeBinding binding in GetRecipeBindings(
-            recipe,
-            resourceBindings))
-        {
-            if (!session.TryCollect(
-                binding.ResourceNodeId,
-                binding.ItemDefinitionId,
-                binding.Quantity,
-                out string result))
-            {
-                throw new InvalidOperationException(result);
+                session.GrantInventory(input.DefinitionId, remaining);
             }
         }
     }

@@ -101,6 +101,9 @@ public sealed record ProductionQueueSaveData(
     long NextProcessSequence,
     IReadOnlyList<ProductionQueueJobSaveData> Jobs);
 
+public sealed record ProductionQueueNetworkSaveData(
+    IReadOnlyList<ProductionQueueSaveData> Stations);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -112,7 +115,8 @@ public sealed record SaveGameSnapshot(
     IReadOnlyList<InventoryItemSaveData> Inventory,
     VisitedPlanetSaveData VisitedPlanet,
     TechnologyProgressSaveData? TechnologyProgress = null,
-    ProductionQueueSaveData? ProductionQueue = null);
+    ProductionQueueSaveData? ProductionQueue = null,
+    ProductionQueueNetworkSaveData? ProductionQueueNetwork = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

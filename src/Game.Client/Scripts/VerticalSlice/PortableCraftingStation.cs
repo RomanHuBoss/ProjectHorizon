@@ -68,16 +68,17 @@ public partial class PortableCraftingStation : StaticBody3D, IInteractable
             return;
         }
 
+        (Color idleAlbedo, Color idleEmission) = GetIdleColors();
         Color albedo = _crafted
             ? new Color(0.10f, 0.62f, 0.30f)
             : _crafting
                 ? new Color(0.86f, 0.48f, 0.08f)
-                : new Color(0.50f, 0.22f, 0.72f);
+                : idleAlbedo;
         Color emission = _crafted
             ? new Color(0.02f, 0.30f, 0.08f)
             : _crafting
                 ? new Color(0.42f, 0.16f, 0.01f)
-                : new Color(0.18f, 0.04f, 0.34f);
+                : idleEmission;
         _mesh.MaterialOverride = new StandardMaterial3D
         {
             AlbedoColor = albedo,
@@ -88,4 +89,26 @@ public partial class PortableCraftingStation : StaticBody3D, IInteractable
             Roughness = 0.34f
         };
     }
+    private (Color Albedo, Color Emission) GetIdleColors()
+    {
+        return StationId switch
+        {
+            "station.smelter" =>
+                (new Color(0.64f, 0.22f, 0.08f),
+                 new Color(0.34f, 0.06f, 0.01f)),
+            "station.refinery" =>
+                (new Color(0.10f, 0.36f, 0.62f),
+                 new Color(0.02f, 0.14f, 0.34f)),
+            "station.distillation_column" =>
+                (new Color(0.08f, 0.55f, 0.58f),
+                 new Color(0.01f, 0.27f, 0.29f)),
+            "station.chemical_processor" =>
+                (new Color(0.32f, 0.58f, 0.12f),
+                 new Color(0.12f, 0.30f, 0.02f)),
+            _ =>
+                (new Color(0.50f, 0.22f, 0.72f),
+                 new Color(0.18f, 0.04f, 0.34f))
+        };
+    }
+
 }

@@ -202,6 +202,20 @@ public sealed class ProductionQueueRuntime
         }
     }
 
+    public double RechargeEnergy(double amount)
+    {
+        if (!double.IsFinite(amount) || amount < 0.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(amount),
+                "Recharge amount must be finite and non-negative.");
+        }
+
+        double before = EnergyRemaining;
+        EnergyRemaining = Math.Min(EnergyCapacity, EnergyRemaining + amount);
+        return EnergyRemaining - before;
+    }
+
     public bool TryConsumeInventory(
         string definitionId,
         int quantity,

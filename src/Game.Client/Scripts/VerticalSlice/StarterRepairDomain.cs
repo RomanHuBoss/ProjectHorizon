@@ -320,7 +320,8 @@ public sealed class StarterRepairSession
             return StationCraftResult.TechnologyLocked;
         }
 
-        if (HasRecipeOutputs(recipe))
+        if (!IndustryRecipePolicy.IsRepeatable(recipe) &&
+            HasRecipeOutputs(recipe))
         {
             result = $"recipe {recipe.RecipeId} already crafted";
             return StationCraftResult.AlreadyCrafted;
@@ -764,7 +765,8 @@ public static class StarterRepairSnapshotFactory
         double playerPositionY,
         double playerPositionZ,
         TechnologyProgressSaveData? technologyProgress = null,
-        ProductionQueueSaveData? productionQueue = null)
+        ProductionQueueSaveData? productionQueue = null,
+        ProductionQueueNetworkSaveData? productionQueueNetwork = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -832,7 +834,8 @@ public static class StarterRepairSnapshotFactory
                 updatedUtc,
                 1),
             technologyProgress,
-            productionQueue);
+            productionQueue,
+            productionQueueNetwork);
     }
 }
 

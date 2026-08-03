@@ -243,7 +243,8 @@ public sealed class StationRecipeSelectorModel
             .Select(recipe => new StationRecipeSelectorEntry(
                 recipe,
                 _technologyProgression.IsUnlocked(recipe.RequiredTechnology),
-                _session.IsRecipeCrafted(recipe.RecipeId),
+                !IndustryRecipePolicy.IsRepeatable(recipe) &&
+                    _session.IsRecipeCrafted(recipe.RecipeId),
                 recipe.Inputs.Sum(input => Math.Max(
                     0,
                     input.Quantity -

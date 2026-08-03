@@ -365,6 +365,182 @@ mesh = SubResource("ResourceMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CeramicCompositeBeta"]
 shape = SubResource("ResourceShape")
 
+[node name="FerricOreAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, -16.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "ferric.alpha"
+ResourceDefinitionId = "resource.ferric_ore"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/FerricOreAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/FerricOreAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="FerricOreBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.0, 0.7, -16.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "ferric.beta"
+ResourceDefinitionId = "resource.ferric_ore"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/FerricOreBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/FerricOreBeta"]
+shape = SubResource("ResourceShape")
+
+[node name="IceWaterAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, -12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "icewater.alpha"
+ResourceDefinitionId = "resource.ice_water"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/IceWaterAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/IceWaterAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="IceWaterBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.0, 0.7, -12.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "icewater.beta"
+ResourceDefinitionId = "resource.ice_water"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/IceWaterBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/IceWaterBeta"]
+shape = SubResource("ResourceShape")
+
+[node name="ParaffiniumAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, -8.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "paraffinium.alpha"
+ResourceDefinitionId = "resource.paraffinium"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/ParaffiniumAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ParaffiniumAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="ParaffiniumBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.0, 0.7, -8.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "paraffinium.beta"
+ResourceDefinitionId = "resource.paraffinium"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/ParaffiniumBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ParaffiniumBeta"]
+shape = SubResource("ResourceShape")
+
+[node name="RawCompotiumAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, -4.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "compotium.alpha"
+ResourceDefinitionId = "resource.raw_compotium"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/RawCompotiumAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/RawCompotiumAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="RawCompotiumBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.0, 0.7, -4.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "compotium.beta"
+ResourceDefinitionId = "resource.raw_compotium"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/RawCompotiumBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/RawCompotiumBeta"]
+shape = SubResource("ResourceShape")
+
+[node name="AcidicBrineAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, 0.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "brine.alpha"
+ResourceDefinitionId = "resource.acidic_brine"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AcidicBrineAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AcidicBrineAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="AcidicBrineBeta" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15.0, 0.7, 0.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "brine.beta"
+ResourceDefinitionId = "resource.acidic_brine"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/AcidicBrineBeta"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/AcidicBrineBeta"]
+shape = SubResource("ResourceShape")
+
+[node name="CatalyticDustAlpha" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_resource"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -18.0, 0.7, 4.0)
+script = ExtResource("3_resource")
+ResourceNodeId = "catalyst.alpha"
+ResourceDefinitionId = "resource.catalytic_dust"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/CatalyticDustAlpha"]
+mesh = SubResource("ResourceMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/CatalyticDustAlpha"]
+shape = SubResource("ResourceShape")
+
+[node name="Smelter" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -11.5, 0.8, -10.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.smelter"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/Smelter"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/Smelter"]
+shape = SubResource("CraftingStationShape")
+
+[node name="Refinery" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -6.0, 0.8, 15.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.refinery"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/Refinery"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/Refinery"]
+shape = SubResource("CraftingStationShape")
+
+[node name="DistillationColumn" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0, 0.8, 15.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.distillation_column"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/DistillationColumn"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/DistillationColumn"]
+shape = SubResource("CraftingStationShape")
+
+[node name="ChemicalProcessor" type="StaticBody3D" parent="Gameplay" groups=["interactable", "vertical_slice_crafting_station"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.0, 0.8, -2.0)
+script = ExtResource("5_crafting_station")
+StationId = "station.chemical_processor"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/ChemicalProcessor"]
+mesh = SubResource("CraftingStationMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/ChemicalProcessor"]
+shape = SubResource("CraftingStationShape")
+
 [node name="LandingPad" type="StaticBody3D" parent="Gameplay"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19, -10)
 

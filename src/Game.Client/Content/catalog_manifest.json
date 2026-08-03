@@ -6,7 +6,7 @@
   "recipes": 128,
   "stations": 15,
   "technologies": 32,
-  "runtimeEnabledRecipes": 10,
+  "runtimeEnabledRecipes": 16,
   "chemistryRecipes": 30,
   "compotiumRecipes": 13,
   "paraffiniumRecipes": 5,
