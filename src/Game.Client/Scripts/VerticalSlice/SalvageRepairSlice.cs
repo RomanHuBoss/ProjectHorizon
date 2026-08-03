@@ -49,6 +49,8 @@ public partial class SalvageRepairSlice : Node3D
 
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly List<SalvageResourceNode> _resourceNodes = new();
+    private IReadOnlyList<CatalogResourcePlacement>
+        _generatedResourcePlacements = Array.Empty<CatalogResourcePlacement>();
     private readonly List<PortableCraftingStation> _craftingStations = new();
     private readonly Dictionary<string, CraftingRecipeDefinition>
         _stationRecipes = new(StringComparer.Ordinal);
@@ -75,6 +77,8 @@ public partial class SalvageRepairSlice : Node3D
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
     private Task<VerticalSliceAcceptanceReport>? _acceptanceTask;
+    private Task<CatalogResourceLifecycleAcceptanceReport>?
+        _catalogResourceLifecycleAcceptanceTask;
     private Task<DataDrivenContentAcceptanceReport>? _contentAcceptanceTask;
     private Task<CraftingExpansionAcceptanceReport>? _craftingAcceptanceTask;
     private Task<CraftTimeAcceptanceReport>? _craftTimeAcceptanceTask;
@@ -96,6 +100,8 @@ public partial class SalvageRepairSlice : Node3D
     private Task<GracefulExitResult>? _gracefulExitTask;
     private SaveDatabaseDiagnostics? _diagnostics;
     private VerticalSliceAcceptanceReport? _acceptanceReport;
+    private CatalogResourceLifecycleAcceptanceReport?
+        _catalogResourceLifecycleAcceptanceReport;
     private DataDrivenContentAcceptanceReport? _contentAcceptanceReport;
     private CraftingExpansionAcceptanceReport? _craftingAcceptanceReport;
     private CraftTimeAcceptanceReport? _craftTimeAcceptanceReport;
@@ -127,6 +133,7 @@ public partial class SalvageRepairSlice : Node3D
     private bool _previousAutoAcceptQuit = true;
     private string _status = "initializing SQLite";
     private string _acceptanceHud = "READY";
+    private string _catalogResourceLifecycleAcceptanceHud = "READY";
     private string _contentAcceptanceHud = "READY";
     private string _craftingAcceptanceHud = "READY";
     private string _craftTimeAcceptanceHud = "READY";
@@ -289,6 +296,8 @@ public partial class SalvageRepairSlice : Node3D
             repairRecipe,
             technologyProgression.IsUnlocked,
             stationRecipes);
+        _generatedResourcePlacements =
+            GenerateMissingCatalogResourceNodes(catalog);
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -365,8 +374,8 @@ public partial class SalvageRepairSlice : Node3D
             "runtime acceptance, F3 for " +
             "selector/research acceptance, F4 for the complete Industry " +
             "Content v2 structural acceptance, F5 for " +
-            "the playable runtime matrix, F6/F7/F9/F10/F11/F12 for " +
-            "regressions or F8 to reset.");
+            "the playable runtime matrix, F6/F9/F10/F11/F12 for " +
+            "regressions, F7 for complete resource acceptance or F8 to reset.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -396,6 +405,14 @@ public partial class SalvageRepairSlice : Node3D
             "source=ProductionNetworkRuntime; aggregate=jobs+states+energy; " +
             "stationDetails=enabled; legacyFallback=enabled; " +
             "falseUnavailable=guarded.");
+        GD.Print(
+            "TASK-100 catalog resource lifecycle READY: " +
+            $"catalog={ContentCatalog.Resources.Count}; " +
+            $"physicalTypes={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}; " +
+            $"nodes={_resourceNodes.Count}; " +
+            $"generated={_generatedResourcePlacements.Count}; " +
+            "genericCollection=enabled; mirrors=enabled; " +
+            "depletionPersistence=enabled; reset=enabled.");
     }
 
     public override void _Notification(int what)
@@ -423,6 +440,7 @@ public partial class SalvageRepairSlice : Node3D
         PollLoadTask();
         PollResetTask();
         PollAcceptanceTask();
+        PollCatalogResourceLifecycleAcceptanceTask();
         PollContentAcceptanceTask();
         PollCraftingAcceptanceTask();
         PollCraftTimeAcceptanceTask();
@@ -1739,6 +1757,78 @@ public partial class SalvageRepairSlice : Node3D
         };
     }
 
+    private IReadOnlyList<CatalogResourcePlacement>
+        GenerateMissingCatalogResourceNodes(GameContentCatalog catalog)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        Node3D gameplay = GetNode<Node3D>("Gameplay");
+        string[] existingDefinitions = GetTree()
+            .GetNodesInGroup("vertical_slice_resource")
+            .OfType<SalvageResourceNode>()
+            .Select(node => node.ResourceDefinitionId)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        IReadOnlyList<CatalogResourcePlacement> placements =
+            CatalogResourceFieldPlanner.BuildMissingPlacements(
+                catalog.Resources,
+                existingDefinitions);
+        if (placements.Count == 0)
+        {
+            return placements;
+        }
+
+        Node3D field = gameplay.GetNodeOrNull<Node3D>(
+            "CatalogResourceField") ?? new Node3D
+            {
+                Name = "CatalogResourceField"
+            };
+        if (field.GetParent() is null)
+        {
+            gameplay.AddChild(field);
+        }
+
+        foreach (CatalogResourcePlacement placement in placements)
+        {
+            SalvageResourceNode resourceNode = new()
+            {
+                Name = placement.NodeName,
+                ResourceNodeId = placement.ResourceNodeId,
+                ResourceDefinitionId = placement.ResourceDefinitionId,
+                Position = new Vector3(
+                    (float)placement.PositionX,
+                    (float)placement.PositionY,
+                    (float)placement.PositionZ)
+            };
+            resourceNode.AddChild(new MeshInstance3D
+            {
+                Name = "MeshInstance3D",
+                Mesh = new CylinderMesh
+                {
+                    TopRadius = 0.42f,
+                    BottomRadius = 0.62f,
+                    Height = 1.2f,
+                    RadialSegments = 8,
+                    Rings = 2
+                }
+            });
+            resourceNode.AddChild(new CollisionShape3D
+            {
+                Name = "CollisionShape3D",
+                Shape = new CylinderShape3D
+                {
+                    Radius = 0.62f,
+                    Height = 1.2f
+                }
+            });
+            field.AddChild(resourceNode);
+            resourceNode.AddToGroup("interactable");
+            resourceNode.AddToGroup("vertical_slice_resource");
+        }
+
+        return placements;
+    }
+
     private void ValidateResourceNodeBindings()
     {
         if (_shipTerminal is null || !string.Equals(
@@ -1832,12 +1922,42 @@ public partial class SalvageRepairSlice : Node3D
         {
             GameResourceDefinition definition =
                 ContentCatalog.GetResource(node.ResourceDefinitionId);
+            GameItemDefinition item = ContentCatalog.GetItem(
+                definition.ItemDefinitionId);
             node.ConfigureDefinition(definition);
+            if (node.Quantity > item.MaxStack)
+            {
+                throw new InvalidOperationException(
+                    $"Resource node {node.ResourceNodeId} yields " +
+                    $"{node.Quantity}, exceeding {item.DefinitionId}.MaxStack=" +
+                    $"{item.MaxStack}.");
+            }
+
             availableByDefinition.TryGetValue(
                 definition.ItemDefinitionId,
                 out int current);
             availableByDefinition[definition.ItemDefinitionId] =
                 current + node.Quantity;
+        }
+
+        string[] physicalResourceDefinitionIds = _resourceNodes
+            .Select(node => node.ResourceDefinitionId)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .ToArray();
+        if (!CatalogResourceFieldPlanner.CoversCatalog(
+                ContentCatalog.Resources,
+                physicalResourceDefinitionIds))
+        {
+            string[] missing = ContentCatalog.Resources.Keys
+                .Except(
+                    physicalResourceDefinitionIds,
+                    StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+            throw new InvalidOperationException(
+                "Vertical slice does not physically cover all catalog " +
+                "resources: " + string.Join(", ", missing));
         }
 
         foreach (CraftingRecipeDefinition recipe in
@@ -1925,6 +2045,14 @@ public partial class SalvageRepairSlice : Node3D
             $"sceneStations={_craftingStations.Count}; " +
             $"resourceNodes={_resourceNodes.Count}; " +
             "allInputsCovered=1; allCraftTimesPositive=1.");
+        GD.Print(
+            "TASK-100 catalog resource binding PASS: " +
+            $"catalog={ContentCatalog.Resources.Count}; " +
+            $"physicalTypes={physicalResourceDefinitionIds.Length}; " +
+            $"nodes={_resourceNodes.Count}; " +
+            $"authored={_resourceNodes.Count - _generatedResourcePlacements.Count}; " +
+            $"generated={_generatedResourcePlacements.Count}; " +
+            "unique=1; deterministicYield=1; maxStack=1; coverage=1.");
         CraftingRecipeDefinition[] portableRecipes = stationRecipes
             .Where(recipe => string.Equals(
                 recipe.RequiredStation,
@@ -2276,6 +2404,7 @@ public partial class SalvageRepairSlice : Node3D
             _loadTask is null &&
             _resetTask is null &&
             _acceptanceTask is null &&
+            _catalogResourceLifecycleAcceptanceTask is null &&
             _contentAcceptanceTask is null &&
             _craftingAcceptanceTask is null &&
             _craftTimeAcceptanceTask is null &&
@@ -2353,21 +2482,37 @@ public partial class SalvageRepairSlice : Node3D
         string directory = Path.GetDirectoryName(_database.DatabasePath) ??
             throw new InvalidOperationException(
                 "Vertical slice database directory could not be resolved.");
-        string testPath = Path.Combine(
+        ResourceNodeBinding[] bindings = BuildResourceBindings().Values
+            .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
+            .ToArray();
+        string verticalSliceTestPath = Path.Combine(
             directory,
             "save_1.vertical-slice-test.db");
+        string resourceLifecycleTestPath = Path.Combine(
+            directory,
+            "save_1.resource-lifecycle-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-062 acceptance running";
+        _status = "TASK-062/TASK-100 resource acceptance running";
         _acceptanceHud = "RUNNING";
+        _catalogResourceLifecycleAcceptanceHud = "RUNNING";
         _acceptanceReport = null;
+        _catalogResourceLifecycleAcceptanceReport = null;
         _acceptanceTask = VerticalSliceAcceptanceRunner.RunAsync(
-            testPath,
+            verticalSliceTestPath,
             SlotId,
             RepairRecipe,
-            BuildResourceBindings().Values
-                .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
-                .ToArray(),
+            bindings,
             _lifetimeCancellation.Token);
+        _catalogResourceLifecycleAcceptanceTask =
+            CatalogResourceLifecycleAcceptanceRunner.RunAsync(
+                resourceLifecycleTestPath,
+                SlotId,
+                ContentCatalog,
+                RepairRecipe,
+                StationRecipes,
+                bindings,
+                _generatedResourcePlacements,
+                _lifetimeCancellation.Token);
     }
 
     private void BeginContentAcceptance()
@@ -2932,9 +3077,6 @@ public partial class SalvageRepairSlice : Node3D
                   $"autosave={(_acceptanceReport.QuestAutosaveObserved ? 1 : 0)}, " +
                   $"roundTrip={(_acceptanceReport.ExactRoundTrip ? 1 : 0)}"
                 : $"FAIL {_acceptanceReport.Result}";
-            _state = _acceptanceReport.Passed
-                ? SalvageRepairSliceState.Passed
-                : SalvageRepairSliceState.Failed;
             _status = _acceptanceReport.Result;
             string output = BuildAcceptanceOutput(_acceptanceReport);
             if (_acceptanceReport.Passed)
@@ -2945,11 +3087,84 @@ public partial class SalvageRepairSlice : Node3D
             {
                 GD.PushError(output);
             }
+
+            UpdateCombinedResourceAcceptanceState();
         }
         catch (Exception exception)
         {
             Fail("acceptance", exception);
         }
+    }
+
+    private void PollCatalogResourceLifecycleAcceptanceTask()
+    {
+        if (_catalogResourceLifecycleAcceptanceTask is null ||
+            !_catalogResourceLifecycleAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<CatalogResourceLifecycleAcceptanceReport> task =
+            _catalogResourceLifecycleAcceptanceTask;
+        _catalogResourceLifecycleAcceptanceTask = null;
+        try
+        {
+            _catalogResourceLifecycleAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            CatalogResourceLifecycleAcceptanceReport report =
+                _catalogResourceLifecycleAcceptanceReport;
+            _catalogResourceLifecycleAcceptanceHud = report.Passed
+                ? $"PASS catalog={report.CatalogResources}, " +
+                  $"physical={report.PhysicalResourceTypes}, " +
+                  $"nodes={report.ResourceNodes}, " +
+                  $"generated={report.GeneratedNodes}, " +
+                  $"collectTypes={report.CollectedResourceTypes}, " +
+                  $"collectNodes={report.CollectedResourceNodes}, " +
+                  $"duplicate={(report.DuplicateRejected ? 1 : 0)}, " +
+                  $"mirrors={(report.InventoryMirrorsSynchronized ? 1 : 0)}, " +
+                  $"depletion={(report.DepletionPersisted ? 1 : 0)}, " +
+                  $"restore={(report.ColdRestoreExact ? 1 : 0)}, " +
+                  $"reset={(report.ResetReady ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _status = report.Result;
+            string output = BuildCatalogResourceLifecycleAcceptanceOutput(
+                report);
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+
+            UpdateCombinedResourceAcceptanceState();
+        }
+        catch (Exception exception)
+        {
+            Fail("catalog resource lifecycle acceptance", exception);
+        }
+    }
+
+    private void UpdateCombinedResourceAcceptanceState()
+    {
+        if (_acceptanceTask is not null ||
+            _catalogResourceLifecycleAcceptanceTask is not null ||
+            _acceptanceReport is null ||
+            _catalogResourceLifecycleAcceptanceReport is null)
+        {
+            return;
+        }
+
+        bool passed = _acceptanceReport.Passed &&
+            _catalogResourceLifecycleAcceptanceReport.Passed;
+        _state = passed
+            ? SalvageRepairSliceState.Passed
+            : SalvageRepairSliceState.Failed;
+        _status = passed
+            ? "TASK-062/TASK-100 resource acceptance passed"
+            : "TASK-062/TASK-100 resource acceptance failed";
     }
 
     private void PollContentAcceptanceTask()
@@ -3910,6 +4125,7 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
                 $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
                 $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
+                $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -3919,7 +4135,7 @@ public partial class SalvageRepairSlice : Node3D
                 "F1 - production queue • " +
                 "F2 - chemical runtime • " +
                 "F3 - selector acceptance • F4/F5 - catalogs • " +
-                "F6/F7/F9/F10/F11/F12 - regressions";
+                "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
 
@@ -3934,8 +4150,10 @@ public partial class SalvageRepairSlice : Node3D
             detailedStationsLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
-            $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
-            $"{_resourceNodes.Count}\n" +
+            $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
+            $"nodes={_resourceNodes.Count} • collected={Session.CollectedNodeCount} • " +
+            $"generated={_generatedResourcePlacements.Count}\n" +
+            $"Snapshot: rev={_revision}\n" +
             objective + "\n" +
             ship + "\n" +
             $"Interaction: {interaction}\n" +
@@ -3946,12 +4164,13 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
             $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
             $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
+            $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
-            $"TASK-062 gameplay (F7): {_acceptanceHud}\n" +
+            $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
             $"TASK-066 crafting (F10): {_craftingAcceptanceHud}\n" +
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
@@ -3962,7 +4181,7 @@ public partial class SalvageRepairSlice : Node3D
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +
-            "F5 - runtime matrix • F6/F7/F9/F10/F11/F12 - regressions • " +
+            "F5 - runtime matrix • F6/F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • Esc - close selector/release mouse";
     }
 
@@ -4083,6 +4302,33 @@ public partial class SalvageRepairSlice : Node3D
             $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
             $"logWritten={(report.LogWritten ? 1 : 0)}; " +
             $"revision={report.Revision}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildCatalogResourceLifecycleAcceptanceOutput(
+        CatalogResourceLifecycleAcceptanceReport report)
+    {
+        return "TASK-100 catalog resource lifecycle acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"catalog={report.CatalogResources}; " +
+            $"physicalTypes={report.PhysicalResourceTypes}; " +
+            $"nodes={report.ResourceNodes}; " +
+            $"generated={report.GeneratedNodes}; " +
+            $"collectedTypes={report.CollectedResourceTypes}; " +
+            $"collectedNodes={report.CollectedResourceNodes}; " +
+            $"metadata={(report.CatalogMetadataValid ? 1 : 0)}; " +
+            $"placement={(report.DeterministicPlacement ? 1 : 0)}; " +
+            $"unique={(report.UniqueNodes ? 1 : 0)}; " +
+            $"duplicateRejected={(report.DuplicateRejected ? 1 : 0)}; " +
+            $"mirrors={(report.InventoryMirrorsSynchronized ? 1 : 0)}; " +
+            $"depletion={(report.DepletionPersisted ? 1 : 0)}; " +
+            $"coldRestore={(report.ColdRestoreExact ? 1 : 0)}; " +
+            $"reset={(report.ResetReady ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
             $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
             $"integrity={report.Diagnostics.IntegrityResult}; " +
             $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +

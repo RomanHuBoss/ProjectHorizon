@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, multi-station production network и aggregate HUD — `IMPLEMENTED`
+### Industry Content v2 и production network — `VERIFIED`; полный resource lifecycle — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени. Основной HUD строится непосредственно из `ProductionNetworkRuntime`: агрегирует jobs, состояния и энергию всех пяти станций, показывает постанционную строку `[R/Q/P]` и не считает исправно инициализированную idle network недоступной.
+Редакция содержит шестнадцать runtime-enabled recipes: стартовый ремонт, девять корабельных компонентов PortableFabricator и связную шестирецептурную линию Refining/Chemistry. В сцене работают пять физических типов станций: PortableFabricator, Smelter, Refinery, DistillationColumn и ChemicalProcessor. Каждая станция получает свой список рецептов из JSON, собственную очередь, слоты и энергетический бюджет, но все станции синхронизированы с единым player inventory. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и сеть незавершённых production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Refining/Chemistry recipes являются повторяемыми, их продукты можно использовать как inputs следующих станций. Энергия каждой station автоматически восстанавливается от нуля до capacity за 60 секунд игрового времени. Основной HUD строится непосредственно из `ProductionNetworkRuntime`: агрегирует jobs, состояния и энергию всех пяти станций, показывает постанционную строку `[R/Q/P]` и не считает исправно инициализированную idle network недоступной. Resource layer vertical slice теперь физически покрывает все 42 world-resource definitions: 32 ранее созданных узла сохранены, а для 26 отсутствовавших типов создаётся детерминированное data-driven поле. Всего в сцене доступно 58 узлов; сбор, duplicate protection, расход, зеркала inventory производственной сети, depletion, autosave/cold restore и `F8` reset используют единый generic lifecycle.
 
 В состав v2 входят:
 
@@ -114,7 +114,7 @@ F3             TASK-082: universal selector + research + persistence
 F4             TASK-080: весь Industry Content v2 (128 recipes)
 F5             TASK-076: playable runtime matrix (16 recipes / 15 station recipes)
 F6             регрессия coolant path
-F7             регрессия salvage → repair
+F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
 F8             очистить gameplay-slot
 F9             регрессия strict JSON catalog
 F10            регрессия launch-capacitor persistence
@@ -135,6 +135,14 @@ TASK-098 production network HUD (F1): PASS stations=5, aggregate=1, transitions=
 ```
 
 `F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Параллельный изолированный `TASK-093` проверяет детерминированные `Q/P/S`, зависимость dismantle returns от свойств предмета и exact SQLite round-trip. `TASK-096` прогоняет четыре специализированные station types и шесть связанных recipes: refined ferrite, purified water, Paraffinium fraction/lubricant и raw Compotium solution/concentrate. `TASK-098` строит aggregate HUD по всем пяти физическим станциям и проверяет aggregate counts/energy, одновременную работу Smelter и Refinery, pause/resume, cancel/refund, completion, recharge, exact cold restore без offline progress, legacy single-queue fallback и отсутствие ложного `unavailable`. Используются отдельные БД `save_1.production-queue-test.db`, `save_1.item-properties-dismantle-test.db`, `save_1.multi-station-industry-test.db` и `save_1.production-network-hud-test.db`; gameplay-slot не изменяется.
+
+Ожидаемый дополнительный `F7` HUD:
+
+```text
+TASK-100 resource lifecycle (F7): PASS catalog=42, physical=42, nodes=58, generated=26, collectTypes=42, collectNodes=58, duplicate=1, mirrors=1, depletion=1, restore=1, reset=1, roundTrip=1
+```
+
+`F7` одновременно сохраняет прежнюю регрессию `TASK-062` и запускает отдельную БД `save_1.resource-lifecycle-test.db`. `TASK-100` выбирает по одному физическому узлу каждого из 42 типов, проверяет metadata и MaxStack, собирает весь baseline, отклоняет повторный сбор, синхронно расходует часть ресурсов в session и во всех station inventory mirrors, выполняет exact SQLite round-trip, cold restore, database reset, `maxWriters=1` и `integrity=ok`. Gameplay-slot не изменяется.
 
 
 ### Multi-station Paraffinium and Compotium starter line
@@ -164,6 +172,22 @@ Stations: PortableFabricator 80/80 [0R/0Q/0P] • Smelter 140/180 [1R/0Q/0P] •
 Detailed mode показывает все станции. Compact mode показывает активные stations и `+N idle stations`. Значение `Production network: unavailable (...)` допустимо только при реальном отсутствии или исключении инициализации runtime; пустая сеть с `jobs=0` остаётся доступной.
 
 Для ручной приёмки после `F8` запустите `refined_ferrite` на Smelter и `purified_water` на Refinery, добавьте queue job, выполните pause/resume и cancel, дождитесь completion, затем штатно перезапустите игру с незавершёнными running/queued/paused jobs. Сводка должна немедленно отражать каждое изменение и восстановить elapsed, states и station energy без offline progress.
+
+### Catalog-wide resource lifecycle
+
+При старте `CatalogResourceFieldPlanner` сравнивает `Content/resources.json` с hand-authored узлами сцены. Для каждого отсутствующего типа создаётся один `SalvageResourceNode` со стабильным ID `catalog.<resource>`, детерминированной позицией и материалом из `ResourceVisualDefinition`. Текущая контрольная конфигурация:
+
+```text
+catalogResources=42
+physicalResourceTypes=42
+authoredNodes=32
+generatedNodes=26
+totalNodes=58
+```
+
+Сгенерированное поле расположено на расширенной тестовой площадке в секторе `z=23.0..36.5`. Все узлы используют существующее взаимодействие `E`, deterministic yield, MaxStack validation и одноразовый collection ID. Собранное состояние сохраняется как inventory delta; после cold restart узел остаётся скрытым, а его остаток и production-network mirrors восстанавливаются. `F8` удаляет snapshot и возвращает все 58 узлов. SQLite schema остаётся `2`.
+
+Ручной smoke-test: нажмите `F8`, убедитесь в detailed HUD `types=42/42`, `nodes=58`, `generated=26`; соберите любой узел из generated field; выполните штатный выход и повторный запуск — выбранный узел не должен появиться снова; затем нажмите `F8` и убедитесь, что он снова доступен. Полное покрытие всех 42 типов проверяется автоматически клавишей `F7`.
 
 ### Ручная проверка Queue-вкладки
 
@@ -697,3 +721,8 @@ physical stations, job states and energy, shows per-station `[R/Q/P]` counters,
 and treats an initialized network with zero jobs as available. F1 validates the
 projection, transitions, recharge, cold restore, legacy fallback and SQLite
 integrity in `save_1.production-network-hud-test.db`.
+
+
+## Catalog-wide resource lifecycle closure
+
+`TASK-100` closes the vertical-slice resource subsystem against the fixed v2 baseline. Every one of the 42 world-resource definitions is represented by a physical generic node. Missing scene types are generated deterministically, while existing authored nodes and their stable IDs remain unchanged for save compatibility. Collection, duplicate rejection, available inventory, station mirrors, depletion, cold restore and reset are covered by the isolated F7 acceptance database `save_1.resource-lifecycle-test.db`. No SQLite schema migration is introduced. After `TASK-101` runtime acceptance, further functional iterations may consume the established resource API but should not add separate resource-lifecycle mechanics unless a confirmed defect requires it.

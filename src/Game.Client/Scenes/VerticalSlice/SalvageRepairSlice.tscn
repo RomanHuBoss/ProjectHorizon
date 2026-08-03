@@ -12,10 +12,10 @@ roughness = 0.92
 
 [sub_resource type="BoxMesh" id="GroundMesh"]
 material = SubResource("GroundMaterial")
-size = Vector3(40, 0.2, 40)
+size = Vector3(80, 0.2, 80)
 
 [sub_resource type="BoxShape3D" id="GroundShape"]
-size = Vector3(40, 0.2, 40)
+size = Vector3(80, 0.2, 80)
 
 [sub_resource type="CylinderMesh" id="ResourceMesh"]
 top_radius = 0.42

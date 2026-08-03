@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-production-network-hud.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-resource-lifecycle-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,68 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и многостанционная production network подтверждены пользователем. `TASK-096/097` приняты по clean build `0/0`, автоматическому `F1`, ручной многостанционной проверке, cold restore и регрессиям. Текущая итерация не расширяет производственный контент: она заменяет устаревшую single-queue диагностику на единую HUD-проекцию всех пяти физических станций.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network и aggregate HUD подтверждены пользователем. `TASK-098/099` приняты по фактическому запуску Godot 4.7.1, строке `TASK-098 ... PASS`, корректной HUD-сводке пяти stations и ручному выполнению jobs на Smelter/Refinery. Текущая итерация закрывает ресурсную подсистему vertical slice по фиксированному baseline v2.0: все 42 world resources получают физическое представление, единый collection/depletion/persistence lifecycle и изолированную F7-приёмку.
 
 ## 3. Результат текущей итерации от 2026-08-03
+
+### 2026-08-03 — закрытие catalog-wide resource lifecycle (`TASK-100`)
+
+**Исходный снимок:** `ProjectHorizon-main(1)(8).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-resource-lifecycle-closure.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** ТЗ v2.0 §9.9, §17.1–17.3, §22.4–22.6, §23, §45.1, §46.1–46.4, §53 и Этап 1: физическая добыча, stable IDs, inventory/depletion delta, static definitions вне SQLite, 42 world resources, persistence compatibility и reset.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь запустил post-hotfix редакцию в Godot Engine 4.7.1 Mono и подтвердил корректную HUD-сводку `stations=5`, полную постанционную детализацию и отсутствие ложного `Production queue: unavailable`;
+- `TASK-098 production network HUD acceptance PASS`: `stations=5; aggregateCounts=1; aggregateEnergy=1; simultaneousRunning=1; pauseResume=1; cancel=1; completion=1; recharge=1; coldRestore=1; legacyFallback=1; falseUnavailable=0; roundTrip=1; maxWriters=1; integrity=ok`;
+- вручную выполнены enqueue/completion на Smelter и Refinery с autosave; пользователь подтвердил: «вроде, работает всё»;
+- `TASK-098` и `TASK-099` переведены в `VERIFIED`; `INDUSTRY-080`–`INDUSTRY-085` и `INDUSTRY-ACC-075`–`INDUSTRY-ACC-079` синхронизированы как `VERIFIED`.
+
+**Реализовано:**
+
+- добавлен Godot-independent `CatalogResourceFieldPlanner`; он сравнивает 42 определения `resources.json` с hand-authored scene bindings и детерминированно размещает отсутствующие resource types;
+- сохранены все 32 существующих узла и их stable IDs; для 26 отсутствовавших типов создаётся по одному generic `SalvageResourceNode`; итог: `42` физических типа и `58` узлов;
+- generated IDs имеют формат `catalog.<resource_suffix>`, позиции стабильны и не пересекаются; тестовая площадка расширена до `80×80`;
+- каждый узел получает deterministic yield и visual material из `GameResourceDefinition`; startup validation проверяет stable ID, catalog coverage, uniqueness и `yield <= MaxStack`;
+- generic collection использует прежний `StarterRepairSession`, запрещает повторный сбор, синхронизирует available inventory со всеми очередями `ProductionNetworkRuntime`, сохраняет depletion и восстанавливает скрытое состояние после cold start;
+- старые snapshots с только hand-authored resource nodes остаются совместимыми, поскольку их IDs не изменены, а generated IDs добавлены без schema migration; SQLite schema остаётся `2`;
+- detailed HUD показывает `types=42/42`, число nodes, collected и generated; startup Output печатает binding/READY diagnostics;
+- `F7` сохраняет прежнюю `TASK-062` regression и параллельно запускает изолированную `TASK-100` acceptance в `save_1.resource-lifecycle-test.db`; gameplay-slot не изменяется;
+- acceptance проверяет все 42 типа, точные counts `32+26=58`, metadata/MaxStack, deterministic placement, collection, duplicate rejection, inventory mirrors, частичный расход/depletion, exact SQLite round-trip, cold restore, реальный `ResetSlotAsync`, autosave log, `maxWriters=1` и `integrity=ok`.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/CatalogResourceFieldPlanner.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/CatalogResourceLifecycleAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-098`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-099`: `IN_PROGRESS` → `VERIFIED`;
+- `TASK-100`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-101`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F7 catalog resource lifecycle, manual generated-node cold restore/reset и regressions;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Ожидаемый F7 HUD:**
+
+```text
+TASK-100 resource lifecycle (F7): PASS catalog=42, physical=42, nodes=58, generated=26, collectTypes=42, collectNodes=58, duplicate=1, mirrors=1, depletion=1, restore=1, reset=1, roundTrip=1
+```
+
+**Ожидаемая строка Output:**
+
+```text
+TASK-100 catalog resource lifecycle acceptance PASS: catalog=42; physicalTypes=42; nodes=58; generated=26; collectedTypes=42; collectedNodes=58; metadata=1; placement=1; unique=1; duplicateRejected=1; mirrors=1; depletion=1; coldRestore=1; reset=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** runtime enforcement отдельных `ExtractionMethod`/`ScanTier`, процедурное распределение по биомам и специализированные tool animations относятся к будущим scan/tool/world-generation системам, а не к отдельным resource-lifecycle итерациям. После `TASK-101 → VERIFIED` ресурсная подсистема vertical slice считается закрытой; последующие механики используют существующий resource API и catalog без возврата к отдельному этапу ресурсов, кроме подтверждённого дефекта.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-101`.
 
 ### 2026-08-03 — единая HUD-сводка многостанционной производственной сети (`TASK-098`)
 
@@ -80,8 +139,8 @@
 
 - `TASK-096`: `IMPLEMENTED` → `VERIFIED`;
 - `TASK-097`: `IN_PROGRESS` → `VERIFIED`;
-- `TASK-098`: `PLANNED` → `IMPLEMENTED`;
-- `TASK-099`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F1 TASK-098, manual HUD transitions, cold restore и regression matrix;
+- `TASK-098`: `PLANNED` → `IMPLEMENTED` в этой исторической итерации; позднее подтверждён и переведён в `VERIFIED`;
+- `TASK-099`: `NOT_STARTED` → `IN_PROGRESS` в этой исторической итерации; позднее закрыт как `VERIFIED`;
 - `TASK-006` остаётся `BLOCKED`.
 
 **Автоматические критерии:**
@@ -96,7 +155,7 @@ TASK-098 production network HUD acceptance PASS: stations=5; aggregateCounts=1; 
 
 **Проверки в среде подготовки:** JSON catalog parse и counts; C# lexical/delimiter audit; проверка уникальности `.uid`; проверка всех `res://` references сцены; поиск legacy HUD-ветки и проверка, что игровой HUD использует aggregate projection. Повторная распаковка итогового ZIP и SHA-256 фиксируются при выдаче.
 
-**Ограничение:** .NET SDK и Godot отсутствуют в среде подготовки; фактический clean build и runtime-приёмка `TASK-098` остаются за `TASK-099`, который не переводится в `VERIFIED` до локального подтверждения пользователя.
+**Историческое ограничение:** на момент подготовки этой редакции .NET SDK и Godot отсутствовали. Последующее локальное runtime-подтверждение пользователя закрыло `TASK-098/099` как `VERIFIED`.
 
 ### 2026-08-03 — multi-station refining/chemistry и стартовая линия Компотия (`TASK-096`)
 
@@ -2787,17 +2846,35 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `INDUSTRY-080` | Основной HUD получает состояние из полного `ProductionNetworkRuntime` | `IMPLEMENTED` | `ProductionNetworkHudModel.Build(network)`; single-queue availability check удалён |
-| `INDUSTRY-081` | HUD агрегирует stations/jobs/running/queued/paused и energy | `IMPLEMENTED` | `ProductionNetworkHudSnapshot` суммирует все `ProductionQueueRuntime` |
-| `INDUSTRY-082` | HUD показывает компактную постанционную детализацию | `IMPLEMENTED` | `DisplayName energy/capacity [R/Q/P]`; active-only compact mode |
-| `INDUSTRY-083` | Исправно инициализированная idle network не считается unavailable | `IMPLEMENTED` | Empty-network projection: `IsAvailable=1`, `jobs=0` |
-| `INDUSTRY-084` | Сводка восстанавливается из network и legacy single-queue save | `IMPLEMENTED` | Existing network restore + `legacySaveData`; schema unchanged |
-| `INDUSTRY-085` | HUD синхронизируется после всех production transitions | `IMPLEMENTED` | Projection пересчитывается в `UpdateHud()` каждый frame |
-| `INDUSTRY-ACC-075` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
-| `INDUSTRY-ACC-076` | F1 подтверждает aggregate/transitions/recharge/restore/fallback | `IN_PROGRESS` | Ожидается `TASK-098 production network HUD (F1): PASS ...` |
-| `INDUSTRY-ACC-077` | Ручной HUD корректен для двух active stations и queue controls | `IN_PROGRESS` | Выполнить сценарий раздела 18F |
-| `INDUSTRY-ACC-078` | Cold restart сохраняет elapsed, states и station energy | `IN_PROGRESS` | Graceful exit/restart с running/queued/paused jobs |
-| `INDUSTRY-ACC-079` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix |
+| `INDUSTRY-080` | Основной HUD получает состояние из полного `ProductionNetworkRuntime` | `VERIFIED` | Runtime HUD пользователя: `stations=5`, корректные aggregate counts/energy |
+| `INDUSTRY-081` | HUD агрегирует stations/jobs/running/queued/paused и energy | `VERIFIED` | F1: `aggregateCounts=1; aggregateEnergy=1; simultaneousRunning=1` |
+| `INDUSTRY-082` | HUD показывает компактную постанционную детализацию | `VERIFIED` | Скриншот detailed HUD содержит все пять stations и `[R/Q/P]` |
+| `INDUSTRY-083` | Исправно инициализированная idle network не считается unavailable | `VERIFIED` | Runtime `jobs=0`; `falseUnavailable=0`; ложная строка отсутствует |
+| `INDUSTRY-084` | Сводка восстанавливается из network и legacy single-queue save | `VERIFIED` | F1: `coldRestore=1; legacyFallback=1; roundTrip=1` |
+| `INDUSTRY-085` | HUD синхронизируется после всех production transitions | `VERIFIED` | F1 pause/resume/cancel/completion/recharge PASS; manual Smelter/Refinery PASS |
+| `INDUSTRY-ACC-075` | Редакция компилируется и запускается | `VERIFIED` | Post-hotfix проект запущен пользователем в Godot 4.7.1 Mono |
+| `INDUSTRY-ACC-076` | F1 подтверждает aggregate/transitions/recharge/restore/fallback | `VERIFIED` | Полная строка `TASK-098 ... PASS` предоставлена пользователем |
+| `INDUSTRY-ACC-077` | Ручной HUD корректен для active stations и queue controls | `VERIFIED` | HUD и ручные jobs Smelter/Refinery подтверждены |
+| `INDUSTRY-ACC-078` | Cold restart сохраняет elapsed, states и station energy | `VERIFIED` | F1: `coldRestore=1`; production persistence regressions PASS |
+| `INDUSTRY-ACC-079` | F2–F12 не регрессируют | `VERIFIED` | Предоставленный runtime output подтверждает применимые regressions |
+
+### 8.19. Catalog-wide resource lifecycle closure
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `RESOURCE-090` | Все 42 world-resource definitions имеют физическое представление в vertical slice | `IMPLEMENTED` | 32 authored + 26 deterministic generated nodes; `physicalTypes=42` |
+| `RESOURCE-091` | Generated resource IDs и позиции стабильны, уникальны и не пересекаются | `IMPLEMENTED` | `CatalogResourceFieldPlanner`; stable IDs `catalog.*`; deterministic acceptance |
+| `RESOURCE-092` | Yield, `MaxStack`, `ExtractionMethod`, `ScanTier` и visual metadata валидируются из catalog | `IMPLEMENTED` | Startup validation и F7 `metadata=1; placement=1; unique=1` |
+| `RESOURCE-093` | Generic `E` collection поддерживает все типы и запрещает duplicate collection | `IMPLEMENTED` | Один `SalvageResourceNode`/`StarterRepairSession`; F7 `collectedTypes=42; collectedNodes=58; duplicateRejected=1` |
+| `RESOURCE-094` | Available inventory синхронизирован со всеми production station mirrors | `IMPLEMENTED` | `AddInventoryAll`/`TryConsumeInventoryAll`; F7 `mirrors=1` |
+| `RESOURCE-095` | Расход и depletion сохраняются без двойного списания/возврата | `IMPLEMENTED` | Session/network consumption + exact snapshot comparison; F7 `depletion=1` |
+| `RESOURCE-096` | Cold restore скрывает собранные nodes и восстанавливает остатки | `IMPLEMENTED` | Stable node IDs + snapshot restore; F7 `coldRestore=1` |
+| `RESOURCE-097` | `F8` очищает slot и возвращает все physical resources | `IMPLEMENTED` | `ResetSlotAsync` + null-session reconstruction; F7 `reset=1` |
+| `RESOURCE-098` | Legacy saves и schema 2 остаются совместимыми | `IMPLEMENTED` | Existing authored IDs unchanged; no schema bump; static definitions remain JSON |
+| `RESOURCE-ACC-090` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `RESOURCE-ACC-091` | F7 подтверждает точные counts и полный lifecycle | `IN_PROGRESS` | Ожидается `TASK-100 ... PASS catalog=42 ... integrity=ok` |
+| `RESOURCE-ACC-092` | Manual generated-node collect/cold restore/F8 reset | `IN_PROGRESS` | Выполнить сценарий раздела 18G |
+| `RESOURCE-ACC-093` | F1–F12 regressions не нарушены | `IN_PROGRESS` | Повторить acceptance matrix после F7 |
 
 ## 9. Очередь ближайших задач
 
@@ -2807,14 +2884,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-099` | Выполнить runtime/build/manual acceptance aggregate production network HUD | Clean build `0/0`; F1 TASK-098; manual two-station transitions; cold restore; F2–F12 regressions |
+| 1 | `TASK-101` | Выполнить build/runtime/manual acceptance catalog-wide resource lifecycle | Clean build `0/0`; F7 TASK-062+100; generated-node cold restore; F8 reset; F1–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-100` | Выбрать следующий функциональный шаг после приёмки HUD | Не расширять scope до завершения `TASK-099` |
+| 3 | `TASK-102` | Выбрать следующий **нересурсный** функциональный шаг | После `TASK-101` resource lifecycle frozen; выбрать торговлю/NPC/quests или иной следующий раздел ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-097`, persistence, vertical slice, Industry Content v2 и multi-station runtime matrix.
-**Реализовано:** `TASK-098` — aggregate production network HUD без изменения production mechanics.
+**Подтверждено:** `TASK-060`–`TASK-099`, persistence, vertical slice, Industry Content v2, multi-station runtime matrix и aggregate HUD.
+**Реализовано:** `TASK-100` — полное физическое покрытие 42 world resources и generic collection/depletion/persistence lifecycle.
 **Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
-**Текущая приёмочная задача:** `TASK-099`.
+**Текущая приёмочная задача:** `TASK-101`. После её закрытия отдельные итерации ресурсной подсистемы не планируются.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4370,6 +4447,40 @@ TASK-098 production network HUD acceptance PASS: stations=5; aggregateCounts=1; 
 12. При исправной сети строка `Production queue: unavailable` не должна появляться ни в detailed, ни в compact HUD; unavailable допустим только при фактической ошибке инициализации runtime.
 13. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
 14. При `FAIL` предоставить полный build log, detailed HUD, строку `TASK-098 ... FAIL`, последние 160 строк Output и шаг ручного сценария, на котором возникло расхождение.
+
+## 18G. Runtime-приёмка `TASK-100/TASK-101`
+
+1. Выполнить `tools\clean-build-windows10.cmd`. Критерий: реальный `CoreCompile`, `0` предупреждений, `0` ошибок.
+2. Запустить `SalvageRepairSlice` и дождаться startup строк:
+
+```text
+TASK-100 catalog resource binding PASS: catalog=42; physicalTypes=42; nodes=58; authored=32; generated=26; unique=1; deterministicYield=1; maxStack=1; coverage=1.
+TASK-100 catalog resource lifecycle READY: catalog=42; physicalTypes=42; nodes=58; generated=26; genericCollection=enabled; mirrors=enabled; depletionPersistence=enabled; reset=enabled.
+```
+
+3. В detailed HUD проверить `Resources: types=42/42 • nodes=58 • collected=<N> • generated=26`.
+4. Нажать `F7` и не выполнять других действий до завершения обеих параллельных проверок. Ожидаются прежний `TASK-062 ... PASS` и новая строка:
+
+```text
+TASK-100 resource lifecycle (F7): PASS catalog=42, physical=42, nodes=58, generated=26, collectTypes=42, collectNodes=58, duplicate=1, mirrors=1, depletion=1, restore=1, reset=1, roundTrip=1
+```
+
+5. Godot Output должен содержать:
+
+```text
+TASK-100 catalog resource lifecycle acceptance PASS: catalog=42; physicalTypes=42; nodes=58; generated=26; collectedTypes=42; collectedNodes=58; metadata=1; placement=1; unique=1; duplicateRejected=1; mirrors=1; depletion=1; coldRestore=1; reset=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+6. Убедиться, что acceptance использует `save_1.resource-lifecycle-test.db`; gameplay `save_1.db` не изменён.
+7. Нажать `F8`; detailed HUD должен показать `collected=0`, а все authored/generated nodes должны быть доступны.
+8. Пройти к generated field в секторе тестовой площадки `z=23.0..36.5`, навести ray/proximity на любой новый цветной node и нажать `E`. Output должен содержать `ResourceCollected(catalog.<id>, definition=resource.<id>, quantity=1)`, а node исчезнуть.
+9. Дождаться autosave либо штатно закрыть игру. После повторного запуска тот же node должен оставаться скрытым, `collected` и inventory quantity — восстановиться; offline regeneration ресурса не допускается.
+10. Нажать `F8` ещё раз: node должен снова появиться, `collected=0`, production inventory mirrors — пусты.
+11. Повторить `F1`, `F2`, `F3`, `F4`, `F5`, `F6`, `F9`, `F10`, `F11`, `F12`; все маршруты должны завершиться `PASS`. Повторный `F7` также должен быть `PASS`.
+12. Для приёмки прислать: build summary, screenshot detailed HUD `42/42, 58, 26`, screenshot F7 PASS, полную строку Output, screenshot generated node до/после collection, screenshot после cold restart и после F8 reset.
+13. При `FAIL` предоставить полный build log, строки `TASK-100 ... FAIL`, последние 180 строк Godot Output, detailed HUD и шаг ручного сценария.
+
+После выполнения этих критериев установить `TASK-100 → VERIFIED`, `TASK-101 → VERIFIED` и считать resource lifecycle vertical slice закрытым.
 
 ## 19. Шаблон новой записи
 
