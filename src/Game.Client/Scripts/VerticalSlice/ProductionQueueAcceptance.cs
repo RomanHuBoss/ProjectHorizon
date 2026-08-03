@@ -21,6 +21,10 @@ public sealed record ProductionQueueAcceptanceReport(
     int CompletedProcesses,
     bool QueueDrained,
     double EnergyRemaining,
+    bool TerminalProgress,
+    bool TerminalEnergy,
+    bool TerminalReservations,
+    bool TerminalActions,
     bool ExactRoundTrip,
     bool LogWritten,
     SaveDatabaseDiagnostics Diagnostics,
@@ -96,6 +100,34 @@ public static class ProductionQueueAcceptanceRunner
                     ProductionQueueJobStatus.Queued;
 
             runtime.Advance(2.0);
+            ProductionQueueTerminalSnapshot terminalSnapshot =
+                ProductionQueueTerminalModel.Build(runtime);
+            bool terminalProgress =
+                terminalSnapshot.Jobs.Count == 3 &&
+                terminalSnapshot.RunningJobs == 2 &&
+                terminalSnapshot.QueuedJobs == 1 &&
+                terminalSnapshot.Jobs.All(row =>
+                    !string.IsNullOrWhiteSpace(row.ProgressBar) &&
+                    !string.IsNullOrWhiteSpace(row.TimingText)) &&
+                terminalSnapshot.Jobs.Any(row =>
+                    row.Progress01 > 0.0 &&
+                    row.ProgressBar.Contains('#'));
+            bool terminalEnergy =
+                Math.Abs(
+                    terminalSnapshot.EnergyCapacity -
+                    station.EnergyCapacity) < 0.000001 &&
+                terminalSnapshot.EnergyRemaining <
+                    terminalSnapshot.EnergyCapacity &&
+                terminalSnapshot.Jobs.All(row => row.ReservedEnergy > 0.0);
+            bool terminalReservations = terminalSnapshot.Jobs.All(row =>
+                !string.IsNullOrWhiteSpace(row.ReservationText) &&
+                row.ReservationText.Contains(
+                    "inputs:",
+                    StringComparison.Ordinal));
+            bool terminalActions =
+                terminalSnapshot.Jobs.Count(row => row.CanPause) == 2 &&
+                terminalSnapshot.Jobs.Count(row => row.CanResume) == 0 &&
+                terminalSnapshot.Jobs.All(row => row.CanCancel);
             double ferriteElapsedBeforePause = runtime.Jobs.Single(job =>
                 job.JobId == ferriteEnqueue.JobId).ElapsedSeconds;
             ProductionQueueCommandReport pause = runtime.Pause(
@@ -269,6 +301,10 @@ public static class ProductionQueueAcceptanceRunner
                 refundExact &&
                 completionExact &&
                 queueDrained &&
+                terminalProgress &&
+                terminalEnergy &&
+                terminalReservations &&
+                terminalActions &&
                 restored.MaximumObservedRunning == station.ParallelSlots &&
                 finalRoundTrip &&
                 logWritten &&
@@ -293,6 +329,14 @@ public static class ProductionQueueAcceptanceRunner
                 failures.Add("completion=0");
             if (!queueDrained)
                 failures.Add("queueDrained=0");
+            if (!terminalProgress)
+                failures.Add("terminalProgress=0");
+            if (!terminalEnergy)
+                failures.Add("terminalEnergy=0");
+            if (!terminalReservations)
+                failures.Add("terminalReservations=0");
+            if (!terminalActions)
+                failures.Add("terminalActions=0");
             if (restored.MaximumObservedRunning != station.ParallelSlots)
                 failures.Add(
                     $"maxParallel={restored.MaximumObservedRunning}");
@@ -325,6 +369,10 @@ public static class ProductionQueueAcceptanceRunner
                 completion.CompletedProcesses.Count,
                 queueDrained,
                 restored.EnergyRemaining,
+                terminalProgress,
+                terminalEnergy,
+                terminalReservations,
+                terminalActions,
                 finalRoundTrip,
                 logWritten,
                 diagnostics,
@@ -351,6 +399,10 @@ public static class ProductionQueueAcceptanceRunner
                 0,
                 false,
                 0.0,
+                false,
+                false,
+                false,
+                false,
                 false,
                 false,
                 new SaveDatabaseDiagnostics(

@@ -29,7 +29,8 @@ public enum SalvageRepairHudMode
 public enum StationSelectorMode
 {
     Recipes = 0,
-    Research = 1
+    Research = 1,
+    Queue = 2
 }
 
 public partial class SalvageRepairSlice : Node3D
@@ -100,6 +101,8 @@ public partial class SalvageRepairSlice : Node3D
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
         _productionQueueAcceptanceReport;
+    private ProductionQueueRuntime? _gameplayProductionQueue;
+    private CraftingStationDefinition? _gameplayQueueStation;
     private SalvageRepairSliceState _state =
         SalvageRepairSliceState.Initializing;
     private SalvageRepairHudMode _hudMode =
@@ -122,6 +125,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _technologySelectorAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
+    private string _queueTerminalAcceptanceHud = "READY";
     private PortableCraftingStation? _selectorStation;
     private Node3D? _selectorInteractor;
     private StationSelectorMode _selectorMode = StationSelectorMode.Recipes;
@@ -141,6 +145,16 @@ public partial class SalvageRepairSlice : Node3D
         _technologyProgression ??
         throw new InvalidOperationException(
             "Technology progression is unavailable.");
+
+    private ProductionQueueRuntime GameplayQueue =>
+        _gameplayProductionQueue ??
+        throw new InvalidOperationException(
+            "Gameplay production queue is unavailable.");
+
+    private CraftingStationDefinition GameplayQueueStation =>
+        _gameplayQueueStation ??
+        throw new InvalidOperationException(
+            "Gameplay queue station definition is unavailable.");
 
     private CraftingRecipeDefinition RepairRecipe => _repairRecipe ??
         throw new InvalidOperationException("Starter repair recipe is unavailable.");
@@ -230,6 +244,8 @@ public partial class SalvageRepairSlice : Node3D
             VerticalSliceContentIds.CoolantRegulatorRecipeId);
         CraftingRecipeDefinition powerCouplerRecipe = catalog.GetRecipe(
             VerticalSliceContentIds.PowerCouplerRecipeId);
+        CraftingStationDefinition gameplayQueueStation = catalog.GetStation(
+            "station.portable_fabricator");
         TechnologyProgression technologyProgression = new(
             catalog.Technologies,
             DefaultResearchPoints);
@@ -240,10 +256,12 @@ public partial class SalvageRepairSlice : Node3D
         _navigationArrayRecipe = navigationArrayRecipe;
         _coolantRegulatorRecipe = coolantRegulatorRecipe;
         _powerCouplerRecipe = powerCouplerRecipe;
+        _gameplayQueueStation = gameplayQueueStation;
         _session = new StarterRepairSession(
             repairRecipe,
             technologyProgression.IsUnlocked,
             stationRecipes);
+        InitializeGameplayProductionQueue(saveData: null);
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -328,6 +346,11 @@ public partial class SalvageRepairSlice : Node3D
                 station => station.ParallelSlots)}; " +
             "reservation=enqueue; cancellationRefund=full; " +
             "gracefulExit=freeze-and-resume; offlineProgress=0.");
+        GD.Print(
+            "TASK-092 production queue terminal READY: " +
+            "tabs=Recipes/Research/Queue; progress=bar+elapsed; " +
+            "actions=pause/resume/cancel; energy=visible; " +
+            "reservations=visible; gameplayPersistence=enabled.");
     }
 
     public override void _Notification(int what)
@@ -364,6 +387,7 @@ public partial class SalvageRepairSlice : Node3D
         PollTechnologySelectorAcceptanceTask();
         PollChemicalProcessAcceptanceTask();
         PollProductionQueueAcceptanceTask();
+        UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
         PollAutosave();
         PollGracefulExitTask();
@@ -397,10 +421,30 @@ public partial class SalvageRepairSlice : Node3D
             {
                 MoveSelector(1);
             }
-            else if (Matches(physical, logical, Key.Tab) ||
-                     Matches(physical, logical, Key.R))
+            else if (Matches(physical, logical, Key.Tab))
             {
-                ToggleSelectorMode();
+                CycleSelectorMode();
+            }
+            else if (Matches(physical, logical, Key.R))
+            {
+                ToggleRecipesResearchMode();
+            }
+            else if (Matches(physical, logical, Key.Q))
+            {
+                if (_selectorMode == StationSelectorMode.Recipes)
+                {
+                    EnqueueSelectedRecipe();
+                }
+                else
+                {
+                    SetSelectorMode(StationSelectorMode.Queue);
+                }
+            }
+            else if (_selectorMode == StationSelectorMode.Queue &&
+                     (Matches(physical, logical, Key.C) ||
+                      Matches(physical, logical, Key.Delete)))
+            {
+                CancelSelectedQueueJob();
             }
             else if (Matches(physical, logical, Key.Enter) ||
                      (Matches(physical, logical, Key.E) &&
@@ -503,6 +547,7 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        EnsureGameplayProductionQueue();
         IReadOnlyList<CraftingRecipeDefinition> recipes =
             GetSelectorRecipes(station.StationId);
         if (recipes.Count == 0)
@@ -591,9 +636,7 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        int count = _selectorMode == StationSelectorMode.Recipes
-            ? GetSelectorRecipes(station.StationId).Count
-            : GetSelectorTechnologies(station.StationId).Count;
+        int count = GetSelectorItemCount(station.StationId);
         if (count == 0)
         {
             _selectorIndex = 0;
@@ -610,16 +653,47 @@ public partial class SalvageRepairSlice : Node3D
         UpdateRecipeSelector();
     }
 
-    private void ToggleSelectorMode()
+    private int GetSelectorItemCount(string stationId)
+    {
+        return _selectorMode switch
+        {
+            StationSelectorMode.Recipes =>
+                GetSelectorRecipes(stationId).Count,
+            StationSelectorMode.Research =>
+                GetSelectorTechnologies(stationId).Count,
+            StationSelectorMode.Queue =>
+                _gameplayProductionQueue?.Jobs.Count ?? 0,
+            _ => 0
+        };
+    }
+
+    private void CycleSelectorMode()
+    {
+        StationSelectorMode next = _selectorMode switch
+        {
+            StationSelectorMode.Recipes => StationSelectorMode.Research,
+            StationSelectorMode.Research => StationSelectorMode.Queue,
+            _ => StationSelectorMode.Recipes
+        };
+        SetSelectorMode(next);
+    }
+
+    private void ToggleRecipesResearchMode()
+    {
+        SetSelectorMode(
+            _selectorMode == StationSelectorMode.Research
+                ? StationSelectorMode.Recipes
+                : StationSelectorMode.Research);
+    }
+
+    private void SetSelectorMode(StationSelectorMode mode)
     {
         if (_selectorStation is null)
         {
             return;
         }
 
-        _selectorMode = _selectorMode == StationSelectorMode.Recipes
-            ? StationSelectorMode.Research
-            : StationSelectorMode.Recipes;
+        _selectorMode = mode;
         _selectorIndex = 0;
         _selectorFeedback = "";
         UpdateRecipeSelector();
@@ -631,6 +705,12 @@ public partial class SalvageRepairSlice : Node3D
         Node3D? interactor = _selectorInteractor;
         if (station is null || interactor is null)
         {
+            return;
+        }
+
+        if (_selectorMode == StationSelectorMode.Queue)
+        {
+            ToggleSelectedQueueJobPause();
             return;
         }
 
@@ -715,6 +795,232 @@ public partial class SalvageRepairSlice : Node3D
             interactor);
     }
 
+    private void EnqueueSelectedRecipe()
+    {
+        PortableCraftingStation? station = _selectorStation;
+        if (station is null)
+        {
+            return;
+        }
+
+        IReadOnlyList<StationRecipeSelectorEntry> entries =
+            GetSelectorRecipeEntries(station.StationId);
+        if (entries.Count == 0)
+        {
+            _selectorFeedback = "No runtime recipes.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        StationRecipeSelectorEntry entry =
+            entries[Math.Clamp(_selectorIndex, 0, entries.Count - 1)];
+        CraftingRecipeDefinition recipe = entry.Recipe;
+        if (entry.Crafted)
+        {
+            _selectorFeedback =
+                $"Recipe {recipe.RecipeId} is already completed.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!entry.TechnologyUnlocked)
+        {
+            _selectorFeedback =
+                $"LOCKED: research {recipe.RequiredTechnology}.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (!entry.InputsAvailable)
+        {
+            _selectorFeedback =
+                $"Missing {entry.MissingInputQuantity} input unit(s).";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        if (GameplayQueue.Jobs.Any(job => string.Equals(
+            job.RecipeId,
+            recipe.RecipeId,
+            StringComparison.Ordinal)))
+        {
+            _selectorFeedback =
+                $"Recipe {recipe.RecipeId} is already in the queue.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        ProductionQueueCommandReport report = GameplayQueue.Enqueue(
+            recipe.RecipeId,
+            CreateNominalEnvironment(recipe),
+            requestedBatches: 1);
+        if (report.Result != ProductionQueueCommandResult.Enqueued)
+        {
+            _selectorFeedback = report.ResultText;
+            _status = report.ResultText;
+            UpdateRecipeSelector();
+            return;
+        }
+
+        try
+        {
+            foreach (CraftingStackDefinition input in recipe.Inputs)
+            {
+                if (!Session.TryConsumeInventory(
+                    input.DefinitionId,
+                    input.Quantity,
+                    out string consumeResult))
+                {
+                    throw new InvalidOperationException(consumeResult);
+                }
+            }
+
+            foreach (CatalystStackDefinition catalyst in recipe.Catalysts)
+            {
+                if (!Session.TryConsumeInventory(
+                    catalyst.DefinitionId,
+                    catalyst.Quantity,
+                    out string consumeResult))
+                {
+                    throw new InvalidOperationException(consumeResult);
+                }
+            }
+        }
+        catch
+        {
+            GameplayQueue.Cancel(report.JobId);
+            throw;
+        }
+
+        _lastDomainEvent = $"ProductionJobEnqueued({report.JobId})";
+        _selectorFeedback = report.ResultText;
+        _status = report.ResultText;
+        _selectorMode = StationSelectorMode.Queue;
+        _selectorIndex = Math.Max(0, GameplayQueue.Jobs.Count - 1);
+        ApplyGameplayQueueStationState();
+        QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+        GD.Print(
+            "TASK-092 player queue enqueue PASS: " +
+            $"job={report.JobId}; recipe={recipe.RecipeId}; " +
+            $"energyReserved={recipe.EnergyCost.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"energyRemaining={GameplayQueue.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"inputsReserved={recipe.Inputs.Sum(input => input.Quantity)}; " +
+            $"status={GameplayQueue.Jobs.Single(job => job.JobId == report.JobId).Status}.");
+        UpdateRecipeSelector();
+    }
+
+    private void ToggleSelectedQueueJobPause()
+    {
+        ProductionQueueJobView? job = GetSelectedQueueJob();
+        if (job is null)
+        {
+            _selectorFeedback = "Queue is empty.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        ProductionQueueCommandReport report = job.Status switch
+        {
+            ProductionQueueJobStatus.Running => GameplayQueue.Pause(job.JobId),
+            ProductionQueueJobStatus.Paused => GameplayQueue.Resume(job.JobId),
+            _ => new ProductionQueueCommandReport(
+                ProductionQueueCommandResult.InvalidState,
+                $"job {job.JobId} is waiting for a free slot",
+                job.JobId,
+                IndustryProcessResult.Ready,
+                Array.Empty<CraftingStackDefinition>(),
+                Array.Empty<CraftingStackDefinition>(),
+                0.0)
+        };
+        _selectorFeedback = report.ResultText;
+        _status = report.ResultText;
+        if (report.Result is ProductionQueueCommandResult.Paused or
+            ProductionQueueCommandResult.Resumed)
+        {
+            _lastDomainEvent =
+                $"ProductionJob{report.Result}({report.JobId})";
+            ApplyGameplayQueueStationState();
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+            GD.Print(
+                "TASK-092 player queue control PASS: " +
+                $"action={report.Result}; job={report.JobId}; " +
+                $"running={GameplayQueue.RunningCount}; " +
+                $"queued={GameplayQueue.QueuedCount}; " +
+                $"paused={GameplayQueue.PausedCount}.");
+        }
+
+        UpdateRecipeSelector();
+    }
+
+    private void CancelSelectedQueueJob()
+    {
+        ProductionQueueJobView? job = GetSelectedQueueJob();
+        if (job is null)
+        {
+            _selectorFeedback = "Queue is empty.";
+            UpdateRecipeSelector();
+            return;
+        }
+
+        ProductionQueueCommandReport report = GameplayQueue.Cancel(job.JobId);
+        if (report.Result == ProductionQueueCommandResult.Cancelled)
+        {
+            foreach (CraftingStackDefinition input in report.RefundedInputs)
+            {
+                Session.GrantInventory(input.DefinitionId, input.Quantity);
+            }
+
+            foreach (CraftingStackDefinition catalyst in report.RefundedCatalysts)
+            {
+                Session.GrantInventory(catalyst.DefinitionId, catalyst.Quantity);
+            }
+
+            _lastDomainEvent = $"ProductionJobCancelled({report.JobId})";
+            ApplyGameplayQueueStationState();
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+            _selectorIndex = Math.Clamp(
+                _selectorIndex,
+                0,
+                Math.Max(0, GameplayQueue.Jobs.Count - 1));
+            GD.Print(
+                "TASK-092 player queue cancellation PASS: " +
+                $"job={report.JobId}; " +
+                $"inputsRefunded={report.RefundedInputs.Sum(input => input.Quantity)}; " +
+                $"catalystsRefunded={report.RefundedCatalysts.Sum(catalyst => catalyst.Quantity)}; " +
+                $"energyRefunded={report.RefundedEnergy.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"energyRemaining={GameplayQueue.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}.");
+        }
+
+        _selectorFeedback = report.ResultText;
+        _status = report.ResultText;
+        UpdateRecipeSelector();
+    }
+
+    private ProductionQueueJobView? GetSelectedQueueJob()
+    {
+        IReadOnlyList<ProductionQueueJobView> jobs = GameplayQueue.Jobs;
+        return jobs.Count == 0
+            ? null
+            : jobs[Math.Clamp(_selectorIndex, 0, jobs.Count - 1)];
+    }
+
+    private static IndustryProcessEnvironment CreateNominalEnvironment(
+        CraftingRecipeDefinition recipe)
+    {
+        RecipeEnvironmentDefinition environment = recipe.Environment;
+        double temperature =
+            (environment.MinimumTemperatureKelvin +
+             environment.MaximumTemperatureKelvin) / 2.0;
+        double pressure = environment.RequiresVacuum
+            ? environment.MinimumPressureKPa
+            : (environment.MinimumPressureKPa +
+               environment.MaximumPressureKPa) / 2.0;
+        return new IndustryProcessEnvironment(
+            temperature,
+            pressure,
+            environment.RequiresVacuum);
+    }
+
     private void UpdateRecipeSelector()
     {
         PortableCraftingStation? station = _selectorStation;
@@ -724,12 +1030,18 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         string stationId = station.StationId;
+        ProductionQueueTerminalSnapshot queueSnapshot =
+            ProductionQueueTerminalModel.Build(GameplayQueue);
         List<string> lines = new()
         {
             $"INDUSTRY TERMINAL - {station.Name}",
             $"Station: {stationId}",
             $"Mode: {_selectorMode} | RP: {TechnologyProgress.ResearchPoints} | " +
             $"Unlocked: {TechnologyProgress.UnlockedCount}/{ContentCatalog.Technologies.Count}",
+            $"Energy: {queueSnapshot.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}/" +
+            $"{queueSnapshot.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)} | " +
+            $"Slots: {queueSnapshot.RunningJobs}/{queueSnapshot.ParallelSlots} | " +
+            $"Waiting: {queueSnapshot.QueuedJobs} | Paused: {queueSnapshot.PausedJobs}",
             ""
         };
 
@@ -741,13 +1053,20 @@ public partial class SalvageRepairSlice : Node3D
             {
                 StationRecipeSelectorEntry entry = entries[index];
                 CraftingRecipeDefinition recipe = entry.Recipe;
-                string status = entry.Crafted
-                    ? "DONE"
-                    : !entry.TechnologyUnlocked
-                        ? $"LOCKED {recipe.RequiredTechnology}"
-                        : !entry.InputsAvailable
-                            ? $"MISSING {entry.MissingInputQuantity}"
-                            : "READY";
+                ProductionQueueJobView? queuedJob = GameplayQueue.Jobs
+                    .FirstOrDefault(job => string.Equals(
+                        job.RecipeId,
+                        recipe.RecipeId,
+                        StringComparison.Ordinal));
+                string status = queuedJob is not null
+                    ? queuedJob.Status.ToString().ToUpperInvariant()
+                    : entry.Crafted
+                        ? "DONE"
+                        : !entry.TechnologyUnlocked
+                            ? $"LOCKED {recipe.RequiredTechnology}"
+                            : !entry.InputsAvailable
+                                ? $"MISSING {entry.MissingInputQuantity}"
+                                : "READY";
                 string inputs = string.Join(
                     " + ",
                     recipe.Inputs.Select(input =>
@@ -760,11 +1079,12 @@ public partial class SalvageRepairSlice : Node3D
                 string cursor = index == _selectorIndex ? ">" : " ";
                 lines.Add(
                     $"{cursor} [{status}] {GetShortContentId(recipe.RecipeId)} " +
-                    $"T{recipe.TechnologyTier} {recipe.CraftTimeSeconds:0.##}s");
+                    $"T{recipe.TechnologyTier} {recipe.CraftTimeSeconds:0.##}s " +
+                    $"E{recipe.EnergyCost:0.###}");
                 lines.Add($"    {inputs} -> {outputs}");
             }
         }
-        else
+        else if (_selectorMode == StationSelectorMode.Research)
         {
             IReadOnlyList<TechnologyDefinition> technologies =
                 GetSelectorTechnologies(stationId);
@@ -789,6 +1109,33 @@ public partial class SalvageRepairSlice : Node3D
                     $"(tier {technology.Tier})");
             }
         }
+        else
+        {
+            lines.Add(
+                $"Queue jobs: {queueSnapshot.Jobs.Count} | " +
+                "freeze-and-resume persistence | offline progress: 0");
+            lines.Add("");
+            if (queueSnapshot.Jobs.Count == 0)
+            {
+                lines.Add("  Queue is empty. Select a recipe and press Q to enqueue.");
+            }
+            else
+            {
+                for (int index = 0; index < queueSnapshot.Jobs.Count; index++)
+                {
+                    ProductionQueueTerminalJobRow row =
+                        queueSnapshot.Jobs[index];
+                    string cursor = index == _selectorIndex ? ">" : " ";
+                    lines.Add(
+                        $"{cursor} [{row.Status.ToString().ToUpperInvariant()}] " +
+                        $"{GetShortContentId(row.RecipeId)} {row.ProgressBar} " +
+                        $"{row.TimingText} {row.SlotText}");
+                    lines.Add(
+                        $"    reserve E{row.ReservedEnergy.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                        row.ReservationText);
+                }
+            }
+        }
 
         if (!string.IsNullOrWhiteSpace(_selectorFeedback))
         {
@@ -797,9 +1144,18 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         lines.Add("");
-        lines.Add(
-            "Up/Down - select | Tab/R - Recipes/Research | " +
-            "Enter/E - confirm | Esc - close");
+        lines.Add(_selectorMode switch
+        {
+            StationSelectorMode.Recipes =>
+                "Up/Down - select | Enter/E - craft now | Q - enqueue | " +
+                "Tab - next tab | R - Research | Esc - close",
+            StationSelectorMode.Research =>
+                "Up/Down - select | Enter/E - unlock | Q - Queue | " +
+                "Tab - next tab | R - Recipes | Esc - close",
+            _ =>
+                "Up/Down - select | Enter/E - pause/resume | C/Delete - cancel | " +
+                "Q - Queue | Tab - next tab | R - Research | Esc - close"
+        });
         _recipeSelectorLabel.Text = string.Join("\n", lines);
     }
 
@@ -829,6 +1185,8 @@ public partial class SalvageRepairSlice : Node3D
             return false;
         }
 
+        EnsureGameplayProductionQueue();
+        GameplayQueue.AddInventory(definitionId, quantity);
         _lastDomainEvent =
             $"ResourceCollected({resourceNodeId}, definition={definitionId}, " +
             $"quantity={quantity})";
@@ -867,6 +1225,8 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        MirrorSessionConsumptionToGameplayQueue(RepairRecipe.Inputs);
+        MirrorSessionGrantToGameplayQueue(RepairRecipe.Outputs);
         _shipTerminal?.SetRepaired(true);
         _lastDomainEvent = "StarterRepairQuestCompleted";
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
@@ -894,6 +1254,14 @@ public partial class SalvageRepairSlice : Node3D
         if (!TryResolveStationRecipe(recipeId, out CraftingRecipeDefinition recipe))
         {
             _status = $"unknown station recipe {recipeId}";
+            return;
+        }
+
+        EnsureGameplayProductionQueue();
+        if (GameplayQueue.Jobs.Count > 0)
+        {
+            _lastDomainEvent = "ProductionQueueBusy";
+            _status = "station queue is active; open the Queue tab to manage it";
             return;
         }
 
@@ -1040,6 +1408,8 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        MirrorSessionConsumptionToGameplayQueue(recipe.Inputs);
+        MirrorSessionGrantToGameplayQueue(recipe.Outputs);
         CraftingRecipeDefinition[] sourceRecipes = StationRecipes
             .Where(candidate => string.Equals(
                 candidate.RequiredStation,
@@ -1363,6 +1733,174 @@ public partial class SalvageRepairSlice : Node3D
         return catalog;
     }
 
+    private void InitializeGameplayProductionQueue(
+        ProductionQueueSaveData? saveData)
+    {
+        if (_gameplayQueueStation is null || _session is null ||
+            _technologyProgression is null)
+        {
+            return;
+        }
+
+        _gameplayProductionQueue = saveData is null
+            ? CreateFreshGameplayProductionQueue()
+            : ProductionQueueRuntime.Restore(
+                GameplayQueueStation,
+                _stationRecipes,
+                saveData,
+                Session.AvailableInventory,
+                TechnologyProgress.IsUnlocked);
+        ApplyGameplayQueueStationState();
+    }
+
+    private ProductionQueueRuntime CreateFreshGameplayProductionQueue()
+    {
+        ProductionQueueRuntime runtime = new(
+            GameplayQueueStation,
+            _stationRecipes,
+            GameplayQueueStation.EnergyCapacity,
+            TechnologyProgress.IsUnlocked);
+        foreach (CraftingStackDefinition stack in Session.AvailableInventory)
+        {
+            runtime.AddInventory(stack.DefinitionId, stack.Quantity);
+        }
+
+        return runtime;
+    }
+
+    private void EnsureGameplayProductionQueue()
+    {
+        if (_gameplayProductionQueue is null)
+        {
+            InitializeGameplayProductionQueue(saveData: null);
+        }
+    }
+
+    private void UpdateGameplayProductionQueue(double delta)
+    {
+        ProductionQueueRuntime? queue = _gameplayProductionQueue;
+        if (queue is null || queue.Jobs.Count == 0)
+        {
+            return;
+        }
+
+        ProductionQueueAdvanceReport advance = queue.Advance(delta);
+        ApplyGameplayQueueStationState();
+        if (advance.CompletedProcesses.Count == 0)
+        {
+            return;
+        }
+
+        foreach (IndustryProcessExecutionReport process in
+            advance.CompletedProcesses)
+        {
+            foreach (CraftingStackDefinition catalyst in
+                process.RetainedCatalysts)
+            {
+                Session.GrantInventory(
+                    catalyst.DefinitionId,
+                    catalyst.Quantity);
+            }
+
+            foreach (CraftingStackDefinition output in process.Outputs)
+            {
+                Session.GrantInventory(output.DefinitionId, output.Quantity);
+            }
+
+            foreach (CraftingStackDefinition byproduct in process.Byproducts)
+            {
+                Session.GrantInventory(
+                    byproduct.DefinitionId,
+                    byproduct.Quantity);
+            }
+
+            _lastDomainEvent =
+                $"ProductionJobCompleted({process.RecipeId})";
+            GD.Print(
+                "TASK-092 player queue completion PASS: " +
+                $"recipe={process.RecipeId}; " +
+                $"outputs={process.Outputs.Sum(output => output.Quantity)}; " +
+                $"byproducts={process.Byproducts.Sum(output => output.Quantity)}; " +
+                $"energyRemaining={queue.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"running={queue.RunningCount}; queued={queue.QueuedCount}; " +
+                $"paused={queue.PausedCount}.");
+        }
+
+        ApplySessionToScene();
+        _status = advance.CompletedProcesses.Count == 1
+            ? $"production completed: {advance.CompletedProcesses[0].RecipeId}"
+            : $"production completed: {advance.CompletedProcesses.Count} jobs";
+        QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+    }
+
+    private void ApplyGameplayQueueStationState()
+    {
+        ProductionQueueRuntime? queue = _gameplayProductionQueue;
+        if (queue is null)
+        {
+            return;
+        }
+
+        foreach (PortableCraftingStation station in _craftingStations.Where(
+            station => string.Equals(
+                station.StationId,
+                queue.StationId,
+                StringComparison.Ordinal)))
+        {
+            station.SetCrafting(queue.RunningCount > 0);
+            if (queue.RunningCount == 0)
+            {
+                CraftingRecipeDefinition[] recipes = StationRecipes
+                    .Where(recipe => string.Equals(
+                        recipe.RequiredStation,
+                        station.StationId,
+                        StringComparison.Ordinal))
+                    .ToArray();
+                station.SetCrafted(
+                    recipes.Length > 0 &&
+                    recipes.All(recipe =>
+                        Session.IsRecipeCrafted(recipe.RecipeId)));
+            }
+        }
+    }
+
+    private void MirrorSessionConsumptionToGameplayQueue(
+        IReadOnlyList<CraftingStackDefinition> stacks)
+    {
+        ProductionQueueRuntime? queue = _gameplayProductionQueue;
+        if (queue is null)
+        {
+            return;
+        }
+
+        foreach (CraftingStackDefinition stack in stacks)
+        {
+            if (!queue.TryConsumeInventory(
+                stack.DefinitionId,
+                stack.Quantity,
+                out string result))
+            {
+                throw new InvalidOperationException(
+                    $"Gameplay queue inventory desynchronized: {result}.");
+            }
+        }
+    }
+
+    private void MirrorSessionGrantToGameplayQueue(
+        IReadOnlyList<CraftingStackDefinition> stacks)
+    {
+        ProductionQueueRuntime? queue = _gameplayProductionQueue;
+        if (queue is null)
+        {
+            return;
+        }
+
+        foreach (CraftingStackDefinition stack in stacks)
+        {
+            queue.AddInventory(stack.DefinitionId, stack.Quantity);
+        }
+    }
+
     private IReadOnlyDictionary<string, ResourceNodeBinding>
         BuildResourceBindings()
     {
@@ -1399,6 +1937,7 @@ public partial class SalvageRepairSlice : Node3D
             _productionQueueAcceptanceTask is null &&
             _gracefulExitTask is null &&
             _selectorStation is null &&
+            (_gameplayProductionQueue?.Jobs.Count ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
             !_closeRequested;
@@ -1616,8 +2155,9 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.production-queue-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-090 production queue acceptance running";
+        _status = "TASK-090/TASK-092 production queue acceptance running";
         _productionQueueAcceptanceHud = "RUNNING";
+        _queueTerminalAcceptanceHud = "RUNNING";
         _productionQueueAcceptanceReport = null;
         _productionQueueAcceptanceTask =
             ProductionQueueAcceptanceRunner.RunAsync(
@@ -1743,7 +2283,8 @@ public partial class SalvageRepairSlice : Node3D
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
             _player.GlobalPosition.Z,
-            TechnologyProgress.ToSaveData());
+            TechnologyProgress.ToSaveData(),
+            _gameplayProductionQueue?.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -1784,6 +2325,8 @@ public partial class SalvageRepairSlice : Node3D
             _fourthCraftingAcceptanceTask is not null ||
             _catalogMatrixAcceptanceTask is not null ||
             _technologySelectorAcceptanceTask is not null ||
+            _chemicalProcessAcceptanceTask is not null ||
+            _productionQueueAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
             _autosave is null)
@@ -1801,7 +2344,8 @@ public partial class SalvageRepairSlice : Node3D
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
             _player.GlobalPosition.Z,
-            TechnologyProgress.ToSaveData());
+            TechnologyProgress.ToSaveData(),
+            _gameplayProductionQueue?.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -1811,7 +2355,9 @@ public partial class SalvageRepairSlice : Node3D
             $"shipRepaired={(Session.ShipRepaired ? 1 : 0)}; " +
             $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}; " +
             $"researchPoints={TechnologyProgress.ResearchPoints}; " +
-            $"unlockedTech={TechnologyProgress.UnlockedCount}.");
+            $"unlockedTech={TechnologyProgress.UnlockedCount}; " +
+            $"queueJobs={_gameplayProductionQueue?.Jobs.Count ?? 0}; " +
+            $"queueEnergy={_gameplayProductionQueue?.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture) ?? "n/a"}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -1861,6 +2407,7 @@ public partial class SalvageRepairSlice : Node3D
                 RepairRecipe,
                 TechnologyProgress.IsUnlocked,
                 StationRecipes.ToArray());
+            InitializeGameplayProductionQueue(snapshot?.ProductionQueue);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -1887,6 +2434,21 @@ public partial class SalvageRepairSlice : Node3D
                 $"crafted={CountCraftedStationRecipes()}/{StationRecipes.Count}; " +
                 $"researchPoints={TechnologyProgress.ResearchPoints}; " +
                 $"unlockedTech={TechnologyProgress.UnlockedCount}.");
+            if (snapshot?.ProductionQueue is { Jobs.Count: > 0 } restoredQueue)
+            {
+                ProductionQueueJobSaveData firstJob = restoredQueue.Jobs
+                    .OrderBy(job => job.JobSequence)
+                    .First();
+                GD.Print(
+                    "TASK-092 player queue restore PASS: " +
+                    $"jobs={restoredQueue.Jobs.Count}; " +
+                    $"running={restoredQueue.Jobs.Count(job => job.Status == ProductionQueueJobStatus.Running)}; " +
+                    $"queued={restoredQueue.Jobs.Count(job => job.Status == ProductionQueueJobStatus.Queued)}; " +
+                    $"paused={restoredQueue.Jobs.Count(job => job.Status == ProductionQueueJobStatus.Paused)}; " +
+                    $"firstJob={firstJob.JobId}; " +
+                    $"elapsed={firstJob.ElapsedSeconds.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                    "offlineProgress=0.");
+            }
         }
         catch (Exception exception)
         {
@@ -1913,6 +2475,7 @@ public partial class SalvageRepairSlice : Node3D
                 RepairRecipe,
                 TechnologyProgress.IsUnlocked,
                 StationRecipes.ToArray());
+            InitializeGameplayProductionQueue(saveData: null);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
@@ -1971,6 +2534,7 @@ public partial class SalvageRepairSlice : Node3D
             else
             {
                 GD.PushError(output);
+                GD.PushError(terminalOutput);
             }
         }
         catch (Exception exception)
@@ -2268,6 +2832,16 @@ public partial class SalvageRepairSlice : Node3D
                   $"completed={report.CompletedProcesses}, " +
                   $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
                 : $"FAIL {report.Result}";
+            _queueTerminalAcceptanceHud = report.Passed &&
+                report.TerminalProgress &&
+                report.TerminalEnergy &&
+                report.TerminalReservations &&
+                report.TerminalActions
+                ? "PASS progress=1, energy=1, reservations=1, actions=1"
+                : $"FAIL progress={(report.TerminalProgress ? 1 : 0)}, " +
+                  $"energy={(report.TerminalEnergy ? 1 : 0)}, " +
+                  $"reservations={(report.TerminalReservations ? 1 : 0)}, " +
+                  $"actions={(report.TerminalActions ? 1 : 0)}";
             _state = report.Passed
                 ? SalvageRepairSliceState.Passed
                 : SalvageRepairSliceState.Failed;
@@ -2286,15 +2860,29 @@ public partial class SalvageRepairSlice : Node3D
                 $"completed={report.CompletedProcesses}; " +
                 $"queueDrained={(report.QueueDrained ? 1 : 0)}; " +
                 $"energyRemaining={report.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"terminalProgress={(report.TerminalProgress ? 1 : 0)}; " +
+                $"terminalEnergy={(report.TerminalEnergy ? 1 : 0)}; " +
+                $"terminalReservations={(report.TerminalReservations ? 1 : 0)}; " +
+                $"terminalActions={(report.TerminalActions ? 1 : 0)}; " +
                 $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
                 $"logWritten={(report.LogWritten ? 1 : 0)}; " +
                 $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
                 $"integrity={report.Diagnostics.IntegrityResult}; " +
                 $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
                 $"result={report.Result}";
+            string terminalOutput =
+                "TASK-092 production queue terminal acceptance " +
+                $"{(report.Passed && report.TerminalProgress && report.TerminalEnergy && report.TerminalReservations && report.TerminalActions ? "PASS" : "FAIL")}: " +
+                $"progress={(report.TerminalProgress ? 1 : 0)}; " +
+                $"energy={(report.TerminalEnergy ? 1 : 0)}; " +
+                $"reservations={(report.TerminalReservations ? 1 : 0)}; " +
+                $"pauseResume={(report.TerminalActions ? 1 : 0)}; " +
+                $"cancel={(report.TerminalActions ? 1 : 0)}; " +
+                "result=queue projection exposes progress, energy, reservations and valid player actions";
             if (report.Passed)
             {
                 GD.Print(output);
+                GD.Print(terminalOutput);
             }
             else
             {
@@ -2545,6 +3133,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _activeCraftingStation = null;
+        ApplyGameplayQueueStationState();
     }
 
     private void ApplyHudMode()
@@ -2596,7 +3185,18 @@ public partial class SalvageRepairSlice : Node3D
         int totalStationRecipes = StationRecipes.Count;
         CraftingRecipeDefinition? nextRecipe = StationRecipes.FirstOrDefault(
             recipe => !Session.IsRecipeCrafted(recipe.RecipeId));
-        string craftProcess = _craftTimer.IsRunning
+        ProductionQueueTerminalSnapshot? queueSnapshot =
+            _gameplayProductionQueue is null
+                ? null
+                : ProductionQueueTerminalModel.Build(GameplayQueue);
+        ProductionQueueTerminalJobRow? activeQueueJob = queueSnapshot?.Jobs
+            .FirstOrDefault(job =>
+                job.Status == ProductionQueueJobStatus.Running) ??
+            queueSnapshot?.Jobs.FirstOrDefault();
+        string craftProcess = activeQueueJob is not null
+            ? $"QUEUE {activeQueueJob.Status} {activeQueueJob.RecipeId} " +
+              $"{activeQueueJob.ProgressBar} {activeQueueJob.TimingText}"
+            : _craftTimer.IsRunning
             ? $"RUNNING {_craftTimer.RecipeId} " +
               $"{_craftTimer.ElapsedSeconds:0.0}/" +
               $"{_craftTimer.DurationSeconds:0.0}s " +
@@ -2611,6 +3211,11 @@ public partial class SalvageRepairSlice : Node3D
             objective = $"Objective: collect salvage " +
                 $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
                 "then interact with ship";
+        }
+        else if (activeQueueJob is not null)
+        {
+            objective = $"Objective: queued production {activeQueueJob.RecipeId} " +
+                $"({activeQueueJob.Progress01 * 100.0:0}%)";
         }
         else if (_craftTimer.IsRunning)
         {
@@ -2644,7 +3249,7 @@ public partial class SalvageRepairSlice : Node3D
             $"Research: RP={TechnologyProgress.ResearchPoints} • " +
             $"unlocked={TechnologyProgress.UnlockedCount}/" +
             $"{ContentCatalog.Technologies.Count} • " +
-            "interact with the fabricator to open Recipes/Research";
+            "interact with the fabricator to open Recipes/Research/Queue";
         string repairLine =
             $"Repair: {RepairRecipe.RecipeId} • " +
             $"{primaryInput.Quantity}x{primaryInput.DefinitionId} -> " +
@@ -2654,6 +3259,13 @@ public partial class SalvageRepairSlice : Node3D
             $"crafted={craftedCount}/{totalStationRecipes} • " +
             $"pending={totalStationRecipes - craftedCount} • " +
             $"physicalStations={_craftingStations.Count}";
+        string queueLine = queueSnapshot is null
+            ? "Production queue: unavailable"
+            : $"Production queue: jobs={queueSnapshot.Jobs.Count} • " +
+              $"running={queueSnapshot.RunningJobs}/{queueSnapshot.ParallelSlots} • " +
+              $"queued={queueSnapshot.QueuedJobs} • paused={queueSnapshot.PausedJobs} • " +
+              $"energy={queueSnapshot.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}/" +
+              $"{queueSnapshot.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)}";
         string pendingPreview = BuildPendingRecipePreview();
         double nextAutosave = Math.Max(
             0.0,
@@ -2670,7 +3282,7 @@ public partial class SalvageRepairSlice : Node3D
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • STATION SELECTOR + RESEARCH • H - HUD\n" +
+                "VERTICAL SLICE 1 • INDUSTRY TERMINAL + QUEUE • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
@@ -2678,12 +3290,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
+                $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • F1 - production queue • " +
+                "E - interact/select • terminal: Tab tabs, Q enqueue/queue, C cancel • " +
+                "F1 - production queue • " +
                 "F2 - chemical runtime • " +
                 "F3 - selector acceptance • F4/F5 - catalogs • " +
                 "F6/F7/F9/F10/F11/F12 - regressions";
@@ -2697,6 +3311,7 @@ public partial class SalvageRepairSlice : Node3D
             technologyLine + "\n" +
             repairLine + "\n" +
             matrixLine + "\n" +
+            queueLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Snapshot: rev={_revision} • collected={Session.CollectedNodeCount}/" +
@@ -2707,6 +3322,7 @@ public partial class SalvageRepairSlice : Node3D
             autosave + "\n" +
             $"Last domain event: {_lastDomainEvent}\n" +
             $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
+            $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
@@ -2719,6 +3335,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
             "WASD/Space - move • E - interact/select • H - HUD • " +
+            "terminal: Tab tabs, Q enqueue/queue, Enter pause/resume, C cancel • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - selector/research acceptance • F4 - all 128 recipes • " +

@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, research, chemical runtime и production queue — `IMPLEMENTED`
+### Industry Content v2, research, chemical runtime и production queue terminal — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -71,7 +71,7 @@ src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
 ```
 
-Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes теперь выбираются на одном физическом PortableFabricator через универсальный Recipes/Research UI. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки и разблокировки сохраняются в SQLite. Для остальных recipes добавлены Godot-независимые atomic process runtime и production queue: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts, hazards, parallel station slots, pause/resume, cancellation with full reservation refunds и freeze-and-resume persistence незавершённых jobs.
+Редакция сохраняет работающий vertical slice из десяти runtime-enabled recipes и отдельно структурно валидирует полный производственный контент. Девять runtime station recipes выбираются на одном физическом PortableFabricator через универсальный терминал с вкладками Recipes, Research и Queue. Требования `RequiredTechnology` исполняются доменной моделью, исследовательские очки, разблокировки и незавершённые player-facing production jobs сохраняются в SQLite. Queue-вкладка показывает progress bar, elapsed/duration, slot status, energy и точные reservations; поддерживает pause/resume и cancellation с полным возвратом inputs, catalysts и energy. Для остальных recipes сохранены Godot-независимые atomic process runtime и production queue: несколько inputs/outputs, batch execution, energy budget, temperature/pressure/vacuum gates, deterministic catalyst consumption, byproducts, hazards, parallel station slots и freeze-and-resume persistence.
 
 В состав v2 входят:
 
@@ -99,9 +99,12 @@ src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 ```text
 WASD / Space   движение и прыжок
 E              собрать ресурс / ремонтировать / открыть станцию / подтвердить выбор
-Up / Down      выбрать рецепт или технологию в station UI
-Tab / R        переключить Recipes / Research
-Enter / E      изготовить выбранный рецепт или разблокировать технологию
+Up / Down      выбрать рецепт, технологию или queue job
+Tab            циклически переключить Recipes / Research / Queue
+R              переключить Recipes / Research
+Enter / E      craft/unlock; во вкладке Queue — pause/resume
+Q              во вкладке Recipes поставить рецепт в очередь; открыть Queue из других вкладок
+C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD
 F1             TASK-090: production queue + active-process persistence
@@ -124,9 +127,20 @@ F12            регрессия navigation path
 
 ```text
 TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1
+TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1
 ```
 
-`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Используется отдельная БД `save_1.production-queue-test.db`; gameplay-slot не изменяется.
+`F1` запускает изолированную проверку smelter queue на два parallel slots. Три jobs резервируют inputs и energy без overcommit; третья job ожидает слот. Проверка выполняет pause/resume, сохраняет незавершённые jobs через `GracefulExit`, восстанавливает точный elapsed progress без offline progress, отменяет активную job с полным возвратом inputs/catalysts/energy, завершает оставшиеся jobs и проверяет финальный `QuestCompleted` SQLite round-trip. Дополнительно строится тот же terminal projection, который используется игровым UI: проверяются progress bar, elapsed time, energy, reservations и допустимые pause/resume/cancel actions. Используется отдельная БД `save_1.production-queue-test.db`; gameplay-slot не изменяется.
+
+
+### Ручная проверка Queue-вкладки
+
+1. Соберите ресурсы для доступного рецепта и при необходимости исследуйте его технологию.
+2. Откройте PortableFabricator, выберите рецепт и нажмите `Q`.
+3. Терминал автоматически перейдёт во вкладку Queue. Должны отображаться status, progress bar, elapsed/duration, slot, reserved energy и reserved inputs.
+4. Нажмите `Enter` или `E`: running job перейдёт в `PAUSED`, прогресс остановится. Повторное нажатие вернёт job в `RUNNING`.
+5. Для проверки отмены нажмите `C` или `Delete`: job исчезает, inputs и energy возвращаются полностью.
+6. Для проверки persistence поставьте job в очередь, закройте игру штатно и запустите снова. Job должен восстановиться с тем же elapsed progress; offline progress не начисляется. В Output появляется `TASK-092 player queue restore PASS` с числом jobs и сохранённым elapsed.
 
 Ожидаемый `F2` HUD:
 

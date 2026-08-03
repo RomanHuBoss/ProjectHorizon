@@ -178,6 +178,20 @@ public sealed class StarterRepairSession
             .Select(pair => new CraftingStackDefinition(pair.Key, pair.Value))
             .ToArray();
 
+    public IReadOnlyList<CraftingStackDefinition> AvailableInventory =>
+        _collectedResources.Values
+            .Where(state => state.RemainingQuantity > 0)
+            .Select(state => new CraftingStackDefinition(
+                state.DefinitionId,
+                state.RemainingQuantity))
+            .Concat(CraftedInventory)
+            .GroupBy(stack => stack.DefinitionId, StringComparer.Ordinal)
+            .Select(group => new CraftingStackDefinition(
+                group.Key,
+                group.Sum(stack => stack.Quantity)))
+            .OrderBy(stack => stack.DefinitionId, StringComparer.Ordinal)
+            .ToArray();
+
     public bool SecondaryRecipeCrafted =>
         _secondaryRecipe is not null &&
         IsRecipeCrafted(_secondaryRecipe.RecipeId);
@@ -388,6 +402,60 @@ public sealed class StarterRepairSession
             HasRecipeOutputs(recipe);
     }
 
+    public bool TryConsumeInventory(
+        string definitionId,
+        int quantity,
+        out string result)
+    {
+        if (!GameContentCatalog.IsStableId(definitionId))
+        {
+            throw new ArgumentException(
+                "Inventory definition ID must be a stable dotted string ID.",
+                nameof(definitionId));
+        }
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(quantity),
+                "Inventory consumption must be positive.");
+        }
+
+        int available = GetAvailableQuantity(definitionId);
+        if (available < quantity)
+        {
+            result = $"missing {quantity - available} x {definitionId}";
+            return false;
+        }
+
+        Consume(definitionId, quantity);
+        result = $"consumed {quantity} x {definitionId}";
+        return true;
+    }
+
+    public void GrantInventory(string definitionId, int quantity)
+    {
+        if (!GameContentCatalog.IsStableId(definitionId))
+        {
+            throw new ArgumentException(
+                "Inventory definition ID must be a stable dotted string ID.",
+                nameof(definitionId));
+        }
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(quantity),
+                "Inventory grant must be positive.");
+        }
+
+        _craftedInventory.TryGetValue(definitionId, out int current);
+        checked
+        {
+            _craftedInventory[definitionId] = current + quantity;
+        }
+    }
+
     public int GetAvailableQuantity(string definitionId)
     {
         int collected = _collectedResources.Values
@@ -479,14 +547,23 @@ public sealed class StarterRepairSession
                     remainingQuantity));
         }
 
-        HashSet<string> knownOutputs = repairRecipe.Outputs
+        HashSet<string> knownInventoryDefinitions = repairRecipe.Inputs
+            .Concat(repairRecipe.Outputs)
+            .Concat(stationRecipes.SelectMany(recipe => recipe.Inputs))
+            .Concat(stationRecipes.SelectMany(recipe =>
+                recipe.Catalysts.Select(catalyst =>
+                    new CraftingStackDefinition(
+                        catalyst.DefinitionId,
+                        catalyst.Quantity))))
             .Concat(stationRecipes.SelectMany(recipe => recipe.Outputs))
-            .Select(output => output.DefinitionId)
+            .Concat(stationRecipes.SelectMany(recipe => recipe.Byproducts))
+            .Concat(stationRecipes.SelectMany(recipe => recipe.DismantleReturns))
+            .Select(stack => stack.DefinitionId)
             .ToHashSet(StringComparer.Ordinal);
         foreach (InventoryItemSaveData item in snapshot.Inventory)
         {
             if (item.ItemId.StartsWith("crafted.", StringComparison.Ordinal) &&
-                knownOutputs.Contains(item.DefinitionId) &&
+                knownInventoryDefinitions.Contains(item.DefinitionId) &&
                 item.Quantity > 0)
             {
                 session._craftedInventory[item.DefinitionId] = item.Quantity;
@@ -627,7 +704,8 @@ public static class StarterRepairSnapshotFactory
         double playerPositionX,
         double playerPositionY,
         double playerPositionZ,
-        TechnologyProgressSaveData? technologyProgress = null)
+        TechnologyProgressSaveData? technologyProgress = null,
+        ProductionQueueSaveData? productionQueue = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -687,7 +765,8 @@ public static class StarterRepairSnapshotFactory
                 SystemId,
                 updatedUtc,
                 1),
-            technologyProgress);
+            technologyProgress,
+            productionQueue);
     }
 }
 

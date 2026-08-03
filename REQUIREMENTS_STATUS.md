@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-02
-> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-warning-fix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,14 +38,75 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084` и `TASK-083/089` подтверждены clean build, автоматическими `F3/F2` и ручной проверкой station UI. Production queue подтверждена пользователем через `F1: PASS` и полный регрессионный прогон. Текущий hotfix устраняет единственное предупреждение `CS8600` в загрузке `save_settings.production_queue`; `TASK-091` ожидает повторной clean build `0/0`.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2 и его runtime-регрессии подтверждены пользователем. `TASK-082/084`, `TASK-083/089` и `TASK-090/091` приняты после runtime-проверок; пользователь подтвердил исправленную nullable-редакцию формулировкой «все работает». Текущая итерация реализует player-facing Queue-вкладку промышленного терминала, управление job lifecycle и сохранение незавершённой gameplay-очереди.
 
 ## 3. Результат текущей итерации от 2026-08-02
 
+### 2026-08-02 — player-facing production queue terminal (`TASK-092`)
+
+**Исходный снимок:** `ProjectHorizon-main(6)(2).zip` — последняя редакция с GitHub, приложенная пользователем.
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue-terminal-ui.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.
+**Связанные требования:** ТЗ v2.0 §52.1, §52.3 и §53; station terminal, production queue visualization, pause/resume/cancel, reservations и active-process persistence.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользователь подтвердил исправленную nullable-редакцию словами «все работает»;
+- `TASK-090` ранее подтверждён `F1: PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1`;
+- warning hotfix изменял только nullable-контракт загрузки `production_queue`; функциональные регрессии уже были подтверждены;
+- `TASK-091`: `IN_PROGRESS` → `VERIFIED`.
+
+**Реализовано:**
+
+- station terminal расширен до трёх вкладок `Recipes / Research / Queue`; `Tab` циклически переключает вкладки, `R` сохраняет быстрый переход Recipes/Research;
+- из Recipes выбранный рецепт можно поставить в gameplay queue клавишей `Q`, при этом обычный `Enter/E` сохраняет прежний immediate timed craft path;
+- Queue-вкладка показывает status, progress bar, elapsed/duration, slot/waiting state, remaining/capacity energy, reserved inputs, catalysts и reserved energy;
+- `Enter/E` во вкладке Queue выполняет pause/resume, `C/Delete` отменяет job;
+- cancellation возвращает в gameplay inventory все reserved inputs/catalysts и energy;
+- gameplay queue использует `ProductionQueueRuntime`, синхронизируется с `StarterRepairSession`, resource collection, repair и legacy direct craft;
+- completion переносит outputs, byproducts и retained catalysts в gameplay inventory, обновляет scene station и вызывает `QuestCompleted` autosave;
+- enqueue/pause/resume/cancel сохраняются через `BaseChanged`; periodic/graceful-exit snapshots включают точный queue payload;
+- cold restore использует freeze-and-resume без offline progress;
+- `StarterRepairSession` сохраняет и восстанавливает не только outputs, но и queue-refunded inputs/catalysts/byproducts;
+- добавлен Godot-независимый `ProductionQueueTerminalModel`; F1 дополнительно проверяет progress/energy/reservations и доступность player actions.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueTerminalModel.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/ProductionQueueAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статические проверки:**
+
+- queue UI использует один Godot-independent projection для runtime и F1 acceptance;
+- сохранены старые Recipes/Research actions и F1–F12 hotkeys;
+- проверены balanced delimiters, строки и комментарии `52` C#-файлов;
+- проверены `52` уникальных UID и `29` фактических `res://`-ссылок; отсутствующие ссылки не обнаружены;
+- JSON Schema v2 подтверждена для `items/resources/recipes/stations/technologies`; counts сохранены: `174/42/128/15/32`;
+- nullable-аннотации новых полей и nullable queue restore обработаны явно;
+- `.git`, `.godot`, `bin`, `obj`, `.vs`, DLL/PDB, БД и runtime-логи не включаются в итоговый архив;
+- ZIP повторно распакован: `142` исходных файла, `missing=0`, `extra=0`, `changed=0`; integrity `PASS`;
+- .NET/Godot в среде подготовки отсутствуют: clean build и runtime остаются частью `TASK-094`.
+
+**Статусы:**
+
+- `TASK-091` → `VERIFIED`;
+- `TASK-092`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-094`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F1 terminal projection и ручной Queue UI/cold restore;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Граница итерации:** UI управляет одной physical PortableFabricator queue с `ParallelSlots=1` и каталоговым energy capacity. Изменение баланса energy/recharge, quality/purity/stability и dismantle returns не входит в `TASK-092`.
+
+**Приёмка `TASK-094`:** clean build `0/0`; F1 должен дополнительно показать `TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1`; вручную поставить recipe через `Q`, увидеть RUNNING progress, выполнить pause/resume, проверить cancellation refund и cold restart с неизменным elapsed progress.
+
 ### 2026-08-02 — nullable warning hotfix для production queue (`TASK-091`)
 
-**Исходный снимок:** `ProjectHorizon-main-production-queue.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-production-queue-warning-fix.zip`  
+**Исходный снимок:** `ProjectHorizon-main-production-queue.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue-warning-fix.zip`
 **Причина:** пользователь подтвердил `F1: PASS` и все регрессии, но реальный `CoreCompile` выдал `CS8600` в `SaveDatabase.cs:1138`.
 
 **Исправлено:**
@@ -72,9 +133,9 @@
 
 ### 2026-08-02 — production queue и active-process lifecycle (`TASK-090`)
 
-**Исходный снимок:** `ProjectHorizon-main(5)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 23:23 (+03:00)  
-**Подготовленный снимок:** `ProjectHorizon-main-production-queue.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(5)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 23:23 (+03:00)
+**Подготовленный снимок:** `ProjectHorizon-main-production-queue.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** ТЗ v2.0 §52.1, §52.3, §53; production queue, station parallel slots, cancellation/refunds и active-process persistence.
 
 **Синхронизация предыдущей приёмки:**
@@ -146,9 +207,9 @@
 
 ### 2026-08-02 — extended chemical process runtime (`TASK-083`)
 
-**Исходный снимок:** `ProjectHorizon-main(4)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:59 (+03:00)  
-**Подготовленный снимок:** `ProjectHorizon-main-chemical-process-runtime.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(4)(3).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:59 (+03:00)
+**Подготовленный снимок:** `ProjectHorizon-main-chemical-process-runtime.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** ТЗ v2.0, разделы 49.4, 52.3, 53 и 54.3; chemical runtime catalysts/byproducts/energy/environment.
 
 **Синхронизация предыдущей приёмки:**
@@ -195,9 +256,9 @@
 
 ### 2026-08-02 — universal station selector, technology enforcement и research persistence (`TASK-082`)
 
-**Исходный снимок:** `ProjectHorizon-main(3)(4).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:22 (+03:00)  
-**Подготовленный снимок:** `ProjectHorizon-main-station-selector-research.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(3)(4).zip` — последняя редакция с GitHub, приложенная пользователем 2026-08-02 22:22 (+03:00)
+**Подготовленный снимок:** `ProjectHorizon-main-station-selector-research.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** ТЗ v2.0, раздел 52.1 и первый шаг 52.3; `TASK-076`–`TASK-083`.
 
 **Синхронизация предыдущей приёмки:**
@@ -256,9 +317,9 @@
 
 ### 2026-08-02 — законченное ТЗ v2.0, Industry Content v2 и химическая линия Компотия (`TASK-080`)
 
-**Исходный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip` — последняя подготовленная редакция из чата  
-**Подготовленный снимок:** `ProjectHorizon-main-industry-spec-v2-compotium.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip` — последняя подготовленная редакция из чата
+**Подготовленный снимок:** `ProjectHorizon-main-industry-spec-v2-compotium.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** новая нормативная редакция `Technical_Specification/2.0`, разделы 17, 23, 36, 39–41 исходного ТЗ; `TASK-076`–`TASK-083`, `INDUSTRY-001`–`INDUSTRY-032`, `CHEM-001`–`CHEM-030`.
 
 **Решение по масштабу:** ограничение в 100 recipes признано искусственным. В ТЗ v2.0 зафиксирован связный каталог из 128 recipes с пятью технологическими уровнями, 15 типами станций и 32 технологиями. Контент оригинален; из других космических и промышленных игр заимствуются только общие жанровые принципы, без копирования названий, лора, текстов, чисел и конкретных цепочек.
@@ -332,9 +393,9 @@
 
 ### 2026-08-02 — пакетное завершение crafting-каталога и универсальная recipe matrix (`TASK-076`)
 
-**Исходный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip` — последняя подготовленная редакция из чата  
-**Подготовленный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip` — последняя подготовленная редакция из чата
+**Подготовленный снимок:** `ProjectHorizon-main-complete-crafting-catalog.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-074`–`TASK-078`, `CONTENT-060`–`CONTENT-079`, `CONTENT-ACC-060`–`CONTENT-ACC-077`.
 
 **Изменение стратегии итераций:** по прямому указанию пользователя прекращено добавление обычных рецептов по одному. Все оставшиеся recipes с уже поддерживаемой семантикой `StoreOutputs` обработаны одним проходом. Следующие отдельные итерации допускаются только для новой механики, а не для очередной записи JSON.
@@ -392,9 +453,9 @@
 
 ### 2026-08-02 — пятый resource/recipe path и four-recipe station session (`TASK-074`)
 
-**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-072`–`TASK-075`, `CONTENT-050`–`CONTENT-067`, `CONTENT-ACC-050`–`CONTENT-ACC-067`.
 
 **Синхронизация предыдущей приёмки:**
@@ -451,9 +512,9 @@
 
 ### 2026-08-02 — четвёртый resource/recipe path и three-recipe station session (`TASK-072`)
 
-**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-070`–`TASK-073`, `CONTENT-040`–`CONTENT-057`, `CONTENT-ACC-040`–`CONTENT-ACC-057`.
 
 **Синхронизация предыдущей приёмки:**
@@ -510,9 +571,9 @@
 
 ### 2026-08-02 — третий resource/recipe path и multi-recipe station session (`TASK-070`)
 
-**Исходный снимок:** `ProjectHorizon-main(12).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(12).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-third-crafting-path-f12-registry-rebuild-fix.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-068`–`TASK-071`, `CONTENT-030`–`CONTENT-047`, `CONTENT-ACC-030`–`CONTENT-ACC-047`.
 
 **Синхронизация предыдущей приёмки:**
@@ -605,8 +666,8 @@
 
 ### 2026-08-02 — исправление ошибки сборки `TASK-068` (`CS0136`)
 
-**Исходный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time-build-fix.zip`  
+**Исходный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time-build-fix.zip`
 **Основание:** локальная сборка пользователя от 2026-08-02 в Godot 4.7.1/.NET завершилась с `2` ошибками и `7` nullable-предупреждениями.
 
 **Исправлено:**
@@ -615,7 +676,7 @@
 - переменные аварийной отмены переименованы в `cancelledRecipeId` и `cancelledElapsed`; логика timed craft, completion и safe cancellation не изменена;
 - повторно проверены изменённый участок, баланс скобок, строки и ссылки на переименованные переменные.
 
-**Фактический результат до исправления:** `7` предупреждений, `2` ошибки `CS0136`; сборка неуспешна.  
+**Фактический результат до исправления:** `7` предупреждений, `2` ошибки `CS0136`; сборка неуспешна.
 **После исправления:** повторная сборка в среде подготовки недоступна; `CONTENT-ACC-030` и `TASK-069` остаются `IN_PROGRESS` до локального результата `0` ошибок. Семь `CS8600` фиксируются как технический долг и не скрываются.
 
 **Изменённые файлы:**
@@ -625,9 +686,9 @@
 
 ### 2026-08-01 — data-driven время крафта и station process (`TASK-068`)
 
-**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time-build-fix.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time-build-fix.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** раздел 17.4, раздел 23, раздел 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-066`–`TASK-069`, `CONTENT-020`–`CONTENT-037`, `CONTENT-ACC-020`–`CONTENT-ACC-037`.
 
 **Синхронизация предыдущей приёмки:**
@@ -682,9 +743,9 @@
 
 ### 2026-08-01 — второй ресурс, рецепт и отдельная crafting station (`TASK-066`)
 
-**Исходный снимок:** `ProjectHorizon-main(5)(2).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-second-resource-crafting-station.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(5)(2).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-second-resource-crafting-station.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-064`–`TASK-067`, `CONTENT-020`–`CONTENT-027`, `CONTENT-ACC-020`–`CONTENT-ACC-027`.
 
 **Синхронизация предыдущей приёмки:**
@@ -746,9 +807,9 @@
 
 ### 2026-08-01 — первый data-driven каталог ресурса и рецепта ремонта (`TASK-064`)
 
-**Исходный снимок:** `ProjectHorizon-main(4)(2).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-data-driven-starter-repair.zip`  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`  
+**Исходный снимок:** `ProjectHorizon-main(4)(2).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-starter-repair.zip`
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`
 **Связанные требования:** разделы 17.2–17.4, 23, 36.1, Этап 1 раздела 40 и критерии 6/10/14 раздела 41 PDF-ТЗ; `TASK-062`–`TASK-065`, `CONTENT-010`–`CONTENT-016`, `CONTENT-ACC-010`–`CONTENT-ACC-015`.
 
 **Синхронизация предыдущей приёмки:**
@@ -814,9 +875,9 @@
 
 ### 2026-08-01 — hotfix уникальных ID ресурсных узлов (`TASK-062/TASK-063`)
 
-**Исходный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-resource-id-hotfix.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-resource-id-hotfix.zip`
+**Git SHA:** отсутствует в архиве
 **Причина hotfix:** после исправления proximity-взаимодействия первый конус собирался, но второй и третий не изменяли прогресс, хотя HUD корректно показывал ближайшую цель.
 
 **Полученное runtime-доказательство дефекта:**
@@ -853,9 +914,9 @@
 
 ### 2026-08-01 — hotfix ручного взаимодействия и HUD (`TASK-062/TASK-063`)
 
-**Исходный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-interaction-hotfix.zip`
+**Git SHA:** отсутствует в архиве
 **Причина hotfix:** автоматическая `F7`-приёмка прошла, однако пользовательская runtime-проверка выявила, что низкие salvage-узлы не подбираются при обычном приближении, а заявленная клавиша `H` вообще не была реализована.
 
 **Полученные runtime-доказательства исходной редакции:**
@@ -891,9 +952,9 @@
 
 ### 2026-08-01 — первый сквозной цикл: сбор ресурса, ремонт корабля и domain autosave (`TASK-062`)
 
-**Исходный снимок:** `ProjectHorizon-main(3)(3).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`  
-**Git SHA:** отсутствует в архиве  
+**Исходный снимок:** `ProjectHorizon-main(3)(3).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-vertical-slice-salvage-repair.zip`
+**Git SHA:** отсутствует в архиве
 **Связанные требования:** разделы 2.2, 17.1–17.3, 19.1–19.3, 22.3, 22.8, 36.3, Этап 1 раздела 40 и критерии 6, 10, 14 раздела 41 PDF-ТЗ; `TASK-060`–`TASK-063`, `VS-010`–`VS-016`, `VS-ACC-010`–`VS-ACC-016`.
 
 **Синхронизация предыдущей приёмки:**
@@ -2458,12 +2519,31 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `INDUSTRY-045` | Completion применяет outputs, byproducts и catalyst policy | `VERIFIED` | Пользователь подтвердил F1: `completed=2`; F2 chemical runtime также PASS |
 | `INDUSTRY-046` | Active jobs сохраняются и восстанавливаются без offline progress | `VERIFIED` | Пользователь подтвердил F1: `restore=1`, `roundTrip=1` |
 | `INDUSTRY-047` | Queue payload входит в exact snapshot comparison | `VERIFIED` | Пользователь подтвердил F1: `roundTrip=1` |
-| `INDUSTRY-ACC-040` | Clean build не содержит errors/warnings | `IN_PROGRESS` | До hotfix: `0 errors / 1 warning CS8600`; повторить clean build после nullable-fix |
+| `INDUSTRY-ACC-040` | Clean build не содержит errors/warnings | `VERIFIED` | Пользователь подтвердил исправленную nullable-редакцию: «все работает» |
 | `INDUSTRY-ACC-041` | F1 подтверждает slots, waiting queue и pause/resume | `VERIFIED` | Пользователь: `slots=2`, `queued=1`, `pause=1` |
 | `INDUSTRY-ACC-042` | F1 подтверждает graceful restore и exact elapsed | `VERIFIED` | Пользователь: `restore=1`, `roundTrip=1` |
 | `INDUSTRY-ACC-043` | F1 подтверждает active cancellation и exact refund | `VERIFIED` | Пользователь: `cancel=1`, `refund=1` |
 | `INDUSTRY-ACC-044` | F1 завершает remaining jobs и очищает queue | `VERIFIED` | Пользователь: `completed=2`; итоговая строка F1 PASS |
 | `INDUSTRY-ACC-045` | F2–F12 не регрессируют | `VERIFIED` | Пользователь подтвердил PASS для F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 |
+
+### 8.15. Player-facing production queue terminal
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `INDUSTRY-050` | Station terminal содержит вкладки Recipes, Research и Queue | `IMPLEMENTED` | `StationSelectorMode.Queue`; `Tab` циклически переключает три режима |
+| `INDUSTRY-051` | Queue UI показывает status, progress, elapsed/duration и slot state | `IMPLEMENTED` | `ProductionQueueTerminalModel`, progress bar и timing row |
+| `INDUSTRY-052` | Queue UI показывает remaining/capacity energy и точные reservations | `IMPLEMENTED` | Header energy; per-job reserved energy, inputs и catalysts |
+| `INDUSTRY-053` | Игрок может enqueue recipe из Recipes без удаления legacy direct craft | `IMPLEMENTED` | `Q` enqueue; `Enter/E` сохраняет immediate timed craft |
+| `INDUSTRY-054` | Игрок может pause/resume выбранный running/paused job | `IMPLEMENTED` | Queue `Enter/E` вызывает `Pause/Resume` |
+| `INDUSTRY-055` | Игрок может cancel job с полным возвратом reservations | `IMPLEMENTED` | Queue `C/Delete`; inputs/catalysts возвращаются в `StarterRepairSession`, energy — в runtime |
+| `INDUSTRY-056` | Gameplay queue completion применяет outputs/byproducts/catalyst policy | `IMPLEMENTED` | `UpdateGameplayProductionQueue` синхронизирует session и scene |
+| `INDUSTRY-057` | Gameplay queue сохраняется при periodic/autosave/graceful exit и cold restore | `IMPLEMENTED` | Queue payload передаётся в `StarterRepairSnapshotFactory.Create`; restore без offline progress |
+| `INDUSTRY-058` | Refund inputs и byproducts переживают SQLite round-trip | `IMPLEMENTED` | `StarterRepairSession.FromSnapshot` принимает inputs/catalysts/outputs/byproducts/dismantle IDs |
+| `INDUSTRY-ACC-050` | Clean build не содержит errors/warnings | `IN_PROGRESS` | Выполнить `tools\clean-build-windows10.cmd` |
+| `INDUSTRY-ACC-051` | F1 подтверждает terminal projection | `IN_PROGRESS` | `progress=1`, `energy=1`, `reservations=1`, `actions=1` |
+| `INDUSTRY-ACC-052` | Ручной UI подтверждает enqueue, pause/resume и cancel/refund | `IN_PROGRESS` | Нужны Queue screenshots и Output lines `TASK-092 player queue ... PASS` |
+| `INDUSTRY-ACC-053` | Cold restart восстанавливает job и exact elapsed без offline progress | `IN_PROGRESS` | Поставить job, выйти штатно, перезапустить и сравнить elapsed |
+| `INDUSTRY-ACC-054` | F2–F12 не регрессируют | `IN_PROGRESS` | Повторить F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 |
 
 ## 9. Очередь ближайших задач
 
@@ -2473,15 +2553,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-091` | Выполнить runtime-приёмку production queue | Clean build `0/0`; `F1: PASS`; slots/queue/pause/restore/cancel/refund/completion/round-trip; затем F2–F12 regressions |
+| 1 | `TASK-094` | Выполнить runtime-приёмку Queue-вкладки | Clean build `0/0`; F1 terminal projection; manual enqueue/pause/resume/cancel/refund; cold restore; F2–F12 regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-092` | Интегрировать queue controls и visualization в station terminal | Queue tab, job progress, pause/resume/cancel actions, player-facing energy/reservations |
-| 4 | `TASK-093` | Реализовать quality/purity/stability и dismantle returns | Следующая семантика ТЗ v2.0 §52.3 после queue lifecycle |
+| 3 | `TASK-093` | Реализовать quality/purity/stability и dismantle returns | Следующая семантика ТЗ v2.0 §52.3 после terminal queue acceptance |
 
-**Подтверждено:** `TASK-060`–`TASK-074`, `TASK-076`–`TASK-084`, `TASK-089`, persistence, vertical slice, Industry Content v2 и runtime matrix.  
-**Реализовано:** `TASK-090` — production queue и active-process freeze-and-resume persistence.  
-**Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.  
-**Текущая приёмочная задача:** `TASK-091`.
+**Подтверждено:** `TASK-060`–`TASK-084`, `TASK-089`–`TASK-091`, persistence, vertical slice, Industry Content v2 и runtime matrix.
+**Реализовано:** `TASK-092` — player-facing Queue-вкладка, progress/actions/reservations и gameplay queue persistence.
+**Заменено:** `TASK-075` и `CONTENT-ACC-060`–`CONTENT-ACC-067` → `SUPERSEDED` полной catalog matrix.
+**Текущая приёмочная задача:** `TASK-094`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -2824,9 +2903,9 @@ TASK-076 catalog crafting matrix acceptance PASS: items=20; resources=10; recipe
 
 ### 2026-08-02 — `TASK-074`, fifth data-driven crafting path
 
-**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`  
-**Git SHA:** отсутствует в исходном архиве  
+**Исходный снимок:** `ProjectHorizon-main(2)(4).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-fifth-crafting-path.zip`
+**Git SHA:** отсутствует в исходном архиве
 **Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-060`–`CONTENT-067`.
 
 **Синхронизация:** clean build и runtime `F6: PASS` пользователя закрыли `TASK-072/TASK-073`; F7/F9/F10/F11/F12 также показали PASS. Comprehensive F6 подтверждает persistence и isolation четвёртого path.
@@ -2841,9 +2920,9 @@ TASK-076 catalog crafting matrix acceptance PASS: items=20; resources=10; recipe
 
 ### 2026-08-02 — `TASK-072`, fourth data-driven crafting path
 
-**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`  
-**Git SHA:** отсутствует в исходном архиве  
+**Исходный снимок:** `ProjectHorizon-main(1)(7).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-fourth-crafting-path.zip`
+**Git SHA:** отсутствует в исходном архиве
 **Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-050`–`CONTENT-057`.
 
 **Синхронизация:** clean build и runtime `F12: PASS` пользователя закрыли `TASK-070/TASK-071`; F9/F10/F11 также показали PASS. Comprehensive F12 подтверждает persistence и isolation третьего path.
@@ -2858,10 +2937,10 @@ TASK-076 catalog crafting matrix acceptance PASS: items=20; resources=10; recipe
 
 ### 2026-08-02 — `TASK-070`, third data-driven crafting path
 
-**Исходный снимок:** `ProjectHorizon-main(12).zip`  
-**Первичный подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`  
-**Hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`  
-**Git SHA:** отсутствует в исходном архиве  
+**Исходный снимок:** `ProjectHorizon-main(12).zip`
+**Первичный подготовленный снимок:** `ProjectHorizon-main-third-crafting-path.zip`
+**Hotfix-снимок:** `ProjectHorizon-main-third-crafting-path-f12-save-fix.zip`
+**Git SHA:** отсутствует в исходном архиве
 **Связанные требования:** PDF-ТЗ 17.2–17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-040`–`CONTENT-047`.
 
 **Синхронизация:** предоставленные пользователем build/runtime-доказательства предыдущей редакции закрыли `TASK-068/TASK-069` и связанные acceptance requirements в `VERIFIED`.
@@ -2880,9 +2959,9 @@ TASK-076 catalog crafting matrix acceptance PASS: items=20; resources=10; recipe
 
 ### 2026-08-01 — `TASK-068`, data-driven craft-time processing
 
-**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`  
-**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`  
-**Git SHA:** отсутствует в исходном архиве  
+**Исходный снимок:** `ProjectHorizon-main(6)(1).zip`
+**Подготовленный снимок:** `ProjectHorizon-main-data-driven-craft-time.zip`
+**Git SHA:** отсутствует в исходном архиве
 **Связанные требования:** PDF-ТЗ 17.4, 23, 36.1, Этап 1 раздела 40, критерии 6/10/14 раздела 41; `CONTENT-030`–`CONTENT-037`.
 
 **Синхронизация:** по прямому указанию пользователя `TASK-066` и `TASK-067`, а также связанные `CONTENT-020`–`CONTENT-027`/`CONTENT-ACC-020`–`CONTENT-ACC-027`, переведены в `VERIFIED`.
@@ -3954,6 +4033,26 @@ TASK-090 production queue acceptance PASS: station=station.smelter; slots=2; max
 6. После F1 открыть PortableFabricator клавишей `E`, переключить Recipes/Research через `Tab/R` и закрыть `Esc`; gameplay `RP`, outputs и основной save не должны измениться.
 7. Повторить `F2`, `F3`, `F4`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; каждый маршрут должен завершиться `PASS`.
 8. При `FAIL` предоставить полный HUD, строку `TASK-090 ... FAIL`, последние 120 строк Godot Output и полный build log.
+
+## 18C. Runtime-приёмка `TASK-092/TASK-094`
+
+1. Выполнить чистую сборку `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
+2. Запустить vertical slice и нажать `F1`. Ожидаемые строки HUD:
+
+```text
+TASK-090 production queue (F1): PASS slots=2, queued=1, pause=1, restore=1, cancel=1, refund=1, completed=2, roundTrip=1
+TASK-092 queue terminal (F1): PASS progress=1, energy=1, reservations=1, actions=1
+```
+
+3. Output должен содержать `TASK-092 production queue terminal acceptance PASS` с `progress=1; energy=1; reservations=1; pauseResume=1; cancel=1`.
+4. Нажать `F8`, собрать ресурсы и отремонтировать корабль. При необходимости исследовать технологию выбранного recipe.
+5. Открыть PortableFabricator, выбрать готовый recipe и нажать `Q`. Терминал должен перейти в Queue и показать RUNNING job, progress bar, elapsed/duration, slot, reserved energy и inputs.
+6. Нажать `Enter/E`: status должен стать `PAUSED`, elapsed не меняется. Повторить `Enter/E`: status возвращается в `RUNNING`.
+7. Для refund-проверки поставить job и нажать `C/Delete`: job исчезает, reserved inputs и energy возвращаются; Output содержит `TASK-092 player queue cancellation PASS`.
+8. Для cold restore поставить job, дождаться ненулевого elapsed, штатно закрыть игру и запустить снова. Job и elapsed должны восстановиться; elapsed не должен увеличиться на время выключенной игры. Output должен содержать `TASK-092 player queue restore PASS: jobs=<N>; ... elapsed=<T>; offlineProgress=0`.
+9. Дождаться completion: output появляется в inventory, station/HUD обновляются, Output содержит `TASK-092 player queue completion PASS`, выполняется `QuestCompleted` autosave.
+10. Повторить `F2/F3/F4/F5/F6/F7/F9/F10/F11/F12`; все маршруты должны завершиться `PASS`.
+11. При `FAIL` предоставить build log, полный HUD/Queue tab, строку `TASK-092 ... FAIL`, последние 120 строк Godot Output и шаг, на котором возникло расхождение.
 
 ## 19. Шаблон новой записи
 

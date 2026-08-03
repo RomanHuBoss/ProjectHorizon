@@ -25,6 +25,8 @@ public sealed record ProductionQueueJobView(
     long JobSequence,
     long ProcessSequence,
     double ReservedEnergy,
+    IReadOnlyList<CraftingStackDefinition> ReservedInputs,
+    IReadOnlyList<CraftingStackDefinition> ReservedCatalysts,
     double Progress01);
 
 public sealed record ProductionQueueCommandReport(
@@ -135,6 +137,8 @@ public sealed class ProductionQueueRuntime
 
     public int ParallelSlots => _station.ParallelSlots;
 
+    public double EnergyCapacity => _station.EnergyCapacity;
+
     public double EnergyRemaining { get; private set; }
 
     public long NextJobSequence => _nextJobSequence;
@@ -196,6 +200,37 @@ public sealed class ProductionQueueRuntime
         {
             _inventory[definitionId] = current + quantity;
         }
+    }
+
+    public bool TryConsumeInventory(
+        string definitionId,
+        int quantity,
+        out string result)
+    {
+        if (!GameContentCatalog.IsStableId(definitionId))
+        {
+            throw new ArgumentException(
+                "Inventory definition ID must be a stable dotted ID.",
+                nameof(definitionId));
+        }
+
+        if (quantity <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(quantity),
+                "Inventory consumption must be positive.");
+        }
+
+        int available = GetQuantity(definitionId);
+        if (available < quantity)
+        {
+            result = $"missing {quantity - available} x {definitionId}";
+            return false;
+        }
+
+        Consume(definitionId, quantity);
+        result = $"consumed {quantity} x {definitionId}";
+        return true;
     }
 
     public ProductionQueueCommandReport Enqueue(
@@ -894,6 +929,16 @@ public sealed class ProductionQueueRuntime
             job.JobSequence,
             job.ProcessSequence,
             job.ReservedEnergy,
+            job.ReservedInputs
+                .Select(stack => new CraftingStackDefinition(
+                    stack.DefinitionId,
+                    stack.Quantity))
+                .ToArray(),
+            job.ReservedCatalysts
+                .Select(stack => new CraftingStackDefinition(
+                    stack.DefinitionId,
+                    stack.Quantity))
+                .ToArray(),
             job.DurationSeconds <= Epsilon
                 ? 1.0
                 : Math.Clamp(
