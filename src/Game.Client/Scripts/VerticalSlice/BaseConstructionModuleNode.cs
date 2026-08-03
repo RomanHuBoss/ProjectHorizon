@@ -124,6 +124,6 @@ public partial class BaseConstructionModuleNode : StaticBody3D
 
     private static string ToNodeName(string instanceId)
     {
-        return instanceId.Replace('.', '_', StringComparison.Ordinal);
+        return instanceId.Replace('.', '_');
     }
 }

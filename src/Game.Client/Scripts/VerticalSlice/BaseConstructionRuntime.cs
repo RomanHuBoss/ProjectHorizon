@@ -358,7 +358,7 @@ public sealed class BaseConstructionRuntime
 
     private static long ParseSequence(string instanceId)
     {
-        int separator = instanceId.LastIndexOf('.', StringComparison.Ordinal);
+        int separator = instanceId.LastIndexOf(".", StringComparison.Ordinal);
         if (separator < 0 ||
             !long.TryParse(
                 instanceId[(separator + 1)..],
