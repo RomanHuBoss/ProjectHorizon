@@ -133,6 +133,25 @@ public sealed record StationServicesSaveData(
     IReadOnlyList<StationServiceStockSaveData> Stock,
     IReadOnlyList<StationServiceQuestSaveData> Quests);
 
+public sealed record BaseConstructionStockSaveData(
+    string ModuleId,
+    int Quantity);
+
+public sealed record BaseConstructionModuleSaveData(
+    string InstanceId,
+    string ModuleId,
+    int GridX,
+    int GridZ,
+    int RotationQuarterTurns,
+    bool Enabled);
+
+public sealed record BaseConstructionSaveData(
+    string BaseId,
+    long NextSequence,
+    double StoredEnergy,
+    IReadOnlyList<BaseConstructionStockSaveData> Stock,
+    IReadOnlyList<BaseConstructionModuleSaveData> Modules);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -146,7 +165,8 @@ public sealed record SaveGameSnapshot(
     TechnologyProgressSaveData? TechnologyProgress = null,
     ProductionQueueSaveData? ProductionQueue = null,
     ProductionQueueNetworkSaveData? ProductionQueueNetwork = null,
-    StationServicesSaveData? StationServices = null);
+    StationServicesSaveData? StationServices = null,
+    BaseConstructionSaveData? BaseConstruction = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

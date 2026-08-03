@@ -486,6 +486,30 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        BaseConstructionSaveData? expectedBase = expected.BaseConstruction;
+        BaseConstructionSaveData? actualBase = actual.BaseConstruction;
+        if ((expectedBase is null) != (actualBase is null))
+        {
+            mismatch = "base_construction presence differs";
+            return false;
+        }
+
+        if (expectedBase is not null && actualBase is not null)
+        {
+            BaseConstructionSaveData orderedExpected =
+                CanonicalizeBaseConstruction(expectedBase);
+            BaseConstructionSaveData orderedActual =
+                CanonicalizeBaseConstruction(actualBase);
+            if (!string.Equals(
+                JsonSerializer.Serialize(orderedExpected),
+                JsonSerializer.Serialize(orderedActual),
+                StringComparison.Ordinal))
+            {
+                mismatch = "base_construction differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -905,7 +929,8 @@ public sealed partial class SaveDatabase : IDisposable
             "DELETE FROM save_settings WHERE slot_id = $slot_id AND " +
             "setting_key IN ('research_points', 'unlocked_technologies', " +
             "'production_queue', 'production_queue_network', " +
-            "'inventory_properties', 'station_services');",
+            "'inventory_properties', 'station_services', " +
+            "'base_construction');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -969,6 +994,19 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeStationServices(snapshot.StationServices))));
+        }
+
+        if (snapshot.BaseConstruction is not null)
+        {
+            ValidateBaseConstruction(snapshot.BaseConstruction);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'base_construction', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeBaseConstruction(snapshot.BaseConstruction))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1209,6 +1247,7 @@ public sealed partial class SaveDatabase : IDisposable
         ProductionQueueSaveData? productionQueue = null;
         ProductionQueueNetworkSaveData? productionQueueNetwork = null;
         StationServicesSaveData? stationServices = null;
+        BaseConstructionSaveData? baseConstruction = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1218,7 +1257,8 @@ public sealed partial class SaveDatabase : IDisposable
                 "WHERE slot_id = $slot_id AND setting_key IN " +
                 "('research_points', 'unlocked_technologies', " +
                 "'production_queue', 'production_queue_network', " +
-                "'inventory_properties', 'station_services') " +
+                "'inventory_properties', 'station_services', " +
+                "'base_construction') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1336,6 +1376,32 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "base_construction",
+            out string? baseConstructionJson))
+        {
+            if (string.IsNullOrWhiteSpace(baseConstructionJson))
+            {
+                throw new InvalidDataException(
+                    "base_construction setting is empty.");
+            }
+
+            try
+            {
+                baseConstruction = JsonSerializer.Deserialize<
+                    BaseConstructionSaveData>(baseConstructionJson) ??
+                    throw new InvalidDataException(
+                        "base_construction setting deserialized to null.");
+                ValidateBaseConstruction(baseConstruction);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "base_construction setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1426,7 +1492,8 @@ public sealed partial class SaveDatabase : IDisposable
             technologyProgress,
             productionQueue,
             productionQueueNetwork,
-            stationServices);
+            stationServices,
+            baseConstruction);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -1484,6 +1551,66 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "station_services contains invalid quest state.");
+            }
+        }
+    }
+
+    private static BaseConstructionSaveData CanonicalizeBaseConstruction(
+        BaseConstructionSaveData baseConstruction)
+    {
+        return baseConstruction with
+        {
+            Stock = baseConstruction.Stock
+                .OrderBy(stock => stock.ModuleId, StringComparer.Ordinal)
+                .ToArray(),
+            Modules = baseConstruction.Modules
+                .OrderBy(module => module.InstanceId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateBaseConstruction(
+        BaseConstructionSaveData baseConstruction)
+    {
+        ArgumentNullException.ThrowIfNull(baseConstruction);
+        if (!GameContentCatalog.IsStableId(baseConstruction.BaseId) ||
+            baseConstruction.NextSequence <= 0 ||
+            baseConstruction.StoredEnergy < 0.0 ||
+            double.IsNaN(baseConstruction.StoredEnergy) ||
+            double.IsInfinity(baseConstruction.StoredEnergy) ||
+            baseConstruction.Stock is null ||
+            baseConstruction.Modules is null ||
+            baseConstruction.Modules.Count > 500)
+        {
+            throw new InvalidDataException(
+                "base_construction contains invalid identity or scalar values.");
+        }
+
+        HashSet<string> stockIds = new(StringComparer.Ordinal);
+        foreach (BaseConstructionStockSaveData stock in baseConstruction.Stock)
+        {
+            if (!GameContentCatalog.IsStableId(stock.ModuleId) ||
+                stock.Quantity < 0 ||
+                !stockIds.Add(stock.ModuleId))
+            {
+                throw new InvalidDataException(
+                    "base_construction contains invalid or duplicate stock.");
+            }
+        }
+
+        HashSet<string> instanceIds = new(StringComparer.Ordinal);
+        HashSet<(int X, int Z)> cells = new();
+        foreach (BaseConstructionModuleSaveData module in
+            baseConstruction.Modules)
+        {
+            if (!GameContentCatalog.IsStableId(module.InstanceId) ||
+                !GameContentCatalog.IsStableId(module.ModuleId) ||
+                module.RotationQuarterTurns is < 0 or > 3 ||
+                !instanceIds.Add(module.InstanceId) ||
+                !cells.Add((module.GridX, module.GridZ)))
+            {
+                throw new InvalidDataException(
+                    "base_construction contains invalid or duplicate modules.");
             }
         }
     }

@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry Content v2, production network и resource lifecycle — `VERIFIED`; station services — `IMPLEMENTED`
+### Industry, resources и station services — `VERIFIED`; base construction subsystem — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -67,6 +67,7 @@ src/Game.Client/Content/recipes.json
 src/Game.Client/Content/stations.json
 src/Game.Client/Content/technologies.json
 src/Game.Client/Content/station_services.json
+src/Game.Client/Content/base_construction.json
 src/Game.Client/Content/localization.ru.json
 src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
@@ -76,7 +77,7 @@ src/Game.Client/Content/catalog_manifest.json
 
 Станционные услуги Этапа 1 реализованы отдельным data-driven слоем `station_services.json`. В vertical slice размещён один trader NPC `npc.trader.ilia_voss` с template dialogue и вкладками Dialogue/Buy/Sell/Quests. Каталог задаёт ровно шесть economy types, три factions с relations и три persistent quest graphs. Все 174 items доступны рынку; цена вычисляется из base price, economy, supply/demand, faction, reputation и deterministic daily factor. Credits, reputation, market stock/day и quest state сохраняются в optional SQLite setting `station_services` без повышения schema 2; старые saves используют legacy fallback. Trade синхронизирует основной inventory и все пять production mirrors.
 
-В правом нижнем углу постоянно отображается компактный индикатор `PLAYER POS` с мировыми координатами `X/Y/Z` из `Player.GlobalPosition` с точностью до 0,1. Индикатор обновляется каждый кадр и остаётся видимым во всех режимах основной HUD-панели, включая `Hidden`, а также при открытых station и trader интерфейсах.
+Строительство баз реализовано как отдельная data-driven подсистема `base_construction.json`: 50 модулей покрывают все 16 категорий раздела 20.1 ТЗ — foundations, floors, walls, roofs, corridors, doors, windows, stairs, rooms, generators, batteries, processors, storage, landing pad, terminals и decoration. Дополнительная техническая категория `Structure` содержит несущие балки, арки и колонны, поэтому всего catalog содержит 17 категорий. Модули ставятся на сетку `2,5 м` с cardinal snap, collision rejection, обязательным anchor и проверкой связности при демонтаже. Исполняются ограничения `500/100/200/20`, электрическая сеть представлена графом, учитывает generators, consumers, batteries и enable/disable. Состояние modules, stock, rotation, device state и battery energy сохраняется в optional SQLite setting `base_construction` без повышения schema 2; legacy saves получают пустую базу и полный starter palette. Режим открывается клавишей `G`, а `F6` запускает изолированную `TASK-106` acceptance совместно с legacy coolant regression. Координаты `Player.GlobalPosition` постоянно отображаются в углу HUD во всех режимах `H`.
 
 В состав v2 входят:
 
@@ -113,13 +114,19 @@ Enter / E      выполнить выбранное station/service дейст�
 Q              station Recipes: поставить recipe в очередь; из других station tabs открыть Queue
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
-H              detailed / compact / hidden main HUD; player coordinates remain visible
+H              detailed / compact / hidden HUD; координаты игрока остаются видимыми
+G              открыть / закрыть режим строительства базы
+Up / Down      в режиме строительства выбрать модуль
+R              в режиме строительства повернуть модуль на 90°
+Enter          поставить выбранный модуль в target grid cell
+X / Delete     демонтировать targeted module с возвратом stock
+T              включить / отключить targeted device
 F1             TASK-090/092/093/096/098: queue, properties, multi-station industry и aggregate HUD
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080: весь Industry Content v2 (128 recipes)
 F5             TASK-076: playable runtime matrix (16 recipes / 15 station recipes)
-F6             регрессия coolant path
+F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
 F8             очистить gameplay-slot
 F9             регрессия strict JSON catalog
@@ -166,16 +173,6 @@ raw_compotium + acidic_brine -> ChemicalProcessor -> raw_compotium_solution (rep
 
 Для постановки процесса подойдите к нужной station, откройте терминал `E`, исследуйте требуемую technology, выберите recipe и нажмите `Q`. Вкладки Queue относятся к конкретной станции; jobs разных станций выполняются параллельно и сохраняются одной `production_queue_network`.
 
-### Player position HUD
-
-В правом нижнем углу отображается независимый от основной панели индикатор:
-
-```text
-PLAYER POS  X=14.2  Y=1.0  Z=11.8
-```
-
-Источник — `Player.GlobalPosition`; координаты обновляются каждый кадр с точностью до `0.1`. Переключение `H` скрывает только основную диагностическую панель: координаты остаются на экране, чтобы можно было находить станции, trader и generated resource field по указанным в документации позициям. При перемещении по площадке должны изменяться прежде всего `X` и `Z`; `Y` отражает высоту игрока.
-
 ### Aggregate production network HUD
 
 В detailed и compact HUD отображается единая сводка, рассчитанная непосредственно из `ProductionNetworkRuntime`:
@@ -212,6 +209,32 @@ TradeItem:      1 x resource.ice_water          -> 220 credits, +5 reputation
 ```
 
 Quest нужно принять до соответствующего действия. После достижения objective статус становится `ReadyToClaim`; claim выдаёт credits/reputation и сохраняется. Для smoke-test нажмите `F8`, примите все три quests, соберите ferric ore и ice water, изготовьте refined ferrite на Smelter, продайте ice water и claim contracts. После штатного restart credits, reputation, stock и quest states должны восстановиться; `F8` возвращает `2400` credits, `0` reputation, stock `6` и quests `Offered`.
+
+### Base construction subsystem
+
+Нажмите `G`, чтобы открыть builder. Target cell вычисляется по направлению взгляда игрока и округляется к сетке `2,5 м`. Первый модуль обязан быть `module.base_power_node`; каждый последующий модуль должен находиться в одной из четырёх соседних cells. Зелёный preview означает допустимую постановку, красный — collision, отсутствие snap, stock или нарушение limit.
+
+```text
+Up / Down    выбрать один из 50 модулей
+R            rotation 0/90/180/270
+Enter        place
+X / Delete   remove с connectivity check и refund
+T            enable/disable generator, battery или consumer
+G / Esc      close
+```
+
+HUD builder показывает target grid/world coordinates, category, stock, power generation/consumption, battery, powered consumers и компактное окно palette. Module nodes имеют mesh, static collision и фактические dynamic lights согласно catalog metadata. Terrain geometry не изменяется.
+
+Ожидаемый `F6` HUD:
+
+```text
+TASK-072 legacy fourth path (F6): PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1
+TASK-106 base construction (F6): PASS modules=50, placed=50, snap=1, collision=1, power=1, limits=1, stress500=1, restore=1, roundTrip=1
+```
+
+`TASK-106` использует отдельную БД `save_1.base-construction-test.db` и проверяет 50 modules / 17 catalog categories (all 16 PDF categories plus Structure), обязательный anchor, grid collision, disconnected placement/removal rejection, connected power graph, battery charge, device toggle, dismantle refund, связный stress graph из 500 modules и отказ на 501-м, отдельный interactive-device limit, exact cold restore, legacy fallback, autosave log, `maxWriters=1` и `integrity=ok`. Gameplay-slot тестом не изменяется.
+
+Ручной smoke-test: нажать `F8`, открыть `G`, поставить anchor, затем несколько соседних structural modules, solar array, battery и consumer; проверить рост generation/consumption и battery; отключить consumer клавишей `T`; попытаться поставить module поверх существующего и отдельно от базы; демонтировать крайний module и убедиться в refund; штатно перезапустить игру и проверить exact restore; `F8` должен вернуть пустую базу и исходный palette.
 
 ### Catalog-wide resource lifecycle
 
@@ -771,7 +794,9 @@ integrity in `save_1.production-network-hud-test.db`.
 ## Stage 1 station-services closure
 
 `TASK-102` adds the complete Stage 1 station-services vertical-slice block: six economy types, three data-driven factions, one physical trader, template dialogue, catalog-wide market pricing, credits and reputation, and three persistent quest graphs. Every one of the 174 catalog items is quotable through the six-factor price formula. Buy/sell operations synchronize the player session and all five production inventory mirrors. The optional `station_services` SQLite setting stores credits, reputation, economy day, stock and quest-node state without increasing schema version 2; legacy saves remain loadable. F3 runs the isolated `save_1.station-services-test.db` acceptance alongside the existing research test. Full galaxy NPC populations, procedural quest generation and inter-system economies remain later-stage features, not unfinished work in this Stage 1 subsystem.
-## Persistent player-coordinate overlay
 
-`TASK-104` adds a bottom-right `PLAYER POS` overlay sourced from `Player.GlobalPosition`. It displays X/Y/Z with one-decimal precision, updates every frame, and remains visible while the main HUD cycles through Detailed, Compact and Hidden modes or while a station-services/production panel is open.
 
+
+### Base construction closure iteration
+
+`TASK-106` adds a 50-module, 17-category data-driven base-construction runtime matching PDF section 20: cardinal snapping, overlap and disconnection rejection, per-base limits, a graph-based electric network with generators/batteries/consumers and switchable devices, static collisions, dynamic lights, dismantle refunds, autosave/cold restore, legacy fallback and F8 reset. F6 runs the isolated SQLite acceptance in parallel with the existing fourth-path regression. The coordinate overlay is preserved across detailed, compact and hidden HUD modes.

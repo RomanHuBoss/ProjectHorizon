@@ -584,6 +584,11 @@ mesh = SubResource("CraftingStationMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/StationTrader"]
 shape = SubResource("CraftingStationShape")
 
+[node name="BaseConstructionModules" type="Node3D" parent="Gameplay"]
+
+[node name="BaseBuildPreview" type="MeshInstance3D" parent="Gameplay"]
+visible = false
+
 [node name="Hud" type="CanvasLayer" parent="."]
 
 [node name="MarginContainer" type="MarginContainer" parent="Hud"]
@@ -639,6 +644,43 @@ theme_override_font_sizes/font_size = 15
 text = "FRONTIER EXCHANGE"
 autowrap_mode = 2
 
+[node name="BaseConstruction" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 255.0
+offset_top = 40.0
+offset_right = 1135.0
+offset_bottom = 625.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/BaseConstruction"]
+mouse_filter = 2
+custom_minimum_size = Vector2(840, 545)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "BASE CONSTRUCTION"
+autowrap_mode = 2
+
+[node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
+mouse_filter = 2
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -350.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 62.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/PlayerCoordinates"]
+mouse_filter = 2
+custom_minimum_size = Vector2(300, 22)
+theme_override_colors/font_color = Color(0.82, 0.96, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "PLAYER POS unavailable"
+horizontal_alignment = 1
+vertical_alignment = 1
+
 [node name="HiddenHint" type="PanelContainer" parent="Hud"]
 visible = false
 mouse_filter = 2
@@ -653,29 +695,6 @@ mouse_filter = 2
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 16
 text = "HUD hidden — press H"
-horizontal_alignment = 1
-vertical_alignment = 1
-
-[node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
-mouse_filter = 2
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -310.0
-offset_top = -52.0
-offset_right = -16.0
-offset_bottom = -16.0
-grow_horizontal = 0
-grow_vertical = 0
-theme_override_styles/panel = SubResource("HudPanel")
-
-[node name="Label" type="Label" parent="Hud/PlayerCoordinates"]
-mouse_filter = 2
-custom_minimum_size = Vector2(286, 28)
-theme_override_colors/font_color = Color(0.82, 0.96, 1, 0.95)
-theme_override_font_sizes/font_size = 14
-text = "PLAYER POS  X=0.0  Y=0.0  Z=0.0"
 horizontal_alignment = 1
 vertical_alignment = 1
 

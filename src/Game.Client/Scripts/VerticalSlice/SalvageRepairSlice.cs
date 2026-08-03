@@ -68,6 +68,8 @@ public partial class SalvageRepairSlice : Node3D
     private GameContentCatalog? _contentCatalog;
     private StationServicesCatalog? _stationServicesCatalog;
     private StationServicesRuntime? _stationServicesRuntime;
+    private BaseConstructionCatalog? _baseConstructionCatalog;
+    private BaseConstructionRuntime? _baseConstructionRuntime;
     private TechnologyProgression? _technologyProgression;
     private CraftingRecipeDefinition? _repairRecipe;
     private CraftingRecipeDefinition? _launchCapacitorRecipe;
@@ -82,11 +84,15 @@ public partial class SalvageRepairSlice : Node3D
     private MarginContainer? _hudMargin;
     private Label? _hudLabel;
     private PanelContainer? _hudHiddenHint;
-    private Label? _playerCoordinatesLabel;
     private PanelContainer? _recipeSelectorPanel;
     private Label? _recipeSelectorLabel;
     private PanelContainer? _stationServicesPanel;
     private Label? _stationServicesLabel;
+    private PanelContainer? _baseConstructionPanel;
+    private Label? _baseConstructionLabel;
+    private Label? _playerCoordinatesLabel;
+    private Node3D? _baseConstructionModulesRoot;
+    private MeshInstance3D? _baseBuildPreview;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
     private Task? _resetTask;
@@ -103,6 +109,8 @@ public partial class SalvageRepairSlice : Node3D
         _technologySelectorAcceptanceTask;
     private Task<StationServicesAcceptanceReport>?
         _stationServicesAcceptanceTask;
+    private Task<BaseConstructionAcceptanceReport>?
+        _baseConstructionAcceptanceTask;
     private Task<ChemicalProcessAcceptanceReport>?
         _chemicalProcessAcceptanceTask;
     private Task<ProductionQueueAcceptanceReport>?
@@ -128,6 +136,8 @@ public partial class SalvageRepairSlice : Node3D
         _technologySelectorAcceptanceReport;
     private StationServicesAcceptanceReport?
         _stationServicesAcceptanceReport;
+    private BaseConstructionAcceptanceReport?
+        _baseConstructionAcceptanceReport;
     private ChemicalProcessAcceptanceReport?
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
@@ -161,6 +171,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _industryCatalogAcceptanceHud = "READY";
     private string _technologySelectorAcceptanceHud = "READY";
     private string _stationServicesAcceptanceHud = "READY";
+    private string _baseConstructionAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
     private string _queueTerminalAcceptanceHud = "READY";
@@ -178,6 +189,10 @@ public partial class SalvageRepairSlice : Node3D
     private int _stationServicesIndex;
     private string _stationServicesFeedback = "";
     private ulong _stationServicesOpenedTicks;
+    private bool _baseBuildMode;
+    private int _baseBuildIndex;
+    private int _baseBuildRotation;
+    private string _baseBuildFeedback = "";
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -196,6 +211,16 @@ public partial class SalvageRepairSlice : Node3D
         _stationServicesRuntime ??
         throw new InvalidOperationException(
             "Station services runtime is unavailable.");
+
+    private BaseConstructionCatalog BaseConstructionCatalog =>
+        _baseConstructionCatalog ??
+        throw new InvalidOperationException(
+            "Base construction catalog is unavailable.");
+
+    private BaseConstructionRuntime BaseConstruction =>
+        _baseConstructionRuntime ??
+        throw new InvalidOperationException(
+            "Base construction runtime is unavailable.");
 
     private TechnologyProgression TechnologyProgress =>
         _technologyProgression ??
@@ -264,8 +289,6 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/MarginContainer/PanelContainer/Label");
         _hudHiddenHint = GetNodeOrNull<PanelContainer>(
             "Hud/HiddenHint");
-        _playerCoordinatesLabel = GetNodeOrNull<Label>(
-            "Hud/PlayerCoordinates/Label");
         _recipeSelectorPanel = GetNodeOrNull<PanelContainer>(
             "Hud/RecipeSelector");
         _recipeSelectorLabel = GetNodeOrNull<Label>(
@@ -274,17 +297,29 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/StationServices");
         _stationServicesLabel = GetNodeOrNull<Label>(
             "Hud/StationServices/Label");
+        _baseConstructionPanel = GetNodeOrNull<PanelContainer>(
+            "Hud/BaseConstruction");
+        _baseConstructionLabel = GetNodeOrNull<Label>(
+            "Hud/BaseConstruction/Label");
+        _playerCoordinatesLabel = GetNodeOrNull<Label>(
+            "Hud/PlayerCoordinates/Label");
+        _baseConstructionModulesRoot = GetNodeOrNull<Node3D>(
+            "Gameplay/BaseConstructionModules");
+        _baseBuildPreview = GetNodeOrNull<MeshInstance3D>(
+            "Gameplay/BaseBuildPreview");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
             "Gameplay/DamagedShip");
         _stationServicesNpc = GetNodeOrNull<StationServicesNpc>(
             "Gameplay/StationTrader");
         _player = GetNodeOrNull<PlayerController>("Player");
         if (_hudMargin is null || _hudLabel is null ||
-            _hudHiddenHint is null || _playerCoordinatesLabel is null ||
-            _recipeSelectorPanel is null ||
+            _hudHiddenHint is null || _recipeSelectorPanel is null ||
             _recipeSelectorLabel is null || _stationServicesPanel is null ||
-            _stationServicesLabel is null || _shipTerminal is null ||
-            _stationServicesNpc is null || _player is null)
+            _stationServicesLabel is null || _baseConstructionPanel is null ||
+            _baseConstructionLabel is null || _playerCoordinatesLabel is null ||
+            _baseConstructionModulesRoot is null || _baseBuildPreview is null ||
+            _shipTerminal is null || _stationServicesNpc is null ||
+            _player is null)
         {
             throw new InvalidOperationException(
                 "Vertical slice scene is missing HUD, player or ship.");
@@ -293,6 +328,8 @@ public partial class SalvageRepairSlice : Node3D
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
             LoadStationServicesCatalog(catalog);
+        BaseConstructionCatalog baseConstructionCatalog =
+            LoadBaseConstructionCatalog(catalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
@@ -337,6 +374,9 @@ public partial class SalvageRepairSlice : Node3D
             catalog,
             stationServicesCatalog,
             StationServicesAcceptanceRunner.NpcId);
+        _baseConstructionCatalog = baseConstructionCatalog;
+        _baseConstructionRuntime = new BaseConstructionRuntime(
+            baseConstructionCatalog);
         _technologyProgression = technologyProgression;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
@@ -391,6 +431,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeGameplayProductionNetwork(
             saveData: null,
             legacySaveData: null);
+        RebuildBaseConstructionScene();
 
         string userDirectory = ProjectSettings.GlobalizePath("user://");
         string databasePath = Path.Combine(
@@ -425,8 +466,9 @@ public partial class SalvageRepairSlice : Node3D
             "runtime acceptance, F3 for " +
             "selector/research acceptance, F4 for the complete Industry " +
             "Content v2 structural acceptance, F5 for " +
-            "the playable runtime matrix, F6/F9/F10/F11/F12 for " +
-            "regressions, F7 for complete resource acceptance or F8 to reset.");
+            "the playable runtime matrix, F6 for base construction plus legacy " +
+            "regression, F9/F10/F11/F12 for regressions, F7 for complete " +
+            "resource acceptance or F8 to reset. Press G for base build mode.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -465,9 +507,17 @@ public partial class SalvageRepairSlice : Node3D
             "genericCollection=enabled; mirrors=enabled; " +
             "depletionPersistence=enabled; reset=enabled.");
         GD.Print(
-            "TASK-104 player coordinate HUD READY: " +
-            "source=Player.GlobalPosition; axes=XYZ; precision=0.1; " +
-            "corner=bottom-right; " +
+            "TASK-106 base construction READY: " +
+            $"modules={BaseConstructionCatalog.Modules.Count}; " +
+            $"grid={BaseConstructionCatalog.GridSizeMeters.ToString("0.#", CultureInfo.InvariantCulture)}m; " +
+            $"limits={BaseConstructionCatalog.Limits.MaximumModules}/" +
+            $"{BaseConstructionCatalog.Limits.MaximumInteractiveDevices}/" +
+            $"{BaseConstructionCatalog.Limits.MaximumActivePhysicsObjects}/" +
+            $"{BaseConstructionCatalog.Limits.MaximumDynamicLights}; " +
+            "snap=cardinal; power=graph; persistence=enabled; F6=acceptance.");
+        GD.Print(
+            "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
+            "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
     }
 
@@ -502,6 +552,7 @@ public partial class SalvageRepairSlice : Node3D
         PollCraftTimeAcceptanceTask();
         PollThirdCraftingAcceptanceTask();
         PollFourthCraftingAcceptanceTask();
+        PollBaseConstructionAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -512,6 +563,8 @@ public partial class SalvageRepairSlice : Node3D
         PollProductionNetworkHudAcceptanceTask();
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
+        _baseConstructionRuntime?.Tick(delta);
+        UpdateBaseBuildPreview();
         PollAutosave();
         PollGracefulExitTask();
         UpdatePeriodicAutosave(delta);
@@ -530,6 +583,46 @@ public partial class SalvageRepairSlice : Node3D
 
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
+        if (_baseBuildMode)
+        {
+            if (Matches(physical, logical, Key.Escape) ||
+                Matches(physical, logical, Key.G))
+            {
+                CloseBaseBuildMode("base construction closed");
+            }
+            else if (Matches(physical, logical, Key.Up))
+            {
+                MoveBaseBuildSelection(-1);
+            }
+            else if (Matches(physical, logical, Key.Down))
+            {
+                MoveBaseBuildSelection(1);
+            }
+            else if (Matches(physical, logical, Key.R))
+            {
+                _baseBuildRotation = (_baseBuildRotation + 1) % 4;
+                _baseBuildFeedback =
+                    $"rotation={_baseBuildRotation * 90} degrees";
+                UpdateBaseConstructionPanel();
+            }
+            else if (Matches(physical, logical, Key.Enter))
+            {
+                PlaceSelectedBaseModule();
+            }
+            else if (Matches(physical, logical, Key.X) ||
+                     Matches(physical, logical, Key.Delete))
+            {
+                RemoveTargetBaseModule();
+            }
+            else if (Matches(physical, logical, Key.T))
+            {
+                ToggleTargetBaseModule();
+            }
+
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (_stationServicesOpen)
         {
             if (Matches(physical, logical, Key.Escape))
@@ -621,6 +714,15 @@ public partial class SalvageRepairSlice : Node3D
                 ConfirmSelectorSelection();
             }
 
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (Matches(physical, logical, Key.G) &&
+            (_state == SalvageRepairSliceState.Ready ||
+             _state == SalvageRepairSliceState.Passed))
+        {
+            OpenBaseBuildMode();
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -719,6 +821,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         CloseRecipeSelector();
+        CloseBaseBuildMode();
         _stationServicesOpen = true;
         _stationServicesTab = StationServicesTab.Dialogue;
         _stationServicesIndex = 0;
@@ -1198,6 +1301,8 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        CloseStationServices();
+        CloseBaseBuildMode();
         bool sameOpenStation = ReferenceEquals(_selectorStation, station);
         _selectorStation = station;
         _selectorInteractor = interactor;
@@ -2750,6 +2855,36 @@ public partial class SalvageRepairSlice : Node3D
         return catalog;
     }
 
+    private static BaseConstructionCatalog LoadBaseConstructionCatalog(
+        GameContentCatalog contentCatalog)
+    {
+        const string path = "res://Content/base_construction.json";
+        string json = Godot.FileAccess.GetFileAsString(path);
+        BaseConstructionCatalog catalog = BaseConstructionCatalog.LoadFromJson(
+            json,
+            contentCatalog);
+        int categories = catalog.Modules.Values
+            .Select(module => module.Category)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        GD.Print(
+            "TASK-106 base construction catalog READY: " +
+            $"schema={catalog.SchemaVersion}; " +
+            $"modules={catalog.Modules.Count}; categories={categories}; " +
+            $"grid={catalog.GridSizeMeters.ToString("0.#", CultureInfo.InvariantCulture)}; " +
+            $"limits={catalog.Limits.MaximumModules}/" +
+            $"{catalog.Limits.MaximumInteractiveDevices}/" +
+            $"{catalog.Limits.MaximumActivePhysicsObjects}/" +
+            $"{catalog.Limits.MaximumDynamicLights}.");
+        GD.Print(
+            "TASK-106 base construction binding PASS: " +
+            $"catalogModules={catalog.Modules.Count}; " +
+            $"baseRecipes={contentCatalog.Recipes.Values.Count(recipe => string.Equals(recipe.Category, "Base", StringComparison.Ordinal))}; " +
+            $"anchors={catalog.Modules.Values.Count(module => module.IsAnchor)}; " +
+            "snap=cardinal; collision=grid; power=graph; persistence=enabled.");
+        return catalog;
+    }
+
     private void InitializeGameplayProductionNetwork(
         ProductionQueueNetworkSaveData? saveData,
         ProductionQueueSaveData? legacySaveData)
@@ -3021,6 +3156,431 @@ public partial class SalvageRepairSlice : Node3D
             StringComparer.Ordinal);
     }
 
+    private IReadOnlyList<BaseModuleDefinition> BaseBuildDefinitions =>
+        BaseConstructionCatalog.Modules.Values
+            .OrderBy(module => module.ModuleId, StringComparer.Ordinal)
+            .ToArray();
+
+    private void OpenBaseBuildMode()
+    {
+        CloseRecipeSelector();
+        CloseStationServices();
+        CloseBaseBuildMode();
+        _baseBuildMode = true;
+        IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
+        if (BaseConstruction.ModuleCount == 0)
+        {
+            _baseBuildIndex = definitions
+                .Select((definition, index) => (definition, index))
+                .Single(pair => pair.definition.IsAnchor)
+                .index;
+        }
+        else
+        {
+            _baseBuildIndex = Math.Clamp(
+                _baseBuildIndex,
+                0,
+                Math.Max(0, definitions.Count - 1));
+        }
+
+        _baseBuildFeedback = BaseConstruction.ModuleCount == 0
+            ? "anchor selected; place it to start the connected base graph"
+            : "select a module and place it on an adjacent grid cell";
+        if (_baseConstructionPanel is not null)
+        {
+            _baseConstructionPanel.Visible = true;
+        }
+
+        if (_baseBuildPreview is not null)
+        {
+            _baseBuildPreview.Visible = true;
+        }
+
+        UpdateBaseConstructionPanel();
+        UpdateBaseBuildPreview();
+        _status = "base construction mode";
+        GD.Print(
+            "TASK-106 player base construction mode PASS: " +
+            $"modules={BaseConstruction.ModuleCount}; " +
+            $"stock={BaseBuildDefinitions.Sum(module => BaseConstruction.GetStock(module.ModuleId))}; " +
+            "controls=Up/Down,R,Enter,X,T,G.");
+    }
+
+    private void CloseBaseBuildMode(string status = "")
+    {
+        _baseBuildMode = false;
+        if (_baseConstructionPanel is not null)
+        {
+            _baseConstructionPanel.Visible = false;
+        }
+
+        if (_baseBuildPreview is not null)
+        {
+            _baseBuildPreview.Visible = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            _status = status;
+        }
+    }
+
+    private void MoveBaseBuildSelection(int delta)
+    {
+        IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        _baseBuildIndex = (_baseBuildIndex + delta) % definitions.Count;
+        if (_baseBuildIndex < 0)
+        {
+            _baseBuildIndex += definitions.Count;
+        }
+
+        _baseBuildFeedback = "module selection changed";
+        UpdateBaseConstructionPanel();
+        UpdateBaseBuildPreview();
+    }
+
+    private void PlaceSelectedBaseModule()
+    {
+        IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        BaseModuleDefinition definition = definitions[_baseBuildIndex];
+        var (gridX, gridZ, _) = GetBaseBuildTarget();
+        BasePlacementResult placementResult = BaseConstruction.TryPlace(
+            definition.ModuleId,
+            gridX,
+            gridZ,
+            _baseBuildRotation,
+            out BaseModulePlacement? placement,
+            out string result);
+        _baseBuildFeedback = result;
+        if (placementResult == BasePlacementResult.Placed && placement is not null)
+        {
+            RebuildBaseConstructionScene();
+            _lastDomainEvent =
+                $"BaseModulePlaced({placement.InstanceId},{placement.ModuleId})";
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+            GD.Print(
+                "TASK-106 player base placement PASS: " +
+                $"instance={placement.InstanceId}; module={placement.ModuleId}; " +
+                $"grid={placement.GridX},{placement.GridZ}; " +
+                $"rotation={placement.RotationQuarterTurns * 90}; " +
+                $"modules={BaseConstruction.ModuleCount}; " +
+                $"power={BaseConstruction.Power.Generation.ToString("0.#", CultureInfo.InvariantCulture)}/" +
+                $"{BaseConstruction.Power.Consumption.ToString("0.#", CultureInfo.InvariantCulture)}.");
+        }
+
+        UpdateBaseConstructionPanel();
+        UpdateBaseBuildPreview();
+    }
+
+    private void RemoveTargetBaseModule()
+    {
+        var (gridX, gridZ, _) = GetBaseBuildTarget();
+        BaseModulePlacement? placement = BaseConstruction.FindAt(gridX, gridZ);
+        if (placement is null)
+        {
+            _baseBuildFeedback = $"no base module at {gridX},{gridZ}";
+            UpdateBaseConstructionPanel();
+            return;
+        }
+
+        bool removed = BaseConstruction.TryRemove(
+            placement.InstanceId,
+            out string result);
+        _baseBuildFeedback = result;
+        if (removed)
+        {
+            RebuildBaseConstructionScene();
+            _lastDomainEvent =
+                $"BaseModuleRemoved({placement.InstanceId},{placement.ModuleId})";
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+            GD.Print(
+                "TASK-106 player base removal PASS: " +
+                $"instance={placement.InstanceId}; module={placement.ModuleId}; " +
+                $"modules={BaseConstruction.ModuleCount}; refunded=1; " +
+                $"connected={BaseConstruction.Power.ConnectedComponents}.");
+        }
+
+        UpdateBaseConstructionPanel();
+        UpdateBaseBuildPreview();
+    }
+
+    private void ToggleTargetBaseModule()
+    {
+        var (gridX, gridZ, _) = GetBaseBuildTarget();
+        BaseModulePlacement? placement = BaseConstruction.FindAt(gridX, gridZ);
+        if (placement is null)
+        {
+            _baseBuildFeedback = $"no base module at {gridX},{gridZ}";
+            UpdateBaseConstructionPanel();
+            return;
+        }
+
+        bool toggled = BaseConstruction.TryToggle(
+            placement.InstanceId,
+            out string result);
+        _baseBuildFeedback = result;
+        if (toggled)
+        {
+            RebuildBaseConstructionScene();
+            _lastDomainEvent =
+                $"BaseDeviceToggled({placement.InstanceId})";
+            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+            GD.Print(
+                "TASK-106 player base device toggle PASS: " +
+                $"instance={placement.InstanceId}; result={result}; " +
+                $"powered={BaseConstruction.Power.PoweredConsumers}/" +
+                $"{BaseConstruction.Power.EnabledConsumers}.");
+        }
+
+        UpdateBaseConstructionPanel();
+        UpdateBaseBuildPreview();
+    }
+
+    private (int GridX, int GridZ, Vector3 WorldPosition)
+        GetBaseBuildTarget()
+    {
+        PlayerController player = _player ??
+            throw new InvalidOperationException("Player is unavailable.");
+        Vector3 forward = -player.GlobalTransform.Basis.Z;
+        forward.Y = 0.0f;
+        if (forward.LengthSquared() < 0.0001f)
+        {
+            forward = Vector3.Forward;
+        }
+        else
+        {
+            forward = forward.Normalized();
+        }
+
+        Vector3 target = player.GlobalPosition + forward * 4.5f;
+        double gridSize = BaseConstructionCatalog.GridSizeMeters;
+        int gridX = (int)Math.Round(
+            target.X / gridSize,
+            MidpointRounding.AwayFromZero);
+        int gridZ = (int)Math.Round(
+            target.Z / gridSize,
+            MidpointRounding.AwayFromZero);
+        return (
+            gridX,
+            gridZ,
+            new Vector3(
+                (float)(gridX * gridSize),
+                0.11f,
+                (float)(gridZ * gridSize)));
+    }
+
+    private void UpdateBaseConstructionPanel()
+    {
+        if (_baseConstructionLabel is null || !_baseBuildMode)
+        {
+            return;
+        }
+
+        IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
+        if (definitions.Count == 0)
+        {
+            _baseConstructionLabel.Text = "BASE CONSTRUCTION\nNo modules.";
+            return;
+        }
+
+        _baseBuildIndex = Math.Clamp(
+            _baseBuildIndex,
+            0,
+            definitions.Count - 1);
+        BaseModuleDefinition selected = definitions[_baseBuildIndex];
+        (int gridX, int gridZ, Vector3 worldPosition) = GetBaseBuildTarget();
+        BaseModulePlacement? targetModule = BaseConstruction.FindAt(
+            gridX,
+            gridZ);
+        List<string> lines = new()
+        {
+            "BASE CONSTRUCTION — Stage 2 foundation subsystem",
+            $"Base: {BaseConstruction.BuildSummary()}",
+            $"Target: grid={gridX},{gridZ} • world=" +
+                $"X={worldPosition.X:0.0} Z={worldPosition.Z:0.0} • " +
+                (targetModule is null
+                    ? "empty"
+                    : $"{targetModule.ModuleId} ({targetModule.InstanceId})"),
+            $"Selected: {selected.ModuleId} • category={selected.Category} • " +
+                $"stock={BaseConstruction.GetStock(selected.ModuleId)} • " +
+                $"rotation={_baseBuildRotation * 90}°",
+            $"Power: generation={BaseConstruction.Power.Generation:0.#} • " +
+                $"consumption={BaseConstruction.Power.Consumption:0.#} • " +
+                $"battery={BaseConstruction.Power.BatteryStored:0.#}/" +
+                $"{BaseConstruction.Power.BatteryCapacity:0.#} • " +
+                $"powered={BaseConstruction.Power.PoweredConsumers}/" +
+                $"{BaseConstruction.Power.EnabledConsumers}",
+            "",
+            "MODULE PALETTE"
+        };
+        const int visiblePaletteRows = 11;
+        int paletteStart = Math.Clamp(
+            _baseBuildIndex - visiblePaletteRows / 2,
+            0,
+            Math.Max(0, definitions.Count - visiblePaletteRows));
+        int paletteEnd = Math.Min(
+            definitions.Count,
+            paletteStart + visiblePaletteRows);
+        if (paletteStart > 0)
+        {
+            lines.Add($"  ... {paletteStart} earlier modules ...");
+        }
+
+        for (int index = paletteStart; index < paletteEnd; index++)
+        {
+            BaseModuleDefinition definition = definitions[index];
+            lines.Add(
+                $"{(index == _baseBuildIndex ? ">" : " ")} " +
+                $"{definition.ModuleId} [{definition.Category}] " +
+                $"stock={BaseConstruction.GetStock(definition.ModuleId)} " +
+                $"P={definition.PowerGeneration:0.#}/" +
+                $"{definition.PowerConsumption:0.#} " +
+                $"B={definition.BatteryCapacity:0.#}");
+        }
+
+        if (paletteEnd < definitions.Count)
+        {
+            lines.Add(
+                $"  ... {definitions.Count - paletteEnd} later modules ...");
+        }
+
+        lines.Add("");
+        lines.Add("Up/Down select • R rotate • Enter place • X/Delete remove");
+        lines.Add("T enable/disable targeted device • G/Esc close");
+        lines.Add($"Result: {_baseBuildFeedback}");
+        _baseConstructionLabel.Text = string.Join("\n", lines);
+    }
+
+    private void UpdateBaseBuildPreview()
+    {
+        if (_baseBuildPreview is null)
+        {
+            return;
+        }
+
+        if (!_baseBuildMode || BaseBuildDefinitions.Count == 0)
+        {
+            _baseBuildPreview.Visible = false;
+            return;
+        }
+
+        BaseModuleDefinition definition = BaseBuildDefinitions[_baseBuildIndex];
+        (int gridX, int gridZ, Vector3 worldPosition) = GetBaseBuildTarget();
+        bool hasAdjacent = BaseConstruction.ModuleCount == 0
+            ? definition.IsAnchor
+            : BaseConstruction.Placements.Any(placement =>
+                Math.Abs(placement.GridX - gridX) +
+                Math.Abs(placement.GridZ - gridZ) == 1);
+        bool valid = BaseConstruction.GetStock(definition.ModuleId) > 0 &&
+            BaseConstruction.FindAt(gridX, gridZ) is null &&
+            hasAdjacent;
+        EnsureBaseBuildPreviewMesh(definition);
+        _baseBuildPreview.GlobalPosition = new Vector3(
+            worldPosition.X,
+            (float)(definition.Size.Y * 0.5 + 0.11),
+            worldPosition.Z);
+        _baseBuildPreview.Rotation = new Vector3(
+            0.0f,
+            _baseBuildRotation * Mathf.Pi * 0.5f,
+            0.0f);
+        _baseBuildPreview.Visible = true;
+        if (_baseBuildPreview.Mesh is PrimitiveMesh primitiveMesh &&
+            primitiveMesh.Material is StandardMaterial3D material)
+        {
+            material.AlbedoColor = valid
+                ? new Color(0.18f, 0.92f, 0.42f, 0.42f)
+                : new Color(0.92f, 0.18f, 0.18f, 0.42f);
+        }
+    }
+
+    private void EnsureBaseBuildPreviewMesh(BaseModuleDefinition definition)
+    {
+        if (_baseBuildPreview is null)
+        {
+            return;
+        }
+
+        if (_baseBuildPreview.Mesh is not null &&
+            string.Equals(
+                _baseBuildPreview.Mesh.ResourceName,
+                definition.ModuleId,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        StandardMaterial3D material = new()
+        {
+            AlbedoColor = new Color(0.18f, 0.92f, 0.42f, 0.42f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            Metallic = 0.1f,
+            Roughness = 0.45f
+        };
+        if (string.Equals(definition.Shape, "Cylinder", StringComparison.Ordinal))
+        {
+            float radius = (float)(Math.Max(
+                definition.Size.X,
+                definition.Size.Z) * 0.5);
+            _baseBuildPreview.Mesh = new CylinderMesh
+            {
+                ResourceName = definition.ModuleId,
+                Material = material,
+                TopRadius = radius * 0.92f,
+                BottomRadius = radius,
+                Height = (float)definition.Size.Y,
+                RadialSegments = 16
+            };
+        }
+        else
+        {
+            _baseBuildPreview.Mesh = new BoxMesh
+            {
+                ResourceName = definition.ModuleId,
+                Material = material,
+                Size = new Vector3(
+                    (float)definition.Size.X,
+                    (float)definition.Size.Y,
+                    (float)definition.Size.Z)
+            };
+        }
+    }
+
+    private void RebuildBaseConstructionScene()
+    {
+        if (_baseConstructionModulesRoot is null ||
+            _baseConstructionRuntime is null ||
+            _baseConstructionCatalog is null)
+        {
+            return;
+        }
+
+        foreach (Node child in _baseConstructionModulesRoot.GetChildren())
+        {
+            _baseConstructionModulesRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        foreach (BaseModulePlacement placement in BaseConstruction.Placements)
+        {
+            BaseConstructionModuleNode node = new();
+            node.Configure(
+                BaseConstructionCatalog.GetModule(placement.ModuleId),
+                placement,
+                BaseConstructionCatalog.GridSizeMeters);
+            _baseConstructionModulesRoot.AddChild(node);
+        }
+    }
+
     private bool CanStartCommand()
     {
         return _database is not null &&
@@ -3038,6 +3598,7 @@ public partial class SalvageRepairSlice : Node3D
             _catalogMatrixAcceptanceTask is null &&
             _technologySelectorAcceptanceTask is null &&
             _stationServicesAcceptanceTask is null &&
+            _baseConstructionAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -3046,6 +3607,7 @@ public partial class SalvageRepairSlice : Node3D
             _gracefulExitTask is null &&
             _selectorStation is null &&
             !_stationServicesOpen &&
+            !_baseBuildMode &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -3245,10 +3807,15 @@ public partial class SalvageRepairSlice : Node3D
         string testPath = Path.Combine(
             directory,
             "save_1.fourth-crafting-path-test.db");
+        string baseConstructionTestPath = Path.Combine(
+            directory,
+            "save_1.base-construction-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-072 fourth crafting path acceptance running";
+        _status = "TASK-072/TASK-106 acceptance running";
         _fourthCraftingAcceptanceHud = "RUNNING";
+        _baseConstructionAcceptanceHud = "RUNNING";
         _fourthCraftingAcceptanceReport = null;
+        _baseConstructionAcceptanceReport = null;
         _fourthCraftingAcceptanceTask =
             FourthCraftingPathAcceptanceRunner.RunAsync(
                 testPath,
@@ -3262,6 +3829,14 @@ public partial class SalvageRepairSlice : Node3D
                         binding => binding.ResourceNodeId,
                         StringComparer.Ordinal)
                     .ToArray(),
+                _lifetimeCancellation.Token);
+        _baseConstructionAcceptanceTask =
+            BaseConstructionAcceptanceRunner.RunAsync(
+                baseConstructionTestPath,
+                SlotId,
+                ContentCatalog,
+                BaseConstructionCatalog,
+                RepairRecipe,
                 _lifetimeCancellation.Token);
     }
 
@@ -3460,7 +4035,8 @@ public partial class SalvageRepairSlice : Node3D
             productionQueue: null,
             productionQueueNetwork:
                 _gameplayProductionNetwork?.CreateSaveData(),
-            stationServices: StationServices.CreateSaveData());
+            stationServices: StationServices.CreateSaveData(),
+            baseConstruction: BaseConstruction.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -3503,6 +4079,7 @@ public partial class SalvageRepairSlice : Node3D
             _catalogMatrixAcceptanceTask is not null ||
             _technologySelectorAcceptanceTask is not null ||
             _stationServicesAcceptanceTask is not null ||
+            _baseConstructionAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -3528,7 +4105,8 @@ public partial class SalvageRepairSlice : Node3D
             productionQueue: null,
             productionQueueNetwork:
                 _gameplayProductionNetwork?.CreateSaveData(),
-            stationServices: StationServices.CreateSaveData());
+            stationServices: StationServices.CreateSaveData(),
+            baseConstruction: BaseConstruction.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -3543,7 +4121,10 @@ public partial class SalvageRepairSlice : Node3D
             $"queueJobs={_gameplayProductionNetwork?.TotalJobs ?? 0}; " +
             $"queueEnergy={(_gameplayProductionNetwork is null ? "n/a" :
                 _gameplayProductionNetwork.Queues.Sum(queue => queue.EnergyRemaining)
-                    .ToString("0.###", CultureInfo.InvariantCulture))}.");
+                    .ToString("0.###", CultureInfo.InvariantCulture))}; " +
+            $"baseModules={BaseConstruction.ModuleCount}; " +
+            $"basePower={BaseConstruction.Power.Generation.ToString("0.###", CultureInfo.InvariantCulture)}/" +
+            $"{BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -3601,6 +4182,9 @@ public partial class SalvageRepairSlice : Node3D
                 StationServiceCatalog,
                 StationServicesAcceptanceRunner.NpcId,
                 snapshot?.StationServices);
+            _baseConstructionRuntime = new BaseConstructionRuntime(
+                BaseConstructionCatalog,
+                snapshot?.BaseConstruction);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -3612,6 +4196,8 @@ public partial class SalvageRepairSlice : Node3D
 
             CloseRecipeSelector();
             CloseStationServices();
+            CloseBaseBuildMode();
+            RebuildBaseConstructionScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -3636,6 +4222,15 @@ public partial class SalvageRepairSlice : Node3D
                 $"completedQuests={StationServices.CompletedQuestCount}; " +
                 $"activeQuests={StationServices.ActiveQuestCount}; " +
                 $"legacyFallback={(snapshot?.StationServices is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-106 base construction restore PASS: " +
+                $"modules={BaseConstruction.ModuleCount}; " +
+                $"stock={BaseConstructionCatalog.Modules.Values.Sum(module => BaseConstruction.GetStock(module.ModuleId))}; " +
+                $"components={BaseConstruction.Power.ConnectedComponents}; " +
+                $"generation={BaseConstruction.Power.Generation.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"consumption={BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"battery={BaseConstruction.StoredEnergy.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"legacyFallback={(snapshot?.BaseConstruction is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -3695,10 +4290,14 @@ public partial class SalvageRepairSlice : Node3D
                 ContentCatalog,
                 StationServiceCatalog,
                 StationServicesAcceptanceRunner.NpcId);
+            _baseConstructionRuntime = new BaseConstructionRuntime(
+                BaseConstructionCatalog);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
             CloseStationServices();
+            CloseBaseBuildMode();
+            RebuildBaseConstructionScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -4047,6 +4646,76 @@ public partial class SalvageRepairSlice : Node3D
         catch (Exception exception)
         {
             Fail("fourth crafting path acceptance", exception);
+        }
+    }
+
+    private void PollBaseConstructionAcceptanceTask()
+    {
+        if (_baseConstructionAcceptanceTask is null ||
+            !_baseConstructionAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<BaseConstructionAcceptanceReport> task =
+            _baseConstructionAcceptanceTask;
+        _baseConstructionAcceptanceTask = null;
+        try
+        {
+            _baseConstructionAcceptanceReport = task.GetAwaiter().GetResult();
+            BaseConstructionAcceptanceReport report =
+                _baseConstructionAcceptanceReport;
+            _baseConstructionAcceptanceHud = report.Passed
+                ? $"PASS modules={report.CatalogModules}, " +
+                  $"placed={report.PlacedModules}, " +
+                  $"snap={(report.Snapping ? 1 : 0)}, " +
+                  $"collision={(report.CollisionRejected ? 1 : 0)}, " +
+                  $"power={(report.PowerGraph ? 1 : 0)}, " +
+                  $"limits={(report.Limits ? 1 : 0)}, " +
+                  $"stress500={(report.Stress500 ? 1 : 0)}, " +
+                  $"restore={(report.ColdRestore ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _state = report.Passed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-106 base construction acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"catalogModules={report.CatalogModules}; " +
+                $"categories={report.Categories}; " +
+                $"placed={report.PlacedModules}; " +
+                $"anchor={(report.AnchorRule ? 1 : 0)}; " +
+                $"snapping={(report.Snapping ? 1 : 0)}; " +
+                $"collisionRejected={(report.CollisionRejected ? 1 : 0)}; " +
+                $"disconnectedRejected={(report.DisconnectedRejected ? 1 : 0)}; " +
+                $"powerGraph={(report.PowerGraph ? 1 : 0)}; " +
+                $"battery={(report.Battery ? 1 : 0)}; " +
+                $"toggle={(report.Toggle ? 1 : 0)}; " +
+                $"removalRefund={(report.RemovalRefund ? 1 : 0)}; " +
+                $"limits={(report.Limits ? 1 : 0)}; " +
+                $"stress500={(report.Stress500 ? 1 : 0)}; " +
+                $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+                $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("base construction acceptance", exception);
         }
     }
 
@@ -4725,39 +5394,30 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
-    private void UpdatePlayerCoordinatesHud()
-    {
-        if (_playerCoordinatesLabel is null)
-        {
-            return;
-        }
-
-        PlayerController? player = _player;
-        if (player is null || !GodotObject.IsInstanceValid(player))
-        {
-            _playerCoordinatesLabel.Text = "PLAYER POS  unavailable";
-            return;
-        }
-
-        Vector3 position = player.GlobalPosition;
-        _playerCoordinatesLabel.Text =
-            "PLAYER POS  " +
-            $"X={position.X.ToString("0.0", CultureInfo.InvariantCulture)}  " +
-            $"Y={position.Y.ToString("0.0", CultureInfo.InvariantCulture)}  " +
-            $"Z={position.Z.ToString("0.0", CultureInfo.InvariantCulture)}";
-    }
-
     private void UpdateHud()
     {
-        UpdatePlayerCoordinatesHud();
         if (_hudLabel is null)
         {
             return;
         }
 
+        if (_playerCoordinatesLabel is not null)
+        {
+            _playerCoordinatesLabel.Text = _player is null
+                ? "PLAYER POS unavailable"
+                : $"PLAYER POS  X={_player.GlobalPosition.X:0.0}  " +
+                  $"Y={_player.GlobalPosition.Y:0.0}  " +
+                  $"Z={_player.GlobalPosition.Z:0.0}";
+        }
+
         if (_selectorStation is not null)
         {
             UpdateRecipeSelector();
+        }
+
+        if (_baseBuildMode)
+        {
+            UpdateBaseConstructionPanel();
         }
 
         string databaseLine = _diagnostics is null
@@ -4871,6 +5531,8 @@ public partial class SalvageRepairSlice : Node3D
         string stationServicesLine =
             $"Station services: {StationServices.BuildSummary()} • " +
             $"NPC={StationServices.NpcId}";
+        string baseConstructionLine =
+            $"Base construction: {BaseConstruction.BuildSummary()}";
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
@@ -4883,6 +5545,7 @@ public partial class SalvageRepairSlice : Node3D
                 networkLine + "\n" +
                 compactStationsLine + "\n" +
                 stationServicesLine + "\n" +
+                baseConstructionLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -4894,10 +5557,11 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
                 $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
                 $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
+                $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "E - interact/select • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
                 "F3 - research + station services • F4/F5 - catalogs • " +
@@ -4915,6 +5579,7 @@ public partial class SalvageRepairSlice : Node3D
             networkLine + "\n" +
             detailedStationsLine + "\n" +
             stationServicesLine + "\n" +
+            baseConstructionLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -4935,6 +5600,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
             $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
             $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
+            $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
@@ -4944,13 +5610,14 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space - move • E - interact/select • H - HUD • " +
+            "WASD/Space - move • E - interact/select • G - base build • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - all 128 recipes • " +
-            "F5 - runtime matrix • F6/F9/F10/F11/F12 - regressions • F7 - all resources • " +
+            "F5 - runtime matrix • F6 - base construction + legacy regression • " +
+            "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • Esc - close selector/release mouse";
     }
 

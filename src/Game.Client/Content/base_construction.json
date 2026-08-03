@@ -1,0 +1,1262 @@
+{
+  "schemaVersion": 1,
+  "gridSizeMeters": 2.5,
+  "limits": {
+    "maximumModules": 500,
+    "maximumInteractiveDevices": 100,
+    "maximumActivePhysicsObjects": 200,
+    "maximumDynamicLights": 20
+  },
+  "definitions": [
+    {
+      "moduleId": "module.base_power_node",
+      "itemDefinitionId": "building.base_power_node",
+      "localizationKey": "base.module.base_power_node",
+      "category": "Foundation",
+      "shape": "Cylinder",
+      "size": {
+        "x": 2.2,
+        "y": 0.5,
+        "z": 2.2
+      },
+      "color": {
+        "r": 0.12,
+        "g": 0.52,
+        "b": 0.74
+      },
+      "starterStock": 10,
+      "isAnchor": true,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 12,
+      "powerConsumption": 4,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.solar_array",
+      "itemDefinitionId": "building.solar_array",
+      "localizationKey": "base.module.solar_array",
+      "category": "Generator",
+      "shape": "Box",
+      "size": {
+        "x": 2.3,
+        "y": 0.35,
+        "z": 1.7
+      },
+      "color": {
+        "r": 0.08,
+        "g": 0.24,
+        "b": 0.62
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 150,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.battery_bank",
+      "itemDefinitionId": "building.battery_bank",
+      "localizationKey": "base.module.battery_bank",
+      "category": "Battery",
+      "shape": "Box",
+      "size": {
+        "x": 1.8,
+        "y": 1.3,
+        "z": 1.4
+      },
+      "color": {
+        "r": 0.28,
+        "g": 0.62,
+        "b": 0.34
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 1,
+      "batteryCapacity": 180
+    },
+    {
+      "moduleId": "module.atmospheric_processor",
+      "itemDefinitionId": "building.atmospheric_processor",
+      "localizationKey": "base.module.atmospheric_processor",
+      "category": "Processor",
+      "shape": "Cylinder",
+      "size": {
+        "x": 1.6,
+        "y": 2.2,
+        "z": 1.6
+      },
+      "color": {
+        "r": 0.18,
+        "g": 0.68,
+        "b": 0.72
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 18,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.water_recycler",
+      "itemDefinitionId": "building.water_recycler",
+      "localizationKey": "base.module.water_recycler",
+      "category": "Processor",
+      "shape": "Box",
+      "size": {
+        "x": 1.8,
+        "y": 1.6,
+        "z": 1.6
+      },
+      "color": {
+        "r": 0.12,
+        "g": 0.42,
+        "b": 0.84
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 14,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.hydroponics_tray",
+      "itemDefinitionId": "building.hydroponics_tray",
+      "localizationKey": "base.module.hydroponics_tray",
+      "category": "Processor",
+      "shape": "Box",
+      "size": {
+        "x": 2.2,
+        "y": 0.7,
+        "z": 1.5
+      },
+      "color": {
+        "r": 0.24,
+        "g": 0.72,
+        "b": 0.28
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 10,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.storage_module",
+      "itemDefinitionId": "building.storage_module",
+      "localizationKey": "base.module.storage_module",
+      "category": "Storage",
+      "shape": "Box",
+      "size": {
+        "x": 2,
+        "y": 1.8,
+        "z": 1.8
+      },
+      "color": {
+        "r": 0.48,
+        "g": 0.5,
+        "b": 0.56
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 2,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.landing_pad_controller",
+      "itemDefinitionId": "building.landing_pad_controller",
+      "localizationKey": "base.module.landing_pad_controller",
+      "category": "LandingPad",
+      "shape": "Cylinder",
+      "size": {
+        "x": 2.3,
+        "y": 0.45,
+        "z": 2.3
+      },
+      "color": {
+        "r": 0.72,
+        "g": 0.44,
+        "b": 0.12
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 2,
+      "powerGeneration": 0,
+      "powerConsumption": 22,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.fabrication_terminal",
+      "itemDefinitionId": "building.fabrication_terminal",
+      "localizationKey": "base.module.fabrication_terminal",
+      "category": "Terminal",
+      "shape": "Box",
+      "size": {
+        "x": 1.6,
+        "y": 1.9,
+        "z": 1.2
+      },
+      "color": {
+        "r": 0.68,
+        "g": 0.24,
+        "b": 0.72
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 28,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.research_console",
+      "itemDefinitionId": "building.research_console",
+      "localizationKey": "base.module.research_console",
+      "category": "Terminal",
+      "shape": "Box",
+      "size": {
+        "x": 1.7,
+        "y": 1.5,
+        "z": 1.3
+      },
+      "color": {
+        "r": 0.42,
+        "g": 0.34,
+        "b": 0.86
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 16,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.foundation_square",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.foundation_square",
+      "category": "Foundation",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.3,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.34,
+        "g": 0.38,
+        "b": 0.42
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.foundation_heavy",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.foundation_heavy",
+      "category": "Foundation",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.55,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.28,
+        "g": 0.31,
+        "b": 0.35
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.foundation_pillar",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.foundation_pillar",
+      "category": "Foundation",
+      "shape": "Cylinder",
+      "size": {
+        "x": 1.3,
+        "y": 1.6,
+        "z": 1.3
+      },
+      "color": {
+        "r": 0.4,
+        "g": 0.42,
+        "b": 0.46
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.floor_standard",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.floor_standard",
+      "category": "Floor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.18,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.46,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.floor_grate",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.floor_grate",
+      "category": "Floor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.14,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.46,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.floor_glass",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.floor_glass",
+      "category": "Floor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.12,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.46,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.floor_industrial",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.floor_industrial",
+      "category": "Floor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.25,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.46,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_standard",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_standard",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.18
+      },
+      "color": {
+        "r": 0.48,
+        "g": 0.52,
+        "b": 0.58
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_reinforced",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_reinforced",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.3
+      },
+      "color": {
+        "r": 0.32,
+        "g": 0.35,
+        "b": 0.4
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_half",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_half",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 1.2,
+        "z": 0.18
+      },
+      "color": {
+        "r": 0.52,
+        "g": 0.56,
+        "b": 0.6
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_corner",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_corner",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.24
+      },
+      "color": {
+        "r": 0.44,
+        "g": 0.48,
+        "b": 0.54
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_service",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_service",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.22
+      },
+      "color": {
+        "r": 0.3,
+        "g": 0.5,
+        "b": 0.56
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wall_bulkhead",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wall_bulkhead",
+      "category": "Wall",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.35
+      },
+      "color": {
+        "r": 0.42,
+        "g": 0.3,
+        "b": 0.28
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.roof_flat",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.roof_flat",
+      "category": "Roof",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.18,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.36,
+        "g": 0.4,
+        "b": 0.46
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.roof_reinforced",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.roof_reinforced",
+      "category": "Roof",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.3,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.3,
+        "g": 0.34,
+        "b": 0.4
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.roof_dome",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.roof_dome",
+      "category": "Roof",
+      "shape": "Cylinder",
+      "size": {
+        "x": 2.2,
+        "y": 0.7,
+        "z": 2.2
+      },
+      "color": {
+        "r": 0.42,
+        "g": 0.46,
+        "b": 0.54
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.roof_solar_ready",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.roof_solar_ready",
+      "category": "Roof",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 0.24,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.22,
+        "g": 0.34,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.corridor_straight",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.corridor_straight",
+      "category": "Corridor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.2,
+        "z": 1.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.44,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.corridor_junction",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.corridor_junction",
+      "category": "Corridor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.2,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.44,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.corridor_airlock",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.corridor_airlock",
+      "category": "Corridor",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.2,
+        "z": 1.7
+      },
+      "color": {
+        "r": 0.38,
+        "g": 0.44,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.door_standard",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.door_standard",
+      "category": "Door",
+      "shape": "Box",
+      "size": {
+        "x": 1.4,
+        "y": 2.2,
+        "z": 0.2
+      },
+      "color": {
+        "r": 0.6,
+        "g": 0.46,
+        "b": 0.24
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.door_bulkhead",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.door_bulkhead",
+      "category": "Door",
+      "shape": "Box",
+      "size": {
+        "x": 1.6,
+        "y": 2.3,
+        "z": 0.32
+      },
+      "color": {
+        "r": 0.48,
+        "g": 0.3,
+        "b": 0.24
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.door_airlock",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.door_airlock",
+      "category": "Door",
+      "shape": "Box",
+      "size": {
+        "x": 1.8,
+        "y": 2.3,
+        "z": 0.38
+      },
+      "color": {
+        "r": 0.28,
+        "g": 0.52,
+        "b": 0.62
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.window_narrow",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.window_narrow",
+      "category": "Window",
+      "shape": "Box",
+      "size": {
+        "x": 1.2,
+        "y": 1.2,
+        "z": 0.12
+      },
+      "color": {
+        "r": 0.18,
+        "g": 0.58,
+        "b": 0.76
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.window_wide",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.window_wide",
+      "category": "Window",
+      "shape": "Box",
+      "size": {
+        "x": 2.2,
+        "y": 1.2,
+        "z": 0.12
+      },
+      "color": {
+        "r": 0.16,
+        "g": 0.54,
+        "b": 0.72
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.window_observation",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.window_observation",
+      "category": "Window",
+      "shape": "Box",
+      "size": {
+        "x": 2.2,
+        "y": 1.8,
+        "z": 0.15
+      },
+      "color": {
+        "r": 0.12,
+        "g": 0.46,
+        "b": 0.68
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.stair_short",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.stair_short",
+      "category": "Stair",
+      "shape": "Box",
+      "size": {
+        "x": 2.2,
+        "y": 1.2,
+        "z": 1.4
+      },
+      "color": {
+        "r": 0.46,
+        "g": 0.48,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.stair_long",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.stair_long",
+      "category": "Stair",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.2,
+        "z": 1.6
+      },
+      "color": {
+        "r": 0.4,
+        "g": 0.42,
+        "b": 0.46
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.ladder_module",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.ladder_module",
+      "category": "Stair",
+      "shape": "Box",
+      "size": {
+        "x": 0.8,
+        "y": 2.4,
+        "z": 0.25
+      },
+      "color": {
+        "r": 0.58,
+        "g": 0.48,
+        "b": 0.24
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.room_habitation",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.room_habitation",
+      "category": "Room",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.42,
+        "g": 0.58,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.room_workshop",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.room_workshop",
+      "category": "Room",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.52,
+        "g": 0.42,
+        "b": 0.32
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.room_laboratory",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.room_laboratory",
+      "category": "Room",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.32,
+        "g": 0.52,
+        "b": 0.68
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.room_medical",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.room_medical",
+      "category": "Room",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 2.4
+      },
+      "color": {
+        "r": 0.62,
+        "g": 0.66,
+        "b": 0.7
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.support_beam",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.support_beam",
+      "category": "Structure",
+      "shape": "Box",
+      "size": {
+        "x": 0.3,
+        "y": 2.4,
+        "z": 0.3
+      },
+      "color": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.52
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.support_arch",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.support_arch",
+      "category": "Structure",
+      "shape": "Box",
+      "size": {
+        "x": 2.4,
+        "y": 2.4,
+        "z": 0.28
+      },
+      "color": {
+        "r": 0.46,
+        "g": 0.46,
+        "b": 0.5
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.support_column",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.support_column",
+      "category": "Structure",
+      "shape": "Cylinder",
+      "size": {
+        "x": 0.55,
+        "y": 2.4,
+        "z": 0.55
+      },
+      "color": {
+        "r": 0.52,
+        "g": 0.5,
+        "b": 0.46
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.wind_turbine",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.wind_turbine",
+      "category": "Generator",
+      "shape": "Cylinder",
+      "size": {
+        "x": 1.5,
+        "y": 3.2,
+        "z": 1.5
+      },
+      "color": {
+        "r": 0.64,
+        "g": 0.68,
+        "b": 0.72
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 90,
+      "powerConsumption": 0,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.battery_wall",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.battery_wall",
+      "category": "Battery",
+      "shape": "Box",
+      "size": {
+        "x": 2.1,
+        "y": 1.6,
+        "z": 0.55
+      },
+      "color": {
+        "r": 0.3,
+        "g": 0.66,
+        "b": 0.38
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 1,
+      "batteryCapacity": 120
+    },
+    {
+      "moduleId": "module.storage_rack",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.storage_rack",
+      "category": "Storage",
+      "shape": "Box",
+      "size": {
+        "x": 2.2,
+        "y": 2.1,
+        "z": 0.9
+      },
+      "color": {
+        "r": 0.5,
+        "g": 0.48,
+        "b": 0.4
+      },
+      "starterStock": 10,
+      "isAnchor": false,
+      "interactiveDevices": 1,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 0,
+      "powerGeneration": 0,
+      "powerConsumption": 1,
+      "batteryCapacity": 0
+    },
+    {
+      "moduleId": "module.decor_beacon",
+      "itemDefinitionId": null,
+      "localizationKey": "base.module.decor_beacon",
+      "category": "Decoration",
+      "shape": "Cylinder",
+      "size": {
+        "x": 0.45,
+        "y": 1.3,
+        "z": 0.45
+      },
+      "color": {
+        "r": 0.86,
+        "g": 0.3,
+        "b": 0.22
+      },
+      "starterStock": 20,
+      "isAnchor": false,
+      "interactiveDevices": 0,
+      "activePhysicsObjects": 0,
+      "dynamicLights": 1,
+      "powerGeneration": 0,
+      "powerConsumption": 1,
+      "batteryCapacity": 0
+    }
+  ]
+}

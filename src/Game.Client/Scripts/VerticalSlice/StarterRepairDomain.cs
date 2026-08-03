@@ -767,7 +767,8 @@ public static class StarterRepairSnapshotFactory
         TechnologyProgressSaveData? technologyProgress = null,
         ProductionQueueSaveData? productionQueue = null,
         ProductionQueueNetworkSaveData? productionQueueNetwork = null,
-        StationServicesSaveData? stationServices = null)
+        StationServicesSaveData? stationServices = null,
+        BaseConstructionSaveData? baseConstruction = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -837,7 +838,8 @@ public static class StarterRepairSnapshotFactory
             technologyProgress,
             productionQueue,
             productionQueueNetwork,
-            stationServices);
+            stationServices,
+            baseConstruction);
     }
 }
 

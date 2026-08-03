@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-player-coordinate-hud.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-base-construction-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,38 +38,51 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и станционные услуги Этапа 1 подтверждены пользователем. Ресурсная и station-services подсистемы закрыты в своих Stage 1 границах. Текущая корректирующая итерация добавляет постоянный индикатор мировых координат игрока, необходимый для навигации по тестовой площадке.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и station services Этапа 1 подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует целиком core-подсистему строительства баз: каталог из 50 модулей, размещение и соединение, лимиты, электрический граф, игровой builder, persistence, reset и изолированную приёмку. Её runtime-подтверждение остаётся за `TASK-107`. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API.
 
 ## 3. Результат текущей итерации от 2026-08-03
 
-### 2026-08-03 — post-acceptance HUD hotfix: координаты игрока (`TASK-104`)
+### 2026-08-03 — mega-итерация: закрытие подсистемы строительства баз (`TASK-106`)
 
-**Исходный снимок:** `ProjectHorizon-main-station-services-closure.zip` — подготовленная и локально проверенная пользователем редакция.  
-**Подготовленный снимок:** `ProjectHorizon-main-player-coordinate-hud.zip`.  
+**Исходный снимок:** `ProjectHorizon-main-station-services-closure(2).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-base-construction-closure.zip`.  
 **Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
-**Причина:** пользователь подтвердил работоспособность station-services mega-итерации, но выявил отсутствие координат игрока на тестовой площадке.
+**Граница:** цель итерации — закрыть не одиночную механику, а связную base-construction subsystem: data catalog, modular placement, snap/collision/connectivity, limits, power graph, player UI, persistence, reset и изолированную acceptance. Resource lifecycle не изменяется; готовый inventory/resource API только остаётся совместимым.
 
-**Синхронизация приёмки `TASK-102/TASK-103`:**
+**Синхронизация подтверждённой приёмки:**
 
-- локальная сборка Godot 4.7.1 Mono завершена: `Предупреждений: 0`, `Ошибок: 0`;
-- startup: `economies=6; factions=3; npcs=1; dialogueOptions=3; quests=3; questNodes=3; tradable=174`;
-- `TASK-102 station services acceptance PASS`: `priceFormula=1; deterministicDaily=1; offlineEconomy=1; supplyDemand=1; buySell=1; atomicRejected=1; creditConservation=1; questGraph=1; questFeasibility=1; questFlow=1; reputation=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
-- повторные F1/F2/F3/F4/F5/F6/F7/F9/F10/F11/F12 завершены `PASS`;
-- пользователь сообщил, что ручной контур работает; subsystem station services Этапа 1 закрыта.
+- пользователь предоставил clean build station-services редакции: `0` предупреждений, `0` ошибок;
+- `TASK-102 station services acceptance PASS`: `economies=6; factions=3; npcs=1; quests=3; tradable=174; priceFormula=1; deterministicDaily=1; offlineEconomy=1; supplyDemand=1; buySell=1; atomicRejected=1; creditConservation=1; questGraph=1; questFeasibility=1; questFlow=1; reputation=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
+- применимые F1–F12 regressions завершились `PASS`; `TASK-102/103 → VERIFIED`; station-services subsystem Этапа 1 закрыта;
+- пользовательский screenshot подтвердил постоянные `PLAYER POS X/Y/Z`; `TASK-104/105 → VERIFIED`; исходный GitHub ZIP не содержал последнюю coordinate-overlay поправку, поэтому она аккуратно перенесена в эту редакцию и размещена в углу без зависимости от режимов Detailed/Compact/Hidden.
 
 **Реализовано:**
 
-- в `Hud` добавлена отдельная bottom-right панель `PlayerCoordinates`;
-- источник координат — `Player.GlobalPosition`; показываются `X`, `Y`, `Z` с точностью `0.1`;
-- значение пересчитывается каждый кадр, без persistence и без изменения gameplay state;
-- overlay остаётся видимым в режимах `Detailed`, `Compact`, `Hidden`, а также при открытом production terminal или station-services UI;
-- отсутствующий/удалённый Player безопасно отображается как `PLAYER POS unavailable`;
-- startup выводит диагностическую строку `TASK-104 player coordinate HUD READY`.
+- добавлен строгий `base_construction.json` schema `1` с ровно `50` data-driven modules — минимальным количеством из PDF-ТЗ;
+- catalog покрывает все `16` категорий раздела 20.1: Foundation, Floor, Wall, Roof, Corridor, Door, Window, Stair, Room, Generator, Battery, Processor, Storage, LandingPad, Terminal и Decoration; дополнительная техническая категория `Structure` объединяет несущие балки, арки и колонны, поэтому всего в catalog `17` категорий;
+- десять device modules связаны со всеми десятью Base outputs Industry Content v2; сорок structural variants являются construction templates и не требуют расширения закрытой resource subsystem;
+- `BaseConstructionRuntime` реализует обязательный first anchor, сетку `2,5 м`, cardinal snap, overlap rejection, единственный связный graph, безопасный dismantle с refund и запрет удаления, разрывающего базу;
+- исполняются лимиты PDF `500 modules / 100 interactive devices / 200 active physics objects / 20 dynamic lights`; acceptance строит связный domain-граф ровно из `500` модулей, проверяет отказ на 501-м, отдельно доводит interactive limit до `100` и проверяет следующий отказ `LimitExceeded`;
+- электрическая сеть представлена графом и агрегирует generators, consumers, batteries, enabled/powered consumers, deficit и stored energy; device toggle отключает генерацию/потребление; offline power progress отсутствует;
+- игровые modules создаются programmatically как `StaticBody3D` с mesh, collision и catalog-defined dynamic lights; terrain geometry не модифицируется;
+- `G` открывает builder; Up/Down выбирают module, `R` поворачивает, `Enter` ставит, `X/Delete` демонтируют, `T` переключает device, `G/Esc` закрывают; target grid и preview показываются в HUD;
+- palette из 50 modules показывается скользящим окном, чтобы UI не переполнялся; основной HUD содержит summary modules/devices/power/battery/components;
+- сохраняются base ID, next sequence, module stock, instances, grid coordinates, rotation, enabled state и battery energy в optional `save_settings.base_construction`; SQLite schema остаётся `2`; legacy save без блока получает пустую базу и полный starter palette;
+- cold start восстанавливает graph без offline progress, graceful exit и autosave включают base snapshot, `F8` очищает base state и перестраивает scene;
+- `F6` сохраняет `TASK-072` regression и параллельно запускает `TASK-106` в отдельной БД `save_1.base-construction-test.db`, не изменяя gameplay-slot.
 
-**Изменённые файлы:**
+**Изменённые/добавленные файлы:**
 
-- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/Content/base_construction.json`;
+- `src/Game.Client/Scripts/VerticalSlice/BaseConstructionCatalog.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/BaseConstructionRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/BaseConstructionModuleNode.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/BaseConstructionAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
 - `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
 - `README.md`;
 - `REQUIREMENTS_STATUS.md`.
 
@@ -77,20 +90,28 @@
 
 - `TASK-102`: `IMPLEMENTED` → `VERIFIED`;
 - `TASK-103`: `IN_PROGRESS` → `VERIFIED`;
-- `SERVICES-100`–`SERVICES-109`, `SERVICES-ACC-100`–`SERVICES-ACC-103`: → `VERIFIED`;
-- `TASK-104`: `PLANNED` → `IMPLEMENTED`;
-- `TASK-105`: `NOT_STARTED` → `IN_PROGRESS` — clean build и ручная проверка динамического overlay;
+- `TASK-104`: подтверждённый coordinate HUD сохраняется `VERIFIED`;
+- `TASK-105`: подтверждённая coordinate HUD acceptance сохраняется `VERIFIED`;
+- `TASK-106`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-107`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F6 dual acceptance, manual builder/power/persistence/F8 и regressions;
 - `TASK-006` остаётся `BLOCKED`.
 
-**Ожидаемая startup-строка:**
+**Ожидаемый F6 HUD:**
 
 ```text
-TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; axes=XYZ; precision=0.1; corner=bottom-right; visibleInModes=Detailed/Compact/Hidden.
+TASK-072 legacy fourth path (F6): PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1
+TASK-106 base construction (F6): PASS modules=50, placed=50, snap=1, collision=1, power=1, limits=1, stress500=1, restore=1, roundTrip=1
 ```
 
-**Граница:** только отображение позиции существующего Player. Карта, компас, waypoint, minimap, navmesh и новые world/resource механики не добавляются.
+**Ожидаемая строка Output:**
 
-**Ограничение среды:** фактическая Godot/.NET runtime-проверка новой панели выполняется пользователем в `TASK-105`.
+```text
+TASK-106 base construction acceptance PASS: catalogModules=50; categories=17; placed=50; anchor=1; snapping=1; collisionRejected=1; disconnectedRejected=1; powerGraph=1; battery=1; toggle=1; removalRefund=1; limits=1; stress500=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** после `TASK-107 → VERIFIED` core base-construction subsystem считается закрытой. Новые module variants, art assets, localization и gameplay devices добавляются data-driven поверх готового API; возврат к placement/snap/connectivity/limits/power/persistence допустим только при подтверждённой регрессии или изменении ТЗ. Planet terrain deformation сознательно не добавляется: PDF 20.4 прямо запрещает изменение геометрии планеты в версии 1.0.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-107`.
 
 ### 2026-08-03 — mega-итерация станционных услуг Этапа 1 (`TASK-102`)
 
@@ -3010,37 +3031,58 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `SERVICES-107` | Quest graphs валидируются на stable IDs, feasibility, reachability и cycles | `VERIFIED` | Strict startup validation + isolated F3 acceptance |
 | `SERVICES-108` | Credits, reputation, market day/stock и quest state сохраняются без schema bump | `VERIFIED` | Optional `save_settings.station_services`; schema 2; legacy null fallback |
 | `SERVICES-109` | Player-facing HUD/UI показывает economy, prices, factors, inventory и quest state | `VERIFIED` | StationServices panel + detailed/compact HUD summary |
-| `SERVICES-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build Godot 4.7.1 Mono: 0 warnings, 0 errors |
-| `SERVICES-ACC-101` | F3 подтверждает exact baseline и persistence | `VERIFIED` | User runtime: полная строка `TASK-102 ... PASS`; `maxWriters=1`; `integrity=ok` |
-| `SERVICES-ACC-102` | Manual NPC/dialogue/buy/sell/three quests/cold restore/F8 | `VERIFIED` | Пользователь сообщил, что функциональность работает; runtime restore и quest flow acceptance PASS |
-| `SERVICES-ACC-103` | F1/F2/F4–F12 не регрессируют | `VERIFIED` | Предоставленный Output: все применимые acceptance routes PASS |
+| `SERVICES-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build: `0` warnings, `0` errors; проект запущен в Godot 4.7.1 Mono |
+| `SERVICES-ACC-101` | F3 подтверждает exact baseline и persistence | `VERIFIED` | User Output: full `TASK-102 ... PASS`, `maxWriters=1`, `integrity=ok` |
+| `SERVICES-ACC-102` | Manual NPC/dialogue/buy/sell/three quests/cold restore/F8 | `VERIFIED` | User confirmed runtime behavior; F3 quest/trade flow and restore acceptance PASS |
+| `SERVICES-ACC-103` | F1/F2/F4–F12 не регрессируют | `VERIFIED` | User Output: F1/F2/F4–F12 applicable regressions PASS |
 
 ### 8.21. Постоянный HUD координат игрока
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `HUD-110` | В углу экрана отображаются мировые координаты игрока X/Y/Z | `IMPLEMENTED` | `Hud/PlayerCoordinates`, источник `Player.GlobalPosition`, precision `0.1` |
-| `HUD-111` | Координаты обновляются во время движения | `IMPLEMENTED` | `UpdatePlayerCoordinatesHud()` вызывается из `_Process` через `UpdateHud()` |
-| `HUD-112` | Индикатор не скрывается режимом HIDDEN основной панели | `IMPLEMENTED` | Overlay является отдельным CanvasLayer child и не затрагивается `ApplyHudMode()` |
-| `HUD-113` | Координаты остаются видимыми при station/trader UI | `IMPLEMENTED` | Отдельная bottom-right panel, UI panels не меняют её visibility |
-| `HUD-ACC-110` | Clean build `0/0` | `IN_PROGRESS` | Выполнить сборку с реальным `CoreCompile` |
-| `HUD-ACC-111` | Manual movement изменяет X/Z и H не скрывает overlay | `IN_PROGRESS` | Проверить сценарий раздела 18I |
+| `HUD-100` | HUD показывает `Player.GlobalPosition` по X/Y/Z с точностью 0,1 | `VERIFIED` | Пользовательский screenshot: `PLAYER POS X=-4.6 Y=1.0 Z=4.4` |
+| `HUD-101` | Координаты остаются видимыми в Detailed/Compact/Hidden | `VERIFIED` | Ручная проверка переключения `H`; отдельная CanvasLayer panel |
+| `HUD-102` | Coordinate overlay не участвует в save state и безопасно показывает unavailable | `VERIFIED` | Godot-independent state отсутствует; null guard в HUD |
+| `HUD-ACC-100` | Проект компилируется и coordinate overlay обновляется runtime | `VERIFIED` | User build `0/0` и runtime screenshot |
+
+### 8.22. Base construction subsystem
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `BASE-100` | Catalog содержит не менее 50 construction modules | `IMPLEMENTED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
+| `BASE-101` | Покрыты все категории PDF 20.1 | `IMPLEMENTED` | Exact 17-category coverage including structural, devices and decoration |
+| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `IMPLEMENTED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
+| `BASE-103` | Overlap и disconnected placement отклоняются | `IMPLEMENTED` | Cell collision + graph connectivity preflight |
+| `BASE-104` | Действуют limits `500/100/200/20` | `IMPLEMENTED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
+| `BASE-105` | Base electrical network представлена graph | `IMPLEMENTED` | generation/consumption/battery/enabled/powered/deficit snapshot |
+| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `IMPLEMENTED` | `TryToggle`; structural modules rejected as non-switchable |
+| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `IMPLEMENTED` | Remove-then-connectivity-check; exact refund |
+| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `IMPLEMENTED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
+| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `IMPLEMENTED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
+| `BASE-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.base_construction`; schema remains 2 |
+| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | Snapshot integration, no offline power tick, scene rebuild/reset |
+| `BASE-112` | Legacy save без base block загружается | `IMPLEMENTED` | Null fallback: empty base + full starter stock |
+| `BASE-113` | Terrain geometry не модифицируется | `IMPLEMENTED` | Modules sit above existing surface; PDF 20.4 respected |
+| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с реальным `CoreCompile` |
+| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | Ожидается `TASK-106 ... PASS` |
+| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `IN_PROGRESS` | Выполнить раздел 18I |
+| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F6 |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** `TASK-005`, `TASK-009`, `TASK-011`, `TASK-023`–`TASK-103` за исключением superseded/плановых задач; Прототипы A–E, production persistence, Industry Content v2, resources и Stage 1 station services.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-105` | Выполнить build/runtime/manual acceptance постоянного coordinate overlay | Clean build `0/0`; startup READY; X/Z меняются при движении; overlay виден в Detailed/Compact/Hidden и поверх station/trader UI |
+| 1 | `TASK-107` | Выполнить build/runtime/manual acceptance base construction subsystem | Clean build `0/0`; F6 TASK-072+106; 50 modules/17 catalog categories; manual snap/collision/power/toggle/refund/cold restore/F8; regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-106` | Выбрать следующий связный блок вне закрытых resources и station services | Рассмотреть base construction/ship systems/world exploration по зависимостям ТЗ |
+| 3 | `TASK-108` | После закрытия base construction выбрать следующий связный subsystem block | Рассмотреть ship systems, points of interest или world exploration по зависимостям ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-103`, persistence, vertical slice, Industry Content v2, production network, aggregate HUD, catalog-wide resources и station services Этапа 1.
-**Реализовано:** `TASK-104` — постоянный bottom-right HUD мировых координат игрока.
-**Текущая приёмочная задача:** `TASK-105`.
+**Подтверждено:** `TASK-060`–`TASK-105`, persistence, vertical slice, Industry Content v2, resources, station services и coordinate HUD.  
+**Реализовано:** `TASK-106` — 50-module base construction subsystem.  
+**Текущая приёмочная задача:** `TASK-107`. После её закрытия core construction runtime не требует отдельных итераций; новые modules добавляются data-driven.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4666,25 +4708,47 @@ TASK-102 station services (F3): PASS economies=6, factions=3, npc=1, quests=3, t
 
 После выполнения критериев установить `TASK-102 → VERIFIED`, `TASK-103 → VERIFIED` и считать station-services subsystem Этапа 1 закрытой.
 
-## 18I. Runtime-приёмка `TASK-104/TASK-105`
+## 18I. Runtime-приёмка `TASK-106/TASK-107`
 
-1. Выполнить clean build `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`, `0` предупреждений и `0` ошибок.
-2. Запустить `SalvageRepairSlice`; Output должен содержать:
+1. Выполнить `tools\clean-build-windows10.cmd`. В build log должен реально выполняться `CoreCompile`; критерий — `Предупреждений: 0`, `Ошибок: 0`.
+2. Запустить `SalvageRepairSlice` и дождаться startup строк:
 
 ```text
-TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; axes=XYZ; precision=0.1; corner=bottom-right; visibleInModes=Detailed/Compact/Hidden.
+TASK-106 base construction catalog READY: schema=1; modules=50; categories=17; grid=2.5; limits=500/100/200/20.
+TASK-106 base construction binding PASS: catalogModules=50; baseRecipes=10; anchors=1; snap=cardinal; collision=grid; power=graph; persistence=enabled.
+TASK-106 base construction READY: modules=50; grid=2.5m; limits=500/100/200/20; snap=cardinal; power=graph; persistence=enabled; F6=acceptance.
 ```
 
-3. В правом нижнем углу должна быть строка формата `PLAYER POS  X=<...>  Y=<...>  Z=<...>`.
-4. Не двигаясь, запомнить значения. Пройти вперёд/назад и влево/вправо: `X` и/или `Z` должны изменяться плавно с шагом отображения `0.1`; при прыжке временно меняется `Y`.
-5. Нажать `H` три раза. Overlay должен оставаться видимым в `Compact`, `Hidden` и `Detailed`; основная HUD-панель продолжает переключаться как раньше.
-6. Открыть `PortableFabricator` и `StationTrader`; координаты должны оставаться видимыми и обновляться после закрытия UI.
-7. Нажать `F8`: coordinate overlay не должен сбрасывать, сохранять или изменять gameplay state; после reposition/reset он просто отражает текущую `GlobalPosition`.
-8. Повторить `F3`; `TASK-082` и `TASK-102` должны остаться `PASS`.
-9. Для приёмки прислать screenshot с coordinate overlay в режиме `Hidden`, startup-строку `TASK-104 ... READY` и build summary.
-10. При дефекте предоставить screenshot, viewport resolution, режим HUD, значения до/после движения и последние 80 строк Output.
+3. Нажать `F6` и не выполнять других действий до завершения двух параллельных проверок. Legacy `TASK-072` должен остаться `PASS`; ожидаемый HUD:
 
-После выполнения критериев установить `TASK-104 → VERIFIED`, `TASK-105 → VERIFIED`.
+```text
+TASK-072 legacy fourth path (F6): PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1
+TASK-106 base construction (F6): PASS modules=50, placed=50, snap=1, collision=1, power=1, limits=1, stress500=1, restore=1, roundTrip=1
+```
+
+4. Godot Output должен содержать:
+
+```text
+TASK-106 base construction acceptance PASS: catalogModules=50; categories=17; placed=50; anchor=1; snapping=1; collisionRejected=1; disconnectedRejected=1; powerGraph=1; battery=1; toggle=1; removalRefund=1; limits=1; stress500=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+5. Убедиться, что acceptance использует `save_1.base-construction-test.db`; gameplay `save_1.db` не изменяется.
+6. Нажать `F8`; HUD base summary должен показать `modules=0/500`, `components=0`; Output — `TASK-106 base construction restore PASS ... legacyFallback=1` при первом старте либо reset.
+7. Нажать `G`. Builder должен открыть palette из `50` modules; координаты игрока остаются видимыми. Target показывает grid/world coordinates, selected module, stock, rotation, power и battery.
+8. До anchor выбрать любой structural module и нажать `Enter`: placement должна быть отклонена сообщением `the first module must be the base anchor`.
+9. Выбрать `module.base_power_node`, поставить его. Затем поставить минимум: foundation/floor/wall/roof, `module.solar_array`, `module.battery_bank` и один consumer (`module.water_recycler` или terminal), каждый в cardinally adjacent cell. Preview должен быть зелёным только для допустимого cell.
+10. Попытаться поставить module поверх занятой cell — ожидается overlap rejection. Отойти так, чтобы target не соседствовал с базой, и повторить — ожидается snap rejection.
+11. Проверить HUD: `components=1`; generation, consumption и battery capacity соответствуют установленным devices. Подождать несколько секунд при surplus — battery должна увеличиваться. Offline charging не допускается.
+12. Навести target на switchable consumer и нажать `T`; consumption/enabled/powered должны измениться, module визуально стать полупрозрачным, его lights — погаснуть. Повторное `T` возвращает device. Structural module должен отвечать `has no switchable device`.
+13. Построить цепочку не менее чем из трёх modules. Попытаться удалить средний module `X/Delete`: removal должна быть отклонена как disconnect. Удалить крайний module: module исчезает, stock увеличивается на `1`, components остаётся `1`.
+14. Пройти сквозь поставленный wall/module: static collision должна блокировать игрока; authored terrain geometry при строительстве не изменяется.
+15. Штатно закрыть игру с несколькими modules, ненулевой battery и одним disabled device. После запуска Output `TASK-106 base construction restore PASS` и scene/HUD должны восстановить exact positions, rotations, stock, enabled state и stored energy без offline progress.
+16. Нажать `F8`: все построенные modules исчезают, battery становится `0`, stock возвращается к starter values, player position — baseline.
+17. Повторить `F1`, `F2`, `F3`, `F4`, `F5`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Повторный `F6` также должен быть `PASS`.
+18. Для приёмки прислать: build summary; screenshot builder с structural + power modules; screenshot green/red preview; screenshot HUD power/battery; screenshot после cold restore; screenshot F6 PASS; полную строку Output `TASK-106 ... PASS`.
+19. При `FAIL` предоставить полный build log, `TASK-106 ... FAIL`, последние 220 строк Godot Output, screenshot builder, base summary, target grid, selected module и точный шаг сценария.
+
+После выполнения критериев установить `TASK-106 → VERIFIED`, `TASK-107 → VERIFIED` и считать core base-construction subsystem закрытой.
 
 ## 19. Шаблон новой записи
 
