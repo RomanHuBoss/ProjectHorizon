@@ -68,6 +68,7 @@
 - сохраняются world seed, region, discovery points, 20 POI instance/type IDs, discovered/resolved flags и custom names в optional `save_settings.planetary_exploration`; SQLite schema остаётся `2`; legacy save без блока получает пустое discovery state;
 - cold restore строго сверяет seed/region/deterministic instance set и derived discovery-points total; graceful exit/autosave включают exploration snapshot; `F8` сбрасывает discovery lifecycle и перестраивает physical scene; offline discovery progress отсутствует;
 - `F4` сохраняет `TASK-080` Industry Content v2 acceptance и затем запускает `TASK-108` в отдельной БД `save_1.planetary-exploration-test.db`, не изменяя gameplay-slot.
+- после пользовательского runtime-наблюдения устранён повторный запуск F4-приёмки при удержании/повторной доставке key-down: команда использует press-release latch, игнорирует echo и не может стартовать повторно до отпускания `F4`; статусы `TASK-108/109` до повторной локальной проверки не повышаются.
 
 **Изменённые/добавленные файлы:**
 

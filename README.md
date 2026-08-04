@@ -821,7 +821,10 @@ version 2 and old saves load with an empty discovery state.
 
 `F4` preserves the complete Industry Content v2 structural acceptance and
 also runs `TASK-108` against the isolated database
-`save_1.planetary-exploration-test.db`. The test verifies 20 deterministic
+`save_1.planetary-exploration-test.db`. The command is edge-triggered: key
+echo and duplicate key-down events are ignored until `F4` is released, so one
+physical press produces exactly one TASK-080/TASK-108 acceptance pair. The
+test verifies 20 deterministic
 placements, environment constraints, symmetric spacing, infrastructure
 clearance, quest bias, complete scan/resolve/naming flow, cold restore, legacy
 fallback, exact round-trip, one-writer discipline and SQLite integrity.

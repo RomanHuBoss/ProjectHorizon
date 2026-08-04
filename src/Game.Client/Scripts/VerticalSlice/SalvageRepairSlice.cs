@@ -207,6 +207,7 @@ public partial class SalvageRepairSlice : Node3D
     private int _baseBuildRotation;
     private string _baseBuildFeedback = "";
     private bool _discoveryCatalogOpen;
+    private bool _f4AcceptanceKeyLatched;
     private int _discoveryCatalogIndex;
     private string _discoveryCatalogFeedback = "";
     private string _craftingInteractorName = "unknown";
@@ -628,15 +629,39 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
-        if (inputEvent is not InputEventKey keyEvent ||
-            !keyEvent.Pressed ||
-            keyEvent.Echo)
+        if (inputEvent is not InputEventKey keyEvent)
         {
             return;
         }
 
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
+        bool isF4 = Matches(physical, logical, Key.F4);
+        if (!keyEvent.Pressed)
+        {
+            if (isF4)
+            {
+                _f4AcceptanceKeyLatched = false;
+            }
+
+            return;
+        }
+
+        if (keyEvent.Echo)
+        {
+            return;
+        }
+
+        if (isF4)
+        {
+            if (_f4AcceptanceKeyLatched)
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            _f4AcceptanceKeyLatched = true;
+        }
         if (_baseBuildMode)
         {
             if (Matches(physical, logical, Key.Escape) ||
@@ -852,7 +877,7 @@ public partial class SalvageRepairSlice : Node3D
             BeginTechnologySelectorAcceptance();
             GetViewport().SetInputAsHandled();
         }
-        else if (Matches(physical, logical, Key.F4) && CanStartCommand())
+        else if (isF4 && CanStartCommand())
         {
             RunIndustryCatalogAcceptance();
             GetViewport().SetInputAsHandled();
