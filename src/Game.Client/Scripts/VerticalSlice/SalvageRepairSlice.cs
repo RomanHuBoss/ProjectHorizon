@@ -207,9 +207,10 @@ public partial class SalvageRepairSlice : Node3D
     private int _baseBuildRotation;
     private string _baseBuildFeedback = "";
     private bool _discoveryCatalogOpen;
-    private const ulong F4ReleaseStableMilliseconds = 120;
+    private const ulong F4ReleaseQuietMilliseconds = 750;
     private bool _f4AcceptanceKeyLatched;
-    private ulong _f4ReleaseObservedTicks;
+    private bool _f4ReleaseSeen;
+    private ulong _f4LastSignalTicks;
     private int _discoveryCatalogIndex;
     private string _discoveryCatalogFeedback = "";
     private string _craftingInteractorName = "unknown";
@@ -571,7 +572,7 @@ public partial class SalvageRepairSlice : Node3D
             $"region={PlanetaryPoiCatalog.RegionKey}; " +
             "scanner=P; catalog=J; placement=constraint-aware; " +
             "discoveries=persistent; F4=acceptance; " +
-            "f4Gate=physical-state+120ms-stable-release.");
+            "f4Gate=release-confirmed+750ms-event-silence.");
         GD.Print(
             "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
@@ -633,32 +634,23 @@ public partial class SalvageRepairSlice : Node3D
 
     private void UpdateF4AcceptanceKeyLatch()
     {
-        if (!_f4AcceptanceKeyLatched)
+        if (!_f4AcceptanceKeyLatched ||
+            !_f4ReleaseSeen ||
+            _planetaryExplorationAcceptanceTask is not null)
         {
-            _f4ReleaseObservedTicks = 0;
-            return;
-        }
-
-        if (Input.IsPhysicalKeyPressed(Key.F4))
-        {
-            _f4ReleaseObservedTicks = 0;
             return;
         }
 
         ulong now = Time.GetTicksMsec();
-        if (_f4ReleaseObservedTicks == 0)
-        {
-            _f4ReleaseObservedTicks = now;
-            return;
-        }
-
-        if (now - _f4ReleaseObservedTicks < F4ReleaseStableMilliseconds)
+        if (_f4LastSignalTicks == 0 ||
+            now - _f4LastSignalTicks < F4ReleaseQuietMilliseconds)
         {
             return;
         }
 
         _f4AcceptanceKeyLatched = false;
-        _f4ReleaseObservedTicks = 0;
+        _f4ReleaseSeen = false;
+        _f4LastSignalTicks = 0;
     }
 
     public override void _UnhandledInput(InputEvent inputEvent)
@@ -671,6 +663,26 @@ public partial class SalvageRepairSlice : Node3D
         Key physical = keyEvent.PhysicalKeycode;
         Key logical = keyEvent.Keycode;
         bool isF4 = Matches(physical, logical, Key.F4);
+        if (isF4)
+        {
+            _f4LastSignalTicks = Time.GetTicksMsec();
+            _f4ReleaseSeen = !keyEvent.Pressed;
+            if (!keyEvent.Pressed || keyEvent.Echo)
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            if (_f4AcceptanceKeyLatched)
+            {
+                GetViewport().SetInputAsHandled();
+                return;
+            }
+
+            _f4AcceptanceKeyLatched = true;
+            _f4ReleaseSeen = false;
+        }
+
         if (!keyEvent.Pressed)
         {
             return;
@@ -679,18 +691,6 @@ public partial class SalvageRepairSlice : Node3D
         if (keyEvent.Echo)
         {
             return;
-        }
-
-        if (isF4)
-        {
-            if (_f4AcceptanceKeyLatched)
-            {
-                GetViewport().SetInputAsHandled();
-                return;
-            }
-
-            _f4AcceptanceKeyLatched = true;
-            _f4ReleaseObservedTicks = 0;
         }
         if (_baseBuildMode)
         {

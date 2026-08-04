@@ -821,12 +821,14 @@ version 2 and old saves load with an empty discovery state.
 
 `F4` preserves the complete Industry Content v2 structural acceptance and
 also runs `TASK-108` against the isolated database
-`save_1.planetary-exploration-test.db`. The command is edge-triggered and
-re-armed only after Godot reports that the physical F4 key has remained
-released for at least 120 ms. Event-level key-up and keyboard-repeat packets
-therefore cannot re-trigger the command while the key is still held: one
-physical press produces exactly one TASK-080/TASK-108 acceptance pair. The
-test verifies 20 deterministic
+`save_1.planetary-exploration-test.db`. The command uses an event-silence
+gate: every F4 key-down, key-up and repeat packet refreshes the gate. A new
+run is permitted only after an actual release packet was the last F4 event,
+the previous acceptance has completed and no further F4 event has been
+observed for at least 750 ms. A subsequent press or repeat cancels the pending
+release. This does not depend on platform-specific physical-key polling and
+blocks synthetic release / non-echo repeat sequences while the key is held. One held press therefore
+produces exactly one TASK-080/TASK-108 acceptance pair. The test verifies 20 deterministic
 placements, environment constraints, symmetric spacing, infrastructure
 clearance, quest bias, complete scan/resolve/naming flow, cold restore, legacy
 fallback, exact round-trip, one-writer discipline and SQLite integrity.

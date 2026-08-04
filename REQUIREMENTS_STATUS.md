@@ -68,7 +68,7 @@
 - сохраняются world seed, region, discovery points, 20 POI instance/type IDs, discovered/resolved flags и custom names в optional `save_settings.planetary_exploration`; SQLite schema остаётся `2`; legacy save без блока получает пустое discovery state;
 - cold restore строго сверяет seed/region/deterministic instance set и derived discovery-points total; graceful exit/autosave включают exploration snapshot; `F8` сбрасывает discovery lifecycle и перестраивает physical scene; offline discovery progress отсутствует;
 - `F4` сохраняет `TASK-080` Industry Content v2 acceptance и затем запускает `TASK-108` в отдельной БД `save_1.planetary-exploration-test.db`, не изменяя gameplay-slot.
-- повторная локальная проверка показала, что event-level release всё ещё мог преждевременно перевзводить F4 latch; защита усилена: latch теперь снимается только после того, как `Input.IsPhysicalKeyPressed(F4)` остаётся false не менее 120 мс. Echo, ложные release/key-down пары и повторный запуск во время удержания блокируются; статусы `TASK-108/109` до новой локальной проверки не повышаются.
+- две последовательные локальные проверки показали, что и event-level release, и `Input.IsPhysicalKeyPressed(F4)` ненадёжны для данной Windows/Godot-конфигурации: удержание F4 генерирует повторные non-echo последовательности. Защита заменена на platform-independent release-confirmed event-silence gate: любой F4 key-down/key-up/echo обновляет timestamp; key-down/repeat отменяет ожидаемое отпускание; latch остаётся установленным во время acceptance и снимается только когда последним F4-событием был key-up и затем прошло 750 мс без новых F4-событий. Статусы `TASK-108/109` до новой локальной проверки не повышаются.
 
 **Изменённые/добавленные файлы:**
 
