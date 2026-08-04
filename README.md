@@ -30,7 +30,7 @@
 
 Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
 
-### Industry, resources и station services — `VERIFIED`; base construction subsystem — `IMPLEMENTED`
+### Industry, resources, station services, base construction и planetary exploration — `VERIFIED`; ship systems/loadout — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -68,6 +68,8 @@ src/Game.Client/Content/stations.json
 src/Game.Client/Content/technologies.json
 src/Game.Client/Content/station_services.json
 src/Game.Client/Content/base_construction.json
+src/Game.Client/Content/planetary_pois.json
+src/Game.Client/Content/ships.json
 src/Game.Client/Content/localization.ru.json
 src/Game.Client/Content/localization.en.json
 src/Game.Client/Content/catalog_manifest.json
@@ -78,6 +80,8 @@ src/Game.Client/Content/catalog_manifest.json
 Станционные услуги Этапа 1 реализованы отдельным data-driven слоем `station_services.json`. В vertical slice размещён один trader NPC `npc.trader.ilia_voss` с template dialogue и вкладками Dialogue/Buy/Sell/Quests. Каталог задаёт ровно шесть economy types, три factions с relations и три persistent quest graphs. Все 174 items доступны рынку; цена вычисляется из base price, economy, supply/demand, faction, reputation и deterministic daily factor. Credits, reputation, market stock/day и quest state сохраняются в optional SQLite setting `station_services` без повышения schema 2; старые saves используют legacy fallback. Trade синхронизирует основной inventory и все пять production mirrors.
 
 Строительство баз реализовано как отдельная data-driven подсистема `base_construction.json`: 50 модулей покрывают все 16 категорий раздела 20.1 ТЗ — foundations, floors, walls, roofs, corridors, doors, windows, stairs, rooms, generators, batteries, processors, storage, landing pad, terminals и decoration. Дополнительная техническая категория `Structure` содержит несущие балки, арки и колонны, поэтому всего catalog содержит 17 категорий. Модули ставятся на сетку `2,5 м` с cardinal snap, collision rejection, обязательным anchor и проверкой связности при демонтаже. Исполняются ограничения `500/100/200/20`, электрическая сеть представлена графом, учитывает generators, consumers, batteries и enable/disable. Состояние modules, stock, rotation, device state и battery energy сохраняется в optional SQLite setting `base_construction` без повышения schema 2; legacy saves получают пустую базу и полный starter palette. Режим открывается клавишей `G`, а `F6` запускает изолированную `TASK-106` acceptance совместно с legacy coolant regression. Координаты `Player.GlobalPosition` постоянно отображаются в углу HUD во всех режимах `H`.
+
+Корабельные системы vertical slice вынесены в строгий каталог `ships.json`. Он содержит все шесть классов из ТЗ v2.0 §14.2, все одиннадцать class parameters, семь отдельно повреждаемых систем из §14.3 и ровно 18 module definitions, совпадающих с outputs категории `ShipModule` Industry Content v2. Исполняемый starter ship использует универсальный класс; `U` открывает loadout manager с вкладками Overview/Modules/Systems. Установка и снятие модулей расходуют и возвращают предметы через существующий shared inventory API, соблюдают Weapon/Technology slots и изменяют derived stats. Повреждение системы отключает зависящие от неё модули и влияет на flight/hyperspace readiness; ремонт требует catalog-defined ship component, а refuel — `chemical.high_energy_fuel`. Class, fuel, installations и system health сохраняются в optional SQLite setting `ship_systems` без повышения schema 2; значение fuel одновременно синхронизируется с legacy `ships` row. `F5` запускает `TASK-110` в отдельной БД вместе с прежней runtime-matrix acceptance.
 
 В состав v2 входят:
 
@@ -115,6 +119,13 @@ Q              station Recipes: поставить recipe в очередь; и�
 C / Delete     отменить выбранный queue job с полным возвратом reservations
 Esc            закрыть station UI / освободить курсор
 H              detailed / compact / hidden HUD; координаты игрока остаются видимыми
+U              открыть / закрыть управление системами и модулями корабля
+Up / Down      в ship manager выбрать модуль или систему
+Tab            в ship manager переключить Overview / Modules / Systems
+Enter / E      установить модуль / отремонтировать систему / заправить корабль
+X              снять выбранный установленный модуль с возвратом в inventory
+D              нанести 25 единиц тестового повреждения выбранной системе
+R              отремонтировать выбранную систему одним catalog-defined компонентом
 G              открыть / закрыть режим строительства базы
 Up / Down      в режиме строительства выбрать модуль
 R              в режиме строительства повернуть модуль на 90°
@@ -124,11 +135,11 @@ T              включить / отключить targeted device
 F1             TASK-090/092/093/096/098: queue, properties, multi-station industry и aggregate HUD
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
-F4             TASK-080: весь Industry Content v2 (128 recipes)
-F5             TASK-076: playable runtime matrix (16 recipes / 15 station recipes)
+F4             TASK-080 + TASK-108: Industry Content v2 и planetary exploration acceptance
+F5             TASK-076 + TASK-110: runtime crafting matrix и ship systems mega-acceptance
 F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
-F8             очистить gameplay-slot
+F8             очистить gameplay-slot, включая ship class/loadout/system health/fuel
 F9             регрессия strict JSON catalog
 F10            регрессия launch-capacitor persistence
 F11            регрессия craft-time state machine
@@ -284,7 +295,14 @@ TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, st
 
 `F3` параллельно прогоняет две изолированные проверки. `TASK-082` сохраняет universal station selector и research graph. `TASK-102` проверяет точный baseline station services `6 economies / 3 factions / 1 NPC / 3 dialogue options / 3 quests / 174 tradable items`, шестимножительную price formula, daily/offline economy, atomic buy/sell, credit conservation, quest graph feasibility, rewards/reputation, cold restore, legacy fallback, one-writer и SQLite integrity. Используется отдельная БД `save_1.station-services-test.db`; gameplay-slot не изменяется.
 
-`F5` прогоняет все пятнадцать runtime station recipes в отдельной SQLite БД и проверяет timing, isolation, autosave, exact round-trip, one-writer и `integrity=ok`.
+Ожидаемый `F5` HUD:
+
+```text
+TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
+TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, readiness=1, fuel=1, restore=1, roundTrip=1
+```
+
+`F5` прогоняет все пятнадцать runtime station recipes и параллельно выполняет изолированную `TASK-110` ship-systems acceptance. Она проверяет точные counts `6 classes / 7 systems / 18 modules`, полное совпадение module definitions с ShipModule outputs, class stats, установку каждого модуля, slot limits и duplicate rejection, derived stats, отключение модулей при повреждении, flight/hyperspace readiness, repair/fuel lifecycle, сохранение количества inventory, cold restore, legacy fallback, exact SQLite round-trip, autosave log, `maxWriters=1` и `integrity=ok`. Используется отдельная БД `save_1.ship-systems-test.db`; gameplay-slot не изменяется.
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 
@@ -832,3 +850,12 @@ produces exactly one TASK-080/TASK-108 acceptance pair. The test verifies 20 det
 placements, environment constraints, symmetric spacing, infrastructure
 clearance, quest bias, complete scan/resolve/naming flow, cold restore, legacy
 fallback, exact round-trip, one-writer discipline and SQLite integrity.
+
+
+### Ship systems, loadout and damage closure
+
+`TASK-110` реализует core-подсистему корабельных классов, модулей и повреждений, требуемую ТЗ v2.0 §14.2–14.3. `ships.json` содержит шесть class profiles с Hull, Shield, CargoCapacity, FuelCapacity, Acceleration, MaxSpeed, Maneuverability, WeaponSlots, TechnologySlots, HyperdriveRange и AtmosphericEfficiency; семь system definitions; восемнадцать module definitions, полностью совпадающих с category `ShipModule` outputs.
+
+После ремонта starter ship нажмите `U`. В Modules установка по `Enter/E` атомарно потребляет один предмет из shared inventory; `X` снимает модуль и возвращает его. В Systems клавиша `D` наносит контролируемое тестовое повреждение, `R` расходует заданный системой repair component. Overview позволяет заправить корабль высокоэнергетическим топливом. Повреждённые engine/impulse/landing/hull блокируют flight readiness, повреждённый hyperdrive или его module — hyperspace readiness, а affected modules перестают давать stat bonuses до ремонта.
+
+Snapshot хранит class ID, fuel, slot installations и exact system health в `save_settings.ship_systems`; `ships.fuel` синхронизируется для совместимости. Старые saves без блока получают versatile starter ship, empty loadout, семь исправных систем и 35 единиц топлива. Текущая итерация не реализует покупку/смену класса и не переписывает уже принятые flight prototypes; это отдельная будущая интеграция, а не незавершённость core loadout/damage runtime.

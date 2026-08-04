@@ -769,7 +769,8 @@ public static class StarterRepairSnapshotFactory
         ProductionQueueNetworkSaveData? productionQueueNetwork = null,
         StationServicesSaveData? stationServices = null,
         BaseConstructionSaveData? baseConstruction = null,
-        PlanetaryExplorationSaveData? planetaryExploration = null)
+        PlanetaryExplorationSaveData? planetaryExploration = null,
+        ShipSystemsSaveData? shipSystems = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -806,7 +807,7 @@ public static class StarterRepairSnapshotFactory
                 session.RepairRecipe.Application.TargetId,
                 "Horizon Starter",
                 session.ShipRepaired ? session.RepairedHealth : 28.0,
-                35.0,
+                shipSystems?.Fuel ?? 35.0,
                 0.0,
                 1.0,
                 -10.0),
@@ -841,7 +842,8 @@ public static class StarterRepairSnapshotFactory
             productionQueueNetwork,
             stationServices,
             baseConstruction,
-            planetaryExploration);
+            planetaryExploration,
+            shipSystems);
     }
 }
 

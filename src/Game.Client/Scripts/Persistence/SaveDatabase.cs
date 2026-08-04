@@ -536,6 +536,30 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        ShipSystemsSaveData? expectedShipSystems = expected.ShipSystems;
+        ShipSystemsSaveData? actualShipSystems = actual.ShipSystems;
+        if ((expectedShipSystems is null) != (actualShipSystems is null))
+        {
+            mismatch = "ship_systems presence differs";
+            return false;
+        }
+
+        if (expectedShipSystems is not null && actualShipSystems is not null)
+        {
+            ShipSystemsSaveData orderedExpected = CanonicalizeShipSystems(
+                expectedShipSystems);
+            ShipSystemsSaveData orderedActual = CanonicalizeShipSystems(
+                actualShipSystems);
+            if (!string.Equals(
+                JsonSerializer.Serialize(orderedExpected),
+                JsonSerializer.Serialize(orderedActual),
+                StringComparison.Ordinal))
+            {
+                mismatch = "ship_systems differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -956,7 +980,7 @@ public sealed partial class SaveDatabase : IDisposable
             "setting_key IN ('research_points', 'unlocked_technologies', " +
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
-            "'base_construction', 'planetary_exploration');",
+            "'base_construction', 'planetary_exploration', 'ship_systems');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1047,6 +1071,25 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizePlanetaryExploration(
                         snapshot.PlanetaryExploration))));
+        }
+
+        if (snapshot.ShipSystems is not null)
+        {
+            if (Math.Abs(snapshot.Ship.Fuel - snapshot.ShipSystems.Fuel) > 0.001)
+            {
+                throw new InvalidDataException(
+                    "ship fuel differs between ships row and ship_systems setting.");
+            }
+
+            ValidateShipSystems(snapshot.ShipSystems);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'ship_systems', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeShipSystems(snapshot.ShipSystems))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1289,6 +1332,7 @@ public sealed partial class SaveDatabase : IDisposable
         StationServicesSaveData? stationServices = null;
         BaseConstructionSaveData? baseConstruction = null;
         PlanetaryExplorationSaveData? planetaryExploration = null;
+        ShipSystemsSaveData? shipSystems = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1299,7 +1343,8 @@ public sealed partial class SaveDatabase : IDisposable
                 "('research_points', 'unlocked_technologies', " +
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
-                "'base_construction', 'planetary_exploration') " +
+                "'base_construction', 'planetary_exploration', " +
+                "'ship_systems') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1469,6 +1514,39 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "ship_systems",
+            out string? shipSystemsJson))
+        {
+            if (string.IsNullOrWhiteSpace(shipSystemsJson))
+            {
+                throw new InvalidDataException(
+                    "ship_systems setting is empty.");
+            }
+
+            try
+            {
+                shipSystems = JsonSerializer.Deserialize<
+                    ShipSystemsSaveData>(shipSystemsJson) ??
+                    throw new InvalidDataException(
+                        "ship_systems setting deserialized to null.");
+                ValidateShipSystems(shipSystems);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "ship_systems setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (shipSystems is not null &&
+            Math.Abs(ship.Fuel - shipSystems.Fuel) > 0.001)
+        {
+            throw new InvalidDataException(
+                "ship fuel differs between ships row and ship_systems setting.");
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1561,7 +1639,8 @@ public sealed partial class SaveDatabase : IDisposable
             productionQueueNetwork,
             stationServices,
             baseConstruction,
-            planetaryExploration);
+            planetaryExploration,
+            shipSystems);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -1722,6 +1801,78 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "planetary_exploration contains invalid or duplicate POI state.");
+            }
+        }
+    }
+
+    private static ShipSystemsSaveData CanonicalizeShipSystems(
+        ShipSystemsSaveData shipSystems)
+    {
+        return shipSystems with
+        {
+            InstalledModules = shipSystems.InstalledModules
+                .OrderBy(module => module.SlotType, StringComparer.Ordinal)
+                .ThenBy(module => module.SlotIndex)
+                .ThenBy(module => module.ModuleId, StringComparer.Ordinal)
+                .ToArray(),
+            Systems = shipSystems.Systems
+                .OrderBy(system => system.SystemId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateShipSystems(ShipSystemsSaveData shipSystems)
+    {
+        ArgumentNullException.ThrowIfNull(shipSystems);
+        if (!GameContentCatalog.IsStableId(shipSystems.ShipClassId) ||
+            !shipSystems.ShipClassId.StartsWith(
+                "ship.class.",
+                StringComparison.Ordinal) ||
+            shipSystems.Fuel < 0.0 ||
+            double.IsNaN(shipSystems.Fuel) ||
+            double.IsInfinity(shipSystems.Fuel) ||
+            shipSystems.InstalledModules is null ||
+            shipSystems.Systems is null ||
+            shipSystems.InstalledModules.Count > 32 ||
+            shipSystems.Systems.Count > 32)
+        {
+            throw new InvalidDataException(
+                "ship_systems contains invalid identity or scalar values.");
+        }
+
+        HashSet<string> moduleIds = new(StringComparer.Ordinal);
+        HashSet<(string SlotType, int SlotIndex)> slots = new();
+        foreach (ShipModuleInstallationSaveData module in
+            shipSystems.InstalledModules)
+        {
+            if (!GameContentCatalog.IsStableId(module.ModuleId) ||
+                !module.ModuleId.StartsWith(
+                    "module.ship.",
+                    StringComparison.Ordinal) ||
+                module.SlotType is not "Technology" and not "Weapon" ||
+                module.SlotIndex < 0 ||
+                !moduleIds.Add(module.ModuleId) ||
+                !slots.Add((module.SlotType, module.SlotIndex)))
+            {
+                throw new InvalidDataException(
+                    "ship_systems contains invalid or duplicate modules.");
+            }
+        }
+
+        HashSet<string> systemIds = new(StringComparer.Ordinal);
+        foreach (ShipSystemHealthSaveData system in shipSystems.Systems)
+        {
+            if (!GameContentCatalog.IsStableId(system.SystemId) ||
+                !system.SystemId.StartsWith(
+                    "ship.system.",
+                    StringComparison.Ordinal) ||
+                system.Health < 0.0 ||
+                double.IsNaN(system.Health) ||
+                double.IsInfinity(system.Health) ||
+                !systemIds.Add(system.SystemId))
+            {
+                throw new InvalidDataException(
+                    "ship_systems contains invalid or duplicate system state.");
             }
         }
     }

@@ -18,7 +18,8 @@ public enum AutosaveTrigger
     ShipPurchased = 5,
     BaseChanged = 6,
     GracefulExit = 7,
-    DiscoveryChanged = 8
+    DiscoveryChanged = 8,
+    ShipChanged = 9
 }
 
 public sealed record PlayerSaveData(
@@ -166,6 +167,21 @@ public sealed record PlanetaryExplorationSaveData(
     int DiscoveryPoints,
     IReadOnlyList<PlanetaryPoiStateSaveData> Pois);
 
+public sealed record ShipModuleInstallationSaveData(
+    string ModuleId,
+    string SlotType,
+    int SlotIndex);
+
+public sealed record ShipSystemHealthSaveData(
+    string SystemId,
+    double Health);
+
+public sealed record ShipSystemsSaveData(
+    string ShipClassId,
+    double Fuel,
+    IReadOnlyList<ShipModuleInstallationSaveData> InstalledModules,
+    IReadOnlyList<ShipSystemHealthSaveData> Systems);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -181,7 +197,8 @@ public sealed record SaveGameSnapshot(
     ProductionQueueNetworkSaveData? ProductionQueueNetwork = null,
     StationServicesSaveData? StationServices = null,
     BaseConstructionSaveData? BaseConstruction = null,
-    PlanetaryExplorationSaveData? PlanetaryExploration = null);
+    PlanetaryExplorationSaveData? PlanetaryExploration = null,
+    ShipSystemsSaveData? ShipSystems = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

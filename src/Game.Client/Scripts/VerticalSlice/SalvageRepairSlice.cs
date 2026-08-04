@@ -42,6 +42,13 @@ public enum StationServicesTab
     Quests = 3
 }
 
+public enum ShipManagementTab
+{
+    Overview = 0,
+    Modules = 1,
+    Systems = 2
+}
+
 public partial class SalvageRepairSlice : Node3D
 {
     private sealed record GracefulExitResult(
@@ -72,6 +79,8 @@ public partial class SalvageRepairSlice : Node3D
     private BaseConstructionRuntime? _baseConstructionRuntime;
     private PlanetaryPoiCatalog? _planetaryPoiCatalog;
     private PlanetaryExplorationRuntime? _planetaryExplorationRuntime;
+    private ShipSystemsCatalog? _shipSystemsCatalog;
+    private ShipSystemsRuntime? _shipSystemsRuntime;
     private IReadOnlyList<PlanetaryPoiPlacement> _planetaryPoiPlacements =
         Array.Empty<PlanetaryPoiPlacement>();
     private readonly List<PlanetaryPoiNode> _planetaryPoiNodes = new();
@@ -97,6 +106,8 @@ public partial class SalvageRepairSlice : Node3D
     private Label? _baseConstructionLabel;
     private PanelContainer? _discoveryCatalogPanel;
     private Label? _discoveryCatalogLabel;
+    private PanelContainer? _shipManagementPanel;
+    private Label? _shipManagementLabel;
     private Label? _playerCoordinatesLabel;
     private Node3D? _baseConstructionModulesRoot;
     private Node3D? _planetaryPoisRoot;
@@ -121,6 +132,8 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionAcceptanceTask;
     private Task<PlanetaryExplorationAcceptanceReport>?
         _planetaryExplorationAcceptanceTask;
+    private Task<ShipSystemsAcceptanceReport>?
+        _shipSystemsAcceptanceTask;
     private Task<ChemicalProcessAcceptanceReport>?
         _chemicalProcessAcceptanceTask;
     private Task<ProductionQueueAcceptanceReport>?
@@ -150,6 +163,8 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionAcceptanceReport;
     private PlanetaryExplorationAcceptanceReport?
         _planetaryExplorationAcceptanceReport;
+    private ShipSystemsAcceptanceReport?
+        _shipSystemsAcceptanceReport;
     private ChemicalProcessAcceptanceReport?
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
@@ -185,6 +200,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _stationServicesAcceptanceHud = "READY";
     private string _baseConstructionAcceptanceHud = "READY";
     private string _planetaryExplorationAcceptanceHud = "READY";
+    private string _shipSystemsAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
     private string _queueTerminalAcceptanceHud = "READY";
@@ -213,6 +229,11 @@ public partial class SalvageRepairSlice : Node3D
     private ulong _f4LastSignalTicks;
     private int _discoveryCatalogIndex;
     private string _discoveryCatalogFeedback = "";
+    private bool _shipManagementOpen;
+    private ShipManagementTab _shipManagementTab = ShipManagementTab.Overview;
+    private int _shipManagementIndex;
+    private string _shipManagementFeedback = "";
+    private ulong _shipManagementOpenedTicks;
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -251,6 +272,16 @@ public partial class SalvageRepairSlice : Node3D
         _planetaryExplorationRuntime ??
         throw new InvalidOperationException(
             "Planetary exploration runtime is unavailable.");
+
+    private ShipSystemsCatalog ShipSystemsCatalog =>
+        _shipSystemsCatalog ??
+        throw new InvalidOperationException(
+            "Ship systems catalog is unavailable.");
+
+    private ShipSystemsRuntime ShipSystems =>
+        _shipSystemsRuntime ??
+        throw new InvalidOperationException(
+            "Ship systems runtime is unavailable.");
 
     private TechnologyProgression TechnologyProgress =>
         _technologyProgression ??
@@ -335,6 +366,10 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/DiscoveryCatalog");
         _discoveryCatalogLabel = GetNodeOrNull<Label>(
             "Hud/DiscoveryCatalog/Label");
+        _shipManagementPanel = GetNodeOrNull<PanelContainer>(
+            "Hud/ShipManagement");
+        _shipManagementLabel = GetNodeOrNull<Label>(
+            "Hud/ShipManagement/Label");
         _playerCoordinatesLabel = GetNodeOrNull<Label>(
             "Hud/PlayerCoordinates/Label");
         _baseConstructionModulesRoot = GetNodeOrNull<Node3D>(
@@ -353,7 +388,8 @@ public partial class SalvageRepairSlice : Node3D
             _recipeSelectorLabel is null || _stationServicesPanel is null ||
             _stationServicesLabel is null || _baseConstructionPanel is null ||
             _baseConstructionLabel is null || _discoveryCatalogPanel is null ||
-            _discoveryCatalogLabel is null || _playerCoordinatesLabel is null ||
+            _discoveryCatalogLabel is null || _shipManagementPanel is null ||
+            _shipManagementLabel is null || _playerCoordinatesLabel is null ||
             _baseConstructionModulesRoot is null || _planetaryPoisRoot is null ||
             _baseBuildPreview is null ||
             _shipTerminal is null || _stationServicesNpc is null ||
@@ -370,6 +406,8 @@ public partial class SalvageRepairSlice : Node3D
             LoadBaseConstructionCatalog(catalog);
         PlanetaryPoiCatalog planetaryPoiCatalog =
             LoadPlanetaryPoiCatalog();
+        ShipSystemsCatalog shipSystemsCatalog =
+            LoadShipSystemsCatalog(catalog);
         IReadOnlyList<PlanetaryPoiPlacement> planetaryPoiPlacements =
             PlanetaryPoiPlanner.Plan(planetaryPoiCatalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
@@ -424,6 +462,8 @@ public partial class SalvageRepairSlice : Node3D
         _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
             planetaryPoiCatalog,
             planetaryPoiPlacements);
+        _shipSystemsCatalog = shipSystemsCatalog;
+        _shipSystemsRuntime = new ShipSystemsRuntime(shipSystemsCatalog);
         _technologyProgression = technologyProgression;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
@@ -517,7 +557,8 @@ public partial class SalvageRepairSlice : Node3D
             "the playable runtime matrix, F6 for base construction plus legacy " +
             "regression, F9/F10/F11/F12 for regressions, F7 for complete " +
             "resource acceptance or F8 to reset. Press G for base build mode, " +
-            "P for scanner pulse and J for the discovery catalog.");
+            "P for scanner pulse, J for the discovery catalog and U for ship " +
+            "management.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -574,6 +615,14 @@ public partial class SalvageRepairSlice : Node3D
             "discoveries=persistent; F4=acceptance; " +
             "f4Gate=release-confirmed+750ms-event-silence.");
         GD.Print(
+            "TASK-110 ship systems READY: " +
+            $"classes={ShipSystemsCatalog.Classes.Count}; " +
+            $"systems={ShipSystemsCatalog.Systems.Count}; " +
+            $"modules={ShipSystemsCatalog.Modules.Count}; " +
+            $"class={ShipSystems.ShipClassId}; " +
+            "loadout=U; damage=per-system; repair=inventory-backed; " +
+            "persistence=enabled; F5=acceptance.");
+        GD.Print(
             "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -613,6 +662,7 @@ public partial class SalvageRepairSlice : Node3D
         PollFourthCraftingAcceptanceTask();
         PollBaseConstructionAcceptanceTask();
         PollPlanetaryExplorationAcceptanceTask();
+        PollShipSystemsAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -690,6 +740,50 @@ public partial class SalvageRepairSlice : Node3D
 
         if (keyEvent.Echo)
         {
+            return;
+        }
+        if (_shipManagementOpen)
+        {
+            if (Matches(physical, logical, Key.Escape) ||
+                Matches(physical, logical, Key.U))
+            {
+                CloseShipManagement("ship management closed");
+            }
+            else if (Matches(physical, logical, Key.Up))
+            {
+                MoveShipManagementSelection(-1);
+            }
+            else if (Matches(physical, logical, Key.Down))
+            {
+                MoveShipManagementSelection(1);
+            }
+            else if (Matches(physical, logical, Key.Tab))
+            {
+                CycleShipManagementTab();
+            }
+            else if (Matches(physical, logical, Key.X) &&
+                     _shipManagementTab == ShipManagementTab.Modules)
+            {
+                UninstallSelectedShipModule();
+            }
+            else if (Matches(physical, logical, Key.D) &&
+                     _shipManagementTab == ShipManagementTab.Systems)
+            {
+                DamageSelectedShipSystem();
+            }
+            else if (Matches(physical, logical, Key.R) &&
+                     _shipManagementTab == ShipManagementTab.Systems)
+            {
+                RepairSelectedShipSystem();
+            }
+            else if (Matches(physical, logical, Key.Enter) ||
+                     (Matches(physical, logical, Key.E) &&
+                      Time.GetTicksMsec() > _shipManagementOpenedTicks + 120))
+            {
+                ConfirmShipManagementSelection();
+            }
+
+            GetViewport().SetInputAsHandled();
             return;
         }
         if (_baseBuildMode)
@@ -856,6 +950,15 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
+        if (Matches(physical, logical, Key.U) &&
+            (_state == SalvageRepairSliceState.Ready ||
+             _state == SalvageRepairSliceState.Passed))
+        {
+            OpenShipManagement();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (Matches(physical, logical, Key.J) &&
             (_state == SalvageRepairSliceState.Ready ||
              _state == SalvageRepairSliceState.Passed))
@@ -978,6 +1081,8 @@ public partial class SalvageRepairSlice : Node3D
 
         CloseRecipeSelector();
         CloseBaseBuildMode();
+        CloseDiscoveryCatalog();
+        CloseShipManagement();
         _stationServicesOpen = true;
         _stationServicesTab = StationServicesTab.Dialogue;
         _stationServicesIndex = 0;
@@ -1459,6 +1564,8 @@ public partial class SalvageRepairSlice : Node3D
 
         CloseStationServices();
         CloseBaseBuildMode();
+        CloseDiscoveryCatalog();
+        CloseShipManagement();
         bool sameOpenStation = ReferenceEquals(_selectorStation, station);
         _selectorStation = station;
         _selectorInteractor = interactor;
@@ -2310,6 +2417,7 @@ public partial class SalvageRepairSlice : Node3D
 
         if (repairResult == StarterRepairResult.AlreadyRepaired)
         {
+            OpenShipManagement();
             return;
         }
 
@@ -3060,6 +3168,46 @@ public partial class SalvageRepairSlice : Node3D
         return catalog;
     }
 
+    private static ShipSystemsCatalog LoadShipSystemsCatalog(
+        GameContentCatalog contentCatalog)
+    {
+        const string path = "res://Content/ships.json";
+        string json = Godot.FileAccess.GetFileAsString(path);
+        ShipSystemsCatalog catalog = ShipSystemsCatalog.LoadFromJson(
+            json,
+            contentCatalog);
+        int shipModuleOutputs = contentCatalog.Recipes.Values
+            .Where(recipe => string.Equals(
+                recipe.Category,
+                "ShipModule",
+                StringComparison.Ordinal))
+            .SelectMany(recipe => recipe.Outputs)
+            .Select(output => output.DefinitionId)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        int repairItems = catalog.Systems.Values
+            .Select(system => system.RepairDefinitionId)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        GD.Print(
+            "TASK-110 ship systems catalog READY: " +
+            $"schema={catalog.SchemaVersion}; " +
+            $"classes={catalog.Classes.Count}; " +
+            $"systems={catalog.Systems.Count}; " +
+            $"modules={catalog.Modules.Count}; " +
+            $"starterClass={catalog.StarterClassId}; " +
+            $"moduleCoverage={catalog.Modules.Count}/{shipModuleOutputs}.");
+        GD.Print(
+            "TASK-110 ship systems binding PASS: " +
+            $"classes={catalog.Classes.Count}; " +
+            $"systems={catalog.Systems.Count}; " +
+            $"modules={catalog.Modules.Count}; " +
+            $"repairItems={repairItems}; " +
+            $"fuel={ShipSystemsAcceptanceRunner.FuelDefinitionId}; " +
+            "slots=Technology/Weapon; persistence=enabled.");
+        return catalog;
+    }
+
     private void InitializeGameplayProductionNetwork(
         ProductionQueueNetworkSaveData? saveData,
         ProductionQueueSaveData? legacySaveData)
@@ -3331,6 +3479,488 @@ public partial class SalvageRepairSlice : Node3D
             StringComparer.Ordinal);
     }
 
+    private IReadOnlyList<ShipModuleDefinition> ShipModuleDefinitions =>
+        ShipSystemsCatalog.Modules.Values
+            .OrderBy(module => module.ModuleId, StringComparer.Ordinal)
+            .ToArray();
+
+    private IReadOnlyList<ShipSystemDefinition> ShipSystemDefinitions =>
+        ShipSystemsCatalog.Systems.Values
+            .OrderBy(system => system.SystemId, StringComparer.Ordinal)
+            .ToArray();
+
+    private void OpenShipManagement()
+    {
+        if (_shipManagementPanel is null)
+        {
+            return;
+        }
+
+        CloseRecipeSelector();
+        CloseStationServices();
+        CloseBaseBuildMode();
+        CloseDiscoveryCatalog();
+        _shipManagementOpen = true;
+        _shipManagementTab = ShipManagementTab.Overview;
+        _shipManagementIndex = 0;
+        _shipManagementFeedback = Session.ShipRepaired
+            ? "ship systems online"
+            : "starter ship must be repaired before loadout changes";
+        _shipManagementOpenedTicks = Time.GetTicksMsec();
+        _shipManagementPanel.Visible = true;
+        UpdateShipManagementPanel();
+        _lastDomainEvent = "ShipManagementOpened";
+    }
+
+    private void CloseShipManagement(string status = "")
+    {
+        _shipManagementOpen = false;
+        if (_shipManagementPanel is not null)
+        {
+            _shipManagementPanel.Visible = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            _status = status;
+        }
+    }
+
+    private void MoveShipManagementSelection(int delta)
+    {
+        int count = GetShipManagementItemCount();
+        if (count <= 0)
+        {
+            _shipManagementIndex = 0;
+            return;
+        }
+
+        _shipManagementIndex = (_shipManagementIndex + delta) % count;
+        if (_shipManagementIndex < 0)
+        {
+            _shipManagementIndex += count;
+        }
+
+        UpdateShipManagementPanel();
+    }
+
+    private void CycleShipManagementTab()
+    {
+        _shipManagementTab = (ShipManagementTab)(
+            ((int)_shipManagementTab + 1) % 3);
+        _shipManagementIndex = 0;
+        _shipManagementFeedback = $"tab={_shipManagementTab}";
+        UpdateShipManagementPanel();
+    }
+
+    private int GetShipManagementItemCount()
+    {
+        return _shipManagementTab switch
+        {
+            ShipManagementTab.Overview => 1,
+            ShipManagementTab.Modules => ShipModuleDefinitions.Count,
+            ShipManagementTab.Systems => ShipSystemDefinitions.Count,
+            _ => 0
+        };
+    }
+
+    private void ConfirmShipManagementSelection()
+    {
+        switch (_shipManagementTab)
+        {
+            case ShipManagementTab.Overview:
+                RefuelShip();
+                break;
+            case ShipManagementTab.Modules:
+                InstallSelectedShipModule();
+                break;
+            case ShipManagementTab.Systems:
+                RepairSelectedShipSystem();
+                break;
+        }
+    }
+
+    private void InstallSelectedShipModule()
+    {
+        if (!Session.ShipRepaired)
+        {
+            _shipManagementFeedback = "repair the starter ship first";
+            return;
+        }
+
+        IReadOnlyList<ShipModuleDefinition> definitions = ShipModuleDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        _shipManagementIndex = Math.Clamp(
+            _shipManagementIndex,
+            0,
+            definitions.Count - 1);
+        ShipModuleDefinition definition = definitions[_shipManagementIndex];
+        ShipModuleInstallResult preflight = ShipSystems.CanInstall(
+            definition.ModuleId,
+            out string result);
+        if (preflight != ShipModuleInstallResult.Installed)
+        {
+            _shipManagementFeedback = result;
+            return;
+        }
+
+        if (!TryConsumeSharedInventory(
+            definition.ModuleId,
+            1,
+            out string inventoryResult))
+        {
+            _shipManagementFeedback = inventoryResult;
+            return;
+        }
+
+        ShipModuleInstallResult installed = ShipSystems.TryInstall(
+            definition.ModuleId,
+            out result);
+        if (installed != ShipModuleInstallResult.Installed)
+        {
+            GrantSharedInventory(definition.ModuleId, 1);
+            _shipManagementFeedback = result;
+            return;
+        }
+
+        _shipManagementFeedback = result;
+        _lastDomainEvent = $"ShipModuleInstalled({definition.ModuleId})";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-110 player ship module install PASS: " +
+            $"module={definition.ModuleId}; slot={definition.SlotType}; " +
+            $"installed={ShipSystems.InstalledModuleCount}; " +
+            $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
+        UpdateShipManagementPanel();
+    }
+
+    private void UninstallSelectedShipModule()
+    {
+        if (!Session.ShipRepaired)
+        {
+            _shipManagementFeedback = "repair the starter ship first";
+            return;
+        }
+
+        IReadOnlyList<ShipModuleDefinition> definitions = ShipModuleDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        _shipManagementIndex = Math.Clamp(
+            _shipManagementIndex,
+            0,
+            definitions.Count - 1);
+        ShipModuleDefinition definition = definitions[_shipManagementIndex];
+        ShipModuleUninstallResult uninstalled = ShipSystems.TryUninstall(
+            definition.ModuleId,
+            out string result);
+        if (uninstalled != ShipModuleUninstallResult.Uninstalled)
+        {
+            _shipManagementFeedback = result;
+            return;
+        }
+
+        GrantSharedInventory(definition.ModuleId, 1);
+        _shipManagementFeedback = result;
+        _lastDomainEvent = $"ShipModuleUninstalled({definition.ModuleId})";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-110 player ship module uninstall PASS: " +
+            $"module={definition.ModuleId}; " +
+            $"installed={ShipSystems.InstalledModuleCount}; refund=1.");
+        UpdateShipManagementPanel();
+    }
+
+    private void DamageSelectedShipSystem()
+    {
+        if (!Session.ShipRepaired)
+        {
+            _shipManagementFeedback = "repair the starter ship first";
+            return;
+        }
+
+        IReadOnlyList<ShipSystemDefinition> definitions = ShipSystemDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        _shipManagementIndex = Math.Clamp(
+            _shipManagementIndex,
+            0,
+            definitions.Count - 1);
+        ShipSystemDefinition definition = definitions[_shipManagementIndex];
+        ShipSystemMutationResult mutation = ShipSystems.ApplyDamage(
+            definition.SystemId,
+            25.0,
+            out string result);
+        _shipManagementFeedback = result;
+        if (mutation != ShipSystemMutationResult.Applied)
+        {
+            return;
+        }
+
+        _lastDomainEvent = $"ShipSystemDamaged({definition.SystemId})";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-110 player ship damage PASS: " +
+            $"system={definition.SystemId}; " +
+            $"health={ShipSystems.GetSystemHealth(definition.SystemId):0.#}/" +
+            $"{ShipSystems.GetSystemMaximumHealth(definition.SystemId):0.#}; " +
+            $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
+        UpdateShipManagementPanel();
+    }
+
+    private void RepairSelectedShipSystem()
+    {
+        if (!Session.ShipRepaired)
+        {
+            _shipManagementFeedback = "repair the starter ship first";
+            return;
+        }
+
+        IReadOnlyList<ShipSystemDefinition> definitions = ShipSystemDefinitions;
+        if (definitions.Count == 0)
+        {
+            return;
+        }
+
+        _shipManagementIndex = Math.Clamp(
+            _shipManagementIndex,
+            0,
+            definitions.Count - 1);
+        ShipSystemDefinition definition = definitions[_shipManagementIndex];
+        double current = ShipSystems.GetSystemHealth(definition.SystemId);
+        double maximum = ShipSystems.GetSystemMaximumHealth(definition.SystemId);
+        if (current + 0.0001 >= maximum)
+        {
+            _shipManagementFeedback = $"{definition.SystemId} is already full";
+            return;
+        }
+
+        if (!TryConsumeSharedInventory(
+            definition.RepairDefinitionId,
+            1,
+            out string inventoryResult))
+        {
+            _shipManagementFeedback = inventoryResult;
+            return;
+        }
+
+        ShipSystemMutationResult mutation = ShipSystems.Repair(
+            definition.SystemId,
+            definition.RepairPerUnit,
+            out string result);
+        if (mutation != ShipSystemMutationResult.Applied)
+        {
+            GrantSharedInventory(definition.RepairDefinitionId, 1);
+            _shipManagementFeedback = result;
+            return;
+        }
+
+        _shipManagementFeedback = result;
+        _lastDomainEvent = $"ShipSystemRepaired({definition.SystemId})";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-110 player ship repair PASS: " +
+            $"system={definition.SystemId}; " +
+            $"repairItem={definition.RepairDefinitionId}; " +
+            $"health={ShipSystems.GetSystemHealth(definition.SystemId):0.#}/" +
+            $"{ShipSystems.GetSystemMaximumHealth(definition.SystemId):0.#}.");
+        UpdateShipManagementPanel();
+    }
+
+    private void RefuelShip()
+    {
+        if (!Session.ShipRepaired)
+        {
+            _shipManagementFeedback = "repair the starter ship first";
+            return;
+        }
+
+        double capacity = ShipSystems.GetEffectiveStats().FuelCapacity;
+        if (ShipSystems.Fuel + 0.0001 >= capacity)
+        {
+            _shipManagementFeedback = "fuel tank is already full";
+            return;
+        }
+
+        if (!TryConsumeSharedInventory(
+            ShipSystemsAcceptanceRunner.FuelDefinitionId,
+            1,
+            out string inventoryResult))
+        {
+            _shipManagementFeedback = inventoryResult;
+            return;
+        }
+
+        double added = ShipSystems.Refuel(25.0);
+        if (added <= 0.0)
+        {
+            GrantSharedInventory(ShipSystemsAcceptanceRunner.FuelDefinitionId, 1);
+            _shipManagementFeedback = "refuel produced no fuel";
+            return;
+        }
+
+        _shipManagementFeedback =
+            $"refueled +{added:0.#}; fuel={ShipSystems.Fuel:0.#}/{capacity:0.#}";
+        _lastDomainEvent = "ShipRefueled";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-110 player ship refuel PASS: " +
+            $"fuel={ShipSystems.Fuel:0.#}/{capacity:0.#}; " +
+            $"item={ShipSystemsAcceptanceRunner.FuelDefinitionId}.");
+        UpdateShipManagementPanel();
+    }
+
+    private bool TryConsumeSharedInventory(
+        string definitionId,
+        int quantity,
+        out string result)
+    {
+        if (Session.GetAvailableQuantity(definitionId) < quantity)
+        {
+            result = $"missing {quantity} x {definitionId}";
+            return false;
+        }
+
+        ProductionQueueRuntime? missingMirror = GameplayNetwork.Queues
+            .FirstOrDefault(queue =>
+                queue.GetQuantity(definitionId) < quantity);
+        if (missingMirror is not null)
+        {
+            result = $"inventory mirror {missingMirror.StationId} is missing " +
+                $"{definitionId}";
+            return false;
+        }
+
+        if (!Session.TryConsumeInventory(definitionId, quantity, out result))
+        {
+            return false;
+        }
+
+        MirrorSessionConsumptionToGameplayNetwork(
+            new[] { new CraftingStackDefinition(definitionId, quantity) });
+        return true;
+    }
+
+    private void GrantSharedInventory(string definitionId, int quantity)
+    {
+        Session.GrantInventory(definitionId, quantity);
+        MirrorSessionGrantToGameplayNetwork(
+            new[] { new CraftingStackDefinition(definitionId, quantity) });
+    }
+
+    private void UpdateShipManagementPanel()
+    {
+        if (_shipManagementPanel is null || _shipManagementLabel is null)
+        {
+            return;
+        }
+
+        _shipManagementPanel.Visible = _shipManagementOpen;
+        if (!_shipManagementOpen)
+        {
+            return;
+        }
+
+        ShipEffectiveStats stats = ShipSystems.GetEffectiveStats();
+        string tabs = string.Join(
+            "  ",
+            Enum.GetValues<ShipManagementTab>().Select(tab =>
+                tab == _shipManagementTab ? $"[{tab}]" : tab.ToString()));
+        string content;
+        if (_shipManagementTab == ShipManagementTab.Overview)
+        {
+            content =
+                $"Class: {GetShortContentId(ShipSystems.ShipClassId)}\n" +
+                $"Hull={stats.Hull:0.#}  Shield={stats.Shield:0.#}  Cargo={stats.CargoCapacity}\n" +
+                $"Fuel={ShipSystems.Fuel:0.#}/{stats.FuelCapacity:0.#}  " +
+                $"Accel={stats.Acceleration:0.#}  Speed={stats.MaxSpeed:0.#}\n" +
+                $"Maneuver={stats.Maneuverability:0.#}  HyperRange={stats.HyperdriveRange:0.#}  " +
+                $"Atmos={stats.AtmosphericEfficiency:0.#}%\n" +
+                $"Slots: weapon={ShipSystems.InstalledWeaponModules}/{stats.WeaponSlots}  " +
+                $"technology={ShipSystems.InstalledTechnologyModules}/{stats.TechnologySlots}\n" +
+                $"Readiness: flight={(Session.ShipRepaired && ShipSystems.FlightReady ? "READY" : "BLOCKED")}  " +
+                $"hyperspace={(Session.ShipRepaired && ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")}  " +
+                $"offlineSystems={ShipSystems.DisabledSystemCount}\n\n" +
+                $"Enter/E: refuel with 1 x {ShipSystemsAcceptanceRunner.FuelDefinitionId} " +
+                $"(inventory={Session.GetAvailableQuantity(ShipSystemsAcceptanceRunner.FuelDefinitionId)})";
+        }
+        else if (_shipManagementTab == ShipManagementTab.Modules)
+        {
+            IReadOnlyList<ShipModuleDefinition> modules = ShipModuleDefinitions;
+            _shipManagementIndex = Math.Clamp(
+                _shipManagementIndex,
+                0,
+                Math.Max(0, modules.Count - 1));
+            int start = Math.Max(0, _shipManagementIndex - 5);
+            int end = Math.Min(modules.Count, start + 11);
+            start = Math.Max(0, end - 11);
+            List<string> lines = new();
+            for (int index = start; index < end; index++)
+            {
+                ShipModuleDefinition module = modules[index];
+                InstalledShipModuleState? installed = ShipSystems.InstalledModules
+                    .FirstOrDefault(value => string.Equals(
+                        value.Definition.ModuleId,
+                        module.ModuleId,
+                        StringComparison.Ordinal));
+                string state = installed is null
+                    ? "AVAILABLE"
+                    : installed.Active ? "INSTALLED/ACTIVE" : "INSTALLED/OFFLINE";
+                lines.Add(
+                    $"{(index == _shipManagementIndex ? ">" : " ")} " +
+                    $"{GetShortContentId(module.ModuleId),-24} " +
+                    $"{module.SlotType,-10} {state,-18} " +
+                    $"inv={Session.GetAvailableQuantity(module.ModuleId)}");
+            }
+
+            content = string.Join("\n", lines) +
+                "\n\nEnter/E: install selected  X: uninstall selected";
+        }
+        else
+        {
+            IReadOnlyList<ShipSystemDefinition> systems = ShipSystemDefinitions;
+            _shipManagementIndex = Math.Clamp(
+                _shipManagementIndex,
+                0,
+                Math.Max(0, systems.Count - 1));
+            List<string> lines = new();
+            for (int index = 0; index < systems.Count; index++)
+            {
+                ShipSystemDefinition system = systems[index];
+                double health = ShipSystems.GetSystemHealth(system.SystemId);
+                double maximum = ShipSystems.GetSystemMaximumHealth(system.SystemId);
+                lines.Add(
+                    $"{(index == _shipManagementIndex ? ">" : " ")} " +
+                    $"{GetShortContentId(system.SystemId),-14} " +
+                    $"{health,6:0.#}/{maximum,-6:0.#} " +
+                    $"repair={GetShortContentId(system.RepairDefinitionId)} " +
+                    $"inv={Session.GetAvailableQuantity(system.RepairDefinitionId)}");
+            }
+
+            content = string.Join("\n", lines) +
+                "\n\nEnter/E or R: repair selected  D: apply 25 test damage";
+        }
+
+        _shipManagementLabel.Text =
+            "SHIP MANAGEMENT - TASK-110\n" +
+            tabs + "\n" +
+            $"Starter repair: {(Session.ShipRepaired ? "COMPLETE" : "REQUIRED")}\n\n" +
+            content + "\n\n" +
+            $"Status: {_shipManagementFeedback}\n" +
+            "Up/Down select  Tab pages  U/Esc close";
+    }
+
     private IReadOnlyList<BaseModuleDefinition> BaseBuildDefinitions =>
         BaseConstructionCatalog.Modules.Values
             .OrderBy(module => module.ModuleId, StringComparer.Ordinal)
@@ -3341,6 +3971,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseRecipeSelector();
         CloseStationServices();
         CloseDiscoveryCatalog();
+        CloseShipManagement();
         CloseBaseBuildMode();
         _baseBuildMode = true;
         IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
@@ -3912,6 +4543,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseRecipeSelector();
         CloseStationServices();
         CloseBaseBuildMode();
+        CloseShipManagement();
         _discoveryCatalogOpen = true;
         _discoveryCatalogIndex = Math.Clamp(
             _discoveryCatalogIndex,
@@ -4089,6 +4721,7 @@ public partial class SalvageRepairSlice : Node3D
             _stationServicesAcceptanceTask is null &&
             _baseConstructionAcceptanceTask is null &&
             _planetaryExplorationAcceptanceTask is null &&
+            _shipSystemsAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -4099,6 +4732,7 @@ public partial class SalvageRepairSlice : Node3D
             !_stationServicesOpen &&
             !_baseBuildMode &&
             !_discoveryCatalogOpen &&
+            !_shipManagementOpen &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -4520,6 +5154,20 @@ public partial class SalvageRepairSlice : Node3D
                         StringComparer.Ordinal)
                     .ToArray(),
                 _lifetimeCancellation.Token);
+        string shipSystemsTestPath = Path.Combine(
+            directory,
+            "save_1.ship-systems-test.db");
+        _shipSystemsAcceptanceHud = "RUNNING";
+        _shipSystemsAcceptanceReport = null;
+        _shipSystemsAcceptanceTask = ShipSystemsAcceptanceRunner.RunAsync(
+            shipSystemsTestPath,
+            SlotId,
+            ContentCatalog,
+            ShipSystemsCatalog,
+            RepairRecipe,
+            _lifetimeCancellation.Token);
+        _status =
+            "TASK-076/TASK-110 runtime matrix and ship systems acceptance running";
     }
 
     private void BeginReset()
@@ -4557,7 +5205,8 @@ public partial class SalvageRepairSlice : Node3D
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
-            planetaryExploration: PlanetaryExploration.CreateSaveData());
+            planetaryExploration: PlanetaryExploration.CreateSaveData(),
+            shipSystems: ShipSystems.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -4588,6 +5237,9 @@ public partial class SalvageRepairSlice : Node3D
 
         CloseRecipeSelector();
         CloseStationServices();
+        CloseBaseBuildMode();
+        CloseDiscoveryCatalog();
+        CloseShipManagement();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -4602,6 +5254,7 @@ public partial class SalvageRepairSlice : Node3D
             _stationServicesAcceptanceTask is not null ||
             _baseConstructionAcceptanceTask is not null ||
             _planetaryExplorationAcceptanceTask is not null ||
+            _shipSystemsAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -4629,7 +5282,8 @@ public partial class SalvageRepairSlice : Node3D
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
-            planetaryExploration: PlanetaryExploration.CreateSaveData());
+            planetaryExploration: PlanetaryExploration.CreateSaveData(),
+            shipSystems: ShipSystems.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -4650,7 +5304,12 @@ public partial class SalvageRepairSlice : Node3D
             $"{BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"discoveries={PlanetaryExploration.DiscoveredCount}/" +
             $"{PlanetaryPoiCatalog.Definitions.Count}; " +
-            $"resolvedPois={PlanetaryExploration.ResolvedCount}.");
+            $"resolvedPois={PlanetaryExploration.ResolvedCount}; " +
+            $"shipClass={ShipSystems.ShipClassId}; " +
+            $"shipModules={ShipSystems.InstalledModuleCount}; " +
+            $"shipFuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -4715,6 +5374,9 @@ public partial class SalvageRepairSlice : Node3D
                 PlanetaryPoiCatalog,
                 _planetaryPoiPlacements,
                 snapshot?.PlanetaryExploration);
+            _shipSystemsRuntime = new ShipSystemsRuntime(
+                ShipSystemsCatalog,
+                snapshot?.ShipSystems);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -4728,6 +5390,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseStationServices();
             CloseBaseBuildMode();
             CloseDiscoveryCatalog();
+            CloseShipManagement();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -4770,6 +5433,16 @@ public partial class SalvageRepairSlice : Node3D
                 $"named={PlanetaryExploration.NamedCount}; " +
                 $"points={PlanetaryExploration.DiscoveryPoints}; " +
                 $"legacyFallback={(snapshot?.PlanetaryExploration is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-110 ship systems restore PASS: " +
+                $"class={ShipSystems.ShipClassId}; " +
+                $"modules={ShipSystems.InstalledModuleCount}; " +
+                $"systems={ShipSystems.SystemHealth.Count}; " +
+                $"offline={ShipSystems.DisabledSystemCount}; " +
+                $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+                $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
+                $"legacyFallback={(snapshot?.ShipSystems is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -4834,12 +5507,14 @@ public partial class SalvageRepairSlice : Node3D
             _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
                 PlanetaryPoiCatalog,
                 _planetaryPoiPlacements);
+            _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
             CloseStationServices();
             CloseBaseBuildMode();
             CloseDiscoveryCatalog();
+            CloseShipManagement();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -4859,6 +5534,15 @@ public partial class SalvageRepairSlice : Node3D
                 $"slot reset; collect {Session.RequiredSalvage} x " +
                 Session.SalvageDefinitionId;
             GD.Print("TASK-062 vertical slice slot reset PASS.");
+            GD.Print(
+                "TASK-110 ship systems reset PASS: " +
+                $"class={ShipSystems.ShipClassId}; " +
+                $"modules={ShipSystems.InstalledModuleCount}; " +
+                $"systems={ShipSystems.SystemHealth.Count}; " +
+                $"offline={ShipSystems.DisabledSystemCount}; " +
+                $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+                $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
         }
         catch (Exception exception)
         {
@@ -5361,9 +6045,6 @@ public partial class SalvageRepairSlice : Node3D
                       $"isolated={_catalogMatrixAcceptanceReport.IsolatedRecipes}, " +
                       $"roundTrip={(_catalogMatrixAcceptanceReport.ExactRoundTrip ? 1 : 0)}"
                     : $"FAIL {_catalogMatrixAcceptanceReport.Result}";
-            _state = _catalogMatrixAcceptanceReport.Passed
-                ? SalvageRepairSliceState.Passed
-                : SalvageRepairSliceState.Failed;
             _status = _catalogMatrixAcceptanceReport.Result;
             string output = BuildCatalogMatrixAcceptanceOutput(
                 _catalogMatrixAcceptanceReport);
@@ -5375,11 +6056,74 @@ public partial class SalvageRepairSlice : Node3D
             {
                 GD.PushError(output);
             }
+
+            UpdateCombinedCatalogAndShipAcceptanceState();
         }
         catch (Exception exception)
         {
             Fail("catalog crafting matrix acceptance", exception);
         }
+    }
+
+    private void PollShipSystemsAcceptanceTask()
+    {
+        if (_shipSystemsAcceptanceTask is null ||
+            !_shipSystemsAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<ShipSystemsAcceptanceReport> task = _shipSystemsAcceptanceTask;
+        _shipSystemsAcceptanceTask = null;
+        try
+        {
+            ShipSystemsAcceptanceReport report = task.GetAwaiter().GetResult();
+            _shipSystemsAcceptanceReport = report;
+            _shipSystemsAcceptanceHud = report.Passed
+                ? $"PASS classes={report.ShipClasses}, systems={report.Systems}, " +
+                  $"modules={report.Modules}, coverage={(report.CatalogCoverage ? 1 : 0)}, " +
+                  $"slots={(report.SlotLimits ? 1 : 0)}, damage={(report.DamageLifecycle ? 1 : 0)}, " +
+                  $"repair={(report.RepairLifecycle ? 1 : 0)}, ready={(report.FlightReadiness && report.HyperspaceReadiness ? 1 : 0)}, " +
+                  $"fuel={(report.FuelLifecycle ? 1 : 0)}, restore={(report.ColdRestore ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            _status = report.Result;
+            string output = BuildShipSystemsAcceptanceOutput(report);
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+
+            UpdateCombinedCatalogAndShipAcceptanceState();
+        }
+        catch (Exception exception)
+        {
+            Fail("ship systems acceptance", exception);
+        }
+    }
+
+    private void UpdateCombinedCatalogAndShipAcceptanceState()
+    {
+        if (_catalogMatrixAcceptanceTask is not null ||
+            _shipSystemsAcceptanceTask is not null ||
+            _catalogMatrixAcceptanceReport is null ||
+            _shipSystemsAcceptanceReport is null)
+        {
+            return;
+        }
+
+        bool passed = _catalogMatrixAcceptanceReport.Passed &&
+            _shipSystemsAcceptanceReport.Passed;
+        _state = passed
+            ? SalvageRepairSliceState.Passed
+            : SalvageRepairSliceState.Failed;
+        _status = passed
+            ? "TASK-076/TASK-110 runtime matrix and ship systems acceptance passed"
+            : "TASK-076/TASK-110 runtime matrix and ship systems acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -6044,6 +6788,11 @@ public partial class SalvageRepairSlice : Node3D
             UpdateDiscoveryCatalogPanel();
         }
 
+        if (_shipManagementOpen)
+        {
+            UpdateShipManagementPanel();
+        }
+
         string databaseLine = _diagnostics is null
             ? "DB: initializing"
             : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
@@ -6163,11 +6912,21 @@ public partial class SalvageRepairSlice : Node3D
             $"resolved={PlanetaryExploration.ResolvedCount} • " +
             $"named={PlanetaryExploration.NamedCount} • " +
             $"points={PlanetaryExploration.DiscoveryPoints} • scanner=P • catalog=J";
+        ShipEffectiveStats shipStats = ShipSystems.GetEffectiveStats();
+        string shipSystemsLine =
+            $"Ship systems: class={GetShortContentId(ShipSystems.ShipClassId)} • " +
+            $"modules={ShipSystems.InstalledModuleCount}/" +
+            $"{shipStats.WeaponSlots + shipStats.TechnologySlots} • " +
+            $"fuel={ShipSystems.Fuel:0.#}/{shipStats.FuelCapacity:0.#} • " +
+            $"offline={ShipSystems.DisabledSystemCount}/" +
+            $"{ShipSystemsCatalog.Systems.Count} • " +
+            $"flight={(Session.ShipRepaired && ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
+            $"hyper={(Session.ShipRepaired && ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS + EXPLORATION • H - HUD\n" +
+                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS + EXPLORATION + SHIP SYSTEMS • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
@@ -6177,6 +6936,7 @@ public partial class SalvageRepairSlice : Node3D
                 stationServicesLine + "\n" +
                 baseConstructionLine + "\n" +
                 explorationLine + "\n" +
+                shipSystemsLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -6192,17 +6952,18 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
                 $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
+                $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "E - interact/select • U - ship management • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> EXPLORE -> AUTOSAVE • H - HUD\n" +
+            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> EXPLORE -> SHIP SYSTEMS -> AUTOSAVE • H - HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
             technologyLine + "\n" +
@@ -6213,6 +6974,7 @@ public partial class SalvageRepairSlice : Node3D
             stationServicesLine + "\n" +
             baseConstructionLine + "\n" +
             explorationLine + "\n" +
+            shipSystemsLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -6237,6 +6999,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
             $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
+            $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -6244,13 +7007,13 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space - move • E - interact/select • P - scanner • J - discoveries • G - base build • H - HUD • " +
+            "WASD/Space - move • E - interact/select • U - ship management • P - scanner • J - discoveries • G - base build • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • Esc - close selector/release mouse";
     }
@@ -6505,6 +7268,37 @@ public partial class SalvageRepairSlice : Node3D
             $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
             $"logWritten={(report.LogWritten ? 1 : 0)}; " +
             $"revision={report.Revision}; " +
+            $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+            $"integrity={report.Diagnostics.IntegrityResult}; " +
+            $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={report.Result}";
+    }
+
+    private static string BuildShipSystemsAcceptanceOutput(
+        ShipSystemsAcceptanceReport report)
+    {
+        return "TASK-110 ship systems acceptance " +
+            $"{(report.Passed ? "PASS" : "FAIL")}: " +
+            $"classes={report.ShipClasses}; " +
+            $"systems={report.Systems}; " +
+            $"modules={report.Modules}; " +
+            $"catalogCoverage={(report.CatalogCoverage ? 1 : 0)}; " +
+            $"classStats={(report.ClassStats ? 1 : 0)}; " +
+            $"installAll={(report.InstallAll ? 1 : 0)}; " +
+            $"slotLimits={(report.SlotLimits ? 1 : 0)}; " +
+            $"duplicateRejected={(report.DuplicateRejected ? 1 : 0)}; " +
+            $"derivedStats={(report.DerivedStats ? 1 : 0)}; " +
+            $"damageLifecycle={(report.DamageLifecycle ? 1 : 0)}; " +
+            $"repairLifecycle={(report.RepairLifecycle ? 1 : 0)}; " +
+            $"moduleDisable={(report.ModuleDisable ? 1 : 0)}; " +
+            $"flightReadiness={(report.FlightReadiness ? 1 : 0)}; " +
+            $"hyperspaceReadiness={(report.HyperspaceReadiness ? 1 : 0)}; " +
+            $"fuelLifecycle={(report.FuelLifecycle ? 1 : 0)}; " +
+            $"inventoryConservation={(report.InventoryConservation ? 1 : 0)}; " +
+            $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+            $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+            $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+            $"logWritten={(report.LogWritten ? 1 : 0)}; " +
             $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
             $"integrity={report.Diagnostics.IntegrityResult}; " +
             $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +

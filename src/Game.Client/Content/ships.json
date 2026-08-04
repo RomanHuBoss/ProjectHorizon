@@ -1,0 +1,536 @@
+{
+  "schemaVersion": 1,
+  "starterClassId": "ship.class.versatile",
+  "classes": [
+    {
+      "shipClassId": "ship.class.explorer",
+      "localizationKey": "ship.class.explorer",
+      "baseStats": {
+        "hull": 120,
+        "shield": 100,
+        "cargoCapacity": 32,
+        "fuelCapacity": 120,
+        "acceleration": 22,
+        "maxSpeed": 82,
+        "maneuverability": 75,
+        "weaponSlots": 1,
+        "technologySlots": 6,
+        "hyperdriveRange": 550,
+        "atmosphericEfficiency": 85
+      }
+    },
+    {
+      "shipClassId": "ship.class.cargo",
+      "localizationKey": "ship.class.cargo",
+      "baseStats": {
+        "hull": 170,
+        "shield": 110,
+        "cargoCapacity": 80,
+        "fuelCapacity": 160,
+        "acceleration": 14,
+        "maxSpeed": 60,
+        "maneuverability": 42,
+        "weaponSlots": 1,
+        "technologySlots": 7,
+        "hyperdriveRange": 450,
+        "atmosphericEfficiency": 65
+      }
+    },
+    {
+      "shipClassId": "ship.class.fighter",
+      "localizationKey": "ship.class.fighter",
+      "baseStats": {
+        "hull": 130,
+        "shield": 150,
+        "cargoCapacity": 18,
+        "fuelCapacity": 100,
+        "acceleration": 30,
+        "maxSpeed": 110,
+        "maneuverability": 92,
+        "weaponSlots": 4,
+        "technologySlots": 4,
+        "hyperdriveRange": 380,
+        "atmosphericEfficiency": 78
+      }
+    },
+    {
+      "shipClassId": "ship.class.versatile",
+      "localizationKey": "ship.class.versatile",
+      "baseStats": {
+        "hull": 150,
+        "shield": 125,
+        "cargoCapacity": 48,
+        "fuelCapacity": 130,
+        "acceleration": 22,
+        "maxSpeed": 85,
+        "maneuverability": 70,
+        "weaponSlots": 2,
+        "technologySlots": 6,
+        "hyperdriveRange": 480,
+        "atmosphericEfficiency": 78
+      }
+    },
+    {
+      "shipClassId": "ship.class.exotic",
+      "localizationKey": "ship.class.exotic",
+      "baseStats": {
+        "hull": 145,
+        "shield": 180,
+        "cargoCapacity": 35,
+        "fuelCapacity": 150,
+        "acceleration": 32,
+        "maxSpeed": 120,
+        "maneuverability": 88,
+        "weaponSlots": 3,
+        "technologySlots": 8,
+        "hyperdriveRange": 720,
+        "atmosphericEfficiency": 92
+      }
+    },
+    {
+      "shipClassId": "ship.class.heavy_expeditionary",
+      "localizationKey": "ship.class.heavy_expeditionary",
+      "baseStats": {
+        "hull": 240,
+        "shield": 170,
+        "cargoCapacity": 100,
+        "fuelCapacity": 220,
+        "acceleration": 12,
+        "maxSpeed": 55,
+        "maneuverability": 35,
+        "weaponSlots": 3,
+        "technologySlots": 10,
+        "hyperdriveRange": 650,
+        "atmosphericEfficiency": 55
+      }
+    }
+  ],
+  "systems": [
+    {
+      "systemId": "ship.system.hull",
+      "localizationKey": "ship.system.hull",
+      "repairDefinitionId": "component.ship.heat_shield_tile",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.shield",
+      "localizationKey": "ship.system.shield",
+      "repairDefinitionId": "component.ship.power_coupler",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.engine",
+      "localizationKey": "ship.system.engine",
+      "repairDefinitionId": "component.ship.coolant_regulator",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.impulse",
+      "localizationKey": "ship.system.impulse",
+      "repairDefinitionId": "component.ship.launch_capacitor",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.hyperdrive",
+      "localizationKey": "ship.system.hyperdrive",
+      "repairDefinitionId": "component.ship.navigation_array",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.weapon",
+      "localizationKey": "ship.system.weapon",
+      "repairDefinitionId": "component.ship.sensor_lens",
+      "repairPerUnit": 35
+    },
+    {
+      "systemId": "ship.system.landing",
+      "localizationKey": "ship.system.landing",
+      "repairDefinitionId": "component.ship.attitude_coil",
+      "repairPerUnit": 35
+    }
+  ],
+  "modules": [
+    {
+      "moduleId": "module.ship.impulse_manifold",
+      "localizationKey": "item.module.ship.impulse_manifold",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine",
+        "ship.system.impulse"
+      ],
+      "durabilityBonus": 15,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 12,
+        "maxSpeed": 5,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.maneuvering_thruster",
+      "localizationKey": "item.module.ship.maneuvering_thruster",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.impulse"
+      ],
+      "durabilityBonus": 20,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 4,
+        "maxSpeed": 0,
+        "maneuverability": 15,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.atmospheric_intake",
+      "localizationKey": "item.module.ship.atmospheric_intake",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine"
+      ],
+      "durabilityBonus": 10,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 3,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 12
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.fusion_injector",
+      "localizationKey": "item.module.ship.fusion_injector",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine"
+      ],
+      "durabilityBonus": 25,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 10,
+        "acceleration": 18,
+        "maxSpeed": 8,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.shield_emitter",
+      "localizationKey": "item.module.ship.shield_emitter",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.shield"
+      ],
+      "durabilityBonus": 30,
+      "effects": {
+        "hull": 0,
+        "shield": 30,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.deflector_array",
+      "localizationKey": "item.module.ship.deflector_array",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.shield",
+        "ship.system.hull"
+      ],
+      "durabilityBonus": 20,
+      "effects": {
+        "hull": 10,
+        "shield": 20,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.hyperspace_core",
+      "localizationKey": "item.module.ship.hyperspace_core",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hyperdrive"
+      ],
+      "durabilityBonus": 30,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 250,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": true
+    },
+    {
+      "moduleId": "module.ship.fuel_regulator",
+      "localizationKey": "item.module.ship.fuel_regulator",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine"
+      ],
+      "durabilityBonus": 15,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 30,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 4
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.oxygen_recycler",
+      "localizationKey": "item.module.ship.oxygen_recycler",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hull"
+      ],
+      "durabilityBonus": 10,
+      "effects": {
+        "hull": 8,
+        "shield": 0,
+        "cargoCapacity": 2,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.thermal_radiator",
+      "localizationKey": "item.module.ship.thermal_radiator",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine",
+        "ship.system.hull"
+      ],
+      "durabilityBonus": 15,
+      "effects": {
+        "hull": 5,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 8
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.docking_computer",
+      "localizationKey": "item.module.ship.docking_computer",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.landing"
+      ],
+      "durabilityBonus": 25,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 5,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 5
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.survey_scanner",
+      "localizationKey": "item.module.ship.survey_scanner",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hyperdrive"
+      ],
+      "durabilityBonus": 10,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 2,
+        "hyperdriveRange": 35,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.mining_laser_head",
+      "localizationKey": "item.module.ship.mining_laser_head",
+      "slotType": "Weapon",
+      "affectedSystems": [
+        "ship.system.weapon"
+      ],
+      "durabilityBonus": 25,
+      "effects": {
+        "hull": 2,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.cargo_expander",
+      "localizationKey": "item.module.ship.cargo_expander",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hull"
+      ],
+      "durabilityBonus": 10,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 24,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.hull_reinforcement",
+      "localizationKey": "item.module.ship.hull_reinforcement",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hull"
+      ],
+      "durabilityBonus": 40,
+      "effects": {
+        "hull": 40,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.reactor_control_rod",
+      "localizationKey": "item.module.ship.reactor_control_rod",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine"
+      ],
+      "durabilityBonus": 25,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 20,
+        "acceleration": 8,
+        "maxSpeed": 0,
+        "maneuverability": 0,
+        "hyperdriveRange": 0,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.quantum_comm_array",
+      "localizationKey": "item.module.ship.quantum_comm_array",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.hyperdrive"
+      ],
+      "durabilityBonus": 20,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 0,
+        "acceleration": 0,
+        "maxSpeed": 0,
+        "maneuverability": 3,
+        "hyperdriveRange": 100,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": false
+    },
+    {
+      "moduleId": "module.ship.compotium_drive_core",
+      "localizationKey": "item.module.ship.compotium_drive_core",
+      "slotType": "Technology",
+      "affectedSystems": [
+        "ship.system.engine",
+        "ship.system.hyperdrive"
+      ],
+      "durabilityBonus": 40,
+      "effects": {
+        "hull": 0,
+        "shield": 0,
+        "cargoCapacity": 0,
+        "fuelCapacity": 25,
+        "acceleration": 20,
+        "maxSpeed": 20,
+        "maneuverability": 0,
+        "hyperdriveRange": 500,
+        "atmosphericEfficiency": 0
+      },
+      "enablesHyperspace": true
+    }
+  ]
+}

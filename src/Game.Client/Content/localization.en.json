@@ -381,6 +381,19 @@
     "poi.alien_archive": "Alien archive",
     "poi.weather_observatory": "Weather observatory",
     "poi.distress_shelter": "Distress shelter",
-    "poi.underground_vault": "Underground vault"
+    "poi.underground_vault": "Underground vault",
+    "ship.class.explorer": "Explorer",
+    "ship.class.cargo": "Cargo hauler",
+    "ship.class.fighter": "Fighter",
+    "ship.class.versatile": "Versatile",
+    "ship.class.exotic": "Exotic",
+    "ship.class.heavy_expeditionary": "Heavy expeditionary",
+    "ship.system.hull": "Hull",
+    "ship.system.shield": "Shield",
+    "ship.system.engine": "Engine",
+    "ship.system.impulse": "Impulse system",
+    "ship.system.hyperdrive": "Hyperdrive",
+    "ship.system.weapon": "Weapon system",
+    "ship.system.landing": "Landing system"
   }
 }

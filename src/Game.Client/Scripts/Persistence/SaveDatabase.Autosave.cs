@@ -460,7 +460,8 @@ public sealed partial class SaveDatabase
                 AutosaveTrigger.QuestCompleted,
                 AutosaveTrigger.ShipPurchased,
                 AutosaveTrigger.BaseChanged,
-                AutosaveTrigger.DiscoveryChanged
+                AutosaveTrigger.DiscoveryChanged,
+                AutosaveTrigger.ShipChanged
             };
 
             for (int index = 0; index < eventTriggers.Length; index++)
@@ -476,10 +477,10 @@ public sealed partial class SaveDatabase
 
             SaveGameSnapshot gracefulExitSnapshot = CreateAcceptanceSnapshot(
                 slotId,
-                revision: 28,
-                playerOffset: 28.0,
-                oreQuantity: 78,
-                visitCount: 12);
+                revision: 29,
+                playerOffset: 29.0,
+                oreQuantity: 79,
+                visitCount: 13);
             await coordinator.FlushAsync(
                 AutosaveTrigger.GracefulExit,
                 gracefulExitSnapshot,
@@ -524,9 +525,9 @@ public sealed partial class SaveDatabase
                 gracefulExitFlushed &&
                 logWritten &&
                 triggerCoverage &&
-                coordinator.RequestedSaves == 8 &&
+                coordinator.RequestedSaves == 10 &&
                 coordinator.CompletedBatches == 2 &&
-                coordinator.CoalescedRequests == 6 &&
+                coordinator.CoalescedRequests == 8 &&
                 coordinator.FailedBatches == 0 &&
                 diagnostics.MaximumConcurrentWriters == 1 &&
                 integrityPassed;

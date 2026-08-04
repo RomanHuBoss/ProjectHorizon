@@ -381,6 +381,19 @@
     "poi.alien_archive": "Инопланетный архив",
     "poi.weather_observatory": "Метеорологическая обсерватория",
     "poi.distress_shelter": "Аварийное убежище",
-    "poi.underground_vault": "Подземное хранилище"
+    "poi.underground_vault": "Подземное хранилище",
+    "ship.class.explorer": "Исследовательский",
+    "ship.class.cargo": "Грузовой",
+    "ship.class.fighter": "Истребитель",
+    "ship.class.versatile": "Универсальный",
+    "ship.class.exotic": "Экзотический",
+    "ship.class.heavy_expeditionary": "Тяжёлый экспедиционный",
+    "ship.system.hull": "Корпус",
+    "ship.system.shield": "Щит",
+    "ship.system.engine": "Двигатель",
+    "ship.system.impulse": "Импульсная система",
+    "ship.system.hyperdrive": "Гипердвигатель",
+    "ship.system.weapon": "Оружейная система",
+    "ship.system.landing": "Система посадки"
   }
 }
