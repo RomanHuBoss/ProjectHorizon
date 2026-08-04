@@ -17,7 +17,8 @@ public enum AutosaveTrigger
     QuestCompleted = 4,
     ShipPurchased = 5,
     BaseChanged = 6,
-    GracefulExit = 7
+    GracefulExit = 7,
+    DiscoveryChanged = 8
 }
 
 public sealed record PlayerSaveData(
@@ -152,6 +153,19 @@ public sealed record BaseConstructionSaveData(
     IReadOnlyList<BaseConstructionStockSaveData> Stock,
     IReadOnlyList<BaseConstructionModuleSaveData> Modules);
 
+public sealed record PlanetaryPoiStateSaveData(
+    string InstanceId,
+    string PoiTypeId,
+    bool Discovered,
+    bool Resolved,
+    string CustomName);
+
+public sealed record PlanetaryExplorationSaveData(
+    long WorldSeed,
+    string RegionKey,
+    int DiscoveryPoints,
+    IReadOnlyList<PlanetaryPoiStateSaveData> Pois);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -166,7 +180,8 @@ public sealed record SaveGameSnapshot(
     ProductionQueueSaveData? ProductionQueue = null,
     ProductionQueueNetworkSaveData? ProductionQueueNetwork = null,
     StationServicesSaveData? StationServices = null,
-    BaseConstructionSaveData? BaseConstruction = null);
+    BaseConstructionSaveData? BaseConstruction = null,
+    PlanetaryExplorationSaveData? PlanetaryExploration = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

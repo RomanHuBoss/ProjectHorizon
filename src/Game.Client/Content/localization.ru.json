@@ -361,6 +361,26 @@
     "npc.trader.ilia_voss": "Илия Восс",
     "quest.frontier.ore_sample": "Проба пограничной руды",
     "quest.frontier.refined_ferrite": "Заказ на очищенный феррит",
-    "quest.frontier.water_trade": "Контракт на торговлю водяным льдом"
+    "quest.frontier.water_trade": "Контракт на торговлю водяным льдом",
+    "poi.emergency_beacon": "Аварийный маяк",
+    "poi.ship_wreck": "Обломки корабля",
+    "poi.abandoned_base": "Заброшенная база",
+    "poi.trading_outpost": "Торговый аванпост",
+    "poi.science_station": "Научная станция",
+    "poi.ancient_artifact": "Древний артефакт",
+    "poi.resource_deposit": "Месторождение ресурсов",
+    "poi.cave_entrance": "Вход в пещеру",
+    "poi.relay": "Ретранслятор",
+    "poi.industrial_site": "Промышленный объект",
+    "poi.pirate_base": "Пиратская база",
+    "poi.landing_pad": "Посадочная площадка",
+    "poi.monolith": "Монолит",
+    "poi.upgrade_capsule": "Капсула улучшения",
+    "poi.cargo_container": "Грузовой контейнер",
+    "poi.crashed_probe": "Разбившийся зонд",
+    "poi.alien_archive": "Инопланетный архив",
+    "poi.weather_observatory": "Метеорологическая обсерватория",
+    "poi.distress_shelter": "Аварийное убежище",
+    "poi.underground_vault": "Подземное хранилище"
   }
 }

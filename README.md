@@ -800,3 +800,28 @@ integrity in `save_1.production-network-hud-test.db`.
 ### Base construction closure iteration
 
 `TASK-106` adds a 50-module, 17-category data-driven base-construction runtime matching PDF section 20: cardinal snapping, overlap and disconnection rejection, per-base limits, a graph-based electric network with generators/batteries/consumers and switchable devices, static collisions, dynamic lights, dismantle refunds, autosave/cold restore, legacy fallback and F8 reset. F6 runs the isolated SQLite acceptance in parallel with the existing fourth-path regression. The coordinate overlay is preserved across detailed, compact and hidden HUD modes.
+
+### Planetary exploration and discovery closure
+
+`TASK-108` closes the Stage 1 planetary exploration loop with a strict
+`planetary_pois.json` catalog containing exactly 20 POI types, including all
+15 types required by PDF section 21. The deterministic planner evaluates
+biome, slope, height, water distance, danger, rarity, quest tags, pairwise
+spacing and vertical-slice infrastructure clearance. One physical
+`StaticBody3D` is generated for every POI type without changing planetary
+terrain geometry.
+
+Press `P` to pulse the scanner. A POI must normally be scanned before `E`
+can resolve its interaction; scan-only POIs complete during the pulse. Press
+`J` to open the persistent discovery catalog, use `Up/Down` to browse and `N`
+to assign a deterministic waypoint name to a discovered, nameable object.
+Discovery points, discovered/resolved state and custom names are saved in the
+optional `save_settings.planetary_exploration` value. SQLite schema remains
+version 2 and old saves load with an empty discovery state.
+
+`F4` preserves the complete Industry Content v2 structural acceptance and
+also runs `TASK-108` against the isolated database
+`save_1.planetary-exploration-test.db`. The test verifies 20 deterministic
+placements, environment constraints, symmetric spacing, infrastructure
+clearance, quest bias, complete scan/resolve/naming flow, cold restore, legacy
+fallback, exact round-trip, one-writer discipline and SQLite integrity.

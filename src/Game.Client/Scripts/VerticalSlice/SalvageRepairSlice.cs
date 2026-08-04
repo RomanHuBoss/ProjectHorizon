@@ -70,6 +70,11 @@ public partial class SalvageRepairSlice : Node3D
     private StationServicesRuntime? _stationServicesRuntime;
     private BaseConstructionCatalog? _baseConstructionCatalog;
     private BaseConstructionRuntime? _baseConstructionRuntime;
+    private PlanetaryPoiCatalog? _planetaryPoiCatalog;
+    private PlanetaryExplorationRuntime? _planetaryExplorationRuntime;
+    private IReadOnlyList<PlanetaryPoiPlacement> _planetaryPoiPlacements =
+        Array.Empty<PlanetaryPoiPlacement>();
+    private readonly List<PlanetaryPoiNode> _planetaryPoiNodes = new();
     private TechnologyProgression? _technologyProgression;
     private CraftingRecipeDefinition? _repairRecipe;
     private CraftingRecipeDefinition? _launchCapacitorRecipe;
@@ -90,8 +95,11 @@ public partial class SalvageRepairSlice : Node3D
     private Label? _stationServicesLabel;
     private PanelContainer? _baseConstructionPanel;
     private Label? _baseConstructionLabel;
+    private PanelContainer? _discoveryCatalogPanel;
+    private Label? _discoveryCatalogLabel;
     private Label? _playerCoordinatesLabel;
     private Node3D? _baseConstructionModulesRoot;
+    private Node3D? _planetaryPoisRoot;
     private MeshInstance3D? _baseBuildPreview;
     private Task<SaveDatabaseDiagnostics>? _initializeTask;
     private Task<SaveGameSnapshot?>? _loadTask;
@@ -111,6 +119,8 @@ public partial class SalvageRepairSlice : Node3D
         _stationServicesAcceptanceTask;
     private Task<BaseConstructionAcceptanceReport>?
         _baseConstructionAcceptanceTask;
+    private Task<PlanetaryExplorationAcceptanceReport>?
+        _planetaryExplorationAcceptanceTask;
     private Task<ChemicalProcessAcceptanceReport>?
         _chemicalProcessAcceptanceTask;
     private Task<ProductionQueueAcceptanceReport>?
@@ -138,6 +148,8 @@ public partial class SalvageRepairSlice : Node3D
         _stationServicesAcceptanceReport;
     private BaseConstructionAcceptanceReport?
         _baseConstructionAcceptanceReport;
+    private PlanetaryExplorationAcceptanceReport?
+        _planetaryExplorationAcceptanceReport;
     private ChemicalProcessAcceptanceReport?
         _chemicalProcessAcceptanceReport;
     private ProductionQueueAcceptanceReport?
@@ -172,6 +184,7 @@ public partial class SalvageRepairSlice : Node3D
     private string _technologySelectorAcceptanceHud = "READY";
     private string _stationServicesAcceptanceHud = "READY";
     private string _baseConstructionAcceptanceHud = "READY";
+    private string _planetaryExplorationAcceptanceHud = "READY";
     private string _chemicalProcessAcceptanceHud = "READY";
     private string _productionQueueAcceptanceHud = "READY";
     private string _queueTerminalAcceptanceHud = "READY";
@@ -193,6 +206,9 @@ public partial class SalvageRepairSlice : Node3D
     private int _baseBuildIndex;
     private int _baseBuildRotation;
     private string _baseBuildFeedback = "";
+    private bool _discoveryCatalogOpen;
+    private int _discoveryCatalogIndex;
+    private string _discoveryCatalogFeedback = "";
     private string _craftingInteractorName = "unknown";
     private string _lastDomainEvent = "none";
 
@@ -221,6 +237,16 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionRuntime ??
         throw new InvalidOperationException(
             "Base construction runtime is unavailable.");
+
+    private PlanetaryPoiCatalog PlanetaryPoiCatalog =>
+        _planetaryPoiCatalog ??
+        throw new InvalidOperationException(
+            "Planetary POI catalog is unavailable.");
+
+    private PlanetaryExplorationRuntime PlanetaryExploration =>
+        _planetaryExplorationRuntime ??
+        throw new InvalidOperationException(
+            "Planetary exploration runtime is unavailable.");
 
     private TechnologyProgression TechnologyProgress =>
         _technologyProgression ??
@@ -301,10 +327,16 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/BaseConstruction");
         _baseConstructionLabel = GetNodeOrNull<Label>(
             "Hud/BaseConstruction/Label");
+        _discoveryCatalogPanel = GetNodeOrNull<PanelContainer>(
+            "Hud/DiscoveryCatalog");
+        _discoveryCatalogLabel = GetNodeOrNull<Label>(
+            "Hud/DiscoveryCatalog/Label");
         _playerCoordinatesLabel = GetNodeOrNull<Label>(
             "Hud/PlayerCoordinates/Label");
         _baseConstructionModulesRoot = GetNodeOrNull<Node3D>(
             "Gameplay/BaseConstructionModules");
+        _planetaryPoisRoot = GetNodeOrNull<Node3D>(
+            "Gameplay/PlanetaryPois");
         _baseBuildPreview = GetNodeOrNull<MeshInstance3D>(
             "Gameplay/BaseBuildPreview");
         _shipTerminal = GetNodeOrNull<StarterShipRepairTerminal>(
@@ -316,8 +348,10 @@ public partial class SalvageRepairSlice : Node3D
             _hudHiddenHint is null || _recipeSelectorPanel is null ||
             _recipeSelectorLabel is null || _stationServicesPanel is null ||
             _stationServicesLabel is null || _baseConstructionPanel is null ||
-            _baseConstructionLabel is null || _playerCoordinatesLabel is null ||
-            _baseConstructionModulesRoot is null || _baseBuildPreview is null ||
+            _baseConstructionLabel is null || _discoveryCatalogPanel is null ||
+            _discoveryCatalogLabel is null || _playerCoordinatesLabel is null ||
+            _baseConstructionModulesRoot is null || _planetaryPoisRoot is null ||
+            _baseBuildPreview is null ||
             _shipTerminal is null || _stationServicesNpc is null ||
             _player is null)
         {
@@ -330,6 +364,10 @@ public partial class SalvageRepairSlice : Node3D
             LoadStationServicesCatalog(catalog);
         BaseConstructionCatalog baseConstructionCatalog =
             LoadBaseConstructionCatalog(catalog);
+        PlanetaryPoiCatalog planetaryPoiCatalog =
+            LoadPlanetaryPoiCatalog();
+        IReadOnlyList<PlanetaryPoiPlacement> planetaryPoiPlacements =
+            PlanetaryPoiPlanner.Plan(planetaryPoiCatalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
@@ -377,6 +415,11 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionCatalog = baseConstructionCatalog;
         _baseConstructionRuntime = new BaseConstructionRuntime(
             baseConstructionCatalog);
+        _planetaryPoiCatalog = planetaryPoiCatalog;
+        _planetaryPoiPlacements = planetaryPoiPlacements;
+        _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
+            planetaryPoiCatalog,
+            planetaryPoiPlacements);
         _technologyProgression = technologyProgression;
         _repairRecipe = repairRecipe;
         _launchCapacitorRecipe = launchCapacitorRecipe;
@@ -432,6 +475,7 @@ public partial class SalvageRepairSlice : Node3D
             saveData: null,
             legacySaveData: null);
         RebuildBaseConstructionScene();
+        RebuildPlanetaryPoiScene();
 
         string userDirectory = ProjectSettings.GlobalizePath("user://");
         string databasePath = Path.Combine(
@@ -468,7 +512,8 @@ public partial class SalvageRepairSlice : Node3D
             "Content v2 structural acceptance, F5 for " +
             "the playable runtime matrix, F6 for base construction plus legacy " +
             "regression, F9/F10/F11/F12 for regressions, F7 for complete " +
-            "resource acceptance or F8 to reset. Press G for base build mode.");
+            "resource acceptance or F8 to reset. Press G for base build mode, " +
+            "P for scanner pulse and J for the discovery catalog.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -516,6 +561,14 @@ public partial class SalvageRepairSlice : Node3D
             $"{BaseConstructionCatalog.Limits.MaximumDynamicLights}; " +
             "snap=cardinal; power=graph; persistence=enabled; F6=acceptance.");
         GD.Print(
+            "TASK-108 planetary exploration READY: " +
+            $"types={PlanetaryPoiCatalog.Definitions.Count}; " +
+            $"placements={_planetaryPoiPlacements.Count}; " +
+            $"seed={PlanetaryPoiCatalog.WorldSeed}; " +
+            $"region={PlanetaryPoiCatalog.RegionKey}; " +
+            "scanner=P; catalog=J; placement=constraint-aware; " +
+            "discoveries=persistent; F4=acceptance.");
+        GD.Print(
             "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -553,6 +606,7 @@ public partial class SalvageRepairSlice : Node3D
         PollThirdCraftingAcceptanceTask();
         PollFourthCraftingAcceptanceTask();
         PollBaseConstructionAcceptanceTask();
+        PollPlanetaryExplorationAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -617,6 +671,35 @@ public partial class SalvageRepairSlice : Node3D
             else if (Matches(physical, logical, Key.T))
             {
                 ToggleTargetBaseModule();
+            }
+
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (_discoveryCatalogOpen)
+        {
+            if (Matches(physical, logical, Key.Escape) ||
+                Matches(physical, logical, Key.J))
+            {
+                CloseDiscoveryCatalog("discovery catalog closed");
+            }
+            else if (Matches(physical, logical, Key.Up))
+            {
+                MoveDiscoveryCatalogSelection(-1);
+            }
+            else if (Matches(physical, logical, Key.Down))
+            {
+                MoveDiscoveryCatalogSelection(1);
+            }
+            else if (Matches(physical, logical, Key.P))
+            {
+                PulsePlanetaryScanner();
+                UpdateDiscoveryCatalogPanel();
+            }
+            else if (Matches(physical, logical, Key.N))
+            {
+                NameSelectedDiscovery();
             }
 
             GetViewport().SetInputAsHandled();
@@ -714,6 +797,24 @@ public partial class SalvageRepairSlice : Node3D
                 ConfirmSelectorSelection();
             }
 
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (Matches(physical, logical, Key.J) &&
+            (_state == SalvageRepairSliceState.Ready ||
+             _state == SalvageRepairSliceState.Passed))
+        {
+            OpenDiscoveryCatalog();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (Matches(physical, logical, Key.P) &&
+            (_state == SalvageRepairSliceState.Ready ||
+             _state == SalvageRepairSliceState.Passed))
+        {
+            PulsePlanetaryScanner();
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -2885,6 +2986,25 @@ public partial class SalvageRepairSlice : Node3D
         return catalog;
     }
 
+    private static PlanetaryPoiCatalog LoadPlanetaryPoiCatalog()
+    {
+        const string path = "res://Content/planetary_pois.json";
+        string json = Godot.FileAccess.GetFileAsString(path);
+        PlanetaryPoiCatalog catalog = PlanetaryPoiCatalog.LoadFromJson(json);
+        int categories = catalog.Definitions.Values
+            .Select(definition => definition.Category)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        GD.Print(
+            "TASK-108 planetary POI catalog READY: " +
+            $"schema={catalog.SchemaVersion}; " +
+            $"types={catalog.Definitions.Count}; categories={categories}; " +
+            $"seed={catalog.WorldSeed}; region={catalog.RegionKey}; " +
+            $"spacing={catalog.MinimumPoiSpacing.ToString("0.#", CultureInfo.InvariantCulture)}; " +
+            "constraints=biome+slope+height+water+danger+rarity+quests.");
+        return catalog;
+    }
+
     private void InitializeGameplayProductionNetwork(
         ProductionQueueNetworkSaveData? saveData,
         ProductionQueueSaveData? legacySaveData)
@@ -3165,6 +3285,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         CloseRecipeSelector();
         CloseStationServices();
+        CloseDiscoveryCatalog();
         CloseBaseBuildMode();
         _baseBuildMode = true;
         IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
@@ -3581,6 +3702,319 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void RebuildPlanetaryPoiScene()
+    {
+        if (_planetaryPoisRoot is null ||
+            _planetaryExplorationRuntime is null ||
+            _planetaryPoiCatalog is null)
+        {
+            return;
+        }
+
+        _planetaryPoiNodes.Clear();
+        foreach (Node child in _planetaryPoisRoot.GetChildren())
+        {
+            _planetaryPoisRoot.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        foreach (PlanetaryPoiRuntimeState state in PlanetaryExploration.States)
+        {
+            PlanetaryPoiNode node = new();
+            node.Configure(state.Definition, state.Placement);
+            _planetaryPoisRoot.AddChild(node);
+            node.ApplyState(state.Discovered, state.Resolved);
+            _planetaryPoiNodes.Add(node);
+        }
+
+        _planetaryPoiNodes.Sort((left, right) => string.Compare(
+            left.InstanceId,
+            right.InstanceId,
+            StringComparison.Ordinal));
+    }
+
+    private void ApplyPlanetaryPoiStateToScene()
+    {
+        if (_planetaryExplorationRuntime is null)
+        {
+            return;
+        }
+
+        foreach (PlanetaryPoiNode node in _planetaryPoiNodes)
+        {
+            PlanetaryPoiRuntimeState state = PlanetaryExploration.GetState(
+                node.InstanceId);
+            node.ApplyState(state.Discovered, state.Resolved);
+        }
+
+        if (_discoveryCatalogOpen)
+        {
+            UpdateDiscoveryCatalogPanel();
+        }
+    }
+
+    private void PulsePlanetaryScanner()
+    {
+        if (_player is null || _planetaryPoiNodes.Count == 0)
+        {
+            _status = "planetary scanner unavailable";
+            return;
+        }
+
+        (PlanetaryPoiNode Node, float Distance)[] ordered = _planetaryPoiNodes
+            .Select(node => (
+                Node: node,
+                Distance: _player.GlobalPosition.DistanceTo(
+                    node.GlobalPosition)))
+            .OrderBy(entry => entry.Distance)
+            .ThenBy(entry => entry.Node.InstanceId, StringComparer.Ordinal)
+            .ToArray();
+        (PlanetaryPoiNode Node, float Distance)[] undiscoveredInRange = ordered
+            .Where(entry =>
+                !PlanetaryExploration.GetState(entry.Node.InstanceId).Discovered &&
+                entry.Distance <= entry.Node.ScanRange)
+            .ToArray();
+        (PlanetaryPoiNode Node, float Distance) nearest =
+            undiscoveredInRange.Length > 0
+                ? undiscoveredInRange[0]
+                : ordered[0];
+
+        if (nearest.Distance > nearest.Node.ScanRange)
+        {
+            _status =
+                $"scanner: nearest POI {nearest.Node.PoiTypeId} is " +
+                $"{nearest.Distance:0.0}m away; range={nearest.Node.ScanRange:0.0}m";
+            _lastDomainEvent =
+                $"PoiScanOutOfRange({nearest.Node.InstanceId})";
+            return;
+        }
+
+        PlanetaryPoiScanResult result = PlanetaryExploration.Scan(
+            nearest.Node.InstanceId,
+            out string message);
+        _status = $"scanner: {message}";
+        _lastDomainEvent =
+            $"PoiScanned({nearest.Node.InstanceId}, result={result})";
+        ApplyPlanetaryPoiStateToScene();
+        if (result == PlanetaryPoiScanResult.Discovered)
+        {
+            QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);
+        }
+
+        GD.Print(
+            "TASK-108 player scanner PASS: " +
+            $"instance={nearest.Node.InstanceId}; " +
+            $"type={nearest.Node.PoiTypeId}; " +
+            $"distance={nearest.Distance.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+            $"result={result}; " +
+            $"discovered={PlanetaryExploration.DiscoveredCount}/" +
+            $"{PlanetaryPoiCatalog.Definitions.Count}; " +
+            $"resolved={PlanetaryExploration.ResolvedCount}; " +
+            $"points={PlanetaryExploration.DiscoveryPoints}.");
+    }
+
+    public bool TryInteractPlanetaryPoi(
+        PlanetaryPoiNode node,
+        Node3D interactor)
+    {
+        ArgumentNullException.ThrowIfNull(node);
+        ArgumentNullException.ThrowIfNull(interactor);
+        PlanetaryPoiInteractionResult result = PlanetaryExploration.Interact(
+            node.InstanceId,
+            out string message);
+        _status = message;
+        _lastDomainEvent =
+            $"PoiInteraction({node.InstanceId}, result={result})";
+        ApplyPlanetaryPoiStateToScene();
+        if (result == PlanetaryPoiInteractionResult.Resolved)
+        {
+            QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);
+        }
+
+        string line =
+            "TASK-108 player POI interaction " +
+            $"{(result == PlanetaryPoiInteractionResult.Resolved ? "PASS" : "BLOCKED")}: " +
+            $"instance={node.InstanceId}; type={node.PoiTypeId}; " +
+            $"result={result}; discovered={PlanetaryExploration.DiscoveredCount}; " +
+            $"resolved={PlanetaryExploration.ResolvedCount}; " +
+            $"points={PlanetaryExploration.DiscoveryPoints}; " +
+            $"interactor={interactor.Name}.";
+        if (result == PlanetaryPoiInteractionResult.Resolved ||
+            result == PlanetaryPoiInteractionResult.AlreadyResolved)
+        {
+            GD.Print(line);
+        }
+        else
+        {
+            GD.PushWarning(line);
+        }
+
+        return result == PlanetaryPoiInteractionResult.Resolved;
+    }
+
+    private void OpenDiscoveryCatalog()
+    {
+        CloseRecipeSelector();
+        CloseStationServices();
+        CloseBaseBuildMode();
+        _discoveryCatalogOpen = true;
+        _discoveryCatalogIndex = Math.Clamp(
+            _discoveryCatalogIndex,
+            0,
+            Math.Max(0, PlanetaryExploration.States.Count - 1));
+        _discoveryCatalogFeedback = string.Empty;
+        if (_discoveryCatalogPanel is not null)
+        {
+            _discoveryCatalogPanel.Visible = true;
+        }
+
+        UpdateDiscoveryCatalogPanel();
+        _status = "discovery catalog opened";
+    }
+
+    private void CloseDiscoveryCatalog(string status = "")
+    {
+        _discoveryCatalogOpen = false;
+        _discoveryCatalogFeedback = string.Empty;
+        if (_discoveryCatalogPanel is not null)
+        {
+            _discoveryCatalogPanel.Visible = false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            _status = status;
+        }
+    }
+
+    private void MoveDiscoveryCatalogSelection(int delta)
+    {
+        int count = PlanetaryExploration.States.Count;
+        if (count <= 0)
+        {
+            _discoveryCatalogIndex = 0;
+            return;
+        }
+
+        _discoveryCatalogIndex = (_discoveryCatalogIndex + delta) % count;
+        if (_discoveryCatalogIndex < 0)
+        {
+            _discoveryCatalogIndex += count;
+        }
+
+        _discoveryCatalogFeedback = string.Empty;
+        UpdateDiscoveryCatalogPanel();
+    }
+
+    private void NameSelectedDiscovery()
+    {
+        IReadOnlyList<PlanetaryPoiRuntimeState> states =
+            GetDiscoveryCatalogStates();
+        if (states.Count == 0)
+        {
+            return;
+        }
+
+        PlanetaryPoiRuntimeState selected = states[Math.Clamp(
+            _discoveryCatalogIndex,
+            0,
+            states.Count - 1)];
+        string generatedName = $"Waypoint {_discoveryCatalogIndex + 1:00}";
+        bool renamed = PlanetaryExploration.TryRename(
+            selected.Placement.InstanceId,
+            generatedName,
+            out string message);
+        _discoveryCatalogFeedback = message;
+        _status = message;
+        if (renamed)
+        {
+            QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);
+            GD.Print(
+                "TASK-108 player POI naming PASS: " +
+                $"instance={selected.Placement.InstanceId}; " +
+                $"name={generatedName}; named={PlanetaryExploration.NamedCount}.");
+        }
+
+        UpdateDiscoveryCatalogPanel();
+    }
+
+    private IReadOnlyList<PlanetaryPoiRuntimeState> GetDiscoveryCatalogStates()
+    {
+        return PlanetaryExploration.States
+            .OrderBy(state => state.Definition.Category, StringComparer.Ordinal)
+            .ThenBy(state => state.Definition.PoiTypeId, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private void UpdateDiscoveryCatalogPanel()
+    {
+        if (_discoveryCatalogLabel is null || !_discoveryCatalogOpen)
+        {
+            return;
+        }
+
+        IReadOnlyList<PlanetaryPoiRuntimeState> states =
+            GetDiscoveryCatalogStates();
+        if (states.Count == 0)
+        {
+            _discoveryCatalogLabel.Text = "DISCOVERY CATALOG\nNo POIs available.";
+            return;
+        }
+
+        _discoveryCatalogIndex = Math.Clamp(
+            _discoveryCatalogIndex,
+            0,
+            states.Count - 1);
+        PlanetaryPoiRuntimeState selected = states[_discoveryCatalogIndex];
+        List<string> lines = new()
+        {
+            "DISCOVERY CATALOG — planetary POIs",
+            $"Discovered {PlanetaryExploration.DiscoveredCount}/{states.Count} | " +
+            $"Resolved {PlanetaryExploration.ResolvedCount}/{states.Count} | " +
+            $"Named {PlanetaryExploration.NamedCount} | " +
+            $"Points {PlanetaryExploration.DiscoveryPoints}",
+            "P scanner pulse | Up/Down select | N assign waypoint name | J/Esc close",
+            string.Empty
+        };
+        int start = Math.Max(0, _discoveryCatalogIndex - 7);
+        int end = Math.Min(states.Count, start + 15);
+        start = Math.Max(0, end - 15);
+        for (int index = start; index < end; index++)
+        {
+            PlanetaryPoiRuntimeState state = states[index];
+            string marker = index == _discoveryCatalogIndex ? ">" : " ";
+            string status = state.Resolved
+                ? "RESOLVED"
+                : state.Discovered ? "DISCOVERED" : "UNKNOWN";
+            string name = state.Discovered
+                ? PlanetaryExploration.DisplayName(state)
+                : "unidentified signal";
+            lines.Add(
+                $"{marker} [{status,-10}] {name} | {state.Definition.Category}");
+        }
+
+        lines.Add(string.Empty);
+        lines.Add(
+            $"Selected: {(selected.Discovered ? PlanetaryExploration.DisplayName(selected) : "unknown")} | " +
+            $"type={selected.Definition.PoiTypeId} | interaction={selected.Definition.InteractionKind}");
+        lines.Add(
+            $"Position: X={selected.Placement.PositionX:0.0} " +
+            $"Z={selected.Placement.PositionZ:0.0} | " +
+            $"scan={selected.Definition.ScanRange:0.0}m | rarity={selected.Definition.Rarity}");
+        lines.Add(
+            $"Environment: biome={selected.Placement.Environment.BiomeId} | " +
+            $"slope={selected.Placement.Environment.SlopeDegrees:0.0}° | " +
+            $"height={selected.Placement.Environment.Height:0.0} | " +
+            $"water={selected.Placement.Environment.DistanceToWater:0.0}m | " +
+            $"danger={selected.Placement.Environment.Danger}");
+        if (!string.IsNullOrWhiteSpace(_discoveryCatalogFeedback))
+        {
+            lines.Add($"Result: {_discoveryCatalogFeedback}");
+        }
+
+        _discoveryCatalogLabel.Text = string.Join("\n", lines);
+    }
+
     private bool CanStartCommand()
     {
         return _database is not null &&
@@ -3599,6 +4033,7 @@ public partial class SalvageRepairSlice : Node3D
             _technologySelectorAcceptanceTask is null &&
             _stationServicesAcceptanceTask is null &&
             _baseConstructionAcceptanceTask is null &&
+            _planetaryExplorationAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -3608,6 +4043,7 @@ public partial class SalvageRepairSlice : Node3D
             _selectorStation is null &&
             !_stationServicesOpen &&
             !_baseBuildMode &&
+            !_discoveryCatalogOpen &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -3659,6 +4095,35 @@ public partial class SalvageRepairSlice : Node3D
         {
             GD.PushError(line);
         }
+
+        BeginPlanetaryExplorationAcceptance();
+    }
+
+    private void BeginPlanetaryExplorationAcceptance()
+    {
+        if (_database is null)
+        {
+            return;
+        }
+
+        string directory = Path.GetDirectoryName(_database.DatabasePath) ??
+            throw new InvalidOperationException(
+                "Vertical slice database directory could not be resolved.");
+        string testPath = Path.Combine(
+            directory,
+            "save_1.planetary-exploration-test.db");
+        _state = SalvageRepairSliceState.Testing;
+        _status = "TASK-080/TASK-108 catalog and exploration acceptance running";
+        _planetaryExplorationAcceptanceHud = "RUNNING";
+        _planetaryExplorationAcceptanceReport = null;
+        _planetaryExplorationAcceptanceTask =
+            PlanetaryExplorationAcceptanceRunner.RunAsync(
+                testPath,
+                SlotId,
+                ContentCatalog,
+                PlanetaryPoiCatalog,
+                RepairRecipe,
+                _lifetimeCancellation.Token);
     }
 
     private void BeginAcceptance()
@@ -4036,7 +4501,8 @@ public partial class SalvageRepairSlice : Node3D
             productionQueueNetwork:
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
-            baseConstruction: BaseConstruction.CreateSaveData());
+            baseConstruction: BaseConstruction.CreateSaveData(),
+            planetaryExploration: PlanetaryExploration.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -4080,6 +4546,7 @@ public partial class SalvageRepairSlice : Node3D
             _technologySelectorAcceptanceTask is not null ||
             _stationServicesAcceptanceTask is not null ||
             _baseConstructionAcceptanceTask is not null ||
+            _planetaryExplorationAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -4106,7 +4573,8 @@ public partial class SalvageRepairSlice : Node3D
             productionQueueNetwork:
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
-            baseConstruction: BaseConstruction.CreateSaveData());
+            baseConstruction: BaseConstruction.CreateSaveData(),
+            planetaryExploration: PlanetaryExploration.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -4124,7 +4592,10 @@ public partial class SalvageRepairSlice : Node3D
                     .ToString("0.###", CultureInfo.InvariantCulture))}; " +
             $"baseModules={BaseConstruction.ModuleCount}; " +
             $"basePower={BaseConstruction.Power.Generation.ToString("0.###", CultureInfo.InvariantCulture)}/" +
-            $"{BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}.");
+            $"{BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"discoveries={PlanetaryExploration.DiscoveredCount}/" +
+            $"{PlanetaryPoiCatalog.Definitions.Count}; " +
+            $"resolvedPois={PlanetaryExploration.ResolvedCount}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -4185,6 +4656,10 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionRuntime = new BaseConstructionRuntime(
                 BaseConstructionCatalog,
                 snapshot?.BaseConstruction);
+            _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
+                PlanetaryPoiCatalog,
+                _planetaryPoiPlacements,
+                snapshot?.PlanetaryExploration);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -4197,7 +4672,9 @@ public partial class SalvageRepairSlice : Node3D
             CloseRecipeSelector();
             CloseStationServices();
             CloseBaseBuildMode();
+            CloseDiscoveryCatalog();
             RebuildBaseConstructionScene();
+            ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -4231,6 +4708,13 @@ public partial class SalvageRepairSlice : Node3D
                 $"consumption={BaseConstruction.Power.Consumption.ToString("0.###", CultureInfo.InvariantCulture)}; " +
                 $"battery={BaseConstruction.StoredEnergy.ToString("0.###", CultureInfo.InvariantCulture)}; " +
                 $"legacyFallback={(snapshot?.BaseConstruction is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-108 planetary exploration restore PASS: " +
+                $"discovered={PlanetaryExploration.DiscoveredCount}; " +
+                $"resolved={PlanetaryExploration.ResolvedCount}; " +
+                $"named={PlanetaryExploration.NamedCount}; " +
+                $"points={PlanetaryExploration.DiscoveryPoints}; " +
+                $"legacyFallback={(snapshot?.PlanetaryExploration is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -4292,12 +4776,17 @@ public partial class SalvageRepairSlice : Node3D
                 StationServicesAcceptanceRunner.NpcId);
             _baseConstructionRuntime = new BaseConstructionRuntime(
                 BaseConstructionCatalog);
+            _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
+                PlanetaryPoiCatalog,
+                _planetaryPoiPlacements);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
             CloseStationServices();
             CloseBaseBuildMode();
+            CloseDiscoveryCatalog();
             RebuildBaseConstructionScene();
+            ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
@@ -4646,6 +5135,81 @@ public partial class SalvageRepairSlice : Node3D
         catch (Exception exception)
         {
             Fail("fourth crafting path acceptance", exception);
+        }
+    }
+
+    private void PollPlanetaryExplorationAcceptanceTask()
+    {
+        if (_planetaryExplorationAcceptanceTask is null ||
+            !_planetaryExplorationAcceptanceTask.IsCompleted)
+        {
+            return;
+        }
+
+        Task<PlanetaryExplorationAcceptanceReport> task =
+            _planetaryExplorationAcceptanceTask;
+        _planetaryExplorationAcceptanceTask = null;
+        try
+        {
+            _planetaryExplorationAcceptanceReport =
+                task.GetAwaiter().GetResult();
+            PlanetaryExplorationAcceptanceReport report =
+                _planetaryExplorationAcceptanceReport;
+            _planetaryExplorationAcceptanceHud = report.Passed
+                ? $"PASS types={report.PoiTypes}, " +
+                  $"placements={report.Placements}, " +
+                  $"deterministic={(report.Deterministic ? 1 : 0)}, " +
+                  $"constraints={(report.Constraints ? 1 : 0)}, " +
+                  $"spacing={(report.Spacing ? 1 : 0)}, " +
+                  $"questBias={(report.QuestBias ? 1 : 0)}, " +
+                  $"clearance={(report.InfrastructureClearance ? 1 : 0)}, " +
+                  $"scan={(report.ScanAll ? 1 : 0)}, " +
+                  $"resolve={(report.ResolveAll ? 1 : 0)}, " +
+                  $"naming={(report.Naming ? 1 : 0)}, " +
+                  $"restore={(report.ColdRestore ? 1 : 0)}, " +
+                  $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
+                : $"FAIL {report.Result}";
+            bool industryPassed =
+                _industryCatalogAcceptanceHud.StartsWith(
+                    "PASS",
+                    StringComparison.Ordinal);
+            _state = report.Passed && industryPassed
+                ? SalvageRepairSliceState.Passed
+                : SalvageRepairSliceState.Failed;
+            _status = report.Result;
+            string output =
+                "TASK-108 planetary exploration acceptance " +
+                $"{(report.Passed ? "PASS" : "FAIL")}: " +
+                $"poiTypes={report.PoiTypes}; " +
+                $"placements={report.Placements}; " +
+                $"deterministic={(report.Deterministic ? 1 : 0)}; " +
+                $"constraints={(report.Constraints ? 1 : 0)}; " +
+                $"spacing={(report.Spacing ? 1 : 0)}; " +
+                $"questBias={(report.QuestBias ? 1 : 0)}; " +
+                $"infrastructureClearance={(report.InfrastructureClearance ? 1 : 0)}; " +
+                $"scanAll={(report.ScanAll ? 1 : 0)}; " +
+                $"resolveAll={(report.ResolveAll ? 1 : 0)}; " +
+                $"naming={(report.Naming ? 1 : 0)}; " +
+                $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+                $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+                $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
+                $"logWritten={(report.LogWritten ? 1 : 0)}; " +
+                $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
+                $"integrity={report.Diagnostics.IntegrityResult}; " +
+                $"elapsedMs={report.ElapsedMilliseconds.ToString("0.0", CultureInfo.InvariantCulture)}; " +
+                $"result={report.Result}";
+            if (report.Passed)
+            {
+                GD.Print(output);
+            }
+            else
+            {
+                GD.PushError(output);
+            }
+        }
+        catch (Exception exception)
+        {
+            Fail("planetary exploration acceptance", exception);
         }
     }
 
@@ -5420,6 +5984,11 @@ public partial class SalvageRepairSlice : Node3D
             UpdateBaseConstructionPanel();
         }
 
+        if (_discoveryCatalogOpen)
+        {
+            UpdateDiscoveryCatalogPanel();
+        }
+
         string databaseLine = _diagnostics is null
             ? "DB: initializing"
             : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
@@ -5533,11 +6102,17 @@ public partial class SalvageRepairSlice : Node3D
             $"NPC={StationServices.NpcId}";
         string baseConstructionLine =
             $"Base construction: {BaseConstruction.BuildSummary()}";
+        string explorationLine =
+            $"Exploration: POIs={PlanetaryPoiCatalog.Definitions.Count} • " +
+            $"discovered={PlanetaryExploration.DiscoveredCount} • " +
+            $"resolved={PlanetaryExploration.ResolvedCount} • " +
+            $"named={PlanetaryExploration.NamedCount} • " +
+            $"points={PlanetaryExploration.DiscoveryPoints} • scanner=P • catalog=J";
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS • H - HUD\n" +
+                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS + EXPLORATION • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
@@ -5546,6 +6121,7 @@ public partial class SalvageRepairSlice : Node3D
                 compactStationsLine + "\n" +
                 stationServicesLine + "\n" +
                 baseConstructionLine + "\n" +
+                explorationLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -5559,18 +6135,19 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
                 $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
                 $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
+                $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "E - interact/select • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4/F5 - catalogs • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> AUTOSAVE • H - HUD\n" +
+            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> EXPLORE -> AUTOSAVE • H - HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
             technologyLine + "\n" +
@@ -5580,6 +6157,7 @@ public partial class SalvageRepairSlice : Node3D
             detailedStationsLine + "\n" +
             stationServicesLine + "\n" +
             baseConstructionLine + "\n" +
+            explorationLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -5602,6 +6180,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
             $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
             $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
+            $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
@@ -5610,12 +6189,12 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space - move • E - interact/select • G - base build • H - HUD • " +
+            "WASD/Space - move • E - interact/select • P - scanner • J - discoveries • G - base build • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
-            "F3 - research + station services acceptance • F4 - all 128 recipes • " +
+            "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
             "F5 - runtime matrix • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • Esc - close selector/release mouse";

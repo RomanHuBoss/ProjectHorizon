@@ -459,7 +459,8 @@ public sealed partial class SaveDatabase
                 AutosaveTrigger.Hyperspace,
                 AutosaveTrigger.QuestCompleted,
                 AutosaveTrigger.ShipPurchased,
-                AutosaveTrigger.BaseChanged
+                AutosaveTrigger.BaseChanged,
+                AutosaveTrigger.DiscoveryChanged
             };
 
             for (int index = 0; index < eventTriggers.Length; index++)
@@ -475,10 +476,10 @@ public sealed partial class SaveDatabase
 
             SaveGameSnapshot gracefulExitSnapshot = CreateAcceptanceSnapshot(
                 slotId,
-                revision: 27,
-                playerOffset: 27.0,
-                oreQuantity: 77,
-                visitCount: 11);
+                revision: 28,
+                playerOffset: 28.0,
+                oreQuantity: 78,
+                visitCount: 12);
             await coordinator.FlushAsync(
                 AutosaveTrigger.GracefulExit,
                 gracefulExitSnapshot,

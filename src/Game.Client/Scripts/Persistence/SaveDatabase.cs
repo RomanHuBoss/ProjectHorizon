@@ -510,6 +510,32 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        PlanetaryExplorationSaveData? expectedExploration =
+            expected.PlanetaryExploration;
+        PlanetaryExplorationSaveData? actualExploration =
+            actual.PlanetaryExploration;
+        if ((expectedExploration is null) != (actualExploration is null))
+        {
+            mismatch = "planetary_exploration presence differs";
+            return false;
+        }
+
+        if (expectedExploration is not null && actualExploration is not null)
+        {
+            PlanetaryExplorationSaveData orderedExpected =
+                CanonicalizePlanetaryExploration(expectedExploration);
+            PlanetaryExplorationSaveData orderedActual =
+                CanonicalizePlanetaryExploration(actualExploration);
+            if (!string.Equals(
+                JsonSerializer.Serialize(orderedExpected),
+                JsonSerializer.Serialize(orderedActual),
+                StringComparison.Ordinal))
+            {
+                mismatch = "planetary_exploration differs";
+                return false;
+            }
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -930,7 +956,7 @@ public sealed partial class SaveDatabase : IDisposable
             "setting_key IN ('research_points', 'unlocked_technologies', " +
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
-            "'base_construction');",
+            "'base_construction', 'planetary_exploration');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1007,6 +1033,20 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeBaseConstruction(snapshot.BaseConstruction))));
+        }
+
+        if (snapshot.PlanetaryExploration is not null)
+        {
+            ValidatePlanetaryExploration(snapshot.PlanetaryExploration);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'planetary_exploration', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizePlanetaryExploration(
+                        snapshot.PlanetaryExploration))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1248,6 +1288,7 @@ public sealed partial class SaveDatabase : IDisposable
         ProductionQueueNetworkSaveData? productionQueueNetwork = null;
         StationServicesSaveData? stationServices = null;
         BaseConstructionSaveData? baseConstruction = null;
+        PlanetaryExplorationSaveData? planetaryExploration = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1258,7 +1299,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "('research_points', 'unlocked_technologies', " +
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
-                "'base_construction') " +
+                "'base_construction', 'planetary_exploration') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1402,6 +1443,32 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "planetary_exploration",
+            out string? planetaryExplorationJson))
+        {
+            if (string.IsNullOrWhiteSpace(planetaryExplorationJson))
+            {
+                throw new InvalidDataException(
+                    "planetary_exploration setting is empty.");
+            }
+
+            try
+            {
+                planetaryExploration = JsonSerializer.Deserialize<
+                    PlanetaryExplorationSaveData>(planetaryExplorationJson) ??
+                    throw new InvalidDataException(
+                        "planetary_exploration setting deserialized to null.");
+                ValidatePlanetaryExploration(planetaryExploration);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "planetary_exploration setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1493,7 +1560,8 @@ public sealed partial class SaveDatabase : IDisposable
             productionQueue,
             productionQueueNetwork,
             stationServices,
-            baseConstruction);
+            baseConstruction,
+            planetaryExploration);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -1611,6 +1679,49 @@ public sealed partial class SaveDatabase : IDisposable
             {
                 throw new InvalidDataException(
                     "base_construction contains invalid or duplicate modules.");
+            }
+        }
+    }
+
+    private static PlanetaryExplorationSaveData
+        CanonicalizePlanetaryExploration(
+            PlanetaryExplorationSaveData exploration)
+    {
+        return exploration with
+        {
+            Pois = exploration.Pois
+                .OrderBy(state => state.InstanceId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidatePlanetaryExploration(
+        PlanetaryExplorationSaveData exploration)
+    {
+        ArgumentNullException.ThrowIfNull(exploration);
+        if (exploration.WorldSeed <= 0 ||
+            !GameContentCatalog.IsStableId(exploration.RegionKey) ||
+            exploration.DiscoveryPoints < 0 ||
+            exploration.Pois is null ||
+            exploration.Pois.Count > 10000)
+        {
+            throw new InvalidDataException(
+                "planetary_exploration contains invalid identity or scalar values.");
+        }
+
+        HashSet<string> instanceIds = new(StringComparer.Ordinal);
+        foreach (PlanetaryPoiStateSaveData state in exploration.Pois)
+        {
+            if (!GameContentCatalog.IsStableId(state.InstanceId) ||
+                !GameContentCatalog.IsStableId(state.PoiTypeId) ||
+                !state.PoiTypeId.StartsWith("poi.", StringComparison.Ordinal) ||
+                !instanceIds.Add(state.InstanceId) ||
+                (state.Resolved && !state.Discovered) ||
+                state.CustomName is null ||
+                state.CustomName.Length > 40)
+            {
+                throw new InvalidDataException(
+                    "planetary_exploration contains invalid or duplicate POI state.");
             }
         }
     }

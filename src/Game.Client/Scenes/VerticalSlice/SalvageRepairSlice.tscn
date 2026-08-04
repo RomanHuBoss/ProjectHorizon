@@ -586,6 +586,8 @@ shape = SubResource("CraftingStationShape")
 
 [node name="BaseConstructionModules" type="Node3D" parent="Gameplay"]
 
+[node name="PlanetaryPois" type="Node3D" parent="Gameplay"]
+
 [node name="BaseBuildPreview" type="MeshInstance3D" parent="Gameplay"]
 visible = false
 
@@ -659,6 +661,23 @@ custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
 text = "BASE CONSTRUCTION"
+autowrap_mode = 2
+
+[node name="DiscoveryCatalog" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 255.0
+offset_top = 40.0
+offset_right = 1135.0
+offset_bottom = 625.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/DiscoveryCatalog"]
+mouse_filter = 2
+custom_minimum_size = Vector2(840, 545)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "DISCOVERY CATALOG"
 autowrap_mode = 2
 
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]

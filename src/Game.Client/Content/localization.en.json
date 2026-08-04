@@ -361,6 +361,26 @@
     "npc.trader.ilia_voss": "Ilia Voss",
     "quest.frontier.ore_sample": "Frontier ore sample",
     "quest.frontier.refined_ferrite": "Refined ferrite order",
-    "quest.frontier.water_trade": "Water-ice trade contract"
+    "quest.frontier.water_trade": "Water-ice trade contract",
+    "poi.emergency_beacon": "Emergency beacon",
+    "poi.ship_wreck": "Ship wreck",
+    "poi.abandoned_base": "Abandoned base",
+    "poi.trading_outpost": "Trading outpost",
+    "poi.science_station": "Science station",
+    "poi.ancient_artifact": "Ancient artifact",
+    "poi.resource_deposit": "Resource deposit",
+    "poi.cave_entrance": "Cave entrance",
+    "poi.relay": "Relay station",
+    "poi.industrial_site": "Industrial site",
+    "poi.pirate_base": "Pirate base",
+    "poi.landing_pad": "Landing pad",
+    "poi.monolith": "Monolith",
+    "poi.upgrade_capsule": "Upgrade capsule",
+    "poi.cargo_container": "Cargo container",
+    "poi.crashed_probe": "Crashed probe",
+    "poi.alien_archive": "Alien archive",
+    "poi.weather_observatory": "Weather observatory",
+    "poi.distress_shelter": "Distress shelter",
+    "poi.underground_vault": "Underground vault"
   }
 }

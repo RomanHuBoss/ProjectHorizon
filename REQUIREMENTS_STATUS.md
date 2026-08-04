@@ -1,8 +1,8 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-03
-> **Подготовленный снимок:** `ProjectHorizon-main-base-construction-closure.zip`
+> **Последняя актуализация:** 2026-08-04
+> **Подготовленный снимок:** `ProjectHorizon-main-planetary-exploration-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,79 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и station services Этапа 1 подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует целиком core-подсистему строительства баз: каталог из 50 модулей, размещение и соединение, лимиты, электрический граф, игровой builder, persistence, reset и изолированную приёмку. Её runtime-подтверждение остаётся за `TASK-107`. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle, station services Этапа 1 и core base-construction/power subsystem подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует целиком Stage 1 planetary exploration subsystem: каталог из 20 POI types, deterministic constraint-aware placement, физические POI, scanner, discovery catalog, naming, persistence/reset и изолированную F4-приёмку. Её runtime-подтверждение остаётся за `TASK-109`. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и не расширяется.
 
-## 3. Результат текущей итерации от 2026-08-03
+## 3. Результат текущей итерации от 2026-08-04
+
+### 2026-08-04 — mega-итерация: закрытие planetary exploration и discovery subsystem (`TASK-108`)
+
+**Исходный снимок:** `ProjectHorizon-main(4)(4).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-planetary-exploration-closure.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Граница:** закрывается один связный блок PDF-ТЗ — planetary POI generation/placement, scanner, discovery lifecycle/catalog, naming, persistence, reset и acceptance. Resource lifecycle, station services и base construction не расширяются и используются только как готовые соседние API.
+
+**Синхронизация подтверждённой base-construction приёмки:**
+
+- пользователь предоставил clean build исправленной редакции: `0` предупреждений, `0` ошибок;
+- `TASK-106 base construction acceptance PASS` многократно подтвердил `catalogModules=50; categories=17; placed=50; anchor=1; snapping=1; collisionRejected=1; disconnectedRejected=1; powerGraph=1; battery=1; toggle=1; removalRefund=1; limits=1; stress500=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
+- вручную подтверждены open/close builder, anchor placement, adjacent placement, stock decrement, power recalculation и autosave `BaseChanged`;
+- применимые F1–F12 regressions завершились `PASS`; `TASK-106/107 → VERIFIED`; core base-construction/power subsystem закрыта.
+
+**Реализовано:**
+
+- добавлен строгий `planetary_pois.json` schema `1` с ровно `20` data-driven POI types; catalog включает все 15 типов PDF §21 и пять дополнительных типов baseline Stage 1;
+- для каждого типа заданы stable ID, localization key, category, shape/size/color, rarity, minimum spacing, allowed biomes, slope/height/water/danger constraints, quest tags, scan range, interaction kind, discovery/resolution points и naming capability; EN/RU localization дополнена 20 ключами;
+- `PlanetaryPoiPlanner` детерминированно создаёт по одному instance каждого типа для фиксированных world seed/region; ordering и rotation используют stable FNV-1a, а placement учитывает biome, slope, height, distance to water, danger, rarity, active quest tags и symmetric pairwise spacing;
+- planner исключает центральную gameplay-зону и закрытое catalog-resource field, чтобы новые POI не пересекались с authored gameplay objects и 26 generated resource nodes; terrain geometry не изменяется;
+- `PlanetaryPoiNode` создаёт physical `StaticBody3D` с procedural mesh/collision и discovery marker; состояние visual меняется для unknown/discovered/resolved; generic `IInteractable` направляет взаимодействие в единый runtime;
+- `P` выполняет scanner pulse и выбирает ближайший ещё не открытый POI в его собственном scan range; out-of-range, already-discovered и unknown состояния безопасны; ScanOnly POI завершается сразу, остальные требуют последующего `E`;
+- `J` открывает discovery catalog; Up/Down выбирают запись, `N` назначает deterministic waypoint name для discovered/nameable POI, `P` можно применять прямо из catalog; HUD показывает POI totals, discovered/resolved/named и discovery points;
+- сохраняются world seed, region, discovery points, 20 POI instance/type IDs, discovered/resolved flags и custom names в optional `save_settings.planetary_exploration`; SQLite schema остаётся `2`; legacy save без блока получает пустое discovery state;
+- cold restore строго сверяет seed/region/deterministic instance set и derived discovery-points total; graceful exit/autosave включают exploration snapshot; `F8` сбрасывает discovery lifecycle и перестраивает physical scene; offline discovery progress отсутствует;
+- `F4` сохраняет `TASK-080` Industry Content v2 acceptance и затем запускает `TASK-108` в отдельной БД `save_1.planetary-exploration-test.db`, не изменяя gameplay-slot.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Content/planetary_pois.json`;
+- `src/Game.Client/Content/localization.en.json`;
+- `src/Game.Client/Content/localization.ru.json`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiCatalog.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiPlanner.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetaryExplorationRuntime.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiNode.cs` и `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetaryExplorationAcceptance.cs` и `.uid`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-106`: `IMPLEMENTED` → `VERIFIED`;
+- `TASK-107`: `IN_PROGRESS` → `VERIFIED`;
+- `TASK-108`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-109`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F4 dual acceptance, manual scan/resolve/name/cold restore/F8 и regressions;
+- `TASK-006` остаётся `BLOCKED`.
+
+**Ожидаемый F4 HUD:**
+
+```text
+TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0
+TASK-108 planetary exploration (F4): PASS types=20, placements=20, deterministic=1, constraints=1, spacing=1, questBias=1, clearance=1, scan=1, resolve=1, naming=1, restore=1, roundTrip=1
+```
+
+**Ожидаемая строка Output:**
+
+```text
+TASK-108 planetary exploration acceptance PASS: poiTypes=20; placements=20; deterministic=1; constraints=1; spacing=1; questBias=1; infrastructureClearance=1; scanAll=1; resolveAll=1; naming=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** после `TASK-109 → VERIFIED` Stage 1 planetary POI/discovery subsystem считается закрытой. Новые POI variants и art assets добавляются data-driven; возврат к deterministic placement, scanner lifecycle, discovery persistence или catalog UI допустим только при подтверждённой регрессии либо изменении ТЗ. Full galaxy/planet procedural streaming остаётся отдельной world-generation задачей и не является незавершённостью данного vertical-slice блока.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-109`.
 
 ### 2026-08-03 — mega-итерация: закрытие подсистемы строительства баз (`TASK-106`)
 
@@ -92,8 +162,8 @@
 - `TASK-103`: `IN_PROGRESS` → `VERIFIED`;
 - `TASK-104`: подтверждённый coordinate HUD сохраняется `VERIFIED`;
 - `TASK-105`: подтверждённая coordinate HUD acceptance сохраняется `VERIFIED`;
-- `TASK-106`: `PLANNED` → `IMPLEMENTED`;
-- `TASK-107`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F6 dual acceptance, manual builder/power/persistence/F8 и regressions;
+- `TASK-106`: `PLANNED` → `IMPLEMENTED` (в этой подготовленной итерации; впоследствии подтверждён пользователем и синхронизирован как `VERIFIED` в записи `TASK-108`);
+- `TASK-107`: `NOT_STARTED` → `IN_PROGRESS` — впоследствии закрыт пользовательской clean build/runtime-приёмкой и синхронизирован как `VERIFIED` в записи `TASK-108`;
 - `TASK-006` остаётся `BLOCKED`.
 
 **Ожидаемый F6 HUD:**
@@ -3049,40 +3119,64 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `BASE-100` | Catalog содержит не менее 50 construction modules | `IMPLEMENTED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
-| `BASE-101` | Покрыты все категории PDF 20.1 | `IMPLEMENTED` | Exact 17-category coverage including structural, devices and decoration |
-| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `IMPLEMENTED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
-| `BASE-103` | Overlap и disconnected placement отклоняются | `IMPLEMENTED` | Cell collision + graph connectivity preflight |
-| `BASE-104` | Действуют limits `500/100/200/20` | `IMPLEMENTED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
-| `BASE-105` | Base electrical network представлена graph | `IMPLEMENTED` | generation/consumption/battery/enabled/powered/deficit snapshot |
-| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `IMPLEMENTED` | `TryToggle`; structural modules rejected as non-switchable |
-| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `IMPLEMENTED` | Remove-then-connectivity-check; exact refund |
-| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `IMPLEMENTED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
-| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `IMPLEMENTED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
-| `BASE-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.base_construction`; schema remains 2 |
-| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | Snapshot integration, no offline power tick, scene rebuild/reset |
-| `BASE-112` | Legacy save без base block загружается | `IMPLEMENTED` | Null fallback: empty base + full starter stock |
-| `BASE-113` | Terrain geometry не модифицируется | `IMPLEMENTED` | Modules sit above existing surface; PDF 20.4 respected |
-| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с реальным `CoreCompile` |
-| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | Ожидается `TASK-106 ... PASS` |
-| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `IN_PROGRESS` | Выполнить раздел 18I |
-| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F6 |
+| `BASE-100` | Catalog содержит не менее 50 construction modules | `VERIFIED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
+| `BASE-101` | Покрыты все категории PDF 20.1 | `VERIFIED` | Exact 17-category coverage including structural, devices and decoration |
+| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `VERIFIED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
+| `BASE-103` | Overlap и disconnected placement отклоняются | `VERIFIED` | Cell collision + graph connectivity preflight |
+| `BASE-104` | Действуют limits `500/100/200/20` | `VERIFIED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
+| `BASE-105` | Base electrical network представлена graph | `VERIFIED` | generation/consumption/battery/enabled/powered/deficit snapshot |
+| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `VERIFIED` | `TryToggle`; structural modules rejected as non-switchable |
+| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `VERIFIED` | Remove-then-connectivity-check; exact refund |
+| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `VERIFIED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
+| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `VERIFIED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
+| `BASE-110` | State сохраняется без SQLite schema bump | `VERIFIED` | Optional `save_settings.base_construction`; schema remains 2 |
+| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `VERIFIED` | Snapshot integration, no offline power tick, scene rebuild/reset |
+| `BASE-112` | Legacy save без base block загружается | `VERIFIED` | Null fallback: empty base + full starter stock |
+| `BASE-113` | Terrain geometry не модифицируется | `VERIFIED` | Modules sit above existing surface; PDF 20.4 respected |
+| `BASE-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build: `0` warnings, `0` errors; исправленная редакция запущена в Godot 4.7.1 Mono |
+| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `VERIFIED` | User Output: repeated `TASK-106 ... PASS`; `stress500=1`; `maxWriters=1`; `integrity=ok` |
+| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `VERIFIED` | User runtime: anchor + adjacent battery placement, stock/power updates, autosave; F6 covers toggle/refund/restore/reset |
+| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `VERIFIED` | User Output: all applicable acceptance routes PASS after TASK-106 |
+
+### 8.23. Planetary POI, scanner и discovery subsystem
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `POI-100` | Catalog содержит ровно 20 POI types и все 15 типов PDF §21 | `IMPLEMENTED` | `planetary_pois.json`; strict exact-count/required-type validation |
+| `POI-101` | POI definitions data-driven и локализуемы | `IMPLEMENTED` | Stable ID, EN/RU key, category, shape, visual, rarity, constraints, interaction, points, naming |
+| `POI-102` | Placement детерминирован по world seed/region | `IMPLEMENTED` | Stable FNV-1a ordering/rotation; identical plan acceptance |
+| `POI-103` | Placement учитывает biome/slope/height/water/danger/rarity/quests | `IMPLEMENTED` | Definition constraint filtering + quest-biased score |
+| `POI-104` | Pairwise spacing симметрично учитывает оба POI types | `IMPLEMENTED` | `max(catalog, left, right)` during planning and acceptance |
+| `POI-105` | POI не пересекаются с central gameplay zone и catalog resource field | `IMPLEMENTED` | Deterministic reserved-area clearance; F4 `infrastructureClearance=1` |
+| `POI-106` | Каждый тип имеет physical scene instance с collision | `IMPLEMENTED` | 20 programmatic `StaticBody3D` nodes, mesh, collision, marker |
+| `POI-107` | Scanner открывает POI только в catalog-defined range | `IMPLEMENTED` | `P`; nearest undiscovered-in-range selection; safe out-of-range/already states |
+| `POI-108` | Interaction требует scan и переводит POI в resolved | `IMPLEMENTED` | `ScanOnly` auto-resolve; Activate/Open/Analyze/Claim/Land через `E` |
+| `POI-109` | Discovery catalog показывает 20 записей и lifecycle state | `IMPLEMENTED` | `J`, Up/Down; unknown/discovered/resolved; environment/position/rarity |
+| `POI-110` | Nameable discovered POI можно назвать | `IMPLEMENTED` | `N`; 3..40 chars; persistent custom name |
+| `POI-111` | Discovery points выводятся из фактических states | `IMPLEMENTED` | Runtime derived-total validation on cold restore |
+| `POI-112` | Exploration state сохраняется без schema bump | `IMPLEMENTED` | Optional `save_settings.planetary_exploration`; SQLite schema 2 |
+| `POI-113` | Cold restore, graceful exit и F8 reset точны | `IMPLEMENTED` | Seed/region/instance identity validation; scene rebuild; no offline discovery |
+| `POI-114` | Legacy save без exploration block загружается | `IMPLEMENTED` | Null fallback: 20 unknown/unresolved POIs, zero points/names |
+| `POI-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с реальным `CoreCompile` |
+| `POI-ACC-101` | F4 подтверждает 20 placements и все domain invariants | `IN_PROGRESS` | Ожидается `TASK-108 ... PASS`, separate SQLite DB |
+| `POI-ACC-102` | Manual scanner/interaction/catalog/naming/restore/F8 работает | `IN_PROGRESS` | Выполнить раздел 18J |
+| `POI-ACC-103` | F1–F3/F5–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F4 |
 
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD; core base-construction/power subsystem.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-107` | Выполнить build/runtime/manual acceptance base construction subsystem | Clean build `0/0`; F6 TASK-072+106; 50 modules/17 catalog categories; manual snap/collision/power/toggle/refund/cold restore/F8; regressions |
+| 1 | `TASK-109` | Выполнить build/runtime/manual acceptance planetary exploration subsystem | Clean build `0/0`; F4 TASK-080+108; 20 POIs; manual scan/resolve/name/cold restore/F8; regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-108` | После закрытия base construction выбрать следующий связный subsystem block | Рассмотреть ship systems, points of interest или world exploration по зависимостям ТЗ |
+| 3 | `TASK-110` | После закрытия exploration выбрать следующий связный subsystem block | Рассмотреть ship systems/ship modules либо расширение world traversal по зависимостям ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-105`, persistence, vertical slice, Industry Content v2, resources, station services и coordinate HUD.  
-**Реализовано:** `TASK-106` — 50-module base construction subsystem.  
-**Текущая приёмочная задача:** `TASK-107`. После её закрытия core construction runtime не требует отдельных итераций; новые modules добавляются data-driven.
+**Подтверждено:** `TASK-060`–`TASK-107`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD и base construction.  
+**Реализовано:** `TASK-108` — 20-type planetary POI/scanner/discovery subsystem.  
+**Текущая приёмочная задача:** `TASK-109`. После её закрытия новые POI variants добавляются data-driven без возврата к planner/scanner/persistence.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -4749,6 +4843,44 @@ TASK-106 base construction acceptance PASS: catalogModules=50; categories=17; pl
 19. При `FAIL` предоставить полный build log, `TASK-106 ... FAIL`, последние 220 строк Godot Output, screenshot builder, base summary, target grid, selected module и точный шаг сценария.
 
 После выполнения критериев установить `TASK-106 → VERIFIED`, `TASK-107 → VERIFIED` и считать core base-construction subsystem закрытой.
+
+## 18J. Runtime-приёмка `TASK-108/TASK-109`
+
+1. Выполнить `tools\clean-build-windows10.cmd`. В build log должен реально выполняться `CoreCompile`; критерий — `Предупреждений: 0`, `Ошибок: 0`.
+2. Запустить `SalvageRepairSlice` и дождаться startup строк:
+
+```text
+TASK-108 planetary POI catalog READY: schema=1; types=20; categories=<N>; seed=1082026; region=region.vertical_slice.frontier_plain; spacing=5.5; constraints=biome+slope+height+water+danger+rarity+quests.
+TASK-108 planetary exploration READY: types=20; placements=20; scanner=P; catalog=J; persistence=enabled; F4=acceptance.
+```
+
+3. Нажать `F4` и не выполнять других действий до завершения. `TASK-080` должен остаться `PASS`; новая строка HUD:
+
+```text
+TASK-108 planetary exploration (F4): PASS types=20, placements=20, deterministic=1, constraints=1, spacing=1, questBias=1, clearance=1, scan=1, resolve=1, naming=1, restore=1, roundTrip=1
+```
+
+4. Godot Output должен содержать полную строку:
+
+```text
+TASK-108 planetary exploration acceptance PASS: poiTypes=20; placements=20; deterministic=1; constraints=1; spacing=1; questBias=1; infrastructureClearance=1; scanAll=1; resolveAll=1; naming=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+5. Убедиться, что acceptance использует `save_1.planetary-exploration-test.db`; gameplay `save_1.db` не изменяется.
+6. Нажать `F8`. HUD exploration summary должен показать `POIs=20`, `discovered=0`, `resolved=0`, `named=0`, `points=0`.
+7. Нажать `J`. Discovery catalog должен содержать 20 записей `UNKNOWN`, показывать position, environment, scan range и rarity выбранного сигнала. Закрыть/открыть catalog клавишей `J`; координатный overlay остаётся видимым.
+8. Ближайшие тестовые POI расположены по периметру, вне центральной площадки и resource field. Для первого smoke test двигаться примерно к `X=2, Z=-26` (Alien archive) либо `X=-26, Z=-4` (Underground vault), ориентируясь по постоянному `PLAYER POS`.
+9. До входа в scan range нажать `P`: HUD/status должен показать nearest distance и range без изменения discovered count. Войти в range и нажать `P` снова: Output `TASK-108 player scanner PASS`; discovered увеличивается ровно на 1.
+10. Для POI с interaction kind не `ScanOnly` нажать `E`: до scan должно быть `ScanRequired`, после scan — `TASK-108 player POI interaction PASS`, resolved увеличивается ровно на 1, points — на catalog-defined reward. Повторное `E` не выдаёт points повторно.
+11. Открыть `J`, выбрать discovered/nameable POI и нажать `N`. Должно появиться имя `Waypoint NN`; named увеличивается на 1; повторное naming обновляет name без повторной выдачи points. Unknown либо non-nameable запись должна быть отклонена.
+12. Оставить минимум один discovered-but-unresolved и один resolved POI, запомнить points/name. Штатно закрыть игру. После запуска Output `TASK-108 planetary exploration restore PASS` и catalog должны восстановить exact flags/name/points; offline progress отсутствует.
+13. Нажать `F8`: все 20 записей возвращаются в `UNKNOWN`, custom names и points очищаются, physical POI scene перестраивается.
+14. Проверить отсутствие пересечений POI с центральными stations/trader/base builder и generated resource field; collision должна блокировать проход через крупные POI, terrain geometry не изменяется.
+15. Повторить `F1`, `F2`, `F3`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Повторный `F4` также должен дать `TASK-080` и `TASK-108 PASS`.
+16. Для приёмки прислать: build summary; screenshot неизвестного discovery catalog; screenshot discovered/resolved/named записи; screenshot HUD F4 PASS; полную строку Output `TASK-108 ... PASS`; строки scanner/interaction/restore.
+17. При `FAIL` предоставить полный build log, `TASK-108 ... FAIL`, последние 240 строк Godot Output, screenshot discovery catalog, player coordinates, selected POI state и точный шаг сценария.
+
+После выполнения критериев установить `TASK-108 → VERIFIED`, `TASK-109 → VERIFIED` и считать Stage 1 planetary exploration/discovery subsystem закрытой.
 
 ## 19. Шаблон новой записи
 
