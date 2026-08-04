@@ -207,7 +207,9 @@ public partial class SalvageRepairSlice : Node3D
     private int _baseBuildRotation;
     private string _baseBuildFeedback = "";
     private bool _discoveryCatalogOpen;
+    private const ulong F4ReleaseStableMilliseconds = 120;
     private bool _f4AcceptanceKeyLatched;
+    private ulong _f4ReleaseObservedTicks;
     private int _discoveryCatalogIndex;
     private string _discoveryCatalogFeedback = "";
     private string _craftingInteractorName = "unknown";
@@ -568,7 +570,8 @@ public partial class SalvageRepairSlice : Node3D
             $"seed={PlanetaryPoiCatalog.WorldSeed}; " +
             $"region={PlanetaryPoiCatalog.RegionKey}; " +
             "scanner=P; catalog=J; placement=constraint-aware; " +
-            "discoveries=persistent; F4=acceptance.");
+            "discoveries=persistent; F4=acceptance; " +
+            "f4Gate=physical-state+120ms-stable-release.");
         GD.Print(
             "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
@@ -596,6 +599,7 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _Process(double delta)
     {
+        UpdateF4AcceptanceKeyLatch();
         PollInitializeTask();
         PollLoadTask();
         PollResetTask();
@@ -627,6 +631,36 @@ public partial class SalvageRepairSlice : Node3D
         UpdateHud();
     }
 
+    private void UpdateF4AcceptanceKeyLatch()
+    {
+        if (!_f4AcceptanceKeyLatched)
+        {
+            _f4ReleaseObservedTicks = 0;
+            return;
+        }
+
+        if (Input.IsPhysicalKeyPressed(Key.F4))
+        {
+            _f4ReleaseObservedTicks = 0;
+            return;
+        }
+
+        ulong now = Time.GetTicksMsec();
+        if (_f4ReleaseObservedTicks == 0)
+        {
+            _f4ReleaseObservedTicks = now;
+            return;
+        }
+
+        if (now - _f4ReleaseObservedTicks < F4ReleaseStableMilliseconds)
+        {
+            return;
+        }
+
+        _f4AcceptanceKeyLatched = false;
+        _f4ReleaseObservedTicks = 0;
+    }
+
     public override void _UnhandledInput(InputEvent inputEvent)
     {
         if (inputEvent is not InputEventKey keyEvent)
@@ -639,11 +673,6 @@ public partial class SalvageRepairSlice : Node3D
         bool isF4 = Matches(physical, logical, Key.F4);
         if (!keyEvent.Pressed)
         {
-            if (isF4)
-            {
-                _f4AcceptanceKeyLatched = false;
-            }
-
             return;
         }
 
@@ -661,6 +690,7 @@ public partial class SalvageRepairSlice : Node3D
             }
 
             _f4AcceptanceKeyLatched = true;
+            _f4ReleaseObservedTicks = 0;
         }
         if (_baseBuildMode)
         {
