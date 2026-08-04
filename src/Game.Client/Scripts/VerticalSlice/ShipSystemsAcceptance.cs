@@ -26,6 +26,11 @@ public sealed record ShipSystemsAcceptanceReport(
     bool HyperspaceReadiness,
     bool FuelLifecycle,
     bool InventoryConservation,
+    bool PreRepairBlocked,
+    bool PreRepairFlightReady,
+    bool CommissionTransition,
+    bool PostRepairFlightReady,
+    bool ResetCommissioned,
     bool ColdRestore,
     bool LegacyFallback,
     bool ExactRoundTrip,
@@ -63,15 +68,35 @@ public static class ShipSystemsAcceptanceRunner
                 definition.BaseStats.MaxSpeed > 0.0 &&
                 definition.BaseStats.TechnologySlots > 0);
 
+            string firstModuleId = shipCatalog.Modules.Keys
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .First();
+            ShipSystemsRuntime preRepairRuntime = new(shipCatalog);
+            bool preRepairFlightReady =
+                !preRepairRuntime.Commissioned &&
+                !preRepairRuntime.FlightReady &&
+                !preRepairRuntime.HyperspaceReady;
+            bool preRepairBlocked =
+                preRepairRuntime.TryInstall(firstModuleId, out _) ==
+                    ShipModuleInstallResult.NotCommissioned &&
+                preRepairRuntime.ApplyDamage(
+                    "ship.system.hull",
+                    1.0,
+                    out _) == ShipSystemMutationResult.NotCommissioned &&
+                !preRepairRuntime.TryConsumeFuel(1.0, out _) &&
+                Math.Abs(preRepairRuntime.Refuel(1.0)) < 0.001;
+            bool commissionTransition = false;
+            bool postRepairFlightReady = false;
+
             bool installAll = shipCatalog.Modules.Values.All(module =>
             {
-                ShipSystemsRuntime isolated = new(shipCatalog);
+                ShipSystemsRuntime isolated = new(shipCatalog, commissioned: true);
                 return isolated.TryInstall(module.ModuleId, out _) ==
                     ShipModuleInstallResult.Installed &&
                     isolated.IsInstalled(module.ModuleId);
             });
 
-            ShipSystemsRuntime slotRuntime = new(shipCatalog);
+            ShipSystemsRuntime slotRuntime = new(shipCatalog, commissioned: true);
             ShipModuleDefinition[] technologyModules = shipCatalog.Modules.Values
                 .Where(module => string.Equals(
                     module.SlotType,
@@ -98,7 +123,7 @@ public static class ShipSystemsAcceptanceRunner
                 duplicateModule,
                 out _) == ShipModuleInstallResult.AlreadyInstalled;
 
-            ShipSystemsRuntime runtime = new(shipCatalog);
+            ShipSystemsRuntime runtime = new(shipCatalog, commissioned: true);
             ShipEffectiveStats baseline = runtime.GetEffectiveStats();
             string[] selectedModules =
             {
@@ -217,6 +242,18 @@ public static class ShipSystemsAcceptanceRunner
                 17.0,
                 out _);
             StarterRepairSession session = new(repairRecipe);
+            bool collectedRepairInput = session.TryCollect(
+                "acceptance.ship_commissioning_salvage",
+                session.SalvageDefinitionId,
+                session.RequiredSalvage,
+                out _);
+            bool repairedSession = collectedRepairInput &&
+                session.TryRepair(out _) == StarterRepairResult.Repaired;
+            commissionTransition = repairedSession &&
+                preRepairRuntime.Commission(out _) &&
+                preRepairRuntime.Commissioned;
+            postRepairFlightReady = commissionTransition &&
+                preRepairRuntime.FlightReady;
             SaveGameSnapshot expected = StarterRepairSnapshotFactory.Create(
                 slotId,
                 revision: 1,
@@ -252,14 +289,26 @@ public static class ShipSystemsAcceptanceRunner
                     JsonSerializer.Serialize(runtime.CreateSaveData()),
                     JsonSerializer.Serialize(restored.CreateSaveData()),
                     StringComparison.Ordinal) &&
+                restored.Commissioned &&
+                restored.FlightReady &&
                 restored.InstalledModuleCount == runtime.InstalledModuleCount &&
                 restored.DisabledSystemCount == runtime.DisabledSystemCount;
             ShipSystemsRuntime legacy = new(shipCatalog, saveData: null);
             bool legacyFallback =
                 legacy.ShipClassId == shipCatalog.StarterClassId &&
+                !legacy.Commissioned &&
+                !legacy.FlightReady &&
+                !legacy.HyperspaceReady &&
                 legacy.InstalledModuleCount == 0 &&
-                legacy.DisabledSystemCount == 0 &&
+                legacy.DisabledSystemCount == shipCatalog.Systems.Count &&
                 Math.Abs(legacy.Fuel - 35.0) < 0.001;
+            ShipSystemsRuntime resetRuntime = new(shipCatalog);
+            bool resetCommissioned =
+                !resetRuntime.Commissioned &&
+                !resetRuntime.FlightReady &&
+                !resetRuntime.HyperspaceReady &&
+                resetRuntime.InstalledModuleCount == 0 &&
+                resetRuntime.DisabledSystemCount == shipCatalog.Systems.Count;
 
             SaveDatabaseDiagnostics diagnostics =
                 await database.ReadDiagnosticsAsync(
@@ -288,7 +337,10 @@ public static class ShipSystemsAcceptanceRunner
                 duplicateRejected && derivedStats && damageLifecycle &&
                 repairLifecycle && moduleDisable && flightReadiness &&
                 hyperspaceReadiness && fuelLifecycle && inventoryConservation &&
-                coldRestore && legacyFallback && exactRoundTrip && logWritten &&
+                preRepairBlocked && preRepairFlightReady &&
+                commissionTransition && postRepairFlightReady &&
+                resetCommissioned && coldRestore && legacyFallback &&
+                exactRoundTrip && logWritten &&
                 diagnostics.MaximumConcurrentWriters == 1 && integrityOk;
             List<string> failures = new();
             if (!catalogCoverage) failures.Add("coverage=0");
@@ -304,6 +356,11 @@ public static class ShipSystemsAcceptanceRunner
             if (!hyperspaceReadiness) failures.Add("hyperReady=0");
             if (!fuelLifecycle) failures.Add("fuel=0");
             if (!inventoryConservation) failures.Add("inventory=0");
+            if (!preRepairBlocked) failures.Add("preRepairBlocked=0");
+            if (!preRepairFlightReady) failures.Add("preRepairFlightReady=0");
+            if (!commissionTransition) failures.Add("commissionTransition=0");
+            if (!postRepairFlightReady) failures.Add("postRepairFlightReady=0");
+            if (!resetCommissioned) failures.Add("resetCommissioned=0");
             if (!coldRestore) failures.Add("restore=0");
             if (!legacyFallback) failures.Add("legacy=0");
             if (!exactRoundTrip) failures.Add($"roundTrip=0({mismatch})");
@@ -314,7 +371,7 @@ public static class ShipSystemsAcceptanceRunner
             string result = passed
                 ? "six ship classes, eighteen catalog modules and seven " +
                   "damageable systems enforced slot limits, derived stats, " +
-                  "damage, repair, readiness, fuel and exact persistence"
+                  "damage, repair, commissioning, readiness, fuel and exact persistence"
                 : string.Join(", ", failures);
             stopwatch.Stop();
             return new ShipSystemsAcceptanceReport(
@@ -336,6 +393,11 @@ public static class ShipSystemsAcceptanceRunner
                 hyperspaceReadiness,
                 fuelLifecycle,
                 inventoryConservation,
+                preRepairBlocked,
+                preRepairFlightReady,
+                commissionTransition,
+                postRepairFlightReady,
+                resetCommissioned,
                 coldRestore,
                 legacyFallback,
                 exactRoundTrip,
@@ -347,29 +409,34 @@ public static class ShipSystemsAcceptanceRunner
         {
             stopwatch.Stop();
             return new ShipSystemsAcceptanceReport(
-                false,
-                $"{exception.GetType().Name}: {exception.Message}",
-                shipCatalog.Classes.Count,
-                shipCatalog.Systems.Count,
-                shipCatalog.Modules.Count,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                new SaveDatabaseDiagnostics(
+                Passed: false,
+                Result: $"{exception.GetType().Name}: {exception.Message}",
+                ShipClasses: shipCatalog.Classes.Count,
+                Systems: shipCatalog.Systems.Count,
+                Modules: shipCatalog.Modules.Count,
+                CatalogCoverage: false,
+                ClassStats: false,
+                InstallAll: false,
+                SlotLimits: false,
+                DuplicateRejected: false,
+                DerivedStats: false,
+                DamageLifecycle: false,
+                RepairLifecycle: false,
+                ModuleDisable: false,
+                FlightReadiness: false,
+                HyperspaceReadiness: false,
+                FuelLifecycle: false,
+                InventoryConservation: false,
+                PreRepairBlocked: false,
+                PreRepairFlightReady: false,
+                CommissionTransition: false,
+                PostRepairFlightReady: false,
+                ResetCommissioned: false,
+                ColdRestore: false,
+                LegacyFallback: false,
+                ExactRoundTrip: false,
+                LogWritten: false,
+                Diagnostics: new SaveDatabaseDiagnostics(
                     0,
                     "unknown",
                     false,
@@ -382,7 +449,7 @@ public static class ShipSystemsAcceptanceRunner
                     0,
                     0,
                     0),
-                stopwatch.Elapsed.TotalMilliseconds);
+                ElapsedMilliseconds: stopwatch.Elapsed.TotalMilliseconds);
         }
         finally
         {

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-04
-> **Подготовленный снимок:** `ProjectHorizon-main-ship-systems-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-ship-systems-commissioning-fix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -42,6 +42,29 @@
 
 ## 3. Результат текущей итерации от 2026-08-04
 
+### 2026-08-04 — исправление интеграции starter repair и ship commissioning (`TASK-110`)
+
+**Основание:** пользовательский runtime-журнал показал логическую рассинхронизацию: `shipRepaired=0`, но прежний `ShipSystemsRuntime` восстанавливал семь исправных систем и сообщал `flightReady=1`. Изолированный `TASK-110 PASS` эту межподсистемную ошибку не выявлял.
+
+**Исправлено:**
+
+- добавлен persistable nullable flag `ShipSystemsSaveData.Commissioned`; отсутствие поля сохраняет совместимость с предыдущими JSON-save blocks;
+- authoritative state задаётся `StarterRepairSession.ShipRepaired`: fresh/reset/unrepaired ship получает `commissioned=0`, семь offline systems, `flightReady=0`, `hyperReady=0`, empty loadout;
+- domain runtime самостоятельно отклоняет install/uninstall/damage/repair/fuel operations до commissioning, а не полагается только на UI guard;
+- успешный `StarterRepairQuestCompleted` выполняет `ShipSystemsRuntime.Commission()`, переводит семь systems в maximum health и сохраняет согласованный snapshot;
+- cold restore передаёт сюжетное repair state как authoritative commissioning state, поэтому старые saves без поля `Commissioned` мигрируют без schema bump;
+- snapshot factory запрещает сохранение явного commissioned state, противоречащего `session.ShipRepaired`; explicit `commissioned=false` с installed modules отклоняется persistence validation;
+- `F5/TASK-110` дополнен критериями `preRepairBlocked`, `preRepairFlightReady`, `commissionTransition`, `postRepairFlightReady`, `resetCommissioned`;
+- startup, restore, reset, graceful-exit и Ship Management показывают commissioning state.
+
+**Статусы:** `TASK-110` остаётся `IMPLEMENTED`, `TASK-111` остаётся `IN_PROGRESS` до clean build, обновлённого F5 PASS и ручного сценария через `U`.
+
+**Ожидаемая новая строка Output:**
+
+```text
+TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
 ### 2026-08-04 — mega-итерация: корабельные классы, loadout и damage subsystem (`TASK-110`)
 
 **Исходный снимок:** `ProjectHorizon-main(5)(4).zip` — последняя редакция с GitHub, приложенная пользователем.  
@@ -68,7 +91,7 @@
 - повреждение affected system отключает зависимые modules и их bonuses; engine/impulse/hull/landing участвуют в flight readiness, hyperdrive + активный hyperspace module — в hyperspace readiness;
 - `U` открывает player-facing Ship Management с вкладками Overview/Modules/Systems; Up/Down выбирают definition, Tab меняет вкладку, Enter/E устанавливает/refuels/repairs, `X` снимает module с exact refund, `D` наносит контролируемые 25 damage, `R` расходует один catalog-defined repair component;
 - все player operations до starter repair блокируются; install/repair/refuel используют уже закрытый shared inventory API и все пять production mirrors без создания новых ресурсов или recipes;
-- class ID, exact fuel, module/slot installations и system health сохраняются в optional `save_settings.ship_systems`; SQLite schema остаётся `2`; legacy `ships.fuel` синхронизируется с new block, old saves получают versatile class, empty loadout, seven healthy systems и 35 fuel;
+- class ID, exact fuel, module/slot installations и system health сохраняются в optional `save_settings.ship_systems`; SQLite schema остаётся `2`; legacy `ships.fuel` синхронизируется с new block; old saves без commissioned field получают authoritative state из `StarterRepairSession`: unrepaired — empty loadout, seven offline systems, 35 fuel; repaired — restored loadout/health и commissioned state;
 - autosave получил отдельный trigger `ShipChanged`; periodic/event/graceful acceptance обновлена на полный enum coverage; graceful exit, cold restore и `F8` reset включают ship state;
 - `F5` сохраняет `TASK-076` runtime matrix и параллельно запускает `TASK-110` в отдельной БД `save_1.ship-systems-test.db`, не изменяя gameplay-slot;
 - acceptance проверяет exact `6/7/18`, module-output coverage, class stats, install всех 18 modules, slot limit/duplicate paths, derived stats, damage/repair/module-disable/readiness, fuel lifecycle, inventory conservation, exact cold restore, legacy fallback, autosave log, round-trip, `maxWriters=1` и `integrity=ok`.
@@ -102,13 +125,13 @@
 
 ```text
 TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
-TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, readiness=1, fuel=1, restore=1, roundTrip=1
+TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, commissioning=1, readiness=1, fuel=1, restore=1, roundTrip=1
 ```
 
 **Ожидаемая строка Output:**
 
 ```text
-TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
 ```
 
 **Граница закрытия:** после `TASK-111 → VERIFIED` core ship class/loadout/damage/persistence subsystem считается закрытой. Новые module definitions добавляются data-driven поверх готового runtime. Покупка/смена класса, применение derived stats к каждому flight prototype и полноценные межсистемные гиперпереходы остаются отдельными интеграционными задачами; они не требуют повторной реализации slot/damage/persistence core.
@@ -3250,9 +3273,10 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `SHIP-107` | System failure disables dependent modules/readiness | `IMPLEMENTED` | Module Active projection; FlightReady/HyperspaceReady domain invariants |
 | `SHIP-108` | Fuel consume/refuel ограничены effective capacity | `IMPLEMENTED` | Runtime clamp; `chemical.high_energy_fuel` inventory-backed player path |
 | `SHIP-109` | Player-facing management UI доступен после starter repair | `IMPLEMENTED` | `U`; Overview/Modules/Systems; Up/Down/Tab/Enter/X/D/R |
-| `SHIP-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.ship_systems`; class/fuel/modules/slots/system health; schema 2 |
+| `SHIP-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.ship_systems`; class/commissioned/fuel/modules/slots/system health; schema 2 |
 | `SHIP-111` | Legacy row fuel и new ship_systems fuel согласованы | `IMPLEMENTED` | Snapshot factory mirrors exact fuel; save preflight rejects mismatch |
 | `SHIP-112` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | `ShipChanged`, snapshot integration, legacy fallback, reset runtime reconstruction |
+| `SHIP-113` | Ship commissioning строго согласован со starter repair | `IMPLEMENTED` | Unrepaired/reset: commissioned=0, 7 offline, flight/hyper=0, mutations blocked; repair performs one commissioning transition |
 | `SHIP-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
 | `SHIP-ACC-101` | F5 подтверждает exact 6/7/18 и domain invariants | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 PASS в isolated DB |
 | `SHIP-ACC-102` | Manual loadout/damage/repair/refuel/restore/F8 работает | `IN_PROGRESS` | Выполнить раздел 18K после ремонта starter ship |
@@ -4993,17 +5017,17 @@ TASK-110 ship systems READY: classes=6; systems=7; modules=18; class=ship.class.
 
 ```text
 TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
-TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, readiness=1, fuel=1, restore=1, roundTrip=1
+TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, commissioning=1, readiness=1, fuel=1, restore=1, roundTrip=1
 ```
 
 4. В Godot Output должна быть одна итоговая строка:
 
 ```text
-TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
 ```
 
-5. Нажать `F8`. До ремонта starter ship открыть `U`: UI должен открыться, но install/repair/refuel должны быть заблокированы сообщением `starter ship must be repaired`.
-6. Собрать три `resource.salvage_alloy`, отремонтировать DamagedShip клавишей `E`. Повторно открыть `U`; Overview должен показывать class `versatile`, fuel `35/<capacity>`, семь systems online, empty loadout и `flight=READY`.
+5. Нажать `F8`. Output должен показать `commissioned=0; flightReady=0; hyperReady=0; offline=7`. До ремонта starter ship открыть `U`: UI должен открыться, но install/repair/refuel должны быть заблокированы сообщением о необходимости repair + commissioning.
+6. Собрать три `resource.salvage_alloy`, отремонтировать DamagedShip клавишей `E`. Output `StarterRepairQuestCompleted` должен содержать `commissioned=1; flightReady=1`. Повторно открыть `U`; Overview должен показывать class `versatile`, fuel `35/<capacity>`, семь systems online, empty loadout и `flight=READY`.
 7. Получить любой ShipModule item штатным crafting path либо использовать уже сохранённый inventory. Во вкладке Modules выбрать его и нажать `Enter/E`. Output: `TASK-110 player ship module install PASS`; inventory уменьшается ровно на 1, installed count растёт, соответствующие derived stats изменяются.
 8. Нажать `Enter/E` повторно на том же module: duplicate install отклоняется без списания. Заполнить доступные Technology slots и проверить отказ следующего module без потери inventory. Для короткой ручной проверки достаточно одного successful install и автоматического F5 `slotLimits=1; duplicateRejected=1`.
 9. На установленном module нажать `X`: Output `TASK-110 player ship module uninstall PASS`; item возвращается ровно один раз.
@@ -5011,7 +5035,7 @@ TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalog
 11. Имея указанный в UI repair component, нажать `R`: component списывается ровно один раз, health растёт на catalog-defined amount, module/readiness восстанавливаются при health > 0. Output: `TASK-110 player ship repair PASS`.
 12. Для refuel сначала оставить fuel ниже capacity (автоматический F5 проверяет consume/refuel domain path; gameplay fuel consumption ещё не интегрирован с flight prototype). Имея `chemical.high_energy_fuel`, нажать `Enter/E` на Overview: item списывается, fuel растёт максимум до capacity, Output `TASK-110 player ship refuel PASS`.
 13. Оставить минимум один module installed и одну system частично повреждённой, штатно закрыть игру. После запуска проверить `TASK-110 ship systems restore PASS`: class, exact fuel, module/slot и health совпадают; offline progress отсутствует.
-14. Нажать `F8`: starter ship systems возвращаются к versatile/empty loadout/7 healthy/35 fuel; gameplay repair state также сбрасывается. В Output ожидается `TASK-110 ship systems reset PASS`.
+14. Нажать `F8`: starter ship systems возвращаются к versatile/empty loadout/7 offline/35 fuel, `commissioned=0`, `flightReady=0`, `hyperReady=0`; gameplay repair state также сбрасывается. В Output ожидается `TASK-110 ship systems reset PASS`.
 15. Повторить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Затем повторить `F5`.
 16. Для приёмки прислать: build summary; screenshot Ship Management после install и после damage; HUD F5 PASS; полную строку `TASK-110 ... PASS`; строки install/uninstall/damage/repair/restore. При невозможности вручную добыть fuel достаточно автоматического `fuelLifecycle=1` и проверки UI refusal без item.
 17. При `FAIL` предоставить полный build log, `TASK-110 ... FAIL`, последние 260 строк Godot Output, screenshot выбранной вкладки, player coordinates, inventory count и точный шаг сценария.

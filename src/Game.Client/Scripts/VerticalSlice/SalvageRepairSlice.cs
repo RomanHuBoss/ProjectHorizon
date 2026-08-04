@@ -620,6 +620,7 @@ public partial class SalvageRepairSlice : Node3D
             $"systems={ShipSystemsCatalog.Systems.Count}; " +
             $"modules={ShipSystemsCatalog.Modules.Count}; " +
             $"class={ShipSystems.ShipClassId}; " +
+            $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
             "loadout=U; damage=per-system; repair=inventory-backed; " +
             "persistence=enabled; F5=acceptance.");
         GD.Print(
@@ -2417,8 +2418,20 @@ public partial class SalvageRepairSlice : Node3D
 
         if (repairResult == StarterRepairResult.AlreadyRepaired)
         {
+            if (!ShipSystems.Commissioned)
+            {
+                ShipSystems.Commission(out _);
+                QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+            }
+
             OpenShipManagement();
             return;
+        }
+
+        if (!ShipSystems.Commission(out string commissioningResult) &&
+            !ShipSystems.Commissioned)
+        {
+            throw new InvalidOperationException(commissioningResult);
         }
 
         MirrorSessionConsumptionToGameplayNetwork(RepairRecipe.Inputs);
@@ -2429,7 +2442,9 @@ public partial class SalvageRepairSlice : Node3D
         GD.Print(
             "Vertical slice domain event: StarterRepairQuestCompleted; " +
             $"autosaveTrigger={AutosaveTrigger.QuestCompleted}; " +
-            $"revision={_revision}; interactor={interactor.Name}");
+            $"revision={_revision}; commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
+            $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
+            $"interactor={interactor.Name}");
     }
 
     public void TryCraftAtStation(
@@ -3503,9 +3518,9 @@ public partial class SalvageRepairSlice : Node3D
         _shipManagementOpen = true;
         _shipManagementTab = ShipManagementTab.Overview;
         _shipManagementIndex = 0;
-        _shipManagementFeedback = Session.ShipRepaired
-            ? "ship systems online"
-            : "starter ship must be repaired before loadout changes";
+        _shipManagementFeedback = Session.ShipRepaired && ShipSystems.Commissioned
+            ? "ship systems commissioned and online"
+            : "starter ship must be repaired and commissioned before loadout changes";
         _shipManagementOpenedTicks = Time.GetTicksMsec();
         _shipManagementPanel.Visible = true;
         UpdateShipManagementPanel();
@@ -3582,9 +3597,9 @@ public partial class SalvageRepairSlice : Node3D
 
     private void InstallSelectedShipModule()
     {
-        if (!Session.ShipRepaired)
+        if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair the starter ship first";
+            _shipManagementFeedback = "repair and commission the starter ship first";
             return;
         }
 
@@ -3641,9 +3656,9 @@ public partial class SalvageRepairSlice : Node3D
 
     private void UninstallSelectedShipModule()
     {
-        if (!Session.ShipRepaired)
+        if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair the starter ship first";
+            _shipManagementFeedback = "repair and commission the starter ship first";
             return;
         }
 
@@ -3680,9 +3695,9 @@ public partial class SalvageRepairSlice : Node3D
 
     private void DamageSelectedShipSystem()
     {
-        if (!Session.ShipRepaired)
+        if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair the starter ship first";
+            _shipManagementFeedback = "repair and commission the starter ship first";
             return;
         }
 
@@ -3721,9 +3736,9 @@ public partial class SalvageRepairSlice : Node3D
 
     private void RepairSelectedShipSystem()
     {
-        if (!Session.ShipRepaired)
+        if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair the starter ship first";
+            _shipManagementFeedback = "repair and commission the starter ship first";
             return;
         }
 
@@ -3780,9 +3795,9 @@ public partial class SalvageRepairSlice : Node3D
 
     private void RefuelShip()
     {
-        if (!Session.ShipRepaired)
+        if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair the starter ship first";
+            _shipManagementFeedback = "repair and commission the starter ship first";
             return;
         }
 
@@ -3889,8 +3904,9 @@ public partial class SalvageRepairSlice : Node3D
                 $"Atmos={stats.AtmosphericEfficiency:0.#}%\n" +
                 $"Slots: weapon={ShipSystems.InstalledWeaponModules}/{stats.WeaponSlots}  " +
                 $"technology={ShipSystems.InstalledTechnologyModules}/{stats.TechnologySlots}\n" +
-                $"Readiness: flight={(Session.ShipRepaired && ShipSystems.FlightReady ? "READY" : "BLOCKED")}  " +
-                $"hyperspace={(Session.ShipRepaired && ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")}  " +
+                $"Readiness: commissioned={(ShipSystems.Commissioned ? "YES" : "NO")}  " +
+                $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")}  " +
+                $"hyperspace={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")}  " +
                 $"offlineSystems={ShipSystems.DisabledSystemCount}\n\n" +
                 $"Enter/E: refuel with 1 x {ShipSystemsAcceptanceRunner.FuelDefinitionId} " +
                 $"(inventory={Session.GetAvailableQuantity(ShipSystemsAcceptanceRunner.FuelDefinitionId)})";
@@ -3955,7 +3971,8 @@ public partial class SalvageRepairSlice : Node3D
         _shipManagementLabel.Text =
             "SHIP MANAGEMENT - TASK-110\n" +
             tabs + "\n" +
-            $"Starter repair: {(Session.ShipRepaired ? "COMPLETE" : "REQUIRED")}\n\n" +
+            $"Starter repair: {(Session.ShipRepaired ? "COMPLETE" : "REQUIRED")}  " +
+            $"Commissioned: {(ShipSystems.Commissioned ? "YES" : "NO")}\n\n" +
             content + "\n\n" +
             $"Status: {_shipManagementFeedback}\n" +
             "Up/Down select  Tab pages  U/Esc close";
@@ -5308,6 +5325,7 @@ public partial class SalvageRepairSlice : Node3D
             $"shipClass={ShipSystems.ShipClassId}; " +
             $"shipModules={ShipSystems.InstalledModuleCount}; " +
             $"shipFuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
             $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
             $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
@@ -5376,7 +5394,8 @@ public partial class SalvageRepairSlice : Node3D
                 snapshot?.PlanetaryExploration);
             _shipSystemsRuntime = new ShipSystemsRuntime(
                 ShipSystemsCatalog,
-                snapshot?.ShipSystems);
+                snapshot?.ShipSystems,
+                commissioned: Session.ShipRepaired);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null)
             {
@@ -5440,6 +5459,7 @@ public partial class SalvageRepairSlice : Node3D
                 $"systems={ShipSystems.SystemHealth.Count}; " +
                 $"offline={ShipSystems.DisabledSystemCount}; " +
                 $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
                 $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
                 $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
                 $"legacyFallback={(snapshot?.ShipSystems is null ? 1 : 0)}.");
@@ -5541,6 +5561,7 @@ public partial class SalvageRepairSlice : Node3D
                 $"systems={ShipSystems.SystemHealth.Count}; " +
                 $"offline={ShipSystems.DisabledSystemCount}; " +
                 $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+                $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
                 $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
                 $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
         }
@@ -6083,7 +6104,8 @@ public partial class SalvageRepairSlice : Node3D
                 ? $"PASS classes={report.ShipClasses}, systems={report.Systems}, " +
                   $"modules={report.Modules}, coverage={(report.CatalogCoverage ? 1 : 0)}, " +
                   $"slots={(report.SlotLimits ? 1 : 0)}, damage={(report.DamageLifecycle ? 1 : 0)}, " +
-                  $"repair={(report.RepairLifecycle ? 1 : 0)}, ready={(report.FlightReadiness && report.HyperspaceReadiness ? 1 : 0)}, " +
+                  $"repair={(report.RepairLifecycle ? 1 : 0)}, commissioning={(report.PreRepairBlocked && report.PreRepairFlightReady && report.CommissionTransition && report.PostRepairFlightReady && report.ResetCommissioned ? 1 : 0)}, " +
+                  $"ready={(report.FlightReadiness && report.HyperspaceReadiness ? 1 : 0)}, " +
                   $"fuel={(report.FuelLifecycle ? 1 : 0)}, restore={(report.ColdRestore ? 1 : 0)}, " +
                   $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}"
                 : $"FAIL {report.Result}";
@@ -6920,8 +6942,9 @@ public partial class SalvageRepairSlice : Node3D
             $"fuel={ShipSystems.Fuel:0.#}/{shipStats.FuelCapacity:0.#} • " +
             $"offline={ShipSystems.DisabledSystemCount}/" +
             $"{ShipSystemsCatalog.Systems.Count} • " +
-            $"flight={(Session.ShipRepaired && ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
-            $"hyper={(Session.ShipRepaired && ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
+            $"commissioned={(ShipSystems.Commissioned ? 1 : 0)} • " +
+            $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
+            $"hyper={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
@@ -7295,6 +7318,11 @@ public partial class SalvageRepairSlice : Node3D
             $"hyperspaceReadiness={(report.HyperspaceReadiness ? 1 : 0)}; " +
             $"fuelLifecycle={(report.FuelLifecycle ? 1 : 0)}; " +
             $"inventoryConservation={(report.InventoryConservation ? 1 : 0)}; " +
+            $"preRepairBlocked={(report.PreRepairBlocked ? 1 : 0)}; " +
+            $"preRepairFlightReady={(report.PreRepairFlightReady ? 1 : 0)}; " +
+            $"commissionTransition={(report.CommissionTransition ? 1 : 0)}; " +
+            $"postRepairFlightReady={(report.PostRepairFlightReady ? 1 : 0)}; " +
+            $"resetCommissioned={(report.ResetCommissioned ? 1 : 0)}; " +
             $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
             $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
             $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +

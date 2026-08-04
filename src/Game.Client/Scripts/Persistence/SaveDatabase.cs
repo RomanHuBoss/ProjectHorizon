@@ -1840,6 +1840,13 @@ public sealed partial class SaveDatabase : IDisposable
                 "ship_systems contains invalid identity or scalar values.");
         }
 
+        if (shipSystems.Commissioned == false &&
+            shipSystems.InstalledModules.Count > 0)
+        {
+            throw new InvalidDataException(
+                "ship_systems cannot contain installed modules before commissioning.");
+        }
+
         HashSet<string> moduleIds = new(StringComparer.Ordinal);
         HashSet<(string SlotType, int SlotIndex)> slots = new();
         foreach (ShipModuleInstallationSaveData module in

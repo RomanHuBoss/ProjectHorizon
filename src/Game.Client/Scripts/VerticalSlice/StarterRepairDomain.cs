@@ -780,6 +780,13 @@ public static class StarterRepairSnapshotFactory
         }
 
         ArgumentNullException.ThrowIfNull(session);
+        if (shipSystems?.Commissioned is bool commissioned &&
+            commissioned != session.ShipRepaired)
+        {
+            throw new InvalidOperationException(
+                "Ship commissioning state must match starter repair state.");
+        }
+
         if (revision <= 0)
         {
             throw new ArgumentOutOfRangeException(

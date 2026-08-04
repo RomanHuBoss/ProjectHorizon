@@ -180,7 +180,8 @@ public sealed record ShipSystemsSaveData(
     string ShipClassId,
     double Fuel,
     IReadOnlyList<ShipModuleInstallationSaveData> InstalledModules,
-    IReadOnlyList<ShipSystemHealthSaveData> Systems);
+    IReadOnlyList<ShipSystemHealthSaveData> Systems,
+    bool? Commissioned = null);
 
 public sealed record SaveGameSnapshot(
     string SlotId,

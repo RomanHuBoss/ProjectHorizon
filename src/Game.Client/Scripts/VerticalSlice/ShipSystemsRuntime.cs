@@ -7,13 +7,15 @@ public enum ShipModuleInstallResult
     Installed = 0,
     AlreadyInstalled = 1,
     SlotUnavailable = 2,
-    UnknownModule = 3
+    UnknownModule = 3,
+    NotCommissioned = 4
 }
 
 public enum ShipModuleUninstallResult
 {
     Uninstalled = 0,
-    NotInstalled = 1
+    NotInstalled = 1,
+    NotCommissioned = 2
 }
 
 public enum ShipSystemMutationResult
@@ -21,7 +23,8 @@ public enum ShipSystemMutationResult
     Applied = 0,
     AlreadyFull = 1,
     AlreadyOffline = 2,
-    UnknownSystem = 3
+    UnknownSystem = 3,
+    NotCommissioned = 4
 }
 
 public sealed record ShipEffectiveStats(
@@ -53,7 +56,8 @@ public sealed class ShipSystemsRuntime
 
     public ShipSystemsRuntime(
         ShipSystemsCatalog catalog,
-        ShipSystemsSaveData? saveData = null)
+        ShipSystemsSaveData? saveData = null,
+        bool? commissioned = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         _catalog = catalog;
@@ -70,6 +74,16 @@ public sealed class ShipSystemsRuntime
             RestoreSystems(saveData.Systems);
         }
 
+        Commissioned = commissioned ?? saveData?.Commissioned ?? false;
+        if (!Commissioned)
+        {
+            _installedModules.Clear();
+            foreach (string systemId in _systemHealth.Keys.ToArray())
+            {
+                _systemHealth[systemId] = 0.0;
+            }
+        }
+
         Fuel = Math.Clamp(
             saveData?.Fuel ?? 35.0,
             0.0,
@@ -77,6 +91,8 @@ public sealed class ShipSystemsRuntime
     }
 
     public string ShipClassId => _shipClass.ShipClassId;
+
+    public bool Commissioned { get; private set; }
 
     public double Fuel { get; private set; }
 
@@ -91,12 +107,14 @@ public sealed class ShipSystemsRuntime
     public int DisabledSystemCount => _systemHealth.Count(pair => pair.Value <= 0.0);
 
     public bool FlightReady =>
+        Commissioned &&
         GetSystemHealth("ship.system.hull") > 0.0 &&
         GetSystemHealth("ship.system.engine") > 0.0 &&
         GetSystemHealth("ship.system.impulse") > 0.0 &&
         GetSystemHealth("ship.system.landing") > 0.0;
 
     public bool HyperspaceReady =>
+        Commissioned &&
         GetSystemHealth("ship.system.hyperdrive") > 0.0 &&
         InstalledModules.Any(module =>
             module.Definition.EnablesHyperspace && module.Active);
@@ -125,6 +143,11 @@ public sealed class ShipSystemsRuntime
 
     public int GetAvailableSlots(string slotType)
     {
+        if (!Commissioned)
+        {
+            return 0;
+        }
+
         int capacity = GetSlotCapacity(slotType);
         int used = _installedModules.Values.Count(value => string.Equals(
             value.SlotType,
@@ -137,6 +160,12 @@ public sealed class ShipSystemsRuntime
         string moduleId,
         out string result)
     {
+        if (!Commissioned)
+        {
+            result = "starter ship is not commissioned";
+            return ShipModuleInstallResult.NotCommissioned;
+        }
+
         if (!_catalog.Modules.TryGetValue(
             moduleId,
             out ShipModuleDefinition? definition))
@@ -194,6 +223,12 @@ public sealed class ShipSystemsRuntime
         string moduleId,
         out string result)
     {
+        if (!Commissioned)
+        {
+            result = "starter ship is not commissioned";
+            return ShipModuleUninstallResult.NotCommissioned;
+        }
+
         if (!_installedModules.Remove(moduleId))
         {
             result = $"{moduleId} is not installed";
@@ -214,6 +249,12 @@ public sealed class ShipSystemsRuntime
 
     public bool TryConsumeFuel(double amount, out string result)
     {
+        if (!Commissioned)
+        {
+            result = "starter ship is not commissioned";
+            return false;
+        }
+
         if (amount <= 0.0 || double.IsNaN(amount) || double.IsInfinity(amount))
         {
             throw new ArgumentOutOfRangeException(nameof(amount));
@@ -232,6 +273,11 @@ public sealed class ShipSystemsRuntime
 
     public double Refuel(double amount)
     {
+        if (!Commissioned)
+        {
+            return 0.0;
+        }
+
         if (amount <= 0.0 || double.IsNaN(amount) || double.IsInfinity(amount))
         {
             throw new ArgumentOutOfRangeException(nameof(amount));
@@ -247,6 +293,12 @@ public sealed class ShipSystemsRuntime
         double amount,
         out string result)
     {
+        if (!Commissioned)
+        {
+            result = "starter ship is not commissioned";
+            return ShipSystemMutationResult.NotCommissioned;
+        }
+
         if (!_systemHealth.TryGetValue(systemId, out double current))
         {
             result = $"unknown ship system {systemId}";
@@ -275,6 +327,12 @@ public sealed class ShipSystemsRuntime
         double amount,
         out string result)
     {
+        if (!Commissioned)
+        {
+            result = "starter ship is not commissioned";
+            return ShipSystemMutationResult.NotCommissioned;
+        }
+
         if (!_systemHealth.TryGetValue(systemId, out double current))
         {
             result = $"unknown ship system {systemId}";
@@ -297,6 +355,25 @@ public sealed class ShipSystemsRuntime
         _systemHealth[systemId] = next;
         result = $"{systemId} repaired {current:0.#}->{next:0.#}/{maximum:0.#}";
         return ShipSystemMutationResult.Applied;
+    }
+
+    public bool Commission(out string result)
+    {
+        if (Commissioned)
+        {
+            result = "starter ship is already commissioned";
+            return false;
+        }
+
+        Commissioned = true;
+        foreach (string systemId in _systemHealth.Keys.ToArray())
+        {
+            _systemHealth[systemId] = GetSystemMaximumHealth(systemId);
+        }
+
+        Fuel = Math.Min(Fuel, GetEffectiveStats().FuelCapacity);
+        result = "starter ship commissioned; all core systems online";
+        return true;
     }
 
     public double GetSystemHealth(string systemId)
@@ -362,7 +439,8 @@ public sealed class ShipSystemsRuntime
                 .Select(pair => new ShipSystemHealthSaveData(
                     pair.Key,
                     pair.Value))
-                .ToArray());
+                .ToArray(),
+            Commissioned);
     }
 
     private int GetSlotCapacity(string slotType)
@@ -378,7 +456,7 @@ public sealed class ShipSystemsRuntime
 
     private bool IsModuleActive(ShipModuleDefinition definition)
     {
-        return definition.AffectedSystems.All(systemId =>
+        return Commissioned && definition.AffectedSystems.All(systemId =>
             GetSystemHealth(systemId) > 0.0);
     }
 
