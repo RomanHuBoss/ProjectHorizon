@@ -560,6 +560,24 @@ public sealed partial class SaveDatabase : IDisposable
             }
         }
 
+        StageOneVoyageSaveData? expectedVoyage = expected.StageOneVoyage;
+        StageOneVoyageSaveData? actualVoyage = actual.StageOneVoyage;
+        if ((expectedVoyage is null) != (actualVoyage is null))
+        {
+            mismatch = "stage_one_voyage presence differs";
+            return false;
+        }
+
+        if (expectedVoyage is not null && actualVoyage is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizeStageOneVoyage(expectedVoyage)),
+                JsonSerializer.Serialize(CanonicalizeStageOneVoyage(actualVoyage)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "stage_one_voyage differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -980,7 +998,8 @@ public sealed partial class SaveDatabase : IDisposable
             "setting_key IN ('research_points', 'unlocked_technologies', " +
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
-            "'base_construction', 'planetary_exploration', 'ship_systems');",
+            "'base_construction', 'planetary_exploration', 'ship_systems', " +
+            "'stage_one_voyage');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1090,6 +1109,38 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeShipSystems(snapshot.ShipSystems))));
+        }
+
+        if (snapshot.StageOneVoyage is not null)
+        {
+            ValidateStageOneVoyage(snapshot.StageOneVoyage);
+            if (snapshot.StageOneVoyage.Location !=
+                    StageOneVoyageLocation.PlanetSurface &&
+                snapshot.ShipSystems?.Commissioned != true)
+            {
+                throw new InvalidDataException(
+                    "active stage_one_voyage requires a commissioned ship.");
+            }
+
+            if (Math.Abs(snapshot.Ship.PositionX -
+                    snapshot.StageOneVoyage.PositionX) > 0.001 ||
+                Math.Abs(snapshot.Ship.PositionY -
+                    snapshot.StageOneVoyage.PositionY) > 0.001 ||
+                Math.Abs(snapshot.Ship.PositionZ -
+                    snapshot.StageOneVoyage.PositionZ) > 0.001)
+            {
+                throw new InvalidDataException(
+                    "ship position differs between ships row and stage_one_voyage setting.");
+            }
+
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'stage_one_voyage', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeStageOneVoyage(snapshot.StageOneVoyage))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1333,6 +1384,7 @@ public sealed partial class SaveDatabase : IDisposable
         BaseConstructionSaveData? baseConstruction = null;
         PlanetaryExplorationSaveData? planetaryExploration = null;
         ShipSystemsSaveData? shipSystems = null;
+        StageOneVoyageSaveData? stageOneVoyage = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1344,7 +1396,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
-                "'ship_systems') " +
+                "'ship_systems', 'stage_one_voyage') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1547,6 +1599,50 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "stage_one_voyage",
+            out string? stageOneVoyageJson))
+        {
+            if (string.IsNullOrWhiteSpace(stageOneVoyageJson))
+            {
+                throw new InvalidDataException(
+                    "stage_one_voyage setting is empty.");
+            }
+
+            try
+            {
+                stageOneVoyage = JsonSerializer.Deserialize<
+                    StageOneVoyageSaveData>(stageOneVoyageJson) ??
+                    throw new InvalidDataException(
+                        "stage_one_voyage setting deserialized to null.");
+                ValidateStageOneVoyage(stageOneVoyage);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "stage_one_voyage setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (stageOneVoyage is not null)
+        {
+            if (stageOneVoyage.Location != StageOneVoyageLocation.PlanetSurface &&
+                shipSystems?.Commissioned != true)
+            {
+                throw new InvalidDataException(
+                    "active stage_one_voyage requires a commissioned ship.");
+            }
+
+            if (Math.Abs(ship.PositionX - stageOneVoyage.PositionX) > 0.001 ||
+                Math.Abs(ship.PositionY - stageOneVoyage.PositionY) > 0.001 ||
+                Math.Abs(ship.PositionZ - stageOneVoyage.PositionZ) > 0.001)
+            {
+                throw new InvalidDataException(
+                    "ship position differs between ships row and stage_one_voyage setting.");
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1640,7 +1736,8 @@ public sealed partial class SaveDatabase : IDisposable
             stationServices,
             baseConstruction,
             planetaryExploration,
-            shipSystems);
+            shipSystems,
+            stageOneVoyage);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -1803,6 +1900,72 @@ public sealed partial class SaveDatabase : IDisposable
                     "planetary_exploration contains invalid or duplicate POI state.");
             }
         }
+    }
+
+    private static StageOneVoyageSaveData CanonicalizeStageOneVoyage(
+        StageOneVoyageSaveData voyage)
+    {
+        ArgumentNullException.ThrowIfNull(voyage);
+        return voyage with
+        {
+            PositionX = NormalizeSignedZero(voyage.PositionX),
+            PositionY = NormalizeSignedZero(voyage.PositionY),
+            PositionZ = NormalizeSignedZero(voyage.PositionZ),
+            RotationX = NormalizeSignedZero(voyage.RotationX),
+            RotationY = NormalizeSignedZero(voyage.RotationY),
+            RotationZ = NormalizeSignedZero(voyage.RotationZ),
+            VelocityX = NormalizeSignedZero(voyage.VelocityX),
+            VelocityY = NormalizeSignedZero(voyage.VelocityY),
+            VelocityZ = NormalizeSignedZero(voyage.VelocityZ)
+        };
+    }
+
+    private static void ValidateStageOneVoyage(StageOneVoyageSaveData voyage)
+    {
+        ArgumentNullException.ThrowIfNull(voyage);
+        if (!Enum.IsDefined(typeof(StageOneVoyageLocation), voyage.Location) ||
+            voyage.TakeoffCount < 0 ||
+            voyage.DockingCount < 0 ||
+            voyage.LandingCount < 0 ||
+            voyage.CompletedLoops < 0 ||
+            voyage.DockingCount > voyage.TakeoffCount ||
+            voyage.LandingCount > voyage.TakeoffCount ||
+            voyage.CompletedLoops > voyage.LandingCount ||
+            string.IsNullOrWhiteSpace(voyage.LastCheckpoint) ||
+            voyage.LastCheckpoint.Length > 64 ||
+            (voyage.Location != StageOneVoyageLocation.PlanetSurface &&
+             !voyage.Piloted) ||
+            (voyage.StationVisitedThisLoop && !voyage.StationVisited))
+        {
+            throw new InvalidDataException(
+                "stage_one_voyage contains invalid state or counters.");
+        }
+
+        double[] values =
+        {
+            voyage.PositionX,
+            voyage.PositionY,
+            voyage.PositionZ,
+            voyage.RotationX,
+            voyage.RotationY,
+            voyage.RotationZ,
+            voyage.VelocityX,
+            voyage.VelocityY,
+            voyage.VelocityZ
+        };
+        foreach (double value in values)
+        {
+            if (!double.IsFinite(value) || Math.Abs(value) > 1_000_000.0)
+            {
+                throw new InvalidDataException(
+                    "stage_one_voyage contains a non-finite or unreasonable pose.");
+            }
+        }
+    }
+
+    private static double NormalizeSignedZero(double value)
+    {
+        return Math.Abs(value) < 0.0000001 ? 0.0 : value;
     }
 
     private static ShipSystemsSaveData CanonicalizeShipSystems(

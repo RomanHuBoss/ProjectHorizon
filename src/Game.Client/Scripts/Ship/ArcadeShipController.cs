@@ -37,6 +37,12 @@ public readonly record struct ArcadeShipRuntimeState(
 
 public partial class ArcadeShipController : CharacterBody3D
 {
+    [Export]
+    public bool StartPilotEnabled { get; set; } = true;
+
+    [Export]
+    public bool AllowRuntimeReset { get; set; } = true;
+
     [Export(PropertyHint.Range, "1.0,200.0,0.5")]
     public float ForwardAcceleration { get; set; } = 20.0f;
 
@@ -92,6 +98,9 @@ public partial class ArcadeShipController : CharacterBody3D
     private ShipControlCommand _externalCommand = ShipControlCommand.Neutral;
     private bool _externalControlActive;
     private bool _manualControlEnabled = true;
+    private bool _pilotEnabled = true;
+    private uint _defaultCollisionLayer;
+    private uint _defaultCollisionMask;
     private int _runtimeErrorCount;
     private int _collisionEvents;
 
@@ -104,6 +113,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public bool AutoStabilizationEnabled { get; private set; } = true;
     public bool ExternalControlActive => _externalControlActive;
     public bool ManualControlEnabled => _manualControlEnabled;
+    public bool PilotEnabled => _pilotEnabled;
     public ShipCameraMode CameraMode { get; private set; } = ShipCameraMode.Chase;
     public int CameraSwitchCount { get; private set; }
     public int RuntimeErrorCount => _runtimeErrorCount;
@@ -121,6 +131,8 @@ public partial class ArcadeShipController : CharacterBody3D
                 "ArcadeShip scene requires chase and cockpit cameras.");
         }
 
+        _defaultCollisionLayer = CollisionLayer;
+        _defaultCollisionMask = CollisionMask;
         MotionMode = CharacterBody3D.MotionModeEnum.Floating;
         MaxSlides = 8;
         SafeMargin = 0.02f;
@@ -129,7 +141,7 @@ public partial class ArcadeShipController : CharacterBody3D
         InitializeLandingSystem();
         InitializeTouchdownSystem();
         SetCameraMode(ShipCameraMode.Chase, false);
-        Input.MouseMode = Input.MouseModeEnum.Captured;
+        SetPilotEnabled(StartPilotEnabled);
         UpdateDiagnostics();
 
         GD.Print(
@@ -140,6 +152,11 @@ public partial class ArcadeShipController : CharacterBody3D
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        if (!_pilotEnabled)
+        {
+            return;
+        }
+
         if (inputEvent is InputEventKey keyEvent &&
             keyEvent.Pressed &&
             !keyEvent.Echo)
@@ -148,6 +165,7 @@ public partial class ArcadeShipController : CharacterBody3D
             Key logical = keyEvent.Keycode;
 
             if ((physical == Key.R || logical == Key.R) &&
+                AllowRuntimeReset &&
                 !_externalControlActive)
             {
                 ResetToSpawn();
@@ -280,6 +298,47 @@ public partial class ArcadeShipController : CharacterBody3D
         {
             _mouseLookInput = Vector2.Zero;
         }
+    }
+
+    public void SetPilotEnabled(bool enabled)
+    {
+        _pilotEnabled = enabled;
+        Visible = enabled;
+        CollisionLayer = enabled ? _defaultCollisionLayer : 0u;
+        CollisionMask = enabled ? _defaultCollisionMask : 0u;
+        SetPhysicsProcess(enabled);
+        SetProcessUnhandledInput(enabled);
+
+        if (!enabled)
+        {
+            ClearExternalCommand();
+            SetManualControlEnabled(false);
+            Velocity = Vector3.Zero;
+            AngularVelocityLocal = Vector3.Zero;
+            _mouseLookInput = Vector2.Zero;
+            if (_chaseCamera is not null)
+            {
+                _chaseCamera.Current = false;
+            }
+
+            if (_cockpitCamera is not null)
+            {
+                _cockpitCamera.Current = false;
+            }
+
+            if (Input.MouseMode == Input.MouseModeEnum.Captured)
+            {
+                Input.MouseMode = Input.MouseModeEnum.Visible;
+            }
+
+            return;
+        }
+
+        SetManualControlEnabled(true);
+        SetCameraMode(CameraMode, false);
+        Input.MouseMode = Input.MouseModeEnum.Captured;
+        UpdateAtmosphereContext();
+        UpdateDiagnostics();
     }
 
     public void SetAutoStabilization(bool enabled)

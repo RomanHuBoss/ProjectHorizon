@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-04
-> **Подготовленный снимок:** `ProjectHorizon-main-ship-systems-commissioning-fix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-stage-one-voyage-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,56 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle, station services Этапа 1, core base-construction/power и planetary exploration/discovery subsystem подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует core-подсистему корабельных классов, loadout, module slots, derived stats, семи отдельно повреждаемых систем, inventory-backed repair/refuel и exact persistence. Её build/runtime/manual acceptance остаётся за `TASK-111`. Закрытые resource, services, base и exploration API не расширяются.
+**Вывод:** все пять технических прототипов, vertical slice, Industry Content v2, production network/HUD, catalog-wide resources, station services Этапа 1, base-construction/power, planetary exploration/discovery и core ship class/loadout/damage/persistence подтверждены пользователем. `TASK-110` и `TASK-111` закрыты runtime-доказательствами: F5, exact restore, one-writer persistence, commissioning и regressions прошли. Текущая mega-итерация `TASK-112` соединяет готовые подсистемы в обязательный Stage 1 end-to-end loop: repair → board → takeoff → orbital station → station services → undock → return → landing → disembark. Реальная сцена `ArcadeShip` получает derived stats из `ShipSystemsRuntime`; voyage state, fuel debits и checkpoints сохраняются без schema bump. Локальная build/runtime/manual acceptance остаётся за `TASK-113`.
 
 ## 3. Результат текущей итерации от 2026-08-04
+
+### 2026-08-04 — mega-итерация: Stage 1 end-to-end voyage (`TASK-112`)
+
+**Исходный снимок:** `ProjectHorizon-main(6)(3).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-stage-one-voyage-closure.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** PDF-ТЗ v2.0 §5.3, §14.1–14.4 и критерий Этапа 1 «repair ship → take off → visit station → return»; persistence §22.8–22.9; data-driven ship stats §14.2.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользовательская сборка commissioning-fix завершилась с `0` предупреждений и `0` ошибок;
+- `TASK-110 ... PASS` подтвердил exact `6/7/18`, commissioning transition, loadout, damage/repair, fuel, cold restore, legacy fallback, round-trip, `maxWriters=1`, `integrity=ok`;
+- gameplay restore подтвердил `shipRepaired=1; commissioned=1; modules=1; fuel=60; flightReady=1`; graceful-exit сохранил то же состояние;
+- все применимые F1–F12 regressions завершились `PASS`; поэтому `TASK-110 → VERIFIED`, `TASK-111 → VERIFIED`, все `SHIP-*` и `SHIP-ACC-*` требования закрыты.
+
+**Реализовано:**
+
+- добавлен `StageOneVoyageRuntime` с детерминированными состояниями `PlanetSurface`, `OutboundFlight`, `OrbitalStation`, `InboundFlight`, counters/checkpoints и строгой validation;
+- в vertical-slice сцену встроен настоящий `ArcadeShip.tscn`, физическая orbital station, голубой docking beacon и зелёный planetary approach ring;
+- готовый `ArcadeShipController` получил opt-in pilot activation: standalone Prototype D сохраняет прежнее поведение, а embedded ship скрыт и физически отключён до boarding;
+- `ShipSystemsRuntime.GetEffectiveStats()` непосредственно задаёт acceleration, reverse/lateral/vertical acceleration, max/boost speed и pitch/yaw/roll rates реального flight controller;
+- после starter repair повторное `E` на корабле выполняет boarding; `T` запускает takeoff/undock; `K` включает/выключает navigation assist; `E` выполняет dock/land/disembark; `F2` сохраняет смену камер ship prototype;
+- takeoff, dock, undock и landing расходуют топливо и блокируются commissioning/FlightReady/landing-system invariants; U/J/P/base-build и acceptance commands защищены от вызова во время piloting;
+- docking открывает существующий `StationServicesRuntime`, поэтому dialogue/buy/sell/quests работают в orbital checkpoint без дублирования economy API;
+- return landing увеличивает completed-loop counter только после фактического station visit; disembark возвращает player camera, collision и movement;
+- optional `save_settings.stage_one_voyage` сохраняет location, pilot flag, station visit, counters, pose, velocity и checkpoint; `ships` row position согласуется с voyage state; SQLite schema остаётся `2`;
+- cold restore поддерживает сохранение в полёте, на станции, после посадки и после завершённого loop; legacy save без блока начинает на поверхности; F8 сбрасывает voyage;
+- F5 теперь параллельно запускает `TASK-076`, `TASK-110` и новый `TASK-112` в отдельной БД `save_1.stage-one-voyage-test.db`;
+- acceptance проверяет derived-stat integration, pre-repair block, takeoff/fuel, range/speed docking rejection, station visit, undock, landing-system rejection, return landing, completed loop, exact persistence, legacy fallback, autosave log, one-writer discipline и SQLite integrity.
+
+**Статусы:**
+
+- `TASK-110`: `VERIFIED`;
+- `TASK-111`: `VERIFIED`;
+- `TASK-112`: `IMPLEMENTED`;
+- `TASK-113`: `IN_PROGRESS` — clean build, F5 triple acceptance и ручной voyage loop;
+- `TASK-006`: `BLOCKED` — ZIP не содержит `.git`.
+
+**Ожидаемая строка Output:**
+
+```text
+TASK-112 Stage 1 voyage acceptance PASS: derivedStats=1; preRepairBlocked=1; takeoff=1; fuelDebited=1; docking=1; stationVisited=1; undock=1; landing=1; loopCompleted=1; readinessRejected=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** после `TASK-113 → VERIFIED` обязательный Stage 1 journey считается end-to-end закрытым. Межсистемная galaxy travel/hyperspace, покупка другого ship class и бесшовная планета масштаба production остаются последующими subsystem blocks, но не требуют повторной реализации repair/loadout/station-services/voyage persistence.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки. Выполнены статические проверки и упаковка; фактическая компиляция и runtime-приёмка не заявляются.
 
 ### 2026-08-04 — исправление интеграции starter repair и ship commissioning (`TASK-110`)
 
@@ -3263,24 +3310,42 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `SHIP-100` | Catalog содержит шесть классов PDF §14.2 | `IMPLEMENTED` | `ships.json`: exact 6 required stable IDs; starter versatile |
-| `SHIP-101` | Каждый класс содержит все 11 параметров | `IMPLEMENTED` | Strict numeric validation of Hull/Shield/Cargo/Fuel/flight/slots/range/atmosphere |
-| `SHIP-102` | Catalog содержит семь damageable systems PDF §14.3 | `IMPLEMENTED` | Exact required IDs hull/shield/engine/impulse/hyperdrive/weapon/landing |
-| `SHIP-103` | Catalog содержит ровно 18 ShipModule outputs | `IMPLEMENTED` | Set equality with all category ShipModule recipe outputs; tags/slots/systems validated |
-| `SHIP-104` | Install/uninstall соблюдают slots и duplicate policy | `IMPLEMENTED` | Atomic preflight, deterministic slot index, exact inventory consume/refund |
-| `SHIP-105` | Active modules изменяют derived ship stats | `IMPLEMENTED` | Nine numeric effects aggregated over modules whose affected systems are online |
-| `SHIP-106` | Damage/repair работают отдельно по семи systems | `IMPLEMENTED` | Per-system health/max health; repair items and amount are catalog-defined |
-| `SHIP-107` | System failure disables dependent modules/readiness | `IMPLEMENTED` | Module Active projection; FlightReady/HyperspaceReady domain invariants |
-| `SHIP-108` | Fuel consume/refuel ограничены effective capacity | `IMPLEMENTED` | Runtime clamp; `chemical.high_energy_fuel` inventory-backed player path |
-| `SHIP-109` | Player-facing management UI доступен после starter repair | `IMPLEMENTED` | `U`; Overview/Modules/Systems; Up/Down/Tab/Enter/X/D/R |
-| `SHIP-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.ship_systems`; class/commissioned/fuel/modules/slots/system health; schema 2 |
-| `SHIP-111` | Legacy row fuel и new ship_systems fuel согласованы | `IMPLEMENTED` | Snapshot factory mirrors exact fuel; save preflight rejects mismatch |
-| `SHIP-112` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | `ShipChanged`, snapshot integration, legacy fallback, reset runtime reconstruction |
-| `SHIP-113` | Ship commissioning строго согласован со starter repair | `IMPLEMENTED` | Unrepaired/reset: commissioned=0, 7 offline, flight/hyper=0, mutations blocked; repair performs one commissioning transition |
-| `SHIP-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
-| `SHIP-ACC-101` | F5 подтверждает exact 6/7/18 и domain invariants | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 PASS в isolated DB |
-| `SHIP-ACC-102` | Manual loadout/damage/repair/refuel/restore/F8 работает | `IN_PROGRESS` | Выполнить раздел 18K после ремонта starter ship |
-| `SHIP-ACC-103` | F1–F4/F6–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F5 |
+| `SHIP-100` | Catalog содержит шесть классов PDF §14.2 | `VERIFIED` | `ships.json`: exact 6 required stable IDs; starter versatile |
+| `SHIP-101` | Каждый класс содержит все 11 параметров | `VERIFIED` | Strict numeric validation of Hull/Shield/Cargo/Fuel/flight/slots/range/atmosphere |
+| `SHIP-102` | Catalog содержит семь damageable systems PDF §14.3 | `VERIFIED` | Exact required IDs hull/shield/engine/impulse/hyperdrive/weapon/landing |
+| `SHIP-103` | Catalog содержит ровно 18 ShipModule outputs | `VERIFIED` | Set equality with all category ShipModule recipe outputs; tags/slots/systems validated |
+| `SHIP-104` | Install/uninstall соблюдают slots и duplicate policy | `VERIFIED` | Atomic preflight, deterministic slot index, exact inventory consume/refund |
+| `SHIP-105` | Active modules изменяют derived ship stats | `VERIFIED` | Nine numeric effects aggregated over modules whose affected systems are online |
+| `SHIP-106` | Damage/repair работают отдельно по семи systems | `VERIFIED` | Per-system health/max health; repair items and amount are catalog-defined |
+| `SHIP-107` | System failure disables dependent modules/readiness | `VERIFIED` | Module Active projection; FlightReady/HyperspaceReady domain invariants |
+| `SHIP-108` | Fuel consume/refuel ограничены effective capacity | `VERIFIED` | Runtime clamp; `chemical.high_energy_fuel` inventory-backed player path |
+| `SHIP-109` | Player-facing management UI доступен после starter repair | `VERIFIED` | `U`; Overview/Modules/Systems; Up/Down/Tab/Enter/X/D/R |
+| `SHIP-110` | State сохраняется без SQLite schema bump | `VERIFIED` | Optional `save_settings.ship_systems`; class/commissioned/fuel/modules/slots/system health; schema 2 |
+| `SHIP-111` | Legacy row fuel и new ship_systems fuel согласованы | `VERIFIED` | Snapshot factory mirrors exact fuel; save preflight rejects mismatch |
+| `SHIP-112` | Cold restore, graceful exit, autosave и F8 reset точны | `VERIFIED` | `ShipChanged`, snapshot integration, legacy fallback, reset runtime reconstruction |
+| `SHIP-113` | Ship commissioning строго согласован со starter repair | `VERIFIED` | Unrepaired/reset: commissioned=0, 7 offline, flight/hyper=0, mutations blocked; repair performs one commissioning transition |
+| `SHIP-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build: 0 warnings, 0 errors; Godot runtime loaded commissioning fix |
+| `SHIP-ACC-101` | F5 подтверждает exact 6/7/18 и domain invariants | `VERIFIED` | User F5: TASK-076 + TASK-110 PASS; exact 6/7/18 and commissioning invariants |
+| `SHIP-ACC-102` | Manual loadout/damage/repair/refuel/restore/F8 работает | `VERIFIED` | User restore: module=1, fuel=60, commissioned=1; domain/manual path and exact persistence confirmed |
+| `SHIP-ACC-103` | F1–F4/F6–F12 не регрессируют | `VERIFIED` | User Output: all applicable F1–F12 acceptance routes PASS |
+
+### 8.25. Stage 1 voyage and orbital-station integration
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `VOY-100` | Voyage недоступен до repair + commissioning | `IMPLEMENTED` | `TryBoard` rejects uncommissioned/not-ready ship; TASK-112 acceptance `preRepairBlocked` |
+| `VOY-101` | Реальный flight controller использует derived ship stats | `IMPLEMENTED` | `StageOneVoyageFlightProfile` maps effective acceleration/speed/maneuverability into embedded ArcadeShip |
+| `VOY-102` | Player может board и take off после ремонта | `IMPLEMENTED` | E boarding, T takeoff, camera/control handoff, Takeoff autosave |
+| `VOY-103` | Существует физическая orbital station и constrained docking | `IMPLEMENTED` | Station collision + beacon; range ≤14 m and speed ≤10 m/s |
+| `VOY-104` | Docking открывает действующие station services | `IMPLEMENTED` | Existing dialogue/buy/sell/quests runtime reused at orbital checkpoint |
+| `VOY-105` | Undock → return → landing → disembark завершают loop | `IMPLEMENTED` | Green approach marker; station-visit-gated completed loop counter |
+| `VOY-106` | Fuel и ship-system readiness влияют на voyage actions | `IMPLEMENTED` | Event fuel costs; FlightReady and landing-system checks; exact fuel persisted |
+| `VOY-107` | Voyage location/pose/counters сохраняются без schema bump | `IMPLEMENTED` | Optional `save_settings.stage_one_voyage`; ships-row position consistency; schema 2 |
+| `VOY-108` | Cold restore, graceful exit, legacy fallback и F8 reset точны | `IMPLEMENTED` | Active-flight restore and fresh surface fallback implemented; acceptance pending runtime |
+| `VOY-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
+| `VOY-ACC-101` | F5 подтверждает полный voyage domain и persistence | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 + TASK-112 PASS |
+| `VOY-ACC-102` | Manual repair→station→return loop работает | `IN_PROGRESS` | Выполнить раздел 18L; проверить controls, services, restore и F8 |
+| `VOY-ACC-103` | F1–F4/F6–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после voyage loop |
 
 ## 9. Очередь ближайших задач
 
@@ -3290,13 +3355,13 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-111` | Выполнить build/runtime/manual acceptance ship systems subsystem | Clean build `0/0`; F5 TASK-076+110; repair starter ship; install/uninstall; damage/repair/refuel; cold restore/F8; regressions |
+| 1 | `TASK-113` | Выполнить build/runtime/manual acceptance Stage 1 voyage subsystem | Clean build `0/0`; F5 TASK-076+110+112; repair→board→takeoff→dock/services→undock→land→disembark; cold restore/F8; regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-112` | После закрытия ship core выбрать следующий связный subsystem block | Рассмотреть интеграцию ship derived stats с flight scene либо Stage 1 end-to-end repair→takeoff→station→return loop |
+| 3 | `TASK-114` | После закрытия Stage 1 voyage выбрать следующий связный subsystem block | Рассмотреть combat/weapons или inter-system navigation/hyperspace без возврата к закрытым ship/voyage core APIs |
 
-**Подтверждено:** `TASK-060`–`TASK-109`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD, base construction и planetary exploration.  
-**Реализовано:** `TASK-110` — six-class catalog + starter-ship loadout/damage/fuel/persistence core.  
-**Текущая приёмочная задача:** `TASK-111`. После её закрытия новые modules добавляются data-driven без возврата к slots/damage/save core.
+**Подтверждено:** `TASK-060`–`TASK-111`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD, base construction, planetary exploration и ship core.  
+**Реализовано:** `TASK-112` — live-derived flight integration + complete Stage 1 voyage/orbital-station loop + persistence.  
+**Текущая приёмочная задача:** `TASK-113`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -5041,6 +5106,31 @@ TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalog
 17. При `FAIL` предоставить полный build log, `TASK-110 ... FAIL`, последние 260 строк Godot Output, screenshot выбранной вкладки, player coordinates, inventory count и точный шаг сценария.
 
 После выполнения критериев установить `TASK-110 → VERIFIED`, `TASK-111 → VERIFIED` и считать core ship class/loadout/damage/persistence subsystem закрытой.
+
+## 18L. Runtime-приёмка `TASK-112/TASK-113`
+
+1. Выполнить `tools\clean-build-windows10.cmd`. Требование: фактический `CoreCompile`, `Предупреждений: 0`, `Ошибок: 0`.
+2. Запустить `SalvageRepairSlice`. Проверить startup:
+
+```text
+TASK-112 Stage 1 voyage READY: loop=repair>board>takeoff>orbital_station>return>land; shipStats=live-derived; fuel=takeoff+dock+undock+landing; readiness=ship-systems; persistence=enabled; F5=acceptance; controls=E board/services/disembark,Enter dock/land,T launch/undock,K assist,F2 camera.
+```
+
+3. Один раз нажать `F5` и дождаться трёх результатов: `TASK-076 PASS`, `TASK-110 PASS`, `TASK-112 PASS`. Gameplay `save_1.db` не должен изменяться; voyage acceptance использует `save_1.stage-one-voyage-test.db`.
+4. Полная строка `TASK-112` должна содержать все единицы, `maxWriters=1`, `integrity=ok`.
+5. Нажать `F8`. Проверить `TASK-112 voyage reset PASS: location=PlanetSurface; piloted=0; stationVisited=0; takeoffs=0; dockings=0; landings=0; loops=0`.
+6. Собрать три бирюзовых `resource.salvage_alloy` и нажать `E` на красном DamagedShip. После `StarterRepairQuestCompleted` нажать `E` на корабле ещё раз. Ожидается `TASK-112 player ship boarding PASS`; player скрывается, включается chase camera настоящего ArcadeShip.
+7. Нажать `T`. Ожидается `TASK-112 player takeoff PASS`; ship переносится на launch altitude, расходует 3 fuel, голубой orbital beacon становится видимым, navigation assist включён.
+8. `K` переключает assist. При assist=1 корабль сам ориентируется и тормозит у голубого beacon; ручное управление сохраняется при assist=0. `F2` переключает chase/cockpit camera. В полёте U/J/P/base-build/acceptance commands не должны открывать наземные интерфейсы.
+9. Когда расстояние ≤14 m и скорость ≤10 m/s, нажать `Enter`. Ожидаются `TASK-112 player orbital docking PASS` и `TASK-112 player station visit PASS`; автоматически открываются station services. Проверить минимум одну вкладку dialogue/buy/sell/quests, затем закрыть `Esc`.
+10. Нажать `T`: `TASK-112 player undock PASS`, зелёный landing ring появляется над стартовой площадкой, assist направляет корабль к планете.
+11. Когда расстояние ≤18 m и скорость ≤12 m/s, нажать `Enter`. Ожидаются `TASK-112 player landing PASS` и `TASK-112 player Stage 1 loop PASS`; fuel уменьшен на суммарные event costs, `loops=1`.
+12. На поверхности нажать `E` ещё раз: `TASK-112 player disembark PASS`; возвращаются player camera/movement/collision и статический repaired ship.
+13. Повторно board/takeoff и штатно закрыть игру в outbound flight либо оставить корабль docked. После запуска проверить `TASK-112 voyage restore PASS`: location, piloted, pose, velocity, station flags, counters и fuel совпадают; offline progress отсутствует. Завершить return/landing.
+14. Нажать `F8` и проверить полный reset voyage и starter repair. Затем выполнить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`, после чего повторить `F5`.
+15. Для подтверждения прислать build summary, полную строку `TASK-112 ... PASS`, строки boarding/takeoff/docking/station/undock/landing/loop/disembark/restore/reset и screenshot ship у orbital beacon либо station.
+
+После выполнения критериев установить `TASK-112 → VERIFIED`, `TASK-113 → VERIFIED` и считать Stage 1 end-to-end journey закрытым.
 
 ## 19. Шаблон новой записи
 

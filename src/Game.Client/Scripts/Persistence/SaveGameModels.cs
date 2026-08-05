@@ -183,6 +183,26 @@ public sealed record ShipSystemsSaveData(
     IReadOnlyList<ShipSystemHealthSaveData> Systems,
     bool? Commissioned = null);
 
+public sealed record StageOneVoyageSaveData(
+    StageOneVoyageLocation Location,
+    bool Piloted,
+    bool StationVisited,
+    bool StationVisitedThisLoop,
+    int TakeoffCount,
+    int DockingCount,
+    int LandingCount,
+    int CompletedLoops,
+    double PositionX,
+    double PositionY,
+    double PositionZ,
+    double RotationX,
+    double RotationY,
+    double RotationZ,
+    double VelocityX,
+    double VelocityY,
+    double VelocityZ,
+    string LastCheckpoint);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -199,7 +219,8 @@ public sealed record SaveGameSnapshot(
     StationServicesSaveData? StationServices = null,
     BaseConstructionSaveData? BaseConstruction = null,
     PlanetaryExplorationSaveData? PlanetaryExploration = null,
-    ShipSystemsSaveData? ShipSystems = null);
+    ShipSystemsSaveData? ShipSystems = null,
+    StageOneVoyageSaveData? StageOneVoyage = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

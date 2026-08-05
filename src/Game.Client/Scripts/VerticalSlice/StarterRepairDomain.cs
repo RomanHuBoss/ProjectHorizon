@@ -770,7 +770,8 @@ public static class StarterRepairSnapshotFactory
         StationServicesSaveData? stationServices = null,
         BaseConstructionSaveData? baseConstruction = null,
         PlanetaryExplorationSaveData? planetaryExploration = null,
-        ShipSystemsSaveData? shipSystems = null)
+        ShipSystemsSaveData? shipSystems = null,
+        StageOneVoyageSaveData? stageOneVoyage = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -785,6 +786,26 @@ public static class StarterRepairSnapshotFactory
         {
             throw new InvalidOperationException(
                 "Ship commissioning state must match starter repair state.");
+        }
+
+        if (!session.ShipRepaired && stageOneVoyage is not null &&
+            (stageOneVoyage.Piloted ||
+             stageOneVoyage.Location != StageOneVoyageLocation.PlanetSurface ||
+             stageOneVoyage.TakeoffCount > 0 ||
+             stageOneVoyage.DockingCount > 0 ||
+             stageOneVoyage.LandingCount > 0 ||
+             stageOneVoyage.CompletedLoops > 0))
+        {
+            throw new InvalidOperationException(
+                "An unrepaired starter ship cannot contain voyage progress.");
+        }
+
+        if (stageOneVoyage is not null &&
+            stageOneVoyage.Location != StageOneVoyageLocation.PlanetSurface &&
+            shipSystems?.Commissioned != true)
+        {
+            throw new InvalidOperationException(
+                "An active voyage requires a commissioned ship-system snapshot.");
         }
 
         if (revision <= 0)
@@ -815,9 +836,9 @@ public static class StarterRepairSnapshotFactory
                 "Horizon Starter",
                 session.ShipRepaired ? session.RepairedHealth : 28.0,
                 shipSystems?.Fuel ?? 35.0,
-                0.0,
-                1.0,
-                -10.0),
+                stageOneVoyage?.PositionX ?? 0.0,
+                stageOneVoyage?.PositionY ?? 1.0,
+                stageOneVoyage?.PositionZ ?? -10.0),
             session.CollectedResources
                 .Select(resource => new InventoryItemSaveData(
                     $"item.{resource.ResourceNodeId}",
@@ -850,7 +871,8 @@ public static class StarterRepairSnapshotFactory
             stationServices,
             baseConstruction,
             planetaryExploration,
-            shipSystems);
+            shipSystems,
+            stageOneVoyage);
     }
 }
 

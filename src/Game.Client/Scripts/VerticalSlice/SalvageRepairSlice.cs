@@ -399,6 +399,8 @@ public partial class SalvageRepairSlice : Node3D
                 "Vertical slice scene is missing HUD, player or ship.");
         }
 
+        BindStageOneVoyageSceneNodes();
+
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
             LoadStationServicesCatalog(catalog);
@@ -474,6 +476,7 @@ public partial class SalvageRepairSlice : Node3D
             repairRecipe,
             technologyProgression.IsUnlocked,
             stationRecipes);
+        InitializeStageOneVoyageRuntime(saveData: null);
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -558,7 +561,9 @@ public partial class SalvageRepairSlice : Node3D
             "regression, F9/F10/F11/F12 for regressions, F7 for complete " +
             "resource acceptance or F8 to reset. Press G for base build mode, " +
             "P for scanner pulse, J for the discovery catalog and U for ship " +
-            "management.");
+            "management. After starter repair press E on the ship to board; " +
+            "T launches or undocks, K toggles navigation assist and E docks, " +
+            "lands or disembarks.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -624,7 +629,13 @@ public partial class SalvageRepairSlice : Node3D
             "loadout=U; damage=per-system; repair=inventory-backed; " +
             "persistence=enabled; F5=acceptance.");
         GD.Print(
-            "TASK-104 player coordinate HUD READY: source=Player.GlobalPosition; " +
+            "TASK-112 Stage 1 voyage READY: " +
+            "loop=repair>board>takeoff>orbital_station>return>land; " +
+            "shipStats=live-derived; fuel=takeoff+dock+undock+landing; " +
+            "readiness=ship-systems; persistence=enabled; F5=acceptance; " +
+            "controls=E board/services/disembark,Enter dock/land,T launch/undock,K assist,F2 camera.");
+        GD.Print(
+            "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
     }
@@ -664,6 +675,7 @@ public partial class SalvageRepairSlice : Node3D
         PollBaseConstructionAcceptanceTask();
         PollPlanetaryExplorationAcceptanceTask();
         PollShipSystemsAcceptanceTask();
+        PollStageOneVoyageAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -674,6 +686,7 @@ public partial class SalvageRepairSlice : Node3D
         PollProductionNetworkHudAcceptanceTask();
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
+        UpdateStageOneVoyage(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
@@ -858,7 +871,12 @@ public partial class SalvageRepairSlice : Node3D
 
         if (_stationServicesOpen)
         {
-            if (Matches(physical, logical, Key.Escape))
+            if (_stationServicesOpenedFromVoyage &&
+                Matches(physical, logical, Key.T))
+            {
+                BeginStageOneUndock();
+            }
+            else if (Matches(physical, logical, Key.Escape))
             {
                 CloseStationServices("station services closed");
             }
@@ -947,6 +965,12 @@ public partial class SalvageRepairSlice : Node3D
                 ConfirmSelectorSelection();
             }
 
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (HandleStageOneVoyageInput(physical, logical))
+        {
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -2421,10 +2445,11 @@ public partial class SalvageRepairSlice : Node3D
             if (!ShipSystems.Commissioned)
             {
                 ShipSystems.Commission(out _);
+                ConfigureVoyageShipFromDerivedStats();
                 QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
             }
 
-            OpenShipManagement();
+            TryBoardStageOneVoyage(interactor);
             return;
         }
 
@@ -2434,10 +2459,12 @@ public partial class SalvageRepairSlice : Node3D
             throw new InvalidOperationException(commissioningResult);
         }
 
+        ConfigureVoyageShipFromDerivedStats();
         MirrorSessionConsumptionToGameplayNetwork(RepairRecipe.Inputs);
         MirrorSessionGrantToGameplayNetwork(RepairRecipe.Outputs);
         _shipTerminal?.SetRepaired(true);
         _lastDomainEvent = "StarterRepairQuestCompleted";
+        _status = "starter ship repaired and commissioned; press E on it again to board";
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
         GD.Print(
             "Vertical slice domain event: StarterRepairQuestCompleted; " +
@@ -4739,6 +4766,7 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionAcceptanceTask is null &&
             _planetaryExplorationAcceptanceTask is null &&
             _shipSystemsAcceptanceTask is null &&
+            _stageOneVoyageAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -4750,6 +4778,7 @@ public partial class SalvageRepairSlice : Node3D
             !_baseBuildMode &&
             !_discoveryCatalogOpen &&
             !_shipManagementOpen &&
+            !(_stageOneVoyageRuntime?.Piloted ?? false) &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
             !_autosave.IsBusy &&
@@ -5183,8 +5212,9 @@ public partial class SalvageRepairSlice : Node3D
             ShipSystemsCatalog,
             RepairRecipe,
             _lifetimeCancellation.Token);
+        BeginStageOneVoyageAcceptance(directory);
         _status =
-            "TASK-076/TASK-110 runtime matrix and ship systems acceptance running";
+            "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance running";
     }
 
     private void BeginReset()
@@ -5223,7 +5253,8 @@ public partial class SalvageRepairSlice : Node3D
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
-            shipSystems: ShipSystems.CreateSaveData());
+            shipSystems: ShipSystems.CreateSaveData(),
+            stageOneVoyage: StageOneVoyage.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -5272,6 +5303,7 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionAcceptanceTask is not null ||
             _planetaryExplorationAcceptanceTask is not null ||
             _shipSystemsAcceptanceTask is not null ||
+            _stageOneVoyageAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -5300,7 +5332,8 @@ public partial class SalvageRepairSlice : Node3D
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
-            shipSystems: ShipSystems.CreateSaveData());
+            shipSystems: ShipSystems.CreateSaveData(),
+            stageOneVoyage: StageOneVoyage.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -5327,7 +5360,10 @@ public partial class SalvageRepairSlice : Node3D
             $"shipFuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
             $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
-            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
+            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
+            $"voyageLocation={StageOneVoyage.Location}; " +
+            $"voyagePiloted={(StageOneVoyage.Piloted ? 1 : 0)}; " +
+            $"voyageLoops={StageOneVoyage.CompletedLoops}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -5396,8 +5432,10 @@ public partial class SalvageRepairSlice : Node3D
                 ShipSystemsCatalog,
                 snapshot?.ShipSystems,
                 commissioned: Session.ShipRepaired);
+            InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             _revision = snapshot?.Revision ?? 0;
-            if (snapshot is not null && _player is not null)
+            if (snapshot is not null && _player is not null &&
+                !StageOneVoyage.Piloted)
             {
                 _player.GlobalPosition = new Vector3(
                     (float)snapshot.Player.PositionX,
@@ -5416,6 +5454,7 @@ public partial class SalvageRepairSlice : Node3D
             _activeCraftingStation = null;
             _craftingInteractorName = "unknown";
             ApplySessionToScene();
+            ApplyStageOneVoyageToScene();
             _state = SalvageRepairSliceState.Ready;
             _status = snapshot is null
                 ? "new starter repair objective"
@@ -5463,6 +5502,16 @@ public partial class SalvageRepairSlice : Node3D
                 $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
                 $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
                 $"legacyFallback={(snapshot?.ShipSystems is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-112 voyage restore PASS: " +
+                $"location={StageOneVoyage.Location}; " +
+                $"piloted={(StageOneVoyage.Piloted ? 1 : 0)}; " +
+                $"stationVisited={(StageOneVoyage.StationVisited ? 1 : 0)}; " +
+                $"takeoffs={StageOneVoyage.TakeoffCount}; " +
+                $"dockings={StageOneVoyage.DockingCount}; " +
+                $"landings={StageOneVoyage.LandingCount}; " +
+                $"loops={StageOneVoyage.CompletedLoops}; " +
+                $"legacyFallback={(snapshot?.StageOneVoyage is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -5528,6 +5577,7 @@ public partial class SalvageRepairSlice : Node3D
                 PlanetaryPoiCatalog,
                 _planetaryPoiPlacements);
             _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
+            InitializeStageOneVoyageRuntime(saveData: null);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
@@ -5549,6 +5599,7 @@ public partial class SalvageRepairSlice : Node3D
             }
 
             ApplySessionToScene();
+            ApplyStageOneVoyageToScene();
             _state = SalvageRepairSliceState.Ready;
             _status =
                 $"slot reset; collect {Session.RequiredSalvage} x " +
@@ -5564,6 +5615,15 @@ public partial class SalvageRepairSlice : Node3D
                 $"commissioned={(ShipSystems.Commissioned ? 1 : 0)}; " +
                 $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
                 $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}.");
+            GD.Print(
+                "TASK-112 voyage reset PASS: " +
+                $"location={StageOneVoyage.Location}; " +
+                $"piloted={(StageOneVoyage.Piloted ? 1 : 0)}; " +
+                $"stationVisited={(StageOneVoyage.StationVisited ? 1 : 0)}; " +
+                $"takeoffs={StageOneVoyage.TakeoffCount}; " +
+                $"dockings={StageOneVoyage.DockingCount}; " +
+                $"landings={StageOneVoyage.LandingCount}; " +
+                $"loops={StageOneVoyage.CompletedLoops}.");
         }
         catch (Exception exception)
         {
@@ -6132,20 +6192,23 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (_catalogMatrixAcceptanceTask is not null ||
             _shipSystemsAcceptanceTask is not null ||
+            _stageOneVoyageAcceptanceTask is not null ||
             _catalogMatrixAcceptanceReport is null ||
-            _shipSystemsAcceptanceReport is null)
+            _shipSystemsAcceptanceReport is null ||
+            _stageOneVoyageAcceptanceReport is null)
         {
             return;
         }
 
         bool passed = _catalogMatrixAcceptanceReport.Passed &&
-            _shipSystemsAcceptanceReport.Passed;
+            _shipSystemsAcceptanceReport.Passed &&
+            _stageOneVoyageAcceptanceReport.Passed;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110 runtime matrix and ship systems acceptance passed"
-            : "TASK-076/TASK-110 runtime matrix and ship systems acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance passed"
+            : "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -6774,8 +6837,8 @@ public partial class SalvageRepairSlice : Node3D
         else if (_hudMode == SalvageRepairHudMode.Detailed)
         {
             _hudMargin.OffsetRight = 1140.0f;
-            _hudMargin.OffsetBottom = 720.0f;
-            _hudLabel.CustomMinimumSize = new Vector2(1090.0f, 665.0f);
+            _hudMargin.OffsetBottom = 770.0f;
+            _hudLabel.CustomMinimumSize = new Vector2(1090.0f, 715.0f);
         }
     }
 
@@ -6788,11 +6851,19 @@ public partial class SalvageRepairSlice : Node3D
 
         if (_playerCoordinatesLabel is not null)
         {
-            _playerCoordinatesLabel.Text = _player is null
-                ? "PLAYER POS unavailable"
-                : $"PLAYER POS  X={_player.GlobalPosition.X:0.0}  " +
-                  $"Y={_player.GlobalPosition.Y:0.0}  " +
-                  $"Z={_player.GlobalPosition.Z:0.0}";
+            Node3D? coordinateSource =
+                (_stageOneVoyageRuntime?.Piloted ?? false)
+                    ? _voyageShip
+                    : _player;
+            string coordinateLabel =
+                (_stageOneVoyageRuntime?.Piloted ?? false)
+                    ? "SHIP POS"
+                    : "PLAYER POS";
+            _playerCoordinatesLabel.Text = coordinateSource is null
+                ? $"{coordinateLabel} unavailable"
+                : $"{coordinateLabel}  X={coordinateSource.GlobalPosition.X:0.0}  " +
+                  $"Y={coordinateSource.GlobalPosition.Y:0.0}  " +
+                  $"Z={coordinateSource.GlobalPosition.Z:0.0}";
         }
 
         if (_selectorStation is not null)
@@ -6921,8 +6992,20 @@ public partial class SalvageRepairSlice : Node3D
               $"lastRev={_autosave.LastSavedRevision} • " +
               $"last={_autosave.LastCompletedTriggerSummary} • " +
               $"next={nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)}s";
-        string interaction = _player?.GetInteractionPrompt() ??
-            "interaction unavailable";
+        string interaction = (_stageOneVoyageRuntime?.Piloted ?? false)
+            ? StageOneVoyage.Location switch
+            {
+                StageOneVoyageLocation.PlanetSurface =>
+                    "ship landed — E disembark",
+                StageOneVoyageLocation.OutboundFlight =>
+                    "fly to blue orbital beacon — E dock when slow and within 14 m",
+                StageOneVoyageLocation.OrbitalStation =>
+                    "docked — E station services, T undock after closing services",
+                StageOneVoyageLocation.InboundFlight =>
+                    "fly to green landing ring — E land when slow and within 18 m",
+                _ => "voyage interaction unavailable"
+            }
+            : _player?.GetInteractionPrompt() ?? "interaction unavailable";
         string stationServicesLine =
             $"Station services: {StationServices.BuildSummary()} • " +
             $"NPC={StationServices.NpcId}";
@@ -6945,11 +7028,12 @@ public partial class SalvageRepairSlice : Node3D
             $"commissioned={(ShipSystems.Commissioned ? 1 : 0)} • " +
             $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
             $"hyper={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
+        string voyageLine = BuildStageOneVoyageHudLine();
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
             _hudLabel.Text =
-                "VERTICAL SLICE 1 • INDUSTRY + TRADE + QUESTS + EXPLORATION + SHIP SYSTEMS • H - HUD\n" +
+                "VERTICAL SLICE 1 • INDUSTRY + EXPLORATION + SHIP SYSTEMS + STAGE 1 VOYAGE • H - HUD\n" +
                 $"{databaseLine}\n" +
                 $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
                 $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
@@ -6960,6 +7044,7 @@ public partial class SalvageRepairSlice : Node3D
                 baseConstructionLine + "\n" +
                 explorationLine + "\n" +
                 shipSystemsLine + "\n" +
+                voyageLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -6976,17 +7061,18 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
+                $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
                 "E - interact/select • U - ship management • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
 
         _hudLabel.Text =
-            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> RESEARCH -> CRAFT -> TRADE -> QUEST -> EXPLORE -> SHIP SYSTEMS -> AUTOSAVE • H - HUD\n" +
+            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> INDUSTRY -> EXPLORE -> BOARD -> TAKEOFF -> STATION -> RETURN -> LAND -> AUTOSAVE • H - HUD\n" +
             databaseLine + "\n" +
             contentLine + "\n" +
             technologyLine + "\n" +
@@ -6998,6 +7084,7 @@ public partial class SalvageRepairSlice : Node3D
             baseConstructionLine + "\n" +
             explorationLine + "\n" +
             shipSystemsLine + "\n" +
+            voyageLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -7023,6 +7110,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
+            $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -7036,9 +7124,9 @@ public partial class SalvageRepairSlice : Node3D
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems + Stage 1 voyage • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
-            "F8 - reset • Esc - close selector/release mouse";
+            "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
     }
 
     private ProductionNetworkHudSnapshot
