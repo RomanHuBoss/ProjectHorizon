@@ -578,6 +578,24 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        GalaxyNavigationSaveData? expectedGalaxy = expected.GalaxyNavigation;
+        GalaxyNavigationSaveData? actualGalaxy = actual.GalaxyNavigation;
+        if ((expectedGalaxy is null) != (actualGalaxy is null))
+        {
+            mismatch = "galaxy_navigation presence differs";
+            return false;
+        }
+
+        if (expectedGalaxy is not null && actualGalaxy is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizeGalaxyNavigation(expectedGalaxy)),
+                JsonSerializer.Serialize(CanonicalizeGalaxyNavigation(actualGalaxy)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "galaxy_navigation differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -999,7 +1017,7 @@ public sealed partial class SaveDatabase : IDisposable
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
             "'base_construction', 'planetary_exploration', 'ship_systems', " +
-            "'stage_one_voyage');",
+            "'stage_one_voyage', 'galaxy_navigation');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1141,6 +1159,28 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeStageOneVoyage(snapshot.StageOneVoyage))));
+        }
+
+        if (snapshot.GalaxyNavigation is not null)
+        {
+            ValidateGalaxyNavigation(snapshot.GalaxyNavigation);
+            if (!string.Equals(
+                snapshot.VisitedPlanet.SystemId,
+                snapshot.GalaxyNavigation.CurrentSystemId,
+                StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    "visited planet system differs from galaxy_navigation current system.");
+            }
+
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'galaxy_navigation', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeGalaxyNavigation(snapshot.GalaxyNavigation))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1385,6 +1425,7 @@ public sealed partial class SaveDatabase : IDisposable
         PlanetaryExplorationSaveData? planetaryExploration = null;
         ShipSystemsSaveData? shipSystems = null;
         StageOneVoyageSaveData? stageOneVoyage = null;
+        GalaxyNavigationSaveData? galaxyNavigation = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1396,7 +1437,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
-                "'ship_systems', 'stage_one_voyage') " +
+                "'ship_systems', 'stage_one_voyage', 'galaxy_navigation') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1643,6 +1684,32 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "galaxy_navigation",
+            out string? galaxyNavigationJson))
+        {
+            if (string.IsNullOrWhiteSpace(galaxyNavigationJson))
+            {
+                throw new InvalidDataException(
+                    "galaxy_navigation setting is empty.");
+            }
+
+            try
+            {
+                galaxyNavigation = JsonSerializer.Deserialize<
+                    GalaxyNavigationSaveData>(galaxyNavigationJson) ??
+                    throw new InvalidDataException(
+                        "galaxy_navigation setting deserialized to null.");
+                ValidateGalaxyNavigation(galaxyNavigation);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "galaxy_navigation setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1720,6 +1787,15 @@ public sealed partial class SaveDatabase : IDisposable
                 reader.GetInt32(3));
         }
 
+        if (galaxyNavigation is not null && !string.Equals(
+            visitedPlanet.SystemId,
+            galaxyNavigation.CurrentSystemId,
+            StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "visited planet system differs from galaxy_navigation current system.");
+        }
+
         return new SaveGameSnapshot(
             slotId,
             revision,
@@ -1737,7 +1813,8 @@ public sealed partial class SaveDatabase : IDisposable
             baseConstruction,
             planetaryExploration,
             shipSystems,
-            stageOneVoyage);
+            stageOneVoyage,
+            galaxyNavigation);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -1960,6 +2037,68 @@ public sealed partial class SaveDatabase : IDisposable
                 throw new InvalidDataException(
                     "stage_one_voyage contains a non-finite or unreasonable pose.");
             }
+        }
+    }
+
+    private static GalaxyNavigationSaveData CanonicalizeGalaxyNavigation(
+        GalaxyNavigationSaveData navigation)
+    {
+        ArgumentNullException.ThrowIfNull(navigation);
+        return navigation with
+        {
+            TotalDistanceLightYears = NormalizeSignedZero(
+                navigation.TotalDistanceLightYears),
+            VisitedSystemIds = navigation.VisitedSystemIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateGalaxyNavigation(
+        GalaxyNavigationSaveData navigation)
+    {
+        ArgumentNullException.ThrowIfNull(navigation);
+        if (navigation.UniverseSeed <= 0 ||
+            !GameContentCatalog.IsStableId(navigation.GalaxyId) ||
+            !string.Equals(
+                navigation.GalaxyId,
+                GalaxyNavigationRuntime.PrimaryGalaxyId,
+                StringComparison.Ordinal) ||
+            !GameContentCatalog.IsStableId(navigation.CurrentSystemId) ||
+            (!string.IsNullOrEmpty(navigation.SelectedDestinationSystemId) &&
+             !GameContentCatalog.IsStableId(
+                 navigation.SelectedDestinationSystemId)) ||
+            (string.IsNullOrEmpty(navigation.SelectedDestinationSystemId) &&
+             (navigation.SelectedSectorX != 0 ||
+              navigation.SelectedSectorY != 0 ||
+              navigation.SelectedSectorZ != 0)) ||
+            navigation.JumpCount < 0 ||
+            !double.IsFinite(navigation.TotalDistanceLightYears) ||
+            navigation.TotalDistanceLightYears < 0.0 ||
+            navigation.VisitedSystemIds is null ||
+            navigation.VisitedSystemIds.Count is < 1 or >
+                GalaxyNavigationRuntime.MaximumVisitedSystems ||
+            navigation.VisitedSystemIds.Any(id =>
+                !GameContentCatalog.IsStableId(id)) ||
+            navigation.VisitedSystemIds
+                .Distinct(StringComparer.Ordinal).Count() !=
+                navigation.VisitedSystemIds.Count ||
+            !navigation.VisitedSystemIds.Contains(
+                navigation.CurrentSystemId,
+                StringComparer.Ordinal))
+        {
+            throw new InvalidDataException(
+                "galaxy_navigation contains invalid identity, counters or visited systems.");
+        }
+
+        GalaxyNavigationRuntime runtime = new(navigation);
+        if (!string.Equals(
+            runtime.CurrentSystem.SystemId,
+            navigation.CurrentSystemId,
+            StringComparison.Ordinal))
+        {
+            throw new InvalidDataException(
+                "galaxy_navigation current system is not deterministic.");
         }
     }
 

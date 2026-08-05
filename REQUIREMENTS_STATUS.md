@@ -1,8 +1,8 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-04
-> **Подготовленный снимок:** `ProjectHorizon-main-stage-one-voyage-closure.zip`
+> **Последняя актуализация:** 2026-08-05
+> **Подготовленный снимок:** `ProjectHorizon-main-galaxy-hyperspace-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -38,9 +38,61 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, Industry Content v2, production network/HUD, catalog-wide resources, station services Этапа 1, base-construction/power, planetary exploration/discovery и core ship class/loadout/damage/persistence подтверждены пользователем. `TASK-110` и `TASK-111` закрыты runtime-доказательствами: F5, exact restore, one-writer persistence, commissioning и regressions прошли. Текущая mega-итерация `TASK-112` соединяет готовые подсистемы в обязательный Stage 1 end-to-end loop: repair → board → takeoff → orbital station → station services → undock → return → landing → disembark. Реальная сцена `ArcadeShip` получает derived stats из `ShipSystemsRuntime`; voyage state, fuel debits и checkpoints сохраняются без schema bump. Локальная build/runtime/manual acceptance остаётся за `TASK-113`.
+**Вывод:** все пять технических прототипов, vertical slice, Industry Content v2, production network/HUD, catalog-wide resources, station services Этапа 1, base-construction/power, planetary exploration/discovery, core ship systems и полный Stage 1 voyage подтверждены пользователем. `TASK-112` и `TASK-113` закрыты прямыми runtime-доказательствами: F5 прошёл, активный `InboundFlight` восстановился, посадка завершилась при distance `2.775` и speed `0`, `loops=1`, disembark восстановил управление персонажем, повторный boarding/takeoff также прошёл. Текущая mega-итерация `TASK-114` реализует следующий связный блок ТЗ: детерминированную on-demand galaxy, иерархические координаты, system/galaxy maps, range-aware route planning, hyperspace jumps, discovery history и persistence без schema bump. Локальная build/runtime/manual acceptance остаётся за `TASK-115`.
 
-## 3. Результат текущей итерации от 2026-08-04
+## 3. Результат текущей итерации от 2026-08-05
+
+### 2026-08-05 — mega-итерация: procedural galaxy, maps, routing and hyperspace (`TASK-114`)
+
+**Исходный снимок:** `ProjectHorizon-main(7)(2).zip` — последняя редакция с GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-galaxy-hyperspace-closure.zip`.  
+**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования:** PDF-ТЗ v2.0 §5 (межсистемные переходы), §6 (иерархические координаты), §7 (seed hierarchy), §14 (HyperdriveRange и hyperdrive system), §22.8 (autosave после hyperspace), §31 (system/galaxy maps), §36 (golden seed/coordinates и 100 hyperjumps), roadmap Этапа 3.
+
+**Синхронизация предыдущей приёмки:**
+
+- пользовательский F5 завершил `TASK-076`, `TASK-110` и `TASK-112` с `PASS`, `maxWriters=1`, `integrity=ok`;
+- сохранение точно восстановило `location=InboundFlight; piloted=1; stationVisited=1; takeoffs=1; dockings=1`;
+- ручная посадка завершилась `distance=2.775; speed=0; fuel=28; landings=1; loops=1`;
+- `TASK-112 player Stage 1 loop PASS` и `TASK-112 player disembark PASS` подтвердили полный end-to-end маршрут и возврат player control;
+- повторный boarding и takeoff прошли, поэтому `TASK-112 → VERIFIED`, `TASK-113 → VERIFIED`.
+
+**Реализовано:**
+
+- добавлен `GalaxyNavigationRuntime`: systems генерируются on-demand из immutable universe seed и sector coordinates, без хранения всей галактики в памяти;
+- введена иерархия `GalaxyId + SectorX/Y/Z + double system position`; starter system сохраняет совместимые IDs `system.vertical_slice` и `planet.vertical_slice`;
+- генератор создаёт шесть типов звёзд, от 1 до 8 планет, archetype, atmosphere/water flags, moons, economy, danger и deterministic planet seeds;
+- `M` открывает единый map terminal: вкладка Galaxy показывает nearby systems, sector coordinates, star type, distance, visited state и route jump count; вкладка System показывает планеты текущей системы;
+- destination selection и A* route planning учитывают фактический `ShipEffectiveStats.HyperdriveRange`; маршрут строится по 26 соседним sectors и не допускает waypoint вне range;
+- hyperspace доступен только для commissioned/flight-ready ship с исправным hyperdrive и активным hyperspace module, только из `OrbitalStation`; fuel списывается по фактической длине waypoint jump;
+- после jump корабль остаётся docked у orbital checkpoint новой системы, поэтому существующие station services и Stage 1 voyage API переиспользуются без параллельной экономики;
+- current system, selected destination, jump count, total distance и visited systems сохраняются в optional `save_settings.galaxy_navigation`; SQLite schema остаётся `2`;
+- snapshot preflight и load validation проверяют deterministic current/destination IDs, GalaxyId, visited set и согласованность с `visited_planets`;
+- player/visited-planet IDs переключаются на current system, сохраняя legacy starter IDs;
+- `F8` сбрасывает galaxy state к starter system; legacy save без блока получает deterministic starter fallback; offline progress отсутствует;
+- `F5` теперь запускает четыре независимые проверки: `TASK-076`, `TASK-110`, `TASK-112`, `TASK-114`; новый тест использует `save_1.galaxy-navigation-test.db`;
+- `TASK-114` проверяет 1000 golden-seed system samples, все star types, planet bounds, coordinate hierarchy, route constraints, precondition rejection, fuel debit, exact round-trip, cold restore, legacy fallback и 100 последовательных hyperspace jumps;
+- исправлена противоречивая startup-подсказка: docking/landing выполняются `Enter`, а `E` используется для services/disembark; `M` явно указан как map control.
+
+**Статусы:**
+
+- `TASK-112`: `VERIFIED`;
+- `TASK-113`: `VERIFIED`;
+- `TASK-114`: `IMPLEMENTED`;
+- `TASK-115`: `IN_PROGRESS` — clean build, F5 quadruple acceptance, manual map/route/jump/restore/reset and regressions;
+- `TASK-006`: `BLOCKED` — ZIP не содержит `.git`.
+
+**Ожидаемая строка Output:**
+
+```text
+TASK-114 galaxy navigation acceptance PASS: deterministic=1; coordinates=1; starCoverage=1; planetBounds=1; routePlanning=1; preconditions=1; hyperspaceJump=1; fuelDebited=1; visitedPersistence=1; stress100=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
+```
+
+**Граница закрытия:** после `TASK-115 → VERIFIED` закрываются procedural galaxy core, maps, route planning, hyperspace lifecycle и discovery persistence. Полноценные уникальные поверхности/биомы каждой новой планеты, seamless inter-scene streaming, combat encounters и межсистемная экономика остаются последующими subsystem blocks; повторная реализация coordinate hierarchy, route API и hyperspace persistence не требуется.
+
+**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки. Выполнены статические проверки, deterministic simulation и упаковка; фактическая компиляция и runtime-приёмка не заявляются.
+
+## 3A. Предыдущая итерация от 2026-08-04
 
 ### 2026-08-04 — mega-итерация: Stage 1 end-to-end voyage (`TASK-112`)
 
@@ -3333,35 +3385,55 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `VOY-100` | Voyage недоступен до repair + commissioning | `IMPLEMENTED` | `TryBoard` rejects uncommissioned/not-ready ship; TASK-112 acceptance `preRepairBlocked` |
-| `VOY-101` | Реальный flight controller использует derived ship stats | `IMPLEMENTED` | `StageOneVoyageFlightProfile` maps effective acceleration/speed/maneuverability into embedded ArcadeShip |
-| `VOY-102` | Player может board и take off после ремонта | `IMPLEMENTED` | E boarding, T takeoff, camera/control handoff, Takeoff autosave |
-| `VOY-103` | Существует физическая orbital station и constrained docking | `IMPLEMENTED` | Station collision + beacon; range ≤14 m and speed ≤10 m/s |
-| `VOY-104` | Docking открывает действующие station services | `IMPLEMENTED` | Existing dialogue/buy/sell/quests runtime reused at orbital checkpoint |
-| `VOY-105` | Undock → return → landing → disembark завершают loop | `IMPLEMENTED` | Green approach marker; station-visit-gated completed loop counter |
-| `VOY-106` | Fuel и ship-system readiness влияют на voyage actions | `IMPLEMENTED` | Event fuel costs; FlightReady and landing-system checks; exact fuel persisted |
-| `VOY-107` | Voyage location/pose/counters сохраняются без schema bump | `IMPLEMENTED` | Optional `save_settings.stage_one_voyage`; ships-row position consistency; schema 2 |
-| `VOY-108` | Cold restore, graceful exit, legacy fallback и F8 reset точны | `IMPLEMENTED` | Active-flight restore and fresh surface fallback implemented; acceptance pending runtime |
-| `VOY-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
-| `VOY-ACC-101` | F5 подтверждает полный voyage domain и persistence | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 + TASK-112 PASS |
-| `VOY-ACC-102` | Manual repair→station→return loop работает | `IN_PROGRESS` | Выполнить раздел 18L; проверить controls, services, restore и F8 |
-| `VOY-ACC-103` | F1–F4/F6–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после voyage loop |
+| `VOY-100` | Voyage недоступен до repair + commissioning | `VERIFIED` | `TryBoard` rejects uncommissioned/not-ready ship; TASK-112 acceptance `preRepairBlocked` |
+| `VOY-101` | Реальный flight controller использует derived ship stats | `VERIFIED` | `StageOneVoyageFlightProfile` maps effective acceleration/speed/maneuverability into embedded ArcadeShip |
+| `VOY-102` | Player может board и take off после ремонта | `VERIFIED` | E boarding, T takeoff, camera/control handoff, Takeoff autosave |
+| `VOY-103` | Существует физическая orbital station и constrained docking | `VERIFIED` | Station collision + beacon; range ≤14 m and speed ≤10 m/s |
+| `VOY-104` | Docking открывает действующие station services | `VERIFIED` | Existing dialogue/buy/sell/quests runtime reused at orbital checkpoint |
+| `VOY-105` | Undock → return → landing → disembark завершают loop | `VERIFIED` | Green approach marker; station-visit-gated completed loop counter |
+| `VOY-106` | Fuel и ship-system readiness влияют на voyage actions | `VERIFIED` | Event fuel costs; FlightReady and landing-system checks; exact fuel persisted |
+| `VOY-107` | Voyage location/pose/counters сохраняются без schema bump | `VERIFIED` | Optional `save_settings.stage_one_voyage`; ships-row position consistency; schema 2 |
+| `VOY-108` | Cold restore, graceful exit, legacy fallback и F8 reset точны | `VERIFIED` | Active-flight restore and fresh surface fallback implemented; user F5 and active-flight restore passed |
+| `VOY-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build/runtime evidence accepted; Stage 1 scene executed |
+| `VOY-ACC-101` | F5 подтверждает полный voyage domain и persistence | `VERIFIED` | User Output contains TASK-076 + TASK-110 + TASK-112 PASS |
+| `VOY-ACC-102` | Manual repair→station→return loop работает | `VERIFIED` | User completed restore→landing→loop→disembark and repeated boarding/takeoff |
+| `VOY-ACC-103` | F1–F4/F6–F12 не регрессируют | `VERIFIED` | Applicable regression matrix passed in preceding evidence; no voyage regression observed |
+
+
+### 8.26. Procedural galaxy, maps, routing and hyperspace subsystem
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `GAL-100` | Galaxy systems генерируются on-demand детерминированно | `IMPLEMENTED` | Immutable universe seed + sector hash; no whole-galaxy allocation |
+| `GAL-101` | Координаты иерархичны: GalaxyId/SectorXYZ/system Double3 | `IMPLEMENTED` | `galaxy.g1`; integer sectors; double system positions; starter IDs compatible |
+| `GAL-102` | System generation покрывает star/planet diversity | `IMPLEMENTED` | 6 star types; 1..8 planets; archetype, moons, atmosphere, water, economy, danger, seeds |
+| `GAL-103` | Обязательны system map и galaxy map | `IMPLEMENTED` | `M`; Tab System/Galaxy; nearby systems, planets, distances, coordinates, visited state |
+| `GAL-104` | Route planning учитывает HyperdriveRange | `IMPLEMENTED` | A* over 26 neighboring sectors; each edge range-checked; unreachable routes rejected |
+| `GAL-105` | Hyperspace имеет strict ship/location preconditions | `IMPLEMENTED` | commissioned + FlightReady + HyperspaceReady + OrbitalStation required |
+| `GAL-106` | Jump расходует fuel и обновляет current/visited state | `IMPLEMENTED` | deterministic waypoint distance/cost; jump/distance counters and visited set |
+| `GAL-107` | Arrival integrates with existing voyage/station services | `IMPLEMENTED` | Arrival remains piloted and docked at orbital checkpoint in destination system |
+| `GAL-108` | Galaxy state сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.galaxy_navigation`; schema 2; deterministic validation |
+| `GAL-109` | Cold restore, legacy fallback, graceful exit и F8 reset точны | `IMPLEMENTED` | Snapshot integration and reset implemented; runtime acceptance pending |
+| `GAL-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
+| `GAL-ACC-101` | F5 подтверждает generation/routing/100 jumps/persistence | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 + TASK-112 + TASK-114 PASS |
+| `GAL-ACC-102` | Manual map/route/jump/restore/reset работает | `IN_PROGRESS` | Выполнить раздел 18M; приобрести/install hyperspace module и jump из station |
+| `GAL-ACC-103` | F1–F4/F6–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после hyperspace jump |
 
 ## 9. Очередь ближайших задач
 
-Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
+Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Закрытые subsystem APIs не переделываются без regression evidence или изменения ТЗ.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD; core base-construction/power; planetary exploration/discovery.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD; base construction; planetary exploration; ship systems; полный Stage 1 voyage.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-113` | Выполнить build/runtime/manual acceptance Stage 1 voyage subsystem | Clean build `0/0`; F5 TASK-076+110+112; repair→board→takeoff→dock/services→undock→land→disembark; cold restore/F8; regressions |
+| 1 | `TASK-115` | Выполнить build/runtime/manual acceptance galaxy+hyperspace subsystem | Clean build `0/0`; F5 TASK-076+110+112+114; M maps; route/jump; restore/F8; regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-114` | После закрытия Stage 1 voyage выбрать следующий связный subsystem block | Рассмотреть combat/weapons или inter-system navigation/hyperspace без возврата к закрытым ship/voyage core APIs |
+| 3 | `TASK-116` | После закрытия galaxy navigation выбрать следующий связный subsystem block | Рассмотреть combat/weapons/hostile encounters либо multi-planet system surfaces, не меняя закрытые navigation APIs |
 
-**Подтверждено:** `TASK-060`–`TASK-111`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD, base construction, planetary exploration и ship core.  
-**Реализовано:** `TASK-112` — live-derived flight integration + complete Stage 1 voyage/orbital-station loop + persistence.  
-**Текущая приёмочная задача:** `TASK-113`.
+**Подтверждено:** `TASK-060`–`TASK-113`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD, base construction, planetary exploration, ship systems и Stage 1 voyage.  
+**Реализовано:** `TASK-114` — procedural galaxy + hierarchical coordinates + maps + routing + hyperspace + discovery persistence.  
+**Текущая приёмочная задача:** `TASK-115`.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -5131,6 +5203,31 @@ TASK-112 Stage 1 voyage READY: loop=repair>board>takeoff>orbital_station>return>
 15. Для подтверждения прислать build summary, полную строку `TASK-112 ... PASS`, строки boarding/takeoff/docking/station/undock/landing/loop/disembark/restore/reset и screenshot ship у orbital beacon либо station.
 
 После выполнения критериев установить `TASK-112 → VERIFIED`, `TASK-113 → VERIFIED` и считать Stage 1 end-to-end journey закрытым.
+
+
+## 18M. Runtime-приёмка `TASK-114/TASK-115`
+
+1. Выполнить `tools\clean-build-windows10.cmd`. Требование: фактический `CoreCompile`, `Предупреждений: 0`, `Ошибок: 0`.
+2. Запустить `SalvageRepairSlice`. Проверить startup:
+
+```text
+TASK-114 galaxy navigation READY: galaxy=galaxy.g1; system=system.vertical_slice; sector=0,0,0; seed=20260805; starTypes=6; generation=on-demand; coordinates=galaxy+sector+double3; maps=M; route=A*+range; hyperspace=station-only; persistence=enabled; F5=acceptance.
+```
+
+3. Один раз нажать `F5` и дождаться четырёх результатов: `TASK-076 PASS`, `TASK-110 PASS`, `TASK-112 PASS`, `TASK-114 PASS`. Gameplay `save_1.db` не должен изменяться; galaxy acceptance использует `save_1.galaxy-navigation-test.db`.
+4. Полная строка `TASK-114` должна содержать все единицы, `stress100=1`, `maxWriters=1`, `integrity=ok`.
+5. Нажать `F8`. Проверить `TASK-114 galaxy navigation reset PASS: galaxy=galaxy.g1; system=system.vertical_slice; sector=0,0,0; visited=1; jumps=0; distance=0.0ly`.
+6. Отремонтировать starter ship, приобрести у trader `module.ship.hyperspace_core` либо изготовить/получить `module.ship.compotium_drive_core`, открыть `U → Modules`, выбрать модуль и установить его. Overview должен показать `hyper=READY`.
+7. Выполнить Stage 1 takeoff и docking к orbital station. Hyperspace deliberately недоступен с поверхности и во время outbound/inbound flight.
+8. На station нажать `M`. Galaxy tab должен показать nearby systems с sector coordinates, star type, distance, route count и VISITED/NEW. `Tab` переключает System tab с 1..8 planets текущей системы.
+9. В Galaxy tab выбрать destination `Up/Down`, нажать `Enter`. При достаточном range/fuel ожидается `TASK-114 player hyperspace jump PASS`; current system/sector меняются, fuel уменьшается, visited и jump counters растут, ship остаётся docked у orbital checkpoint новой системы.
+10. Для multi-waypoint route повторять `Enter`, пока destination не достигнут. Ни один waypoint не должен превышать effective HyperdriveRange.
+11. Штатно закрыть игру после минимум одного jump. После запуска проверить `TASK-114 galaxy navigation restore PASS`: GalaxyId/current sector/system, selected destination, jumps, distance и visited set совпадают; voyage остаётся `OrbitalStation`, offline progress отсутствует.
+12. Нажать `M` и проверить VISITED для пройденной системы. Нажать `F8`: возврат к `system.vertical_slice`, visited=1, jumps=0; ship/voyage также сброшены.
+13. Выполнить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`, затем повторить `F5`.
+14. Для подтверждения прислать build summary, полную строку `TASK-114 ... PASS`, startup/restore/reset lines, строку player hyperspace jump и screenshot обеих вкладок `M`.
+
+После выполнения критериев установить `TASK-114 → VERIFIED`, `TASK-115 → VERIFIED` и считать procedural galaxy/navigation/hyperspace subsystem закрытой.
 
 ## 19. Шаблон новой записи
 

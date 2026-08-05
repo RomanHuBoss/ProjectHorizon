@@ -400,6 +400,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         BindStageOneVoyageSceneNodes();
+        BindGalaxyNavigationSceneNodes();
 
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
@@ -477,6 +478,7 @@ public partial class SalvageRepairSlice : Node3D
             technologyProgression.IsUnlocked,
             stationRecipes);
         InitializeStageOneVoyageRuntime(saveData: null);
+        InitializeGalaxyNavigationRuntime(saveData: null);
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -562,8 +564,9 @@ public partial class SalvageRepairSlice : Node3D
             "resource acceptance or F8 to reset. Press G for base build mode, " +
             "P for scanner pulse, J for the discovery catalog and U for ship " +
             "management. After starter repair press E on the ship to board; " +
-            "T launches or undocks, K toggles navigation assist and E docks, " +
-            "lands or disembarks.");
+            "T launches or undocks, K toggles navigation assist, Enter docks " +
+            "or lands, and E opens services or disembarks. Press M for the " +
+            "system/galaxy map.");
         GD.Print(
             "TASK-090 production queue READY: " +
             $"stations={ContentCatalog.Stations.Count}; " +
@@ -635,6 +638,18 @@ public partial class SalvageRepairSlice : Node3D
             "readiness=ship-systems; persistence=enabled; F5=acceptance; " +
             "controls=E board/services/disembark,Enter dock/land,T launch/undock,K assist,F2 camera.");
         GD.Print(
+            "TASK-114 galaxy navigation READY: " +
+            $"galaxy={GalaxyNavigation.CurrentSystem.GalaxyId}; " +
+            $"system={GalaxyNavigation.CurrentSystem.SystemId}; " +
+            $"sector={GalaxyNavigation.CurrentSystem.SectorX}," +
+            $"{GalaxyNavigation.CurrentSystem.SectorY}," +
+            $"{GalaxyNavigation.CurrentSystem.SectorZ}; " +
+            $"seed={GalaxyNavigation.UniverseSeed}; " +
+            $"starTypes={Enum.GetValues<GalaxyStarType>().Length}; " +
+            "generation=on-demand; coordinates=galaxy+sector+double3; " +
+            "maps=M; route=A*+range; hyperspace=station-only; " +
+            "persistence=enabled; F5=acceptance.");
+        GD.Print(
             "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -676,6 +691,7 @@ public partial class SalvageRepairSlice : Node3D
         PollPlanetaryExplorationAcceptanceTask();
         PollShipSystemsAcceptanceTask();
         PollStageOneVoyageAcceptanceTask();
+        PollGalaxyNavigationAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -872,6 +888,12 @@ public partial class SalvageRepairSlice : Node3D
         if (_stationServicesOpen)
         {
             if (_stationServicesOpenedFromVoyage &&
+                Matches(physical, logical, Key.M))
+            {
+                CloseStationServices();
+                OpenGalaxyMap();
+            }
+            else if (_stationServicesOpenedFromVoyage &&
                 Matches(physical, logical, Key.T))
             {
                 BeginStageOneUndock();
@@ -965,6 +987,12 @@ public partial class SalvageRepairSlice : Node3D
                 ConfirmSelectorSelection();
             }
 
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (HandleGalaxyNavigationInput(physical, logical))
+        {
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -4767,6 +4795,7 @@ public partial class SalvageRepairSlice : Node3D
             _planetaryExplorationAcceptanceTask is null &&
             _shipSystemsAcceptanceTask is null &&
             _stageOneVoyageAcceptanceTask is null &&
+            _galaxyNavigationAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -4778,6 +4807,7 @@ public partial class SalvageRepairSlice : Node3D
             !_baseBuildMode &&
             !_discoveryCatalogOpen &&
             !_shipManagementOpen &&
+            !_galaxyMapOpen &&
             !(_stageOneVoyageRuntime?.Piloted ?? false) &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
@@ -5213,8 +5243,9 @@ public partial class SalvageRepairSlice : Node3D
             RepairRecipe,
             _lifetimeCancellation.Token);
         BeginStageOneVoyageAcceptance(directory);
+        BeginGalaxyNavigationAcceptance(directory);
         _status =
-            "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance running";
     }
 
     private void BeginReset()
@@ -5254,7 +5285,8 @@ public partial class SalvageRepairSlice : Node3D
             baseConstruction: BaseConstruction.CreateSaveData(),
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
-            stageOneVoyage: StageOneVoyage.CreateSaveData());
+            stageOneVoyage: StageOneVoyage.CreateSaveData(),
+            galaxyNavigation: GalaxyNavigation.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -5288,6 +5320,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseBaseBuildMode();
         CloseDiscoveryCatalog();
         CloseShipManagement();
+        CloseGalaxyMap();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -5304,6 +5337,7 @@ public partial class SalvageRepairSlice : Node3D
             _planetaryExplorationAcceptanceTask is not null ||
             _shipSystemsAcceptanceTask is not null ||
             _stageOneVoyageAcceptanceTask is not null ||
+            _galaxyNavigationAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -5333,7 +5367,8 @@ public partial class SalvageRepairSlice : Node3D
             baseConstruction: BaseConstruction.CreateSaveData(),
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
-            stageOneVoyage: StageOneVoyage.CreateSaveData());
+            stageOneVoyage: StageOneVoyage.CreateSaveData(),
+            galaxyNavigation: GalaxyNavigation.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -5363,7 +5398,10 @@ public partial class SalvageRepairSlice : Node3D
             $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
             $"voyageLocation={StageOneVoyage.Location}; " +
             $"voyagePiloted={(StageOneVoyage.Piloted ? 1 : 0)}; " +
-            $"voyageLoops={StageOneVoyage.CompletedLoops}.");
+            $"voyageLoops={StageOneVoyage.CompletedLoops}; " +
+            $"galaxySystem={GalaxyNavigation.CurrentSystem.SystemId}; " +
+            $"galaxyVisited={GalaxyNavigation.VisitedSystemIds.Count}; " +
+            $"hyperJumps={GalaxyNavigation.JumpCount}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -5433,6 +5471,7 @@ public partial class SalvageRepairSlice : Node3D
                 snapshot?.ShipSystems,
                 commissioned: Session.ShipRepaired);
             InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
+            InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null &&
                 !StageOneVoyage.Piloted)
@@ -5448,6 +5487,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseBaseBuildMode();
             CloseDiscoveryCatalog();
             CloseShipManagement();
+            CloseGalaxyMap();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -5512,6 +5552,19 @@ public partial class SalvageRepairSlice : Node3D
                 $"landings={StageOneVoyage.LandingCount}; " +
                 $"loops={StageOneVoyage.CompletedLoops}; " +
                 $"legacyFallback={(snapshot?.StageOneVoyage is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-114 galaxy navigation restore PASS: " +
+                $"galaxy={GalaxyNavigation.CurrentSystem.GalaxyId}; " +
+                $"system={GalaxyNavigation.CurrentSystem.SystemId}; " +
+                $"sector={GalaxyNavigation.CurrentSystem.SectorX}," +
+                $"{GalaxyNavigation.CurrentSystem.SectorY}," +
+                $"{GalaxyNavigation.CurrentSystem.SectorZ}; " +
+                $"star={GalaxyNavigation.CurrentSystem.StarType}; " +
+                $"planets={GalaxyNavigation.CurrentSystem.Planets.Count}; " +
+                $"visited={GalaxyNavigation.VisitedSystemIds.Count}; " +
+                $"jumps={GalaxyNavigation.JumpCount}; " +
+                $"distance={GalaxyNavigation.TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly; " +
+                $"legacyFallback={(snapshot?.GalaxyNavigation is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -5578,6 +5631,7 @@ public partial class SalvageRepairSlice : Node3D
                 _planetaryPoiPlacements);
             _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
             InitializeStageOneVoyageRuntime(saveData: null);
+            InitializeGalaxyNavigationRuntime(saveData: null);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
@@ -5585,6 +5639,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseBaseBuildMode();
             CloseDiscoveryCatalog();
             CloseShipManagement();
+            CloseGalaxyMap();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -5624,6 +5679,16 @@ public partial class SalvageRepairSlice : Node3D
                 $"dockings={StageOneVoyage.DockingCount}; " +
                 $"landings={StageOneVoyage.LandingCount}; " +
                 $"loops={StageOneVoyage.CompletedLoops}.");
+            GD.Print(
+                "TASK-114 galaxy navigation reset PASS: " +
+                $"galaxy={GalaxyNavigation.CurrentSystem.GalaxyId}; " +
+                $"system={GalaxyNavigation.CurrentSystem.SystemId}; " +
+                $"sector={GalaxyNavigation.CurrentSystem.SectorX}," +
+                $"{GalaxyNavigation.CurrentSystem.SectorY}," +
+                $"{GalaxyNavigation.CurrentSystem.SectorZ}; " +
+                $"visited={GalaxyNavigation.VisitedSystemIds.Count}; " +
+                $"jumps={GalaxyNavigation.JumpCount}; " +
+                $"distance={GalaxyNavigation.TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly.");
         }
         catch (Exception exception)
         {
@@ -6193,22 +6258,25 @@ public partial class SalvageRepairSlice : Node3D
         if (_catalogMatrixAcceptanceTask is not null ||
             _shipSystemsAcceptanceTask is not null ||
             _stageOneVoyageAcceptanceTask is not null ||
+            _galaxyNavigationAcceptanceTask is not null ||
             _catalogMatrixAcceptanceReport is null ||
             _shipSystemsAcceptanceReport is null ||
-            _stageOneVoyageAcceptanceReport is null)
+            _stageOneVoyageAcceptanceReport is null ||
+            _galaxyNavigationAcceptanceReport is null)
         {
             return;
         }
 
         bool passed = _catalogMatrixAcceptanceReport.Passed &&
             _shipSystemsAcceptanceReport.Passed &&
-            _stageOneVoyageAcceptanceReport.Passed;
+            _stageOneVoyageAcceptanceReport.Passed &&
+            _galaxyNavigationAcceptanceReport.Passed;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance passed"
-            : "TASK-076/TASK-110/TASK-112 runtime, ship systems and Stage 1 voyage acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -6998,11 +7066,11 @@ public partial class SalvageRepairSlice : Node3D
                 StageOneVoyageLocation.PlanetSurface =>
                     "ship landed — E disembark",
                 StageOneVoyageLocation.OutboundFlight =>
-                    "fly to blue orbital beacon — E dock when slow and within 14 m",
+                    "fly to blue orbital beacon — Enter dock when slow and within 14 m",
                 StageOneVoyageLocation.OrbitalStation =>
                     "docked — E station services, T undock after closing services",
                 StageOneVoyageLocation.InboundFlight =>
-                    "fly to green landing ring — E land when slow and within 18 m",
+                    "fly to green landing ring — Enter land when slow and within 18 m",
                 _ => "voyage interaction unavailable"
             }
             : _player?.GetInteractionPrompt() ?? "interaction unavailable";
@@ -7029,6 +7097,7 @@ public partial class SalvageRepairSlice : Node3D
             $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
             $"hyper={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
         string voyageLine = BuildStageOneVoyageHudLine();
+        string galaxyLine = BuildGalaxyNavigationHudLine();
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
@@ -7045,6 +7114,7 @@ public partial class SalvageRepairSlice : Node3D
                 explorationLine + "\n" +
                 shipSystemsLine + "\n" +
                 voyageLine + "\n" +
+                galaxyLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -7062,11 +7132,12 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
                 $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
                 $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
+                $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • U - ship management • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "E - interact/select • U - ship management • M - system/galaxy map • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
@@ -7085,6 +7156,7 @@ public partial class SalvageRepairSlice : Node3D
             explorationLine + "\n" +
             shipSystemsLine + "\n" +
             voyageLine + "\n" +
+            galaxyLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -7111,6 +7183,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
             $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
             $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
+            $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -7118,13 +7191,13 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space - move • E - interact/select • U - ship management • P - scanner • J - discoveries • G - base build • H - HUD • " +
+            "WASD/Space - move • E - interact/select • U - ship management • M - system/galaxy map • P - scanner • J - discoveries • G - base build • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems + Stage 1 voyage • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
     }

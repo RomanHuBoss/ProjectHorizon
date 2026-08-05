@@ -203,6 +203,21 @@ public sealed record StageOneVoyageSaveData(
     double VelocityZ,
     string LastCheckpoint);
 
+public sealed record GalaxyNavigationSaveData(
+    long UniverseSeed,
+    string GalaxyId,
+    string CurrentSystemId,
+    int CurrentSectorX,
+    int CurrentSectorY,
+    int CurrentSectorZ,
+    string SelectedDestinationSystemId,
+    int SelectedSectorX,
+    int SelectedSectorY,
+    int SelectedSectorZ,
+    int JumpCount,
+    double TotalDistanceLightYears,
+    IReadOnlyList<string> VisitedSystemIds);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -220,7 +235,8 @@ public sealed record SaveGameSnapshot(
     BaseConstructionSaveData? BaseConstruction = null,
     PlanetaryExplorationSaveData? PlanetaryExploration = null,
     ShipSystemsSaveData? ShipSystems = null,
-    StageOneVoyageSaveData? StageOneVoyage = null);
+    StageOneVoyageSaveData? StageOneVoyage = null,
+    GalaxyNavigationSaveData? GalaxyNavigation = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

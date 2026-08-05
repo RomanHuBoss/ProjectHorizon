@@ -771,7 +771,8 @@ public static class StarterRepairSnapshotFactory
         BaseConstructionSaveData? baseConstruction = null,
         PlanetaryExplorationSaveData? planetaryExploration = null,
         ShipSystemsSaveData? shipSystems = null,
-        StageOneVoyageSaveData? stageOneVoyage = null)
+        StageOneVoyageSaveData? stageOneVoyage = null,
+        GalaxyNavigationSaveData? galaxyNavigation = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -808,6 +809,20 @@ public static class StarterRepairSnapshotFactory
                 "An active voyage requires a commissioned ship-system snapshot.");
         }
 
+        if (galaxyNavigation is not null &&
+            (!string.Equals(
+                galaxyNavigation.GalaxyId,
+                GalaxyNavigationRuntime.PrimaryGalaxyId,
+                StringComparison.Ordinal) ||
+             galaxyNavigation.VisitedSystemIds is null ||
+             !galaxyNavigation.VisitedSystemIds.Contains(
+                 galaxyNavigation.CurrentSystemId,
+                 StringComparer.Ordinal)))
+        {
+            throw new InvalidOperationException(
+                "Galaxy navigation must use the primary galaxy and include the current system in visited systems.");
+        }
+
         if (revision <= 0)
         {
             throw new ArgumentOutOfRangeException(
@@ -829,7 +844,7 @@ public static class StarterRepairSnapshotFactory
                 playerPositionX,
                 playerPositionY,
                 playerPositionZ,
-                PlanetId),
+                ResolveCurrentPlanetId(galaxyNavigation)),
             new ShipSaveData(
                 "ship.starter",
                 session.RepairRecipe.Application.TargetId,
@@ -861,8 +876,8 @@ public static class StarterRepairSnapshotFactory
                 .OrderBy(item => item.ItemId, StringComparer.Ordinal)
                 .ToArray(),
             new VisitedPlanetSaveData(
-                PlanetId,
-                SystemId,
+                ResolveCurrentPlanetId(galaxyNavigation),
+                galaxyNavigation?.CurrentSystemId ?? SystemId,
                 updatedUtc,
                 1),
             technologyProgress,
@@ -872,7 +887,31 @@ public static class StarterRepairSnapshotFactory
             baseConstruction,
             planetaryExploration,
             shipSystems,
-            stageOneVoyage);
+            stageOneVoyage,
+            galaxyNavigation);
+    }
+
+    private static string ResolveCurrentPlanetId(
+        GalaxyNavigationSaveData? galaxyNavigation)
+    {
+        if (galaxyNavigation is null || string.Equals(
+            galaxyNavigation.CurrentSystemId,
+            SystemId,
+            StringComparison.Ordinal))
+        {
+            return PlanetId;
+        }
+
+        const string systemPrefix = "system.";
+        if (!galaxyNavigation.CurrentSystemId.StartsWith(
+            systemPrefix,
+            StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Galaxy current system ID must use the system. prefix.");
+        }
+
+        return $"planet.{galaxyNavigation.CurrentSystemId[systemPrefix.Length..].Replace('.', '_')}.01";
     }
 }
 

@@ -279,6 +279,30 @@ public sealed class StageOneVoyageRuntime
         return StageOneVoyageActionResult.Applied;
     }
 
+    public void ArriveAtOrbitalStationFromHyperspace()
+    {
+        if (!Piloted)
+        {
+            throw new InvalidOperationException(
+                "Hyperspace arrival requires a piloted ship.");
+        }
+
+        Location = StageOneVoyageLocation.OrbitalStation;
+        StationVisited = true;
+        StationVisitedThisLoop = true;
+        SetPose(
+            StationDockPositionX,
+            StationDockPositionY,
+            StationDockPositionZ,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0);
+        LastCheckpoint = "hyperspace.arrival";
+    }
+
     public StageOneVoyageActionResult TryUndock(
         ShipSystemsRuntime shipSystems,
         out string result)

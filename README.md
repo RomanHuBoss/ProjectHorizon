@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Текущий этап — **Этап 1: вертикальный срез**. Все пять технических прототипов приняты; начата интеграция первого сквозного игрового цикла.
+Текущий Stage 1 vertical slice закрыт runtime-приёмкой. Проект перешёл к foundation следующего уровня: procedural galaxy, maps, route planning и hyperspace, без преждевременной генерации всей галактики в памяти.
 
-### Industry, resources, station services, base construction, planetary exploration и ship systems — `VERIFIED`; Stage 1 voyage — `IMPLEMENTED`
+### Stage 1 voyage и все предшествующие подсистемы — `VERIFIED`; procedural galaxy/navigation/hyperspace — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -84,6 +84,8 @@ src/Game.Client/Content/catalog_manifest.json
 Корабельные системы vertical slice вынесены в строгий каталог `ships.json`. Он содержит все шесть классов из ТЗ v2.0 §14.2, все одиннадцать class parameters, семь отдельно повреждаемых систем из §14.3 и ровно 18 module definitions, совпадающих с outputs категории `ShipModule` Industry Content v2. Исполняемый starter ship использует универсальный класс; `U` на поверхности открывает loadout manager с вкладками Overview/Modules/Systems. `ShipSystemsRuntime.Commissioned` жёстко синхронизирован с сюжетным `StarterRepairSession.ShipRepaired`: до завершения стартового ремонта семь систем offline, flight/hyperspace readiness равны false, а install/uninstall/damage/repair/refuel запрещены самим domain runtime. Успешный starter repair выполняет единственный commissioning transition, переводит семь систем в исправное состояние и только после этого разрешает эксплуатацию корабля. Установка и снятие модулей расходуют и возвращают предметы через существующий shared inventory API, соблюдают Weapon/Technology slots и изменяют derived stats. Повреждение системы отключает зависящие от неё модули и влияет на flight/hyperspace readiness; ремонт требует catalog-defined ship component, а refuel — `chemical.high_energy_fuel`. Class, commissioned flag, fuel, installations и system health сохраняются в optional SQLite setting `ship_systems` без повышения schema 2; значение fuel одновременно синхронизируется с legacy `ships` row.
 
 `TASK-112` интегрирует эту доменную модель с реальным `ArcadeShipController` и закрывает сквозной критерий Этапа 1: ремонт корабля → посадка в кабину → взлёт → перелёт к физической орбитальной станции → стыковка и открытие уже существующих station services → отстыковка → возврат → посадка → высадка. Ускорение, максимальная скорость и манёвренность контроллера вычисляются из `ShipSystemsRuntime.GetEffectiveStats()`, а взлёт, стыковка, посадка и расход топлива блокируются состоянием commissioning, readiness и соответствующих систем. Voyage location, pilot state, точная поза/скорость, checkpoints, station visit и completed-loop counter сохраняются в optional SQLite setting `stage_one_voyage` без повышения schema 2. `F5` запускает `TASK-076`, `TASK-110` и изолированную `TASK-112` acceptance.
+
+`TASK-114` добавляет следующий целостный subsystem block: procedural galaxy, обязательные system/galaxy maps, route planning и hyperspace. `GalaxyNavigationRuntime` генерирует systems только по запросу из immutable universe seed, `GalaxyId`, integer sector coordinates и double system positions; whole galaxy никогда не помещается в один `Vector3` и не создаётся целиком в памяти. Каждый system имеет deterministic star type, 1–8 planets, archetypes, moons, atmosphere/water flags, economy, danger и planet seeds. `M` открывает Galaxy/System terminal; route planning использует A* по соседним sectors и фактический `HyperdriveRange` установленного ship loadout. Jump разрешён только commissioned/flight-ready кораблю с исправным hyperdrive и активным hyperspace module, только из orbital station; топливо списывается по длине waypoint. Current system, destination, counters и visited systems сохраняются в optional SQLite setting `galaxy_navigation` без повышения schema 2 и согласуются с `visited_planets`. После jump существующие voyage и station-services API переиспользуются в destination system. `F5` запускает отдельную `TASK-114` acceptance, включая 1000 deterministic samples и 100 последовательных hyperjumps.
 
 В состав v2 входят:
 
@@ -139,6 +141,8 @@ C / Space      vertical thrust вниз / вверх
 Q / E          roll влево / вправо
 B / X          boost / braking; G — stabilization
 F2             переключить корабельную камеру во время пилотирования
+M              открыть system/galaxy map; Tab переключает карты, Up/Down выбирает destination
+Enter          в galaxy map: построить route и выполнить следующий hyperspace waypoint
 G              открыть / закрыть режим строительства базы
 Up / Down      в режиме строительства выбрать модуль
 R              в режиме строительства повернуть модуль на 90°
@@ -149,10 +153,10 @@ F1             TASK-090/092/093/096/098: queue, properties, multi-station indust
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080 + TASK-108: Industry Content v2 и planetary exploration acceptance
-F5             TASK-076 + TASK-110 + TASK-112: crafting, ship systems и Stage 1 voyage mega-acceptance
+F5             TASK-076 + TASK-110 + TASK-112 + TASK-114: crafting, ship systems, voyage и galaxy mega-acceptance
 F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
-F8             очистить gameplay-slot, включая ship systems и Stage 1 voyage state
+F8             очистить gameplay-slot, включая ship systems, voyage и galaxy state
 F9             регрессия strict JSON catalog
 F10            регрессия launch-capacitor persistence
 F11            регрессия craft-time state machine
@@ -314,9 +318,10 @@ TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, st
 TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
 TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, commissioning=1, readiness=1, fuel=1, restore=1, roundTrip=1
 TASK-112 Stage 1 voyage (F5): PASS derived=1, preRepair=1, takeoff=1, fuel=1, dock=1, station=1, undock=1, landing=1, loop=1, readiness=1, restore=1, roundTrip=1
+TASK-114 galaxy navigation (F5): PASS deterministic=1, stars=1, route=1, jump=1, stress100=1, restore=1
 ```
 
-`F5` прогоняет три независимые проверки. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива при взлёте/стыковке/отстыковке/посадке, отказ при нарушении docking distance/speed, доступ station services только после docking, блокировку посадки повреждённой Landing system, её ремонт, полный planet→station→planet loop, disembark, cold restore активного voyage state, legacy fallback, exact round-trip, autosave log, `maxWriters=1` и `integrity=ok`. Gameplay-slot ни одна acceptance не изменяет.
+`F5` прогоняет четыре независимые проверки. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива, docking/station/return/landing lifecycle, disembark, active-flight restore и exact persistence. `TASK-114` использует `save_1.galaxy-navigation-test.db`: проверяет 1000 deterministic systems, GalaxyId/Sector/Double3 hierarchy, все шесть star types, planet bounds, range-aware A*, strict preconditions, fuel debit, visited discovery, cold restore, legacy fallback, exact round-trip и 100 последовательных hyperjumps. Gameplay-slot ни одна acceptance не изменяет.
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 
@@ -891,3 +896,7 @@ repair ship → E board → T takeoff → fly/navigation assist to orbital dock
 `save_settings.stage_one_voyage` хранит location, piloted flag, station visit, counters, exact ship pose/velocity и checkpoint. `ships` row получает ту же позицию для cross-table validation. Cold restore возвращает игрока в кабину и в точную фазу полёта без offline progress; legacy saves получают surface/not-piloted state. `F8` очищает voyage вместе с остальными gameplay-данными. SQLite schema остаётся `2`.
 
 После runtime-приёмки `TASK-112` изменять этот контур следует только при интеграции полноценной планетарно-космической смены сцен, межсистемных перелётов или новых типов станций; повторно реализовывать boarding, readiness/fuel gates, docking/landing lifecycle и persistence не требуется.
+
+### Procedural galaxy, maps and hyperspace (`TASK-114`)
+
+После полного Stage 1 loop приобрести и установить `module.ship.hyperspace_core` либо `module.ship.compotium_drive_core`, состыковаться с orbital station и нажать `M`. Galaxy tab показывает nearby systems, sector coordinates, star type, прямую distance, количество waypoint jumps и `VISITED/NEW`; System tab показывает все planets текущей системы. `Up/Down` меняет selection, `Enter` строит route и выполняет следующий waypoint. Jump отклоняется на поверхности, в полёте, без commissioning, при `flightReady=0`, с повреждённым hyperdrive, без активного hyperspace module, при недостатке fuel или отсутствии range-aware route. После успешного jump ship остаётся piloted и docked у station checkpoint новой системы; station services доступны без нового economy runtime. Штатное завершение и cold restore обязаны сохранять exact system/sector/destination/jump/distance/visited state. `F8` возвращает `galaxy.g1/system.vertical_slice`, `visited=1`, `jumps=0`.
