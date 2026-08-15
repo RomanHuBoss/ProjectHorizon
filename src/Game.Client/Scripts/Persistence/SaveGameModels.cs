@@ -20,7 +20,8 @@ public enum AutosaveTrigger
     GracefulExit = 7,
     DiscoveryChanged = 8,
     ShipChanged = 9,
-    PlayerChanged = 10
+    PlayerChanged = 10,
+    NpcChanged = 11
 }
 
 public sealed record PlayerSaveData(
@@ -250,6 +251,23 @@ public sealed record PlayerSurvivalSaveData(
     IReadOnlyList<string> InstalledSuitModuleIds,
     IReadOnlyList<string> InstalledMultitoolModuleIds);
 
+public sealed record NpcFactionReputationSaveData(
+    string FactionId,
+    int Reputation);
+
+public sealed record NpcFactionAgentStateSaveData(
+    string NpcId,
+    double Health,
+    bool Interacted,
+    bool Defeated,
+    int DefeatCount);
+
+public sealed record NpcFactionSaveData(
+    long WorldSeed,
+    string RegionKey,
+    IReadOnlyList<NpcFactionReputationSaveData> Reputations,
+    IReadOnlyList<NpcFactionAgentStateSaveData> Agents);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -271,7 +289,8 @@ public sealed record SaveGameSnapshot(
     GalaxyNavigationSaveData? GalaxyNavigation = null,
     EcologySaveData? Ecology = null,
     ProceduralQuestSaveData? ProceduralQuests = null,
-    PlayerSurvivalSaveData? PlayerSurvival = null);
+    PlayerSurvivalSaveData? PlayerSurvival = null,
+    NpcFactionSaveData? NpcFactions = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

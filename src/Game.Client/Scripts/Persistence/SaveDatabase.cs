@@ -650,6 +650,24 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        NpcFactionSaveData? expectedNpcFactions = expected.NpcFactions;
+        NpcFactionSaveData? actualNpcFactions = actual.NpcFactions;
+        if ((expectedNpcFactions is null) != (actualNpcFactions is null))
+        {
+            mismatch = "npc_factions presence differs";
+            return false;
+        }
+
+        if (expectedNpcFactions is not null && actualNpcFactions is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizeNpcFactions(expectedNpcFactions)),
+                JsonSerializer.Serialize(CanonicalizeNpcFactions(actualNpcFactions)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "npc_factions differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -1072,7 +1090,7 @@ public sealed partial class SaveDatabase : IDisposable
             "'inventory_properties', 'station_services', " +
             "'base_construction', 'planetary_exploration', 'ship_systems', " +
             "'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
-            "'procedural_quests', 'player_survival');",
+            "'procedural_quests', 'player_survival', 'npc_factions');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1275,6 +1293,19 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizePlayerSurvival(snapshot.PlayerSurvival))));
+        }
+
+        if (snapshot.NpcFactions is not null)
+        {
+            ValidateNpcFactions(snapshot.NpcFactions);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'npc_factions', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeNpcFactions(snapshot.NpcFactions))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1523,6 +1554,7 @@ public sealed partial class SaveDatabase : IDisposable
         EcologySaveData? ecology = null;
         ProceduralQuestSaveData? proceduralQuests = null;
         PlayerSurvivalSaveData? playerSurvival = null;
+        NpcFactionSaveData? npcFactions = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1535,7 +1567,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
                 "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
-                "'procedural_quests', 'player_survival') ORDER BY setting_key;";
+                "'procedural_quests', 'player_survival', 'npc_factions') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1882,6 +1914,31 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "npc_factions",
+            out string? npcFactionsJson))
+        {
+            if (string.IsNullOrWhiteSpace(npcFactionsJson))
+            {
+                throw new InvalidDataException(
+                    "npc_factions setting is empty.");
+            }
+
+            try
+            {
+                npcFactions = JsonSerializer.Deserialize<NpcFactionSaveData>(
+                    npcFactionsJson) ?? throw new InvalidDataException(
+                        "npc_factions setting deserialized to null.");
+                ValidateNpcFactions(npcFactions);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "npc_factions setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1989,7 +2046,8 @@ public sealed partial class SaveDatabase : IDisposable
             galaxyNavigation,
             ecology,
             proceduralQuests,
-            playerSurvival);
+            playerSurvival,
+            npcFactions);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -2423,6 +2481,68 @@ public sealed partial class SaveDatabase : IDisposable
         {
             throw new InvalidDataException(
                 "player_survival contains invalid or duplicate equipment IDs.");
+        }
+    }
+
+    private static NpcFactionSaveData CanonicalizeNpcFactions(
+        NpcFactionSaveData npcFactions)
+    {
+        ArgumentNullException.ThrowIfNull(npcFactions);
+        return npcFactions with
+        {
+            Reputations = npcFactions.Reputations
+                .OrderBy(entry => entry.FactionId, StringComparer.Ordinal)
+                .ToArray(),
+            Agents = npcFactions.Agents
+                .OrderBy(entry => entry.NpcId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateNpcFactions(NpcFactionSaveData npcFactions)
+    {
+        ArgumentNullException.ThrowIfNull(npcFactions);
+        if (npcFactions.WorldSeed <= 0 ||
+            string.IsNullOrWhiteSpace(npcFactions.RegionKey) ||
+            !npcFactions.RegionKey.StartsWith("region.", StringComparison.Ordinal) ||
+            npcFactions.Reputations is null ||
+            npcFactions.Agents is null ||
+            npcFactions.Reputations.Count > NpcFactionCatalog.ExpectedFactionCount ||
+            npcFactions.Agents.Count > NpcFactionCatalog.ExpectedAgentCount)
+        {
+            throw new InvalidDataException(
+                "npc_factions contains invalid seed, region or delta collection sizes.");
+        }
+
+        HashSet<string> factionIds = new(StringComparer.Ordinal);
+        foreach (NpcFactionReputationSaveData reputation in npcFactions.Reputations)
+        {
+            if (!GameContentCatalog.IsStableId(reputation.FactionId) ||
+                !reputation.FactionId.StartsWith("faction.", StringComparison.Ordinal) ||
+                !factionIds.Add(reputation.FactionId) ||
+                reputation.Reputation is < -100 or > 100 ||
+                reputation.Reputation == 0)
+            {
+                throw new InvalidDataException(
+                    "npc_factions contains an invalid or duplicate reputation delta.");
+            }
+        }
+
+        HashSet<string> npcIds = new(StringComparer.Ordinal);
+        foreach (NpcFactionAgentStateSaveData agent in npcFactions.Agents)
+        {
+            if (!GameContentCatalog.IsStableId(agent.NpcId) ||
+                !agent.NpcId.StartsWith("npc.", StringComparison.Ordinal) ||
+                !npcIds.Add(agent.NpcId) ||
+                !double.IsFinite(agent.Health) ||
+                agent.Health < 0.0 || agent.Health > 500.0 ||
+                agent.DefeatCount < 0 ||
+                (agent.Defeated && agent.Health > 0.0001) ||
+                (!agent.Defeated && agent.Health <= 0.0))
+            {
+                throw new InvalidDataException(
+                    "npc_factions contains an invalid or duplicate NPC state delta.");
+            }
         }
     }
 

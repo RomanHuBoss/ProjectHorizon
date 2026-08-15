@@ -73,7 +73,13 @@ public partial class SalvageRepairSlice
             PlanetaryPoiCatalog,
             EcologyCatalog,
             GalaxyNavigation,
-            includeCombatTargets);
+            includeCombatTargets,
+            defeatTargetIds: includeCombatTargets
+                ? NpcFactionCatalog.DefeatTargetIds
+                : null,
+            protectTargetIds: includeCombatTargets
+                ? NpcFactionCatalog.ProtectTargetIds
+                : null);
     }
 
     private void InitializeProceduralQuestRuntime(
@@ -81,7 +87,7 @@ public partial class SalvageRepairSlice
     {
         _proceduralQuestRuntime = new ProceduralQuestRuntime(
             ProceduralQuestCatalog,
-            BuildProceduralQuestCapabilities(includeCombatTargets: false),
+            BuildProceduralQuestCapabilities(includeCombatTargets: true),
             saveData);
         _missionJournalOpen = false;
         _missionJournalSelection = 0;
@@ -375,6 +381,11 @@ public partial class SalvageRepairSlice
             factionId,
             credits,
             reputation);
+        if (_npcFactionRuntime is not null &&
+            NpcFactionCatalog.Factions.ContainsKey(factionId))
+        {
+            NpcFactions.ApplyReputationDelta(factionId, reputation);
+        }
         _missionJournalFeedback =
             $"{result}; +{credits} cr; +{reputation} rep";
         _lastDomainEvent =
@@ -536,7 +547,7 @@ public partial class SalvageRepairSlice
             SlotId,
             ProceduralQuestCatalog,
             BuildProceduralQuestCapabilities(includeCombatTargets: true),
-            BuildProceduralQuestCapabilities(includeCombatTargets: false),
+            BuildProceduralQuestCapabilities(includeCombatTargets: true),
             RepairRecipe,
             _lifetimeCancellation.Token);
     }

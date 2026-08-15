@@ -663,7 +663,9 @@ public static class ProceduralQuestCapabilityFactory
         PlanetaryPoiCatalog poiCatalog,
         EcologyCatalog ecologyCatalog,
         GalaxyNavigationRuntime galaxyNavigation,
-        bool includeCombatTargets)
+        bool includeCombatTargets,
+        IReadOnlyList<string>? defeatTargetIds = null,
+        IReadOnlyList<string>? protectTargetIds = null)
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(stationServices);
@@ -729,10 +731,16 @@ public static class ProceduralQuestCapabilityFactory
             attainableItems,
             new[] { "object.ship.starter" },
             includeCombatTargets
-                ? new[] { "target.raider_drone", "target.hostile_scout" }
+                ? (defeatTargetIds is null || defeatTargetIds.Count == 0
+                    ? new[] { "target.raider_drone", "target.hostile_scout" }
+                    : defeatTargetIds.Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal).ToArray())
                 : Array.Empty<string>(),
             includeCombatTargets
-                ? new[] { "target.frontier_relay", "target.science_probe" }
+                ? (protectTargetIds is null || protectTargetIds.Count == 0
+                    ? new[] { "target.frontier_relay", "target.science_probe" }
+                    : protectTargetIds.Distinct(StringComparer.Ordinal)
+                        .OrderBy(value => value, StringComparer.Ordinal).ToArray())
                 : Array.Empty<string>(),
             baseConstruction.Modules.Keys
                 .OrderBy(value => value, StringComparer.Ordinal)

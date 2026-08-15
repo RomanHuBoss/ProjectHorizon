@@ -2,13 +2,166 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-player-survival-multitool-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-npc-factions-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0A. Текущая синхронизация и mega-итерация 2026-08-15
+## 0A. Текущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+
+### Закрытие player survival по решению владельца продукта
+
+Предыдущая редакция `TASK-120/121` была прямо принята владельцем продукта для
+продолжения разработки без дополнительной трудоёмкой ручной проверки. Журнал
+синхронизирован с этим решением до выбора нового шага:
+
+- `TASK-120` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-121` — `IN_PROGRESS` → `VERIFIED`;
+- статус повышен как `acceptance waiver by product owner`, а не как локально
+  выполненные clean build/F5; сборка и runtime `TASK-120` в среде подготовки не
+  выполнялись и не заявляются.
+
+### TASK-122 — NPC / factions / dialogue core mega-iteration
+
+**Исходный снимок:** `ProjectHorizon-main(8)(1).zip`
+(последняя приложенная GitHub-редакция).  
+**Подготовленный снимок:** `ProjectHorizon-main-npc-factions-closure.zip`.  
+**Git SHA:** архив не содержит `.git`; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования PDF v2.0:** §16 «NPC и фракции»; §19.1–19.4
+процедурные `DefeatTarget/ProtectTarget`; §22 persistence. Требование §30.1 о
+локальных tiled `NavigationServer3D/NavigationRegion3D` не присваивается этой
+задаче и остаётся отдельной navigation-итерацией.
+
+**Реализовано:**
+
+- добавлен строгий `npc_factions.json` schema `1`, использующий существующие
+  `Trading / Scientific / Military` faction definitions Station Services вместо
+  создания второй экономики; catalog валидирует reciprocal relation matrix,
+  economy interests/tags, quest types, visual styles и name pools;
+- покрыты ровно все восемь NPC archetypes PDF: `Trader`, `Technician`, `Pilot`,
+  `Scientist`, `Guard`, `GuildRepresentative`, `Traveler`, `Opponent`; существующий
+  `npc.trader.ilia_voss` остаётся authored Station Services NPC и не дублируется,
+  ещё семь агентов создаются в `Gameplay/NpcPopulation`;
+- все faction-bound NPC используют имена из уже определённых faction name pools;
+  catalog проверяет точное archetype coverage `8/8`, уникальные stable IDs,
+  faction/combat flags и допустимые spatial/combat параметры;
+- добавлено восемь RU/EN dialogue templates — по одному на archetype. Каждый
+  содержит stable dialogue/option IDs, executable `always` либо
+  `reputation>=N` condition, minimum reputation, локализованные greeting/response/
+  consequence/farewell, action и reputation delta; Trader exposes existing trade,
+  GuildRepresentative — existing Mission Journal, protected NPC — protection
+  acknowledgement;
+- `NpcFactionRuntime` хранит per-faction reputation и delta-only agent state;
+  meaningful dialogue consequence применяется один раз на NPC, friendly fire
+  снижает reputation, не-hostile defeat даёт дополнительный penalty;
+- наземные NPC реализованы как `CharacterBody3D + IInteractable + IHitscanTarget`:
+  deterministic local patrol/steering, flee после friendly hit, interaction `E`,
+  физический hitscan damage; hostile Opponent преследует игрока в detection range
+  и наносит damage через существующий `PlayerController.ReceiveExternalDamage`;
+- hostile target после lethal hit воспроизводимо respawn-ится с инкрементом
+  `DefeatCount`, поэтому `DefeatTarget` остаётся выполнимым и после раннего боя;
+  Scientist и Traveler являются реальными `ProtectTarget`;
+- procedural quest capability factory принимает реальные NPC target IDs; обычный
+  gameplay-board теперь включает и валидирует `DefeatTarget` и `ProtectTarget`,
+  снимая известное ограничение `TASK-118`, при этом все остальные 13 objective
+  types и 20-offer deterministic board сохраняются;
+- procedural quest reward дополнительно применяется к новой per-faction
+  reputation, когда faction ID известен NPC/faction catalog;
+- persistence добавляет optional `save_settings.npc_factions` без повышения
+  SQLite schema `2`: world seed/region + только ненулевые reputation и изменённые
+  agent states; repeated save использует общий DELETE→INSERT replace path;
+  поддержаны exact round-trip, cold restore, legacy-empty fallback, graceful exit
+  и `F8` reset;
+- `AutosaveTrigger.NpcChanged` добавлен как новый trigger; gameplay autosave и
+  graceful-exit snapshot включают NPC/faction deltas;
+- `F5` расширен изолированной `TASK-122` acceptance в
+  `save_1.npc-factions-test.db`: 3 factions, 8 archetypes/agents/dialogues, relation
+  matrix, localized condition coverage, one-shot interaction, reputation, friendly
+  fire, respawnable combat target, real quest target IDs, delta-only state, две
+  последовательные записи, exact round-trip, cold restore, legacy fallback,
+  autosave log, one-writer discipline и SQLite integrity;
+- README/HUD обновлены: `E` включает наземных NPC, `F5` содержит `TASK-122`,
+  `F8` сбрасывает NPC/faction deltas; отдельная строка HUD показывает alive agents,
+  combat/protected targets, defeat count и три faction reputations.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Content/npc_factions.json`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcFactionCatalog.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcFactionRuntime.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcFactionAgentNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcFactionAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceNpcFactions.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceProceduralQuests.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralQuestRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralQuestAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-120`: `IMPLEMENTED` → `VERIFIED` — прямой acceptance waiver владельца
+  продукта;
+- `TASK-121`: `IN_PROGRESS` → `VERIFIED` — тот же acceptance waiver;
+- `TASK-122`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-123`: `NOT_STARTED` → `IN_PROGRESS` — clean build + единый F5 + короткий
+  NPC smoke на стороне пользователя;
+- `TASK-006`: остаётся `BLOCKED`.
+
+**Проверки среды подготовки:**
+
+- JSON parse/catalog invariants проверены статически: `3 factions / 8 archetypes /
+  8 agents / 8 dialogues / 1 hostile / 2 protected`;
+- проверены optional-setting read/write/delete paths `npc_factions`, обе snapshot
+  factory интеграции, scene nodes `Gameplay/NpcPopulation` и `Hud/NpcInteraction`,
+  реальные procedural combat/protection target IDs и отсутствие изменения schema;
+- .NET SDK, C# compiler и Godot в среде подготовки отсутствуют, поэтому clean
+  build и фактический Godot runtime **не заявляются**; `TASK-122` остаётся
+  `IMPLEMENTED`, а `TASK-123` — `IN_PROGRESS`.
+
+**Минимальная runtime-приёмка TASK-123:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`,
+   `0` errors.
+2. Запустить `SalvageRepairSlice`. Startup должен содержать:
+
+```text
+TASK-122 NPC/faction catalog READY: schema=1; factions=3; archetypes=8; agents=8; dialogues=8; defeatTargets=1; protectTargets=2; ...
+TASK-122 physical NPC population READY: authored=1; dynamic=7; interaction=E; hostileCombat=multitool-hitscan; localSteering=enabled.
+```
+
+3. Если восстановился старый gameplay state — нажать `F8`; затем один раз `F5`.
+   Успех — строка:
+
+```text
+TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialogues=8; factionCoverage=1; relations=1; dialogueCoverage=1; interaction=1; reputation=1; combat=1; questTargets=1; deltaOnly=1; coldRestore=1; legacyFallback=1; roundTrip=1; repeatedSave=1; logWritten=1; maxWriters=1; integrity=ok; ...
+```
+
+4. Короткий manual smoke: подойти к любому новому NPC и нажать `E`; проверить
+   `Up/Down + Enter`, затем закрыть `Esc`. У Scientist/Traveler выбрать protection
+   option. Переключить multitool в weapon (`Z` при необходимости) и четырежды
+   попасть в hostile Opponent: Output должен показать `defeated=1; respawned=1`,
+   HUD — увеличение `defeats`. Открыть `Q`: среди 20 missions должны присутствовать
+   реальные `DefeatTarget` и `ProtectTarget`.
+5. Для достаточного подтверждения прислать build summary, screenshot HUD после F5
+   и полную строку `TASK-122 NPC/factions acceptance PASS`. При `FAIL` — build log,
+   `TASK-122 ... FAIL`, последние ~200 строк Godot Output и точный шаг smoke.
+
+**Следующий рекомендуемый mega-шаг после TASK-123:** `TASK-124` — наземная NPC
+навигация/encounter layer по §30.1: локальные tiled `NavigationRegion3D`,
+NavigationServer3D path requests, avoidance, obstacle recovery и bounded streaming
+без whole-planet navmesh. Это логически продолжает уже закрытый NPC/faction core и
+может быть выполнено отдельной крупной подсистемой.
+
+---
+
+## 0B. Текущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -104,7 +257,7 @@
 
 ---
 
-## 0B. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0C. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -236,7 +389,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0C. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0D. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 
@@ -424,7 +577,7 @@ C# lexical/bracket integrity и точная change-boundary относител�
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. `TASK-118/119` дополнительно закрыты прямым acceptance-waiver решением владельца продукта, явно отделённым от runtime-доказательств. Текущая mega-итерация `TASK-120` закрывает core персонажа §13: survival pools, hazard protection, sprint/crouch/jetpack/swim, exosuit equipment, unified multitool energy, fauna damage и optional SQLite persistence. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance `TASK-121` — `IN_PROGRESS`.
+**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. `TASK-118/119` и `TASK-120/121` закрыты явными acceptance-waiver решениями владельца продукта, отдельно от локальных runtime-доказательств. Текущая mega-итерация `TASK-122` закрывает базовый NPC/faction/dialogue core §16 и подключает реальные hostile/protected NPC к procedural quests. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance `TASK-123` — `IN_PROGRESS`; tiled NavigationServer3D layer §30.1 остаётся следующим отдельным блоком.
 
 ## 3. Результат текущей итерации от 2026-08-03
 

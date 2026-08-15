@@ -166,9 +166,10 @@ public static class ProceduralQuestAcceptanceRunner
                         quest,
                         gameplayCapabilities,
                         out _)) &&
-                gameplayBoard.All(quest =>
-                    quest.ObjectiveType is not ProceduralQuestObjectiveType.DefeatTarget and
-                        not ProceduralQuestObjectiveType.ProtectTarget);
+                gameplayBoard.Any(quest =>
+                    quest.ObjectiveType == ProceduralQuestObjectiveType.DefeatTarget) &&
+                gameplayBoard.Any(quest =>
+                    quest.ObjectiveType == ProceduralQuestObjectiveType.ProtectTarget);
 
             ProceduralQuestRuntime persistenceRuntime = new(
                 catalog,

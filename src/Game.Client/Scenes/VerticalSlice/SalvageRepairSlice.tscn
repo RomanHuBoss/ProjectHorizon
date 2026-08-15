@@ -691,6 +691,8 @@ shape = SubResource("CraftingStationShape")
 
 [node name="PlanetaryPois" type="Node3D" parent="Gameplay"]
 
+[node name="NpcPopulation" type="Node3D" parent="Gameplay"]
+
 [node name="BaseBuildPreview" type="MeshInstance3D" parent="Gameplay"]
 visible = false
 
@@ -849,6 +851,23 @@ custom_minimum_size = Vector2(990, 595)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "PROCEDURAL MISSION JOURNAL"
+autowrap_mode = 2
+
+[node name="NpcInteraction" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 210.0
+offset_top = 42.0
+offset_right = 1175.0
+offset_bottom = 630.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/NpcInteraction"]
+mouse_filter = 2
+custom_minimum_size = Vector2(925, 545)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "NPC INTERACTION"
 autowrap_mode = 2
 
 [node name="PlayerEquipment" type="PanelContainer" parent="Hud"]

@@ -402,6 +402,7 @@ public partial class SalvageRepairSlice : Node3D
         BindStageOneVoyageSceneNodes();
         BindGalaxyNavigationSceneNodes();
         BindEcologySceneNodes();
+        BindNpcFactionSceneNodes();
         BindProceduralQuestSceneNodes();
         BindPlayerSurvivalSceneNodes();
 
@@ -415,6 +416,7 @@ public partial class SalvageRepairSlice : Node3D
         ShipSystemsCatalog shipSystemsCatalog =
             LoadShipSystemsCatalog(catalog);
         _ecologyCatalog = LoadEcologyCatalog(catalog);
+        _npcFactionCatalog = LoadNpcFactionCatalog(stationServicesCatalog);
         _proceduralQuestCatalog = LoadProceduralQuestCatalog(
             stationServicesCatalog);
         _playerSurvivalCatalog = LoadPlayerSurvivalCatalog(catalog);
@@ -487,6 +489,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
         InitializeEcologyRuntime(saveData: null);
+        InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
         InitializePlayerSurvivalRuntime(saveData: null);
         _generatedResourcePlacements =
@@ -535,6 +538,7 @@ public partial class SalvageRepairSlice : Node3D
             legacySaveData: null);
         RebuildBaseConstructionScene();
         RebuildPlanetaryPoiScene();
+        RebuildNpcFactionScene();
 
         string userDirectory = ProjectSettings.GlobalizePath("user://");
         string databasePath = Path.Combine(
@@ -688,6 +692,13 @@ public partial class SalvageRepairSlice : Node3D
             "stats=health+shield+stamina+life-support+hazard+oxygen+jetpack+multitool; " +
             "movement=sprint+crouch+jump+jetpack+swim; equipment=I; mode=Z; persistence=enabled; F5=acceptance.");
         GD.Print(
+            "TASK-122 NPC/factions READY: " +
+            $"factions={NpcFactionCatalog.Factions.Count}; archetypes={NpcFactionCatalog.Archetypes.Count}; " +
+            $"agents={NpcFactionCatalog.Agents.Count}; dialogues={NpcFactionCatalog.Dialogues.Count}; " +
+            $"defeatTargets={NpcFactionCatalog.DefeatTargetIds.Count}; protectTargets={NpcFactionCatalog.ProtectTargetIds.Count}; " +
+            "reputation=per-faction; dialogue=localized+conditional+consequences; " +
+            "combat=physical-hostile; persistence=delta-state; proceduralCombatObjectives=enabled; F5=acceptance.");
+        GD.Print(
             "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -733,6 +744,7 @@ public partial class SalvageRepairSlice : Node3D
         PollEcologyAcceptanceTask();
         PollProceduralQuestAcceptanceTask();
         PollPlayerSurvivalAcceptanceTask();
+        PollNpcFactionAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -813,6 +825,11 @@ public partial class SalvageRepairSlice : Node3D
 
         if (keyEvent.Echo)
         {
+            return;
+        }
+        if (HandleNpcFactionInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
             return;
         }
         if (HandlePlayerSurvivalInput(physical, logical))
@@ -4913,6 +4930,7 @@ public partial class SalvageRepairSlice : Node3D
             _ecologyAcceptanceTask is null &&
             _proceduralQuestAcceptanceTask is null &&
             _playerSurvivalAcceptanceTask is null &&
+            _npcFactionAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -4928,6 +4946,7 @@ public partial class SalvageRepairSlice : Node3D
             !_ecologyCatalogOpen &&
             !_missionJournalOpen &&
             !_playerEquipmentOpen &&
+            !_npcInteractionOpen &&
             !(_stageOneVoyageRuntime?.Piloted ?? false) &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
@@ -5367,8 +5386,9 @@ public partial class SalvageRepairSlice : Node3D
         BeginEcologyAcceptance(directory);
         BeginProceduralQuestAcceptance(directory);
         BeginPlayerSurvivalAcceptance(directory);
+        BeginNpcFactionAcceptance(directory);
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120 runtime, ship systems, voyage, galaxy navigation, ecology, quests and player survival acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122 runtime, ship systems, voyage, galaxy navigation, ecology, quests, player survival and NPC/factions acceptance running";
     }
 
     private void BeginReset()
@@ -5412,7 +5432,8 @@ public partial class SalvageRepairSlice : Node3D
             galaxyNavigation: GalaxyNavigation.CreateSaveData(),
             ecology: Ecology.CreateSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
-            playerSurvival: PlayerSurvival.CreateSaveData());
+            playerSurvival: PlayerSurvival.CreateSaveData(),
+            npcFactions: NpcFactions.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -5450,6 +5471,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseEcologyCatalog();
         CloseMissionJournal();
         ClosePlayerEquipment();
+        CloseNpcInteraction();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -5470,6 +5492,7 @@ public partial class SalvageRepairSlice : Node3D
             _ecologyAcceptanceTask is not null ||
             _proceduralQuestAcceptanceTask is not null ||
             _playerSurvivalAcceptanceTask is not null ||
+            _npcFactionAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -5503,7 +5526,8 @@ public partial class SalvageRepairSlice : Node3D
             galaxyNavigation: GalaxyNavigation.CreateSaveData(),
             ecology: Ecology.CreateSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
-            playerSurvival: PlayerSurvival.CreateSaveData());
+            playerSurvival: PlayerSurvival.CreateSaveData(),
+            npcFactions: NpcFactions.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -5614,6 +5638,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
             InitializeEcologyRuntime(snapshot?.Ecology);
+            InitializeNpcFactionRuntime(snapshot?.NpcFactions);
             InitializeProceduralQuestRuntime(snapshot?.ProceduralQuests);
             InitializePlayerSurvivalRuntime(snapshot?.PlayerSurvival);
             _revision = snapshot?.Revision ?? 0;
@@ -5635,7 +5660,9 @@ public partial class SalvageRepairSlice : Node3D
             CloseEcologyCatalog();
             CloseMissionJournal();
             ClosePlayerEquipment();
+            CloseNpcInteraction();
             RebuildBaseConstructionScene();
+            RebuildNpcFactionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
@@ -5735,6 +5762,13 @@ public partial class SalvageRepairSlice : Node3D
                 $"multitool={PlayerSurvival.InstalledMultitoolModules.Count}; " +
                 $"mode={PlayerSurvival.ActiveMultitoolFunction}; " +
                 $"legacyFallback={(snapshot?.PlayerSurvival is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-122 NPC/factions restore PASS: " +
+                $"agents={NpcFactions.AliveCount}/{NpcFactions.AgentCount}; " +
+                $"defeats={NpcFactions.TotalOpponentDefeats}; " +
+                $"repDeltas={NpcFactions.CreateSaveData().Reputations.Count}; " +
+                $"agentDeltas={NpcFactions.CreateSaveData().Agents.Count}; " +
+                $"legacyFallback={(snapshot?.NpcFactions is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -5803,6 +5837,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
             InitializeEcologyRuntime(saveData: null);
+            InitializeNpcFactionRuntime(saveData: null);
             InitializeProceduralQuestRuntime(saveData: null);
             InitializePlayerSurvivalRuntime(saveData: null);
             _revision = 0;
@@ -5816,7 +5851,9 @@ public partial class SalvageRepairSlice : Node3D
             CloseEcologyCatalog();
             CloseMissionJournal();
             ClosePlayerEquipment();
+            CloseNpcInteraction();
             RebuildBaseConstructionScene();
+            RebuildNpcFactionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
@@ -5884,6 +5921,11 @@ public partial class SalvageRepairSlice : Node3D
                 $"stamina={PlayerSurvival.Stamina:0.#}; oxygen={PlayerSurvival.Oxygen:0.#}; " +
                 $"suit={PlayerSurvival.InstalledSuitModules.Count}; " +
                 $"multitool={PlayerSurvival.InstalledMultitoolModules.Count}; mode={PlayerSurvival.ActiveMultitoolFunction}.");
+            GD.Print(
+                "TASK-122 NPC/factions reset PASS: " +
+                $"agents={NpcFactions.AliveCount}/{NpcFactions.AgentCount}; " +
+                $"defeats={NpcFactions.TotalOpponentDefeats}; " +
+                $"repDeltas={NpcFactions.CreateSaveData().Reputations.Count}; agentDeltas={NpcFactions.CreateSaveData().Agents.Count}.");
         }
         catch (Exception exception)
         {
@@ -6457,13 +6499,15 @@ public partial class SalvageRepairSlice : Node3D
             _ecologyAcceptanceTask is not null ||
             _proceduralQuestAcceptanceTask is not null ||
             _playerSurvivalAcceptanceTask is not null ||
+            _npcFactionAcceptanceTask is not null ||
             _catalogMatrixAcceptanceReport is null ||
             _shipSystemsAcceptanceReport is null ||
             _stageOneVoyageAcceptanceReport is null ||
             _galaxyNavigationAcceptanceReport is null ||
             _ecologyAcceptanceReport is null ||
             _proceduralQuestAcceptanceReport is null ||
-            _playerSurvivalAcceptanceReport is null)
+            _playerSurvivalAcceptanceReport is null ||
+            _npcFactionAcceptanceReport is null)
         {
             return;
         }
@@ -6474,13 +6518,14 @@ public partial class SalvageRepairSlice : Node3D
             _galaxyNavigationAcceptanceReport.Passed &&
             _ecologyAcceptanceReport.Passed &&
             _proceduralQuestAcceptanceReport.Passed &&
-            _playerSurvivalAcceptanceReport.Passed;
+            _playerSurvivalAcceptanceReport.Passed &&
+            _npcFactionAcceptanceReport.Passed;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120 runtime, ship systems, voyage, galaxy navigation, ecology, quests and player survival acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120 runtime, ship systems, voyage, galaxy navigation, ecology, quests and player survival acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122 runtime, ship systems, voyage, galaxy navigation, ecology, quests, player survival and NPC/factions acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122 runtime, ship systems, voyage, galaxy navigation, ecology, quests, player survival and NPC/factions acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7303,6 +7348,7 @@ public partial class SalvageRepairSlice : Node3D
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
         string ecologyLine = BuildEcologyHudLine();
+        string npcFactionLine = BuildNpcFactionHudLine();
         string missionLine = BuildProceduralQuestHudLine();
 
         if (_hudMode == SalvageRepairHudMode.Compact)
@@ -7322,6 +7368,7 @@ public partial class SalvageRepairSlice : Node3D
                 voyageLine + "\n" +
                 galaxyLine + "\n" +
                 ecologyLine + "\n" +
+                npcFactionLine + "\n" +
                 missionLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
@@ -7344,11 +7391,12 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
                 $"TASK-118 procedural quests (F5): {_proceduralQuestAcceptanceHud}\n" +
                 $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
+                $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
                 "E - interact/select • I - exosuit/multitool • Q - mission journal on foot • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology + procedural quests + player survival • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology + procedural quests + player survival + NPC/factions • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
@@ -7369,6 +7417,7 @@ public partial class SalvageRepairSlice : Node3D
             voyageLine + "\n" +
             galaxyLine + "\n" +
             ecologyLine + "\n" +
+            npcFactionLine + "\n" +
             missionLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
@@ -7400,6 +7449,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
             $"TASK-118 procedural quests (F5): {_proceduralQuestAcceptanceHud}\n" +
             $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
+            $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -7413,7 +7463,7 @@ public partial class SalvageRepairSlice : Node3D
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology + procedural quests + player survival • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology + procedural quests + player survival + NPC/factions • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
     }

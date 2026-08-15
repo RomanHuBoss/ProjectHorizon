@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "worldSeed": 421337,
+  "regionKey": "region.vertical_slice.frontier",
+  "archetypes": [
+    {
+      "archetype": "Trader",
+      "localizationKey": "npc_type.trader",
+      "nameEn": "Trader",
+      "nameRu": "Торговец"
+    },
+    {
+      "archetype": "Technician",
+      "localizationKey": "npc_type.technician",
+      "nameEn": "Technician",
+      "nameRu": "Техник"
+    },
+    {
+      "archetype": "Pilot",
+      "localizationKey": "npc_type.pilot",
+      "nameEn": "Pilot",
+      "nameRu": "Пилот"
+    },
+    {
+      "archetype": "Scientist",
+      "localizationKey": "npc_type.scientist",
+      "nameEn": "Scientist",
+      "nameRu": "Учёный"
+    },
+    {
+      "archetype": "Guard",
+      "localizationKey": "npc_type.guard",
+      "nameEn": "Guard",
+      "nameRu": "Охранник"
+    },
+    {
+      "archetype": "GuildRepresentative",
+      "localizationKey": "npc_type.guild_representative",
+      "nameEn": "Guild representative",
+      "nameRu": "Представитель гильдии"
+    },
+    {
+      "archetype": "Traveler",
+      "localizationKey": "npc_type.traveler",
+      "nameEn": "Traveler",
+      "nameRu": "Случайный путешественник"
+    },
+    {
+      "archetype": "Opponent",
+      "localizationKey": "npc_type.opponent",
+      "nameEn": "Opponent",
+      "nameRu": "Противник"
+    }
+  ],
+  "agents": [
+    {
+      "npcId": "npc.trader.ilia_voss",
+      "displayNameEn": "Ilia Voss",
+      "displayNameRu": "Илия Восс",
+      "archetype": "Trader",
+      "factionId": "faction.meridian_exchange",
+      "dialogueId": "dialogue.npc.trader",
+      "positionX": 14.0,
+      "positionY": 0.9,
+      "positionZ": 12.0,
+      "patrolRadius": 0.0,
+      "health": 100.0,
+      "walkSpeed": 0.0,
+      "detectionRange": 0.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": true,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": false,
+      "colorR": 0.12,
+      "colorG": 0.34,
+      "colorB": 0.62
+    },
+    {
+      "npcId": "npc.technician.mara_quill",
+      "displayNameEn": "Mara Quill",
+      "displayNameRu": "Мара Квилл",
+      "archetype": "Technician",
+      "factionId": "faction.meridian_exchange",
+      "dialogueId": "dialogue.npc.technician",
+      "positionX": 9.0,
+      "positionY": 0.0,
+      "positionZ": 15.0,
+      "patrolRadius": 3.5,
+      "health": 100.0,
+      "walkSpeed": 1.7,
+      "detectionRange": 8.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": false,
+      "colorR": 0.18,
+      "colorG": 0.58,
+      "colorB": 0.72
+    },
+    {
+      "npcId": "npc.pilot.soren_vale",
+      "displayNameEn": "Soren Vale",
+      "displayNameRu": "Сорен Вейл",
+      "archetype": "Pilot",
+      "factionId": "faction.meridian_exchange",
+      "dialogueId": "dialogue.npc.pilot",
+      "positionX": 17.0,
+      "positionY": 0.0,
+      "positionZ": 7.0,
+      "patrolRadius": 4.0,
+      "health": 100.0,
+      "walkSpeed": 2.1,
+      "detectionRange": 8.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": false,
+      "colorR": 0.2,
+      "colorG": 0.46,
+      "colorB": 0.76
+    },
+    {
+      "npcId": "npc.scientist.eren_sol",
+      "displayNameEn": "Dr. Eren Sol",
+      "displayNameRu": "д-р Эрен Сол",
+      "archetype": "Scientist",
+      "factionId": "faction.helix_academy",
+      "dialogueId": "dialogue.npc.scientist",
+      "positionX": -15.0,
+      "positionY": 0.0,
+      "positionZ": 13.0,
+      "patrolRadius": 3.0,
+      "health": 90.0,
+      "walkSpeed": 1.5,
+      "detectionRange": 8.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": true,
+      "colorR": 0.72,
+      "colorG": 0.64,
+      "colorB": 0.94
+    },
+    {
+      "npcId": "npc.guard.vera_kane",
+      "displayNameEn": "Vera Kane",
+      "displayNameRu": "Вера Кейн",
+      "archetype": "Guard",
+      "factionId": "faction.aegis_compact",
+      "dialogueId": "dialogue.npc.guard",
+      "positionX": -18.0,
+      "positionY": 0.0,
+      "positionZ": 8.0,
+      "patrolRadius": 5.0,
+      "health": 130.0,
+      "walkSpeed": 1.8,
+      "detectionRange": 10.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": false,
+      "colorR": 0.48,
+      "colorG": 0.18,
+      "colorB": 0.18
+    },
+    {
+      "npcId": "npc.guild.talia_nox",
+      "displayNameEn": "Talia Nox",
+      "displayNameRu": "Талия Нокс",
+      "archetype": "GuildRepresentative",
+      "factionId": "faction.helix_academy",
+      "dialogueId": "dialogue.npc.guild_representative",
+      "positionX": 12.0,
+      "positionY": 0.0,
+      "positionZ": -15.0,
+      "patrolRadius": 2.5,
+      "health": 100.0,
+      "walkSpeed": 1.4,
+      "detectionRange": 8.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": false,
+      "colorR": 0.55,
+      "colorG": 0.38,
+      "colorB": 0.82
+    },
+    {
+      "npcId": "npc.traveler.yun_ardent",
+      "displayNameEn": "Yun Ardent",
+      "displayNameRu": "Юн Ардент",
+      "archetype": "Traveler",
+      "factionId": "faction.helix_academy",
+      "dialogueId": "dialogue.npc.traveler",
+      "positionX": -12.0,
+      "positionY": 0.0,
+      "positionZ": -14.0,
+      "patrolRadius": 6.0,
+      "health": 85.0,
+      "walkSpeed": 2.0,
+      "detectionRange": 8.0,
+      "attackRange": 0.0,
+      "attackDamage": 0.0,
+      "attackCooldownSeconds": 0.0,
+      "existingScene": false,
+      "hostile": false,
+      "respawnable": false,
+      "canBeProtected": true,
+      "colorR": 0.35,
+      "colorG": 0.66,
+      "colorB": 0.48
+    },
+    {
+      "npcId": "npc.opponent.rogue_dax",
+      "displayNameEn": "Rogue Dax",
+      "displayNameRu": "Изгой Дакс",
+      "archetype": "Opponent",
+      "factionId": "",
+      "dialogueId": "dialogue.npc.opponent",
+      "positionX": -24.0,
+      "positionY": 0.0,
+      "positionZ": -18.0,
+      "patrolRadius": 7.0,
+      "health": 100.0,
+      "walkSpeed": 2.4,
+      "detectionRange": 16.0,
+      "attackRange": 2.2,
+      "attackDamage": 8.0,
+      "attackCooldownSeconds": 1.25,
+      "existingScene": false,
+      "hostile": true,
+      "respawnable": true,
+      "canBeProtected": false,
+      "colorR": 0.72,
+      "colorG": 0.12,
+      "colorB": 0.1
+    }
+  ],
+  "dialogues": [
+    {
+      "dialogueId": "dialogue.npc.trader",
+      "archetype": "Trader",
+      "greetingEn": "Frontier Exchange is open. I can route trade or contracts.",
+      "greetingRu": "Frontier Exchange открыт. Могу перейти к торговле или контрактам.",
+      "farewellEn": "Safe travels.",
+      "farewellRu": "Счастливого пути.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.trader.trade",
+          "textEn": "Open trade.",
+          "textRu": "Открыть торговлю.",
+          "condition": "reputation>=-100",
+          "action": "OpenTrade",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Market interface requested.",
+          "consequenceRu": "Запрошен интерфейс рынка."
+        },
+        {
+          "optionId": "dialogue_option.npc.trader.missions",
+          "textEn": "Show available contracts.",
+          "textRu": "Показать доступные контракты.",
+          "condition": "reputation>=-100",
+          "action": "OpenMissions",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Mission journal requested.",
+          "consequenceRu": "Запрошен журнал заданий."
+        },
+        {
+          "optionId": "dialogue_option.npc.trader.close",
+          "textEn": "Goodbye.",
+          "textRu": "До встречи.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.technician",
+      "archetype": "Technician",
+      "greetingEn": "Mara Quill. Field systems and repair diagnostics are my department.",
+      "greetingRu": "Мара Квилл. Полевые системы и ремонтная диагностика — моя работа.",
+      "farewellEn": "Keep your systems inside tolerance.",
+      "farewellRu": "Держите системы в рабочих допусках.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.technician.repair",
+          "textEn": "Any repair advice?",
+          "textRu": "Что посоветуете по ремонту?",
+          "condition": "reputation>=-20",
+          "action": "RepairHint",
+          "minimumReputation": -20,
+          "reputationDelta": 1,
+          "consequenceEn": "Repair diagnostics shared; first useful interaction improves reputation.",
+          "consequenceRu": "Передана ремонтная диагностика; первое полезное общение повышает репутацию."
+        },
+        {
+          "optionId": "dialogue_option.npc.technician.close",
+          "textEn": "Thanks.",
+          "textRu": "Спасибо.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.pilot",
+      "archetype": "Pilot",
+      "greetingEn": "Soren Vale. I fly the local lanes when the weather permits.",
+      "greetingRu": "Сорен Вейл. Летаю по местным трассам, когда позволяет погода.",
+      "farewellEn": "Watch the approach vector.",
+      "farewellRu": "Следите за вектором захода.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.pilot.flight",
+          "textEn": "Tell me about the local approach.",
+          "textRu": "Расскажите о местном заходе.",
+          "condition": "reputation>=-40",
+          "action": "FlightHint",
+          "minimumReputation": -40,
+          "reputationDelta": 1,
+          "consequenceEn": "Local flight note shared.",
+          "consequenceRu": "Передана заметка о местных полётах."
+        },
+        {
+          "optionId": "dialogue_option.npc.pilot.close",
+          "textEn": "Clear skies.",
+          "textRu": "Чистого неба.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.scientist",
+      "archetype": "Scientist",
+      "greetingEn": "Dr. Eren Sol. The local biosphere is more complex than the first survey suggested.",
+      "greetingRu": "Доктор Эрен Сол. Местная биосфера сложнее, чем показала первая разведка.",
+      "farewellEn": "Do not contaminate the samples.",
+      "farewellRu": "Не загрязняйте образцы.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.scientist.science",
+          "textEn": "What should I scan?",
+          "textRu": "Что стоит сканировать?",
+          "condition": "reputation>=-30",
+          "action": "ScienceHint",
+          "minimumReputation": -30,
+          "reputationDelta": 1,
+          "consequenceEn": "Survey priority shared.",
+          "consequenceRu": "Передан приоритет исследований."
+        },
+        {
+          "optionId": "dialogue_option.npc.scientist.protect",
+          "textEn": "I am here to secure your field work.",
+          "textRu": "Я здесь, чтобы обеспечить безопасность полевых работ.",
+          "condition": "reputation>=-50",
+          "action": "AcknowledgeProtection",
+          "minimumReputation": -50,
+          "reputationDelta": 1,
+          "consequenceEn": "Protection objective acknowledged.",
+          "consequenceRu": "Цель по защите подтверждена."
+        },
+        {
+          "optionId": "dialogue_option.npc.scientist.close",
+          "textEn": "Good luck with the survey.",
+          "textRu": "Удачи с исследованием.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.guard",
+      "archetype": "Guard",
+      "greetingEn": "Vera Kane, Aegis Compact. This perimeter is under observation.",
+      "greetingRu": "Вера Кейн, Aegis Compact. Этот периметр находится под наблюдением.",
+      "farewellEn": "Stay clear of restricted equipment.",
+      "farewellRu": "Не приближайтесь к оборудованию с ограниченным доступом.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.guard.briefing",
+          "textEn": "Any security concerns?",
+          "textRu": "Есть угрозы безопасности?",
+          "condition": "reputation>=0",
+          "action": "GuardBriefing",
+          "minimumReputation": 0,
+          "reputationDelta": 1,
+          "consequenceEn": "Security briefing shared.",
+          "consequenceRu": "Передана сводка безопасности."
+        },
+        {
+          "optionId": "dialogue_option.npc.guard.close",
+          "textEn": "Understood.",
+          "textRu": "Понятно.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.guild_representative",
+      "archetype": "GuildRepresentative",
+      "greetingEn": "Talia Nox. I coordinate field contracts for the Academy network.",
+      "greetingRu": "Талия Нокс. Я координирую полевые контракты сети Академии.",
+      "farewellEn": "The board refreshes as capabilities change.",
+      "farewellRu": "Доска заданий обновляется по мере изменения возможностей.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.guild.missions",
+          "textEn": "Open the mission board.",
+          "textRu": "Открыть доску заданий.",
+          "condition": "reputation>=-50",
+          "action": "OpenMissions",
+          "minimumReputation": -50,
+          "reputationDelta": 1,
+          "consequenceEn": "Mission journal requested.",
+          "consequenceRu": "Запрошен журнал заданий."
+        },
+        {
+          "optionId": "dialogue_option.npc.guild.close",
+          "textEn": "Later.",
+          "textRu": "Позже.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.traveler",
+      "archetype": "Traveler",
+      "greetingEn": "Yun Ardent. I thought this route would be quieter.",
+      "greetingRu": "Юн Ардент. Я думал, этот маршрут будет спокойнее.",
+      "farewellEn": "I will keep moving.",
+      "farewellRu": "Я продолжу путь.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.traveler.story",
+          "textEn": "What did you see on the road?",
+          "textRu": "Что вы видели по дороге?",
+          "condition": "reputation>=-40",
+          "action": "TravelerStory",
+          "minimumReputation": -40,
+          "reputationDelta": 1,
+          "consequenceEn": "A local rumor was shared.",
+          "consequenceRu": "Передан местный слух."
+        },
+        {
+          "optionId": "dialogue_option.npc.traveler.protect",
+          "textEn": "I can cover your route from here.",
+          "textRu": "Я могу прикрыть ваш маршрут отсюда.",
+          "condition": "reputation>=-50",
+          "action": "AcknowledgeProtection",
+          "minimumReputation": -50,
+          "reputationDelta": 1,
+          "consequenceEn": "Protection objective acknowledged.",
+          "consequenceRu": "Цель по защите подтверждена."
+        },
+        {
+          "optionId": "dialogue_option.npc.traveler.close",
+          "textEn": "Take care.",
+          "textRu": "Берегите себя.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    },
+    {
+      "dialogueId": "dialogue.npc.opponent",
+      "archetype": "Opponent",
+      "greetingEn": "Wrong place. Leave before I make the decision for you.",
+      "greetingRu": "Не то место. Уходи, пока я не решил за тебя.",
+      "farewellEn": "Run.",
+      "farewellRu": "Беги.",
+      "options": [
+        {
+          "optionId": "dialogue_option.npc.opponent.warning",
+          "textEn": "Stand down.",
+          "textRu": "Оружие вниз.",
+          "condition": "always",
+          "action": "HostileWarning",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "The opponent remains hostile.",
+          "consequenceRu": "Противник остаётся враждебным."
+        },
+        {
+          "optionId": "dialogue_option.npc.opponent.close",
+          "textEn": "Back away.",
+          "textRu": "Отойти.",
+          "condition": "always",
+          "action": "Close",
+          "minimumReputation": -100,
+          "reputationDelta": 0,
+          "consequenceEn": "Dialogue closed.",
+          "consequenceRu": "Диалог закрыт."
+        }
+      ]
+    }
+  ]
+}
