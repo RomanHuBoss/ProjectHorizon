@@ -186,6 +186,32 @@ public partial class SalvageRepairSlice
         }
     }
 
+    private void ExerciseAerialNavigationDuringWorldAcceptance(
+        WorldSceneContext context)
+    {
+        if (!_aerialNavigationAcceptanceRunning ||
+            context.Kind != WorldSceneKind.Orbit ||
+            _npcShipNavigationNodes.Count == 0)
+        {
+            return;
+        }
+
+        // TASK-148 deliberately suspends orbit traffic while the player is on the
+        // surface. Exercise the actual ship steering only while its Orbit shell is
+        // live, then let TASK-148 restore the original residency state. Two orbit
+        // legs x 150 fixed steps provide five seconds of deterministic decision
+        // time without moving CharacterBody3D instances outside a physics frame.
+        const double step = 1.0 / SystemFrequencyPolicy.PhysicsHz;
+        const int stepsPerOrbitLeg = 150;
+        for (int frame = 0; frame < stepsPerOrbitLeg; frame++)
+        {
+            foreach (NpcShipNavigationNode ship in _npcShipNavigationNodes)
+            {
+                ship.StepForAcceptance(step);
+            }
+        }
+    }
+
     private void RefreshAerialNavigationEnvironment()
     {
         if (_aerialSteeringRuntime is null)
@@ -410,7 +436,9 @@ public partial class SalvageRepairSlice
                 _npcShipNavigationNodes,
                 _aerialGridProbe,
                 _aerialObstacleProbe,
-                _aerialPoiProbe);
+                _aerialPoiProbe,
+                shipTrafficExpectedActive:
+                    _worldSceneCoordinatorRuntime?.Current.Kind == WorldSceneKind.Orbit);
         _aerialNavigationAcceptanceRunning = false;
         _aerialAcceptanceForceLeaderTarget = false;
         UpdateNpcShipTrafficTargets();

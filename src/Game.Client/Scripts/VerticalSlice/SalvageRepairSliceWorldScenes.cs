@@ -376,7 +376,8 @@ public partial class SalvageRepairSlice
             report = WorldSceneCoordinatorAcceptanceRunner.Run(
                 _worldSceneCoordinatorNode,
                 () => ApplyWorldResidencyPolicy(force: false),
-                WorldResidencyPolicyMatches);
+                WorldResidencyPolicyMatches,
+                ExerciseAerialNavigationDuringWorldAcceptance);
         }
         finally
         {

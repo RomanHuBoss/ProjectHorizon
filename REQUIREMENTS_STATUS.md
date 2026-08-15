@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task149-transactional-world-scene-acceptance.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task149-runtime-regression-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -49,7 +49,7 @@ TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; 
 C# lexical structural check PASS: 5/5 changed C# files; dotnet/godot executables unavailable in preparation environment
 ```
 
-**Недоступные проверки:** в среде подготовки отсутствуют `dotnet`, `godot` и `godot4`. Поэтому clean C# build, фактическое исполнение xUnit и Godot F5/runtime не заявляются. По регламенту `TASK-149` и `WORLD-ACC-100..103` остаются `IN_PROGRESS` до внешней runtime-приёмки.
+**Недоступные проверки:** в среде подготовки отсутствуют `dotnet`, `godot` и `godot4`. Поэтому clean C# build, фактическое исполнение xUnit и Godot F5/runtime не заявляются. По регламенту `TASK-149` остаётся `IN_PROGRESS`; после внешнего F5 подтверждён `WORLD-ACC-102`, а `WORLD-ACC-100/101/103` требуют оставшейся внешней приёмки.
 
 **Внешняя сборка 2026-08-15 18:36:** Godot/.NET реально запустил `CoreCompile` для `Game.Client` и обнаружил единственную ошибку `CS0136` в `WorldSceneCoordinatorAcceptance.cs(105,44)` при `0` warnings. Причина устранена переименованием локальной переменной шага `result` → `transitionResult`; после hotfix все repository static validators повторно PASS. Повторный внешний clean build и F5/runtime всё ещё требуются до `VERIFIED`.
 
@@ -63,6 +63,25 @@ C# lexical structural check PASS: 5/5 changed C# files; dotnet/godot executables
 5. Затем вручную пройти Surface → Orbit → StationInterior → hyperspace → destination StationInterior → Orbit → Surface и выполнить graceful exit/restart. После restart location/system/planet должны восстановиться из voyage+galaxy persistence.
 
 **Статус:** `TASK-148` остаётся `IMPLEMENTED`; `TASK-149` остаётся `IN_PROGRESS` до clean build + F5 + manual/cold-restore evidence.
+
+### TASK-149.4 — F5 runtime regression closure после успешного transactional world-scene acceptance
+
+**Внешнее runtime evidence от 2026-08-15 18:43 (+03:00):** Godot 4.7.1 .NET на `Forward Mobile / Vulkan` успешно выполнил собственный TASK-148 acceptance: `transitionGraph=1; illegalRejected=1; hyperspaceSystemChange=1; packedScenes=1; singleLiveScene=1; liveContextMatch=1; residencyPolicy=1; livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; testTransitions=6; testReloads=7; testRejected=1; testHyperspace=1; sceneLoadFailures=0; rollbacks=0`. Это является реальным подтверждением world-scene transaction/self-restore contract.
+
+Тот же F5 выявил четыре смежных runtime regression defects:
+
+- `TASK-130`: только `profileContract=0`; причина — сравнение `SaveDatabase.DatabasePath` и `GameProfilePaths.PrimaryDatabasePath` как сырых строк при разных, но эквивалентных представлениях пути. Исправлено канонизацией `Path.GetFullPath` и platform-aware comparison.
+- `TASK-142`: `nearbyTicks=199/100`, `distantTicks=39/20`, `frequencyPolicy=0`; причина — modulo-only accumulator после tolerance-admitted floating boundary оставлял почти полный interval и давал повторный tick на следующем кадре. Исправлено вычитанием целого числа elapsed intervals. Существующий xUnit диапазон 99–101 / 19–21 теперь является прямым regression guard.
+- `TASK-124`: NavigationServer сообщил query before first map synchronization; acceptance вследствие этого получил `tilesTouched=0; pathPoints=0; crossTilePath=0; obstacleClearance=0; recoveryProbe=0`. Arbitrary two-frame delay заменён на gate по `NavigationServer3D.MapGetIterationId`; query разрешается только после ненулевой итерации и после фактического изменения iteration относительно region rebuild.
+- `TASK-126`: fauna runtime работал, но ships дали `shipSamples=0` и все ship steering primitives = 0. Это не отсутствие ship AI, а конфликт acceptance с новой TASK-148 residency policy: на Surface `Gameplay/NpcShipTraffic` корректно suspended. F5 runner теперь передаёт live-step observer; на двух Orbit legs четыре NPC ships выполняют non-moving fixed-step steering acceptance, а финальная проверка на восстановленном Surface требует их suspended residency.
+
+Сообщения редактора `Cannot open file '/root/godot/modules/mono/glue/.../NativeCalls.cs'` относятся к попытке открыть внутренний source path GodotSharp из stack trace и не являются `res://` resource проекта.
+
+**Изменённые файлы:** `SystemFrequencyPolicy.cs`, `SalvageRepairSliceApplicationShell.cs`, `NpcNavigationSurfaceNode.cs`, `NpcShipNavigationNode.cs`, `AerialNavigationAcceptance.cs`, `SalvageRepairSliceAerialNavigation.cs`, `WorldSceneCoordinatorAcceptance.cs`, `SalvageRepairSliceWorldScenes.cs`, local quality scripts, README/CHANGELOG/REQUIREMENTS_STATUS и новый `validate-task149-runtime-regression-closure.py`.
+
+**Статическая проверка в среде подготовки:** все repository `tools/validate-*.py` PASS, включая `TASK-149.4 RUNTIME REGRESSION CLOSURE PASS: frequencyGate=1; navIterationGuard=1; profilePathNormalization=1; orbitResidentShipProbe=1; residencyAwareAerialAcceptance=1; xunitFrequencyBounds=1`. `dotnet`/Godot в среде подготовки отсутствуют, поэтому внешний clean build/F5 этой hotfix-редакции всё ещё обязателен.
+
+**Статус:** `WORLD-ACC-102: IN_PROGRESS → VERIFIED` по реальному TASK-148 F5 evidence. `WORLD-ACC-100/101/103` остаются `IN_PROGRESS`; `TASK-149` остаётся `IN_PROGRESS` до clean three-layer build, local quality и ручного Surface→Orbit→Station→Hyperspace→Station→Orbit→Surface + cold restore.
 
 ### TASK-148.2 — runtime hotfix: Godot text-scene parse + AudioDirector startup lifecycle
 
@@ -5141,7 +5160,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `IMPLEMENTED` | RU/EN world-scene HUD + TASK-148 acceptance |
 | `WORLD-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-149: выполнить three-layer clean build |
 | `WORLD-ACC-101` | Local/CI quality и xUnit green | `IN_PROGRESS` | Все Python quality gates green; TASK-148 validator требует xunit=4/4, но фактический `dotnet test` недоступен в среде подготовки |
-| `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `IN_PROGRESS` | Требуется livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1 в Godot 4.7.1 .NET |
+| `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `VERIFIED` | 2026-08-15 runtime: livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; sceneLoadFailures=0; rollbacks=0 |
 | `WORLD-ACC-103` | Manual Surface→Orbit→Station→Hyper→Station→Orbit→Surface + cold restore | `IN_PROGRESS` | Выполнить TASK-149 runtime smoke |
 
 ## 9. Очередь ближайших задач

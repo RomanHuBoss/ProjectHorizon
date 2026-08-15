@@ -50,7 +50,8 @@ public static class AerialNavigationAcceptanceEvaluator
         IReadOnlyList<NpcShipNavigationNode> ships,
         bool gridProbe,
         bool obstacleProbe,
-        bool poiProbe)
+        bool poiProbe,
+        bool shipTrafficExpectedActive)
     {
         ArgumentNullException.ThrowIfNull(fauna);
         ArgumentNullException.ThrowIfNull(ships);
@@ -84,9 +85,13 @@ public static class AerialNavigationAcceptanceEvaluator
         bool poi = poiProbe &&
             after.PointOfInterestCount >= 4 &&
             after.PoiSelections > before.PoiSelections;
+        bool shipResidency = shipTrafficExpectedActive
+            ? shipDiagnostics.All(item => item.Active)
+            : shipDiagnostics.All(item => !item.Active);
         bool shipSteering =
             shipDiagnostics.Length == 4 &&
-            shipDiagnostics.All(item => item.Active && item.SteeringSamples > 0);
+            shipResidency &&
+            shipDiagnostics.All(item => item.SteeringSamples > 0);
         bool pursuit = after.PursuitSamples > before.PursuitSamples;
         bool evade = after.EvadeSamples > before.EvadeSamples;
         bool arrive = after.ArriveSamples > before.ArriveSamples;

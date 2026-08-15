@@ -23,6 +23,7 @@ python3 tools/validate-section38-architecture-contract.py
 python3 tools/validate-platform-architecture-contract.py
 python3 tools/validate-task146-base-construction-closure.py
 python3 tools/validate-task148-world-scene-coordinator.py
+python3 tools/validate-task149-runtime-regression-closure.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

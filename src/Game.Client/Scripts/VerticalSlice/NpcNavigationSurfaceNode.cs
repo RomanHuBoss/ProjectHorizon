@@ -80,12 +80,15 @@ public partial class NpcNavigationSurfaceNode : Node3D
     private int _evictedRegions;
     private int _walkableCells;
     private int _obstacleRevision;
+    private long _synchronizationBaselineIteration;
+    private bool _navigationSynchronizationPending;
 
     public bool IsConfigured => _player is not null && _worldRoot is not null;
 
     public bool ReadyForQueries => IsConfigured &&
         _regions.Count > 0 &&
-        _syncFramesRemaining <= 0;
+        _syncFramesRemaining <= 0 &&
+        HasNavigationMapSynchronized();
 
     public int ActiveRegionCount => _regions.Count;
 
@@ -324,6 +327,8 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             return;
         }
+        long synchronizationBaseline = GetNavigationMapIteration();
+        bool navigationChanged = false;
         _centerTile = nextCenter;
         _hasCenterTile = true;
         HashSet<NpcNavigationTileKey> desired = BuildDesiredTileSet(nextCenter);
@@ -338,6 +343,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             RemoveChild(region);
             region.QueueFree();
             _evictedRegions++;
+            navigationChanged = true;
         }
         foreach (NpcNavigationTileKey key in desired.OrderBy(key => key.X).ThenBy(key => key.Z))
         {
@@ -353,14 +359,20 @@ public partial class NpcNavigationSurfaceNode : Node3D
             _regions.Add(key, region);
             AddChild(region);
             _createdRegions++;
+            navigationChanged = true;
         }
         RecountWalkableCells();
         _streamGeneration++;
-        _syncFramesRemaining = Math.Max(_syncFramesRemaining, 2);
+        if (navigationChanged)
+        {
+            MarkNavigationSynchronizationPending(synchronizationBaseline);
+        }
     }
 
     private void RebuildCurrentTiles()
     {
+        long synchronizationBaseline = GetNavigationMapIteration();
+        bool navigationChanged = false;
         NpcNavigationTileKey[] keys = _regions.Keys.ToArray();
         foreach (NpcNavigationTileKey key in keys)
         {
@@ -369,6 +381,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             RemoveChild(old);
             old.QueueFree();
             _evictedRegions++;
+            navigationChanged = true;
         }
         foreach (NpcNavigationTileKey key in keys.OrderBy(key => key.X).ThenBy(key => key.Z))
         {
@@ -380,10 +393,51 @@ public partial class NpcNavigationSurfaceNode : Node3D
             _regions.Add(key, region);
             AddChild(region);
             _createdRegions++;
+            navigationChanged = true;
         }
         RecountWalkableCells();
         _streamGeneration++;
+        if (navigationChanged)
+        {
+            MarkNavigationSynchronizationPending(synchronizationBaseline);
+        }
+    }
+
+    private long GetNavigationMapIteration()
+    {
+        if (!IsInsideTree())
+        {
+            return 0;
+        }
+        return NavigationServer3D.MapGetIterationId(
+            GetWorld3D().NavigationMap);
+    }
+
+    private void MarkNavigationSynchronizationPending(long baselineIteration)
+    {
+        _synchronizationBaselineIteration = baselineIteration;
+        _navigationSynchronizationPending = true;
         _syncFramesRemaining = Math.Max(_syncFramesRemaining, 2);
+    }
+
+    private bool HasNavigationMapSynchronized()
+    {
+        long currentIteration = GetNavigationMapIteration();
+        if (currentIteration <= 0)
+        {
+            return false;
+        }
+        if (!_navigationSynchronizationPending)
+        {
+            return true;
+        }
+        if (currentIteration == _synchronizationBaselineIteration)
+        {
+            return false;
+        }
+        _navigationSynchronizationPending = false;
+        _synchronizationBaselineIteration = currentIteration;
+        return true;
     }
 
     private HashSet<NpcNavigationTileKey> BuildDesiredTileSet(

@@ -23,6 +23,9 @@ save schema and procedural-generator versions are versioned independently.
 
 ### Fixed
 
+- Closed the F5 runtime regressions surfaced after TASK-148 acceptance: `SystemFrequencyGate` no longer double-ticks at floating-point interval boundaries; ground NPC navigation waits for a real `NavigationServer3D` map iteration before querying; TASK-130 compares canonical save paths instead of raw strings; and TASK-126 exercises NPC-ship steering only while Orbit residency is actually active.
+- Added residency-aware NPC-ship diagnostics plus a non-moving acceptance step so suspended orbital traffic is not misreported as active on Surface and F5 can validate steering without moving `CharacterBody3D` instances outside a physics frame.
+- Added `validate-task149-runtime-regression-closure.py` to Windows/Linux local quality gates.
 - Fixed the external Windows/Godot build blocker `CS0136` in `WorldSceneCoordinatorAcceptance.cs`: the per-step transition result now uses `transitionResult` instead of shadowing the final acceptance `result` local.
 - Removed the failure window where `WorldSceneCoordinatorRuntime` could advance to the destination context before the destination PackedScene had successfully loaded/entered the scene tree.
 

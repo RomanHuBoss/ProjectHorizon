@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using Godot;
 
@@ -159,10 +160,9 @@ public partial class SalvageRepairSlice
             GameProfilePaths.PrimarySlotId,
             StarterRepairSnapshotFactory.SlotId,
             StringComparison.Ordinal) &&
-            string.Equals(
+            PathsReferToSameFile(
                 _database?.DatabasePath,
-                GameProfilePaths.PrimaryDatabasePath,
-                StringComparison.OrdinalIgnoreCase);
+                GameProfilePaths.PrimaryDatabasePath);
 
         bool passed = settingsRoundTrip && shellScene && overlay &&
             onFootActions && shipActions && pauseAction && planetMapAction && inventoryScreen &&
@@ -189,6 +189,20 @@ public partial class SalvageRepairSlice
         {
             GD.PushError(line);
         }
+    }
+
+    private static bool PathsReferToSameFile(string? left, string? right)
+    {
+        if (string.IsNullOrWhiteSpace(left) || string.IsNullOrWhiteSpace(right))
+        {
+            return false;
+        }
+        string normalizedLeft = Path.GetFullPath(left);
+        string normalizedRight = Path.GetFullPath(right);
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+        return string.Equals(normalizedLeft, normalizedRight, comparison);
     }
 
     private static bool HasKeyboardAndGamepad(string action)

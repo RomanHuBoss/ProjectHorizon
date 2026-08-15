@@ -26,7 +26,8 @@ public static class WorldSceneCoordinatorAcceptanceRunner
     public static WorldSceneCoordinatorAcceptanceReport Run(
         WorldSceneCoordinatorNode liveCoordinator,
         Action refreshResidencyPolicy,
-        Func<bool> residencyPolicyMatches)
+        Func<bool> residencyPolicyMatches,
+        Action<WorldSceneContext>? liveStepObserver = null)
     {
         ArgumentNullException.ThrowIfNull(liveCoordinator);
         ArgumentNullException.ThrowIfNull(refreshResidencyPolicy);
@@ -99,6 +100,7 @@ public static class WorldSceneCoordinatorAcceptanceRunner
                 ref residencyPolicy,
                 ref liveSteps,
                 ref maxHostChildren);
+            liveStepObserver?.Invoke(alphaSurface);
 
             foreach (WorldSceneContext context in livePath)
             {
@@ -125,6 +127,7 @@ public static class WorldSceneCoordinatorAcceptanceRunner
                     ref maxHostChildren);
                 liveTransitionPath &= stepPassed;
                 transitionGraph &= stepPassed;
+                liveStepObserver?.Invoke(context);
 
                 if (context.Kind == WorldSceneKind.StationInterior &&
                     string.Equals(

@@ -52,11 +52,29 @@ public sealed class SystemFrequencyGate
             return true;
         }
         _accumulator += deltaSeconds;
-        if (_accumulator + 1e-9 < _intervalSeconds)
+        const double boundaryTolerance = 1e-9;
+        if (_accumulator + boundaryTolerance < _intervalSeconds)
         {
             return false;
         }
-        _accumulator %= _intervalSeconds;
+
+        // Consume every elapsed interval at once but emit only one decision tick.
+        // Subtracting the interval count instead of using '%' is important here:
+        // when an exact boundary is represented just below the interval, the
+        // tolerance may admit the tick while modulo would keep almost a full
+        // interval and cause a second tick on the next frame.
+        double elapsedIntervals = Math.Max(
+            1.0,
+            Math.Floor((_accumulator + boundaryTolerance) / _intervalSeconds));
+        _accumulator -= elapsedIntervals * _intervalSeconds;
+        if (_accumulator < 0.0 && _accumulator > -boundaryTolerance)
+        {
+            _accumulator = 0.0;
+        }
+        if (_accumulator >= _intervalSeconds)
+        {
+            _accumulator %= _intervalSeconds;
+        }
         return true;
     }
 

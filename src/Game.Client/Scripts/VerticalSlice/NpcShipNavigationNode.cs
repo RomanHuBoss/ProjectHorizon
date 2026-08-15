@@ -147,6 +147,24 @@ public partial class NpcShipNavigationNode : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        StepNavigation(delta, performMovement: true);
+    }
+
+    public void StepForAcceptance(double delta)
+    {
+        Vector3 originalVelocity = Velocity;
+        StepNavigation(delta, performMovement: false);
+        Velocity = originalVelocity;
+        _steering?.UpsertEntity(
+            ShipId,
+            "npc_ship",
+            GlobalPosition,
+            originalVelocity,
+            _radius);
+    }
+
+    private void StepNavigation(double delta, bool performMovement)
+    {
         if (_steering is null || string.IsNullOrWhiteSpace(ShipId))
         {
             return;
@@ -207,11 +225,17 @@ public partial class NpcShipNavigationNode : CharacterBody3D
 
         float weight = Math.Clamp((float)delta * _acceleration, 0.0f, 1.0f);
         Velocity = Velocity.Lerp(_cachedDesiredVelocity, weight);
-        MoveAndSlide();
+        if (performMovement)
+        {
+            MoveAndSlide();
+        }
         _steeringSamples++;
         _steering.RecordShipSample();
         UpdateMinimumObstacleClearance();
-        OrientToVelocity();
+        if (performMovement)
+        {
+            OrientToVelocity();
+        }
         _steering.UpsertEntity(
             ShipId,
             "npc_ship",
@@ -235,7 +259,30 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 ? 9999.0f
                 : _minimumObstacleClearance,
             ResolveTarget() is not null,
-            IsInsideTree() && Visible);
+            IsRuntimeActiveByResidency());
+    }
+
+    private bool IsRuntimeActiveByResidency()
+    {
+        if (!IsInsideTree())
+        {
+            return false;
+        }
+
+        Node? current = this;
+        while (current is not null)
+        {
+            if (current.ProcessMode == Node.ProcessModeEnum.Disabled)
+            {
+                return false;
+            }
+            if (current is Node3D node3D && !node3D.Visible)
+            {
+                return false;
+            }
+            current = current.GetParent();
+        }
+        return true;
     }
 
     private void UpdateRoleState()
