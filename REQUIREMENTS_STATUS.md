@@ -2,13 +2,143 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-aerial-navigation-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-star-system-simulation-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0. Текущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+
+### Закрытие aerial-navigation итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и перейти к следующей. Поэтому до начала TASK-128 журнал синхронизирован:
+
+- `TASK-126` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-127` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка не приписываются среде подготовки задним числом.
+
+### TASK-128 — runtime звёздной системы и single-planet activation
+
+**Исходный снимок:** `ProjectHorizon-main-aerial-navigation-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-star-system-simulation-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §15.1 «Модель звёздной системы», §15.2
+«Уровни представления объектов», §15.3 «Активация планеты»; архитектурный принцип
+§5.2 «не загружать всю галактику в одну сцену»; интеграция с уже закрытым §8
+Galaxy/System map и hyperspace. TASK-128 закрывает именно vertical-slice runtime
+§15 и не объявляет завершённой всю будущую scene-coordination архитектуру §5.
+
+**Реализовано:**
+
+- добавлен `StarSystemSimulationRuntime`, использующий существующий
+  `GalaxyNavigationRuntime.CurrentSystem` как единственный источник system/planet
+  definitions и seeds: ровно одна star, исходные `1–8` planets, точные `0–4` moons
+  на planet, `1–3` station contacts и bounded `4–16` ship contacts;
+- системная иерархия детерминирована stable IDs и parent links
+  `star → planet → moon/station → traffic`; никакой второй galaxy generator и
+  параллельный universe-state не создаются;
+- движение небесных тел задаётся аналитическими круговыми орбитами в наклонённых
+  плоскостях с постоянным радиусом и `OrbitTimeScale=120`; N-body, взаимная
+  гравитация и численное интегрирование намеренно отсутствуют в соответствии §15.1;
+- добавлены четыре representation states: `DetailedPlanet`, `Proxy`, `Marker`,
+  `Statistical`; границы дальнего представления bounded (`180/420 m` в локальном
+  vertical-slice scale), ship contacts никогда не создаются как тяжёлые physics
+  bodies в system runtime;
+- `Gameplay/StarSystemSimulation` создаёт lightweight non-colliding sphere/box
+  visuals для текущей системы, обновляет их из аналитического snapshot и скрывает
+  statistical/detailed representation; одновременно detailed может быть только
+  текущая planet;
+- после hyperspace runtime отслеживает смену `CurrentSystem.SystemId`, освобождает
+  старые proxy visuals и детерминированно строит новую систему из destination seed;
+- реализован реальный PlanetRuntime activation gate: `PlanetSurface` всегда active;
+  в полёте surface runtime active только в радиусе `72 m` от surface checkpoint;
+  на orbital station surface переводится в proxy/suspended state;
+- при suspension сохраняются фактические текущие `Visible`, `ProcessMode`,
+  `CollisionLayer/Mask`, после чего отключаются `GroundBody`, water, resources,
+  crafting stations, ecology, ground NPC/navigation, base construction, POI и
+  preview; OrbitalStation, VoyageShip, NPC ship traffic и system proxies остаются;
+- при возвращении восстанавливаются именно сохранённые состояния, поэтому уже
+  собранный/скрытый объект не становится видимым ошибочно; после transition заново
+  синхронизируются aerial obstacle-grid и ground navigation obstacles;
+- activation pipeline диагностирует наличие galaxy parameters, far LOD, current
+  planet focus, active surface runtime, atmosphere, ground collision, NPC navigation
+  и region/ecology objects (`0xFF` для полностью активной поверхности);
+- HUD получил строку `Star system` с system ID, body counts, LOD counts,
+  `PlanetRuntime=ACTIVE/PROXY`, pipeline mask и simulation epoch;
+- `F5` расширен `TASK-128` acceptance: deterministic hierarchy, exact body/moon
+  coverage, invariant analytic orbit radius, coverage Proxy/Marker/Statistical,
+  single-DetailedPlanet invariant, deterministic system transition, live visual
+  projection, runtime samples, surface-activation state и activation pipeline;
+- новых таблиц/settings сохранений нет: runtime transient и восстанавливается из
+  уже persisted `galaxy_navigation`; SQLite schema остаётся `2`.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationRuntime.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceStarSystem.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-126`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-127`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-128`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-129`: `NOT_STARTED` → `IN_PROGRESS` — clean build + единый F5/runtime smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Проверки среды подготовки:**
+
+- полный lightweight lexical scan всех C# source files, scene/ext-resource/`res://`
+  wiring, UID uniqueness и JSON parse;
+- проверка неизменности Industry/NPC/Ecology baseline и отсутствия новой persistence
+  migration;
+- математическая проверка орбитальной формулы: inclination реализован поворотом
+  orbital plane, поэтому `|r|` сохраняется, а не увеличивается вертикальной добавкой;
+- release ZIP должен повторно распаковываться и проходить те же проверки без
+  `.godot/bin/obj/.vs/.git`, runtime DB/log и иных build artefacts;
+- .NET SDK/MSBuild и Godot в среде подготовки отсутствуют, поэтому локальные
+  `dotnet build`, Godot import и фактический runtime не заявляются.
+
+**Минимальная runtime-приёмка TASK-129:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`,
+   `0 errors`.
+2. Запустить `SalvageRepairSlice`; ожидается `TASK-128 star-system simulation READY`
+   с system/body/planet/moon/station/traffic counts.
+3. На поверхности один раз нажать `F5`. Ключевой критерий:
+
+```text
+TASK-128 star-system simulation acceptance PASS: deterministic=1; bodyCoverage=1; moonBounds=1; analyticOrbits=1; representationLevels=1; singleDetailedPlanet=1; systemTransition=1; visualProjection=1; runtimeSamples=1; surfaceActivation=1; activationPipeline=1; ...
+```
+
+4. Manual activation smoke: HUD должен показывать `PlanetRuntime=ACTIVE` на
+   поверхности; после взлёта и удаления дальше ~72 m — `PROXY`; orbital station —
+   `PROXY`; после возвращения/посадки — снова `ACTIVE`, без оживления ранее
+   собранных resources и без пропажи NPC/base state.
+5. После hyperspace jump проверить новую строку `TASK-128 ... READY`/HUD с новым
+   system ID и новым deterministic body-set; старые proxy nodes не должны оставаться.
+6. При `FAIL` предоставить clean-build log, полную строку `TASK-128 ... FAIL`,
+   последние ~200 строк Godot Output и screenshot HUD со строкой `Star system`.
+
+**Граница закрытия:** TASK-128 закрывает §15 в текущем vertical slice: system
+simulation/LOD/one-planet activation и hyperspace rebuild. Полноценное физическое
+перемещение между несколькими одновременно доступными PlanetWorld scenes и общий
+scene coordinator §5 остаются отдельной будущей архитектурной задачей и здесь не
+выдаются за готовые.
+
+**Следующий рекомендуемый mega-шаг после TASK-129:** новый gap-analysis PDF v2.0;
+не расширять §15 мелкими патчами без найденной regression.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -135,7 +265,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0B. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -246,7 +376,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0A. Текущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0C. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -395,7 +525,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0B. Текущая синхронизация и mega-итерация 2026-08-15
+## 0D. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -491,7 +621,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0C. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0E. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -623,7 +753,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0D. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0F. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 

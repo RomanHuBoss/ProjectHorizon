@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://Scenes/Ship/ArcadeShip.tscn" id="7_voyage_ship"]
 [ext_resource type="Script" uid="uid://dps120watervol01" path="res://Scripts/Player/PlayerEnvironmentVolume.cs" id="8_player_environment"]
 [ext_resource type="Script" uid="uid://dn124navsurface01" path="res://Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs" id="9_npc_navigation"]
+[ext_resource type="Script" uid="uid://ss128node00001" path="res://Scripts/VerticalSlice/StarSystemSimulationNode.cs" id="10_star_system_simulation"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -180,6 +181,9 @@ shape = SubResource("PlayerWaterShape")
 [node name="Ecology" type="Node3D" parent="Gameplay"]
 
 [node name="NpcShipTraffic" type="Node3D" parent="Gameplay"]
+
+[node name="StarSystemSimulation" type="Node3D" parent="Gameplay"]
+script = ExtResource("10_star_system_simulation")
 
 [node name="VoyageShip" parent="Gameplay" instance=ExtResource("7_voyage_ship")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -10)
