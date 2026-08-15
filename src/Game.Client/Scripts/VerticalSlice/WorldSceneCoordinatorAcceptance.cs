@@ -102,9 +102,9 @@ public static class WorldSceneCoordinatorAcceptanceRunner
 
             foreach (WorldSceneContext context in livePath)
             {
-                WorldSceneTransitionResult result =
+                WorldSceneTransitionResult transitionResult =
                     liveCoordinator.TryTransition(context, out string detail);
-                if (result != WorldSceneTransitionResult.Applied)
+                if (transitionResult != WorldSceneTransitionResult.Applied)
                 {
                     executionFailure =
                         $"live transition to {context.Kind} failed: {detail}";

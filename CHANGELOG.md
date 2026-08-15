@@ -23,6 +23,7 @@ save schema and procedural-generator versions are versioned independently.
 
 ### Fixed
 
+- Fixed the external Windows/Godot build blocker `CS0136` in `WorldSceneCoordinatorAcceptance.cs`: the per-step transition result now uses `transitionResult` instead of shadowing the final acceptance `result` local.
 - Removed the failure window where `WorldSceneCoordinatorRuntime` could advance to the destination context before the destination PackedScene had successfully loaded/entered the scene tree.
 
 ## [0.1.0-alpha.148.2] - 2026-08-15

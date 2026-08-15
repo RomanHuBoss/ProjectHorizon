@@ -13,7 +13,7 @@
 ### TASK-149 — mega-итерация: transactional world-scene acceptance hardening
 
 **Исходный снимок:** `ProjectHorizon-main(10)(1).zip` (последняя приложенная GitHub-редакция).  
-**Подготовленный снимок:** `ProjectHorizon-main-task149-transactional-world-scene-acceptance.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task149-cs0136-hotfix.zip`.  
 **Связанные требования PDF-ТЗ v2.0:** §4.4 `SceneCoordinator` как допустимый глобальный orchestration service; §5.2 — одновременно загружается только необходимый уровень представления; §5.3 — переходы поверхность/космос/станция/гиперпереход; §22.8 — autosave после посадки, взлёта и гиперперехода; Stage 1 — игрок взлетает, посещает станцию и возвращается.
 
 **Восстановление нормативных файлов:** исходный ZIP содержал `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf` и `.docx` только как Git LFS pointer-файлы. В подготовленный снимок возвращены полные исходные бинарные документы: PDF `1774256` bytes, SHA-256 `1facda8ebc41f1fd161f4b3ce9d2c3847b61a3aae0f9283e45bf9999f50f3dd8` (точно совпадает с LFS oid), DOCX `112226` bytes, SHA-256 `c57207aa7e4ee245cadb50da2dd7ae92575294d664684afbaa56d2bb9f56fc23`. Дополнительно восстановлен точный payload `Technical_Specification/1.0/Project_Horizon_Technical_Specification_v1.0.pdf`: `574489` bytes, SHA-256 `19468fcaa1116601ef1afd3b963263711a3a76eaa69414e5c72e2f61ffa92f14`, совпадающий с его LFS oid. Эти документы не пересобирались и не редактировались скриптами. Для v1.0 DOCX точный LFS payload в доступных исходниках не найден, поэтому его pointer намеренно не подменялся реконструированным файлом.
@@ -50,6 +50,9 @@ C# lexical structural check PASS: 5/5 changed C# files; dotnet/godot executables
 ```
 
 **Недоступные проверки:** в среде подготовки отсутствуют `dotnet`, `godot` и `godot4`. Поэтому clean C# build, фактическое исполнение xUnit и Godot F5/runtime не заявляются. По регламенту `TASK-149` и `WORLD-ACC-100..103` остаются `IN_PROGRESS` до внешней runtime-приёмки.
+
+**Внешняя сборка 2026-08-15 18:36:** Godot/.NET реально запустил `CoreCompile` для `Game.Client` и обнаружил единственную ошибку `CS0136` в `WorldSceneCoordinatorAcceptance.cs(105,44)` при `0` warnings. Причина устранена переименованием локальной переменной шага `result` → `transitionResult`; после hotfix все repository static validators повторно PASS. Повторный внешний clean build и F5/runtime всё ещё требуются до `VERIFIED`.
+
 
 **Минимальная пользовательская приёмка TASK-149:**
 
