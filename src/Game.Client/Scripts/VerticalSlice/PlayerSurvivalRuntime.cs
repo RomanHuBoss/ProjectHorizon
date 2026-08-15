@@ -22,11 +22,19 @@ public enum PlayerEquipmentMutationResult
     InsufficientEnergy = 6
 }
 
+/// <summary>Provides movement systems with access to survival resources without exposing the Godot scene tree.</summary>
 public interface IPlayerMovementResourceProvider
 {
+    /// <summary>Attempts to consume stamina for movement.</summary>
     bool TryConsumeStamina(double amount);
+
+    /// <summary>Attempts to consume jetpack energy for movement.</summary>
     bool TryConsumeJetpackEnergy(double amount);
+
+    /// <summary>Advances movement-related resource recovery.</summary>
     void RecoverMovementResources(double deltaSeconds, bool sprinting, bool jetpacking);
+
+    /// <summary>Updates whether the player is currently swimming.</summary>
     void SetSwimming(bool swimming);
 }
 

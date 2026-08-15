@@ -41,6 +41,7 @@ public static class StructuredGameLogger
     private static string _worldObject = "none";
     private static int _entriesWritten;
     private static int _redactedValues;
+    private static readonly List<string> PendingLines = new();
     private static readonly HashSet<string> CategoriesSeen = new(StringComparer.Ordinal);
 
     public static void EnsureInitialized(SceneTree tree)
@@ -119,9 +120,24 @@ public static class StructuredGameLogger
                 worldObject = _worldObject,
                 fields = safeFields
             };
-            File.AppendAllText(_logPath, JsonSerializer.Serialize(entry) + Environment.NewLine);
-            _entriesWritten++;
+            PendingLines.Add(JsonSerializer.Serialize(entry));
             CategoriesSeen.Add(category.ToString());
+        }
+    }
+
+    /// <summary>Flushes all queued telemetry records to the JSONL file as one batch.</summary>
+    public static void FlushPending()
+    {
+        lock (Gate)
+        {
+            if (!_initialized || string.IsNullOrWhiteSpace(_logPath) || PendingLines.Count == 0)
+            {
+                return;
+            }
+            string payload = string.Join(Environment.NewLine, PendingLines) + Environment.NewLine;
+            File.AppendAllText(_logPath, payload);
+            _entriesWritten += PendingLines.Count;
+            PendingLines.Clear();
         }
     }
 

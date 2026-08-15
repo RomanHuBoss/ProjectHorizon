@@ -189,7 +189,7 @@ F1             TASK-090/092/093/096/098: queue, properties, multi-station indust
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080 + TASK-108: Industry Content v2 и planetary exploration acceptance
-F5             mega-acceptance, включая TASK-132 localization + TASK-134 audio + TASK-136 diagnostics + TASK-138 verification smoke
+F5             mega-acceptance, включая TASK-132 localization + TASK-134 audio + TASK-136 diagnostics + TASK-138 verification + TASK-142 architecture
 F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
 F8             очистить gameplay-slot, включая ship systems, voyage, galaxy, survival, quests и NPC/faction deltas
@@ -369,9 +369,10 @@ TASK-132 localization (F5): PASS locales=2, keys=1329, parity=1, missingValues=0
 TASK-134 audio architecture (F5): PASS buses=8/8, cues=19/19, pool2d=8, pool3d=16, activeTransient<=24, maxConcurrent=29, poolSteals>0, positional=1, attenuation=1, atmosphere=1, water=1, interior=1, vacuum=1, externalVacuumSuppressed=1, internalVacuumAllowed=1, musicCrossfade=1, ui=1, voice=1, settingsRouting=1
 TASK-136 developer diagnostics (F5): PASS tools=5/5, commands=15/15, devGate=1, seedExplorer=1, planetPreview=1, chunkProfiler=1, saveInspector=1, debugConsole=1, logCategories=14/14, redaction=1, secretLeak=0, jsonl=1
 TASK-138 verification suite (F5): PASS generatorVersion=1, goldenSystems=4/4, goldenPoi=1, controlHeights=1, checksums=1, unitGroups=10/10, saveScenarios=8/8, loadScenarios=8/8, landingStress=100/100, visualSmoke=1, visualComponents=1, coverageThresholds=80/70/80
+TASK-142 architecture hardening (F5): PASS typedEvents=11/11, liveSubscriptions=11/11, nearbyTicks≈100, distantTicks≈20, physicsHz=60, playerHz=60, nearbyAiHz=10, distantAiHz=2, backgroundEconomyHz=0.5, eventBus=1, frequencyPolicy=1
 ```
 
-`F5` прогоняет независимые subsystem acceptance-проверки, включая application shell, localization runtime, TASK-134 audio architecture, TASK-136 Developer & Diagnostics Suite и TASK-138 golden/visual smoke. Полная §36 проверка намеренно выполняется отдельной командой `tools\run-section36-tests.cmd`: F5 не подменяет xUnit/coverage gate. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива, docking/station/return/landing lifecycle, disembark, active-flight restore и exact persistence. `TASK-114` использует `save_1.galaxy-navigation-test.db`: проверяет 1000 deterministic systems, GalaxyId/Sector/Double3 hierarchy, все шесть star types, planet bounds, range-aware A*, strict preconditions, fuel debit, visited discovery, cold restore, legacy fallback, exact round-trip и 100 последовательных hyperjumps. `TASK-116` проверяет deterministic ecology baseline и delta-only persistence. `TASK-118` использует `save_1.procedural-quests-test.db` и проверяет все 15 objective types, deterministic 20-offer board, feasibility rejection, active limit, state-graph lifecycle, rewards, current gameplay board, cold restore, legacy fallback, exact round-trip, autosave log, one-writer discipline и SQLite integrity. `TASK-122` дополнительно проверяет reciprocal faction matrix, все восемь archetypes/dialogue templates, one-shot dialogue reputation consequences, friendly-fire reputation penalty, respawnable hostile combat target, реальные Defeat/Protect capability IDs, delta-only save, repeated optional-setting replacement, cold restore, legacy fallback, autosave log, one-writer discipline и SQLite integrity. `TASK-124` дополнительно проверяет локальный tile budget, межтайловый NavigationServer3D path, obstacle clearance, forced stream eviction/restore, server synchronization, NavigationAgent3D path requests, avoidance callbacks и recovery probe. `TASK-126` проверяет exact flying coverage `4`, общий aerial runtime, local spatial-grid probe, spherical static avoidance, POI selection, altitude envelope, четыре физических NPC ships, runtime samples для `arrive/formation/pursuit/evade`, combat-state transitions и clearance относительно spherical obstacle proxies. `TASK-128` проверяет deterministic star-system hierarchy, exact planet/moon coverage, аналитические орбиты с постоянным радиусом, Proxy/Marker/Statistical tiers, invariant ровно одной DetailedPlanet, deterministic system transition, live visual projection и текущий PlanetRuntime activation pipeline. `TASK-134` переключает atmosphere/water/interior/vacuum profiles, проверяет external-vacuum suppression против internal Vehicle cue, overflow обоих bounded pools, positional requests/attenuation, UI/Voice layers, music state transitions и bus-volume routing, затем восстанавливает текущую audio environment. Gameplay-slot ни одна acceptance не изменяет.
+`F5` прогоняет независимые subsystem acceptance-проверки, включая application shell, localization runtime, TASK-134 audio architecture, TASK-136 Developer & Diagnostics Suite, TASK-138 golden/visual smoke и TASK-142 typed-event/frequency architecture smoke. Полная §36 проверка намеренно выполняется отдельной командой `tools\run-section36-tests.cmd`: F5 не подменяет xUnit/coverage gate. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива, docking/station/return/landing lifecycle, disembark, active-flight restore и exact persistence. `TASK-114` использует `save_1.galaxy-navigation-test.db`: проверяет 1000 deterministic systems, GalaxyId/Sector/Double3 hierarchy, все шесть star types, planet bounds, range-aware A*, strict preconditions, fuel debit, visited discovery, cold restore, legacy fallback, exact round-trip и 100 последовательных hyperjumps. `TASK-116` проверяет deterministic ecology baseline и delta-only persistence. `TASK-118` использует `save_1.procedural-quests-test.db` и проверяет все 15 objective types, deterministic 20-offer board, feasibility rejection, active limit, state-graph lifecycle, rewards, current gameplay board, cold restore, legacy fallback, exact round-trip, autosave log, one-writer discipline и SQLite integrity. `TASK-122` дополнительно проверяет reciprocal faction matrix, все восемь archetypes/dialogue templates, one-shot dialogue reputation consequences, friendly-fire reputation penalty, respawnable hostile combat target, реальные Defeat/Protect capability IDs, delta-only save, repeated optional-setting replacement, cold restore, legacy fallback, autosave log, one-writer discipline и SQLite integrity. `TASK-124` дополнительно проверяет локальный tile budget, межтайловый NavigationServer3D path, obstacle clearance, forced stream eviction/restore, server synchronization, NavigationAgent3D path requests, avoidance callbacks и recovery probe. `TASK-126` проверяет exact flying coverage `4`, общий aerial runtime, local spatial-grid probe, spherical static avoidance, POI selection, altitude envelope, четыре физических NPC ships, runtime samples для `arrive/formation/pursuit/evade`, combat-state transitions и clearance относительно spherical obstacle proxies. `TASK-128` проверяет deterministic star-system hierarchy, exact planet/moon coverage, аналитические орбиты с постоянным радиусом, Proxy/Marker/Statistical tiers, invariant ровно одной DetailedPlanet, deterministic system transition, live visual projection и текущий PlanetRuntime activation pipeline. `TASK-134` переключает atmosphere/water/interior/vacuum profiles, проверяет external-vacuum suppression против internal Vehicle cue, overflow обоих bounded pools, positional requests/attenuation, UI/Voice layers, music state transitions и bus-volume routing, затем восстанавливает текущую audio environment. Gameplay-slot ни одна acceptance не изменяет.
 
 ### §36 Verification & automated tests (TASK-138)
 
@@ -442,8 +443,41 @@ TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/
 ```
 
 Подробная branch/release policy: `docs/BUILD_AND_RELEASE.md`. Настройки branch protection
-(`quality` и `debug-exports` как required checks) находятся на стороне GitHub и поэтому
-не могут быть доказаны одним архивом без `.git`; это runtime/repository gate TASK-141.
+(`quality` и `debug-exports` как required checks) находятся на стороне GitHub. TASK-140/141
+приняты владельцем продукта как `VERIFIED`; текущий архив по-прежнему не содержит `.git`,
+поэтому repository metadata не приписывается локальной проверке.
+
+### §38 Architecture & code-quality hardening (TASK-142)
+
+Section 38 переведён в исполняемый архитектурный контракт. Добавлены Godot-independent
+`IDomainEvent` / `IDomainEventBus` и одиннадцать нормативных typed events: `ItemAdded`,
+`ItemRemoved`, `ResourceMined`, `PlanetEntered`, `PlanetExited`, `SystemDiscovered`,
+`QuestAccepted`, `QuestCompleted`, `ShipDamaged`, `BaseModulePlaced`, `SaveRequested`.
+Реальные resource/voyage/galaxy/quest/ship/base/save flows публикуют эти события; Godot
+signals не используются как cross-domain business bus.
+
+`SystemFrequencyPolicy` фиксирует 60 Hz physics/player, 10 Hz nearby AI, 2 Hz distant AI,
+0.2–1 Hz background economy (shipping default 0.5 Hz) и batched telemetry. Godot project
+явно задаёт `physics/common/physics_ticks_per_second=60`; ground NPC и NPC-ship decision
+logic работает на 10 Hz, сохраняя physics-rate movement integration, а distant ecology — на
+2 Hz. `StructuredGameLogger` накапливает JSONL lines и flush'ит их пакетно, а scene-exit
+Main Menu / Developer Workbench / gameplay гарантирует финальный flush.
+
+Все production `Task`/`ValueTask` операции имеют явный `CancellationToken`; SQL ограничен
+persistence/developer-inspection boundary, public interfaces XML-документированы, empty
+`catch` запрещены, domain runtime/catalog/model не наследуются от `Godot.Node`, worldgen
+не запускается напрямую из `_Process`, а application UI не мутирует inventory/crafting
+напрямую. Подробный контракт: `docs/ARCHITECTURE_SECTION38.md`.
+
+Статический §38 gate:
+
+```text
+python tools/validate-section38-architecture-contract.py
+TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
+```
+
+Section-38 xUnit tests находятся в `tests/ProjectHorizon.Tests/Architecture/Section38ArchitectureTests.cs`;
+`tools/run-section37-quality.*`, PR CI и release workflow выполняют новый gate автоматически.
 
 Статические contract gates:
 
@@ -459,6 +493,12 @@ TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS: tools=5/5; commands=15/15; logCate
 
 python tools/validate-section36-testing-contract.py
 TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; goldenVersion=1; goldenSystems=4; goldenPoi=20; coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1.
+
+python tools/validate-section37-build-contract.py
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+
+python tools/validate-section38-architecture-contract.py
+TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
 ```
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.

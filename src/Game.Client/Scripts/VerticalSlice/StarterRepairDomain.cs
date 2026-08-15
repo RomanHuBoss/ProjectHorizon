@@ -955,6 +955,7 @@ public static class VerticalSliceAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(60.0));
 
             await database.InitializeAsync(cancellationToken)

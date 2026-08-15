@@ -11,6 +11,24 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.142] - 2026-08-15
+
+### Added
+
+- Typed domain event bus with the eleven normative section-38 business events.
+- Executable system-frequency policy for 60 Hz physics/player control, 10 Hz nearby AI,
+  2 Hz distant AI, bounded background economy updates and batched telemetry.
+- Section-38 architecture contract validator and xUnit architecture tests.
+
+### Changed
+
+- Resource, voyage, galaxy, quest, ship-damage, base-placement and save-request flows now
+  publish typed domain events instead of relying only on scene-local state strings.
+- Ground NPC and NPC-ship decision logic is throttled to the normative nearby-AI cadence
+  while movement integration remains physics-rate; distant ecology runs at 2 Hz.
+- Structured telemetry is buffered and flushed in batches, including scene-exit flushes.
+- Physics tick rate is explicitly pinned to 60 Hz in the Godot project configuration.
+
 ## [0.1.0-alpha.140] - 2026-08-15
 
 ### Added

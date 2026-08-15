@@ -171,6 +171,7 @@ public static class NpcFactionAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(25));
             if (File.Exists(autosave.AutosaveLogPath))
             {

@@ -226,8 +226,10 @@ public partial class SalvageRepairSlice
                 if (ProceduralQuests.TryAccept(questId, out string accepted))
                 {
                     _missionJournalFeedback = accepted;
-                    _lastDomainEvent = $"ProceduralQuestAccepted({questId})";
-                    QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+                    PublishDomainEvent(new QuestAccepted(
+                        questId,
+                        "procedural",
+                        DateTimeOffset.UtcNow));
                     GD.Print(
                         "TASK-118 player procedural quest accept PASS: " +
                         $"quest={questId}; type={selected.Definition.ObjectiveType}; " +
@@ -382,9 +384,10 @@ public partial class SalvageRepairSlice
             NpcFactions.ApplyReputationDelta(factionId, reputation);
         }
         _missionJournalFeedback = LF("ui.quest.reward", ("result", result), ("credits", credits), ("reputation", reputation));
-        _lastDomainEvent =
-            $"ProceduralQuestCompleted({selected.Definition.QuestId})";
-        QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+        PublishDomainEvent(new QuestCompleted(
+            selected.Definition.QuestId,
+            "procedural",
+            DateTimeOffset.UtcNow));
         GD.Print(
             "TASK-118 player procedural quest completion PASS: " +
             $"quest={selected.Definition.QuestId}; type={selected.Definition.ObjectiveType}; " +

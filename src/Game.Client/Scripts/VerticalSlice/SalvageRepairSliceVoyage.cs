@@ -433,8 +433,9 @@ public partial class SalvageRepairSlice
 
         _voyageNavigationAssist = true;
         ApplyStageOneVoyageToScene();
-        _lastDomainEvent = "StageOneTakeoff";
-        QueueCurrentSnapshot(AutosaveTrigger.Takeoff);
+        PublishDomainEvent(new PlanetExited(
+            GalaxyNavigation.CurrentPlanetId,
+            DateTimeOffset.UtcNow));
         StageOneVoyageFlightProfile profile =
             StageOneVoyageRuntime.CreateFlightProfile(ShipSystems);
         GD.Print(
@@ -554,13 +555,9 @@ public partial class SalvageRepairSlice
 
         _voyageNavigationAssist = false;
         ApplyStageOneVoyageToScene();
-        _lastDomainEvent = "StageOneLanding";
-        RecordProceduralQuestObjective(
-            ProceduralQuestObjectiveType.ExplorePlanet,
+        PublishDomainEvent(new PlanetEntered(
             GalaxyNavigation.CurrentPlanetId,
-            1,
-            queueAutosave: false);
-        QueueCurrentSnapshot(AutosaveTrigger.Landing);
+            DateTimeOffset.UtcNow));
         GD.Print(
             "TASK-112 player landing PASS: " +
             $"distance={distance.ToString("0.###", CultureInfo.InvariantCulture)}; " +

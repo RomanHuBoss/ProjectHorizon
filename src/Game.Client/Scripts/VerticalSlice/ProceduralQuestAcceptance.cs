@@ -215,6 +215,7 @@ public static class ProceduralQuestAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(50));
             await database.InitializeAsync(cancellationToken).ConfigureAwait(false);
             await database.ResetSlotAsync(slotId, cancellationToken)

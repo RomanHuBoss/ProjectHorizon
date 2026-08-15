@@ -130,7 +130,9 @@ public partial class SavePrototype : Node3D
         _databaseDisplayPath = databasePath;
         SaveDatabase database = new(databasePath);
         _database = database;
-        _autosaveCoordinator = new SaveAutosaveCoordinator(database);
+        _autosaveCoordinator = new SaveAutosaveCoordinator(
+            database,
+            new DomainEventBus());
         _initializeTask = database.InitializeAsync(_lifetimeCancellation.Token);
 
         SceneTree tree = GetTree();
@@ -454,7 +456,7 @@ public partial class SavePrototype : Node3D
         _statusMessage =
             "graceful-exit: ожидание активных операций и полного autosave flush";
         _autosaveOperationHud = "RUNNING GracefulExit flush";
-        _gracefulExitTask = FlushGracefulExitAsync(activeTasks);
+        _gracefulExitTask = FlushGracefulExitAsync(activeTasks, _lifetimeCancellation.Token);
         GD.Print(
             "Prototype E graceful-exit flush started: " +
             $"activeTasks={activeTasks.Length}; " +
@@ -487,7 +489,8 @@ public partial class SavePrototype : Node3D
     }
 
     private async Task<GracefulExitResult> FlushGracefulExitAsync(
-        Task[] activeTasks)
+        Task[] activeTasks,
+        CancellationToken cancellationToken)
     {
         SaveDatabase database = _database ??
             throw new InvalidOperationException(
@@ -498,15 +501,15 @@ public partial class SavePrototype : Node3D
 
         if (activeTasks.Length > 0)
         {
-            await Task.WhenAll(activeTasks).ConfigureAwait(false);
+            await Task.WhenAll(activeTasks).WaitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         await coordinator.FlushPendingAsync(
-            _lifetimeCancellation.Token).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
 
         SaveGameSnapshot? sourceSnapshot = await database.LoadAsync(
             SlotId,
-            _lifetimeCancellation.Token).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
         if (sourceSnapshot is null)
         {
             return new GracefulExitResult(
@@ -525,7 +528,7 @@ public partial class SavePrototype : Node3D
         await coordinator.FlushAsync(
             AutosaveTrigger.GracefulExit,
             exitSnapshot,
-            _lifetimeCancellation.Token).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
         return new GracefulExitResult(
             SnapshotWritten: true,
             Revision: revision);
@@ -1031,10 +1034,11 @@ public partial class SavePrototype : Node3D
         _refreshCompletionState = completionState;
         _state = SavePrototypeState.Loading;
         _statusMessage = "обновление snapshot и диагностики";
-        _refreshTask = LoadAndRefreshDiagnosticsAsync();
+        _refreshTask = LoadAndRefreshDiagnosticsAsync(_lifetimeCancellation.Token);
     }
 
-    private async Task<SavePrototypeRefresh> LoadAndRefreshDiagnosticsAsync()
+    private async Task<SavePrototypeRefresh> LoadAndRefreshDiagnosticsAsync(
+        CancellationToken cancellationToken)
     {
         if (_database is null)
         {
@@ -1043,11 +1047,11 @@ public partial class SavePrototype : Node3D
 
         SaveGameSnapshot? snapshot = await _database.LoadAsync(
             SlotId,
-            _lifetimeCancellation.Token).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
         SaveDatabaseDiagnostics diagnostics =
             await _database.ReadDiagnosticsAsync(
                 SlotId,
-                _lifetimeCancellation.Token).ConfigureAwait(false);
+                cancellationToken).ConfigureAwait(false);
         return new SavePrototypeRefresh(snapshot, diagnostics);
     }
 

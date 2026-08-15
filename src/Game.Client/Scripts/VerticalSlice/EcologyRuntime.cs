@@ -223,9 +223,10 @@ public sealed class EcologyRuntime
         }
 
         _simplifiedAccumulator += deltaSeconds;
-        while (_simplifiedAccumulator >= 1.0)
+        double interval = 1.0 / SystemFrequencyPolicy.DistantAiHz;
+        while (_simplifiedAccumulator >= interval)
         {
-            _simplifiedAccumulator -= 1.0;
+            _simplifiedAccumulator -= interval;
             _simplifiedTicks++;
         }
     }
@@ -250,12 +251,12 @@ public sealed class EcologyRuntime
 
         if (distanceMeters <= 20.0)
         {
-            return 10.0;
+            return SystemFrequencyPolicy.NearbyAiHz;
         }
 
         if (distanceMeters <= 50.0)
         {
-            return 4.0;
+            return SystemFrequencyPolicy.DistantAiHz;
         }
 
         return 0.0;

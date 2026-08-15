@@ -47,6 +47,11 @@ public partial class DeveloperWorkbenchController : Control
         ShowSeedExplorer();
     }
 
+    public override void _ExitTree()
+    {
+        StructuredGameLogger.FlushPending();
+    }
+
     private void BuildUi()
     {
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);

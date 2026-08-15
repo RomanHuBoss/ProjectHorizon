@@ -173,6 +173,7 @@ public static class PlayerSurvivalAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(25));
             await database.InitializeAsync(cancellationToken).ConfigureAwait(false);
             await database.ResetSlotAsync(slotId, cancellationToken).ConfigureAwait(false);

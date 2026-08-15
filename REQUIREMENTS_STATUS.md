@@ -2,13 +2,138 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-section37-ci-release-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-section38-architecture-hardening.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Build / CI / Release Engineering / §37 closure
+## 0. Текущая mega-итерация 2026-08-15 — Architecture & Code-Quality Hardening / §38 closure
+
+### Закрытие §37 по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-142 журнал синхронизирован:
+
+- `TASK-140` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-141` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; фактические GitHub metadata,
+  CI logs и branch-protection settings не приписываются локальной среде, а `.git` по-прежнему
+  отсутствует в переданном архиве.
+
+### TASK-142 — executable section-38 architecture contract
+
+**Исходный снимок:** `ProjectHorizon-main-section37-ci-release-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-section38-architecture-hardening.zip`.  
+**Связанные требования ТЗ v2.0:** §38 и §38.1–38.2 «Правила программирования /
+частоты систем / типизированные события».
+
+**Реализовано:**
+
+- добавлены Godot-independent `IDomainEvent`, `IDomainEventBus` и thread-safe
+  `DomainEventBus`; business-event transport не зависит от scene tree;
+- реализованы все 11 нормативных typed events: `ItemAdded`, `ItemRemoved`,
+  `ResourceMined`, `PlanetEntered`, `PlanetExited`, `SystemDiscovered`, `QuestAccepted`,
+  `QuestCompleted`, `ShipDamaged`, `BaseModulePlaced`, `SaveRequested`;
+- реальные gameplay flows для добычи/инвентаря, planet enter/exit, system discovery,
+  quest lifecycle, ship damage, base placement и persistence queue теперь публикуют typed
+  events; один live bus подписывает cross-domain reactions при инициализации vertical slice
+  и освобождает subscriptions при shutdown;
+- `SaveAutosaveCoordinator` получает event bus явной зависимостью и публикует
+  `SaveRequested` после постановки snapshot в очередь; scene-level SQL не добавлялся;
+- `SystemFrequencyPolicy` задаёт нормативные 60 Hz physics/player, 10 Hz nearby AI,
+  2 Hz distant AI, диапазон background economy 0.2–1 Hz (shipping default 0.5 Hz) и
+  batched telemetry 2 Hz; `project.godot` явно фиксирует physics tick rate 60 Hz;
+- ground NPC и NPC-ship target/state decisions переведены на 10 Hz gates при сохранении
+  physics-rate movement/navigation integration; distant ecology работает на 2 Hz;
+- `StructuredGameLogger` больше не делает append на каждый telemetry event: строки
+  буферизуются и flush'ятся пакетно; gameplay flush — по policy, а Main Menu, Developer
+  Workbench и shutdown дополнительно выполняют финальный flush;
+- аудит async boundary выявил и устранён для всех production `Task/ValueTask`: теперь
+  явный `CancellationToken` имеется также у private autosave worker, refresh и graceful-exit
+  operations, а не только у public persistence API;
+- публичные interfaces получили XML documentation; статический contract запрещает empty
+  `catch`, SQL вне Persistence/Developer inspection boundary, Godot Node как domain model,
+  world-generation непосредственно из `_Process`, project dependency cycles и прямые
+  inventory/crafting mutations из Application UI;
+- добавлены `tools/validate-section38-architecture-contract.py`, xUnit
+  `Section38ArchitectureTests.cs` и документ `docs/ARCHITECTURE_SECTION38.md`; новый gate
+  включён в local section-37 quality scripts, PR CI и release workflow;
+- `F5` получил отдельный TASK-142 smoke: exact 11-event dispatch, 11 live subscriptions,
+  fixed-rate probes около 100 nearby / 20 distant ticks за 10 simulated seconds и проверку
+  ecology mapping 10/2 Hz; gameplay save-slot для самого event-bus probe не изменяется;
+- application version повышена до `0.1.0-alpha.142`, changelog и release documentation
+  синхронизированы.
+
+**Статусы:**
+
+- `TASK-140`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-141`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-142`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-143`: `NOT_STARTED` → `IN_PROGRESS` — clean build + xUnit/quality + Godot F5 runtime;
+- `TASK-006`: остаётся `BLOCKED`, поскольку release ZIP не содержит `.git` metadata.
+
+**Статическая приёмка TASK-142:**
+
+```text
+TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
+```
+
+Одновременно проходят прежние TASK-132/134/136/138/140 contract gates и JSON/schema
+validation. Production C# structural audit: `148/148` source/test files PASS; в среде
+подготовки отсутствуют `dotnet`, `msbuild`, `csc`, `mcs`, `godot`, `godot4`, поэтому
+реальный compile/runtime PASS не приписывается.
+
+**Diff относительно принятого TASK-140 snapshot до упаковки:**
+
+```text
+files: 363
+added: 11
+changed: 48
+removed: 0
+C# files: 148
+JSON files: 21
+```
+
+**Статический pre-release audit:**
+
+```text
+TASK-132 localization: PASS
+TASK-134 audio: PASS
+TASK-136 developer diagnostics: PASS
+TASK-138 section-36 testing contract: PASS
+TASK-140 JSON/schema + section-37 build contract: PASS
+TASK-142 section-38 architecture contract: PASS
+C# lexical structure: 148/148 PASS
+JSON: 21/21 PASS
+UID: 138/138 unique
+res:// references: 65; broken=0
+XML project/build files: 3/3 PASS
+forbidden build/runtime artifacts: 0
+Industry baseline: 174 items / 42 resources / 128 recipes / 15 stations / 32 technologies
+NPC baseline: 3 factions / 8 archetypes / 8 agents / 8 dialogues
+Ecology baseline: 16 biomes / 60 flora / 20 fauna
+```
+
+**Минимальная приёмка TASK-143:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`; требуются реальный `CoreCompile`,
+   `0 errors` и `0 warnings`.
+2. Выполнить `tools\run-section37-quality.cmd`; должны пройти xUnit/coverage, JSON,
+   migrations/recovery и все contract gates вплоть до TASK-142.
+3. Запустить игру и один раз нажать `F5`; требуется строка `TASK-142 architecture acceptance
+   PASS` с `typedEvents=11/11`, `liveSubscriptions=11/11`, nearby/distant tick counts около
+   `100/20`, `physicsHz=60`, `nearbyAiHz=10`, `distantAiHz=2`, `eventBus=1`,
+   `frequencyPolicy=1`.
+4. Короткий smoke: добыть ресурс, выполнить переход planet exit/enter, принять/завершить
+   задание и повредить ship system; прежние quest/autosave реакции должны сохраниться.
+
+**Граница закрытия:** после clean build, quality/xUnit PASS и TASK-142 F5/runtime smoke
+`TASK-143 → VERIFIED`; тогда §38 можно считать закрытым для текущего shipping vertical slice.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Build / CI / Release Engineering / §37 closure
 
 ### Закрытие §36 по решению владельца продукта
 
@@ -3992,8 +4117,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `TOOL-004` | 37.1 | Использовать Git | `IMPLEMENTED` | Архив получен из репозитория; `.gitignore`, `.gitattributes` присутствуют | Записать merge commit SHA из `main` |
 | `TOOL-005` | 37.1 | Git LFS для крупных бинарных файлов | `IMPLEMENTED` | LFS-шаблоны настроены для `.blend`, `.glb`, `.fbx`, аудио, видео и исходников текстур | Проверить `git lfs track` |
 | `TOOL-006` | 37.1 | Не хранить кеш, сборки, IDE-настройки, локальные БД и логи | `IMPLEMENTED` | `.gitignore` + TASK-140 repository contract; релизный архив проходит forbidden-artifact audit | Подтвердить green CI на GitHub |
-| `TOOL-007` | 37.2 | `main`, `develop`, `feature/*`, `fix/*`, `release/*` | `IN_PROGRESS` | TASK-140 формализовал branch policy в `docs/BUILD_AND_RELEASE.md`; архив без `.git` не доказывает существование remote branches | TASK-141: проверить/создать ветки и protection на GitHub |
-| `TOOL-008` | 37.2 | `main` всегда собирается | `IN_PROGRESS` | `.github/workflows/ci.yml` запускает quality + Windows/Linux Debug exports для main/develop/release; required check ещё должен быть включён на GitHub | TASK-141: green CI + required checks |
+| `TOOL-007` | 37.2 | `main`, `develop`, `feature/*`, `fix/*`, `release/*` | `VERIFIED` | TASK-140 implementation + TASK-141 acceptance waiver владельца продукта; `.git` metadata не входит в release ZIP | Поддерживать policy в GitHub |
+| `TOOL-008` | 37.2 | `main` всегда собирается | `VERIFIED` | TASK-140 CI pipeline + TASK-141 acceptance waiver владельца продукта | Не ослаблять required quality/export checks |
 
 ---
 
@@ -4002,17 +4127,24 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | ID | Раздел ТЗ | Требование | Статус | Доказательство / замечание | Следующее действие |
 |---|---:|---|---|---|---|
 | `ARCH-001` | 4.1 | Многослойная архитектура | `IN_PROGRESS` | Пока создан только `Game.Client` | Создавать библиотеки по мере появления логики, не заранее |
-| `ARCH-002` | 4.1 | Доменная логика не зависит от `Godot.Node` | `NOT_STARTED` | Доменная логика ещё отсутствует | Контролировать при создании `Game.Domain` |
+| `ARCH-002` | 4.1 | Доменная логика не зависит от `Godot.Node` | `IMPLEMENTED` | TASK-142 gate: runtime/catalog/domain classes и typed event contracts не используют `Godot.Node` как модель; event bus Godot-independent | TASK-143 runtime/quality gate |
 | `ARCH-003` | 4.2 | Godot-клиент в `src/Game.Client` | `IMPLEMENTED` | Структура соответствует ТЗ | Подтвердить сборкой из чистого клона |
 | `ARCH-006` | 4.3 | Клиент содержит сцены, камеры, управление и адаптеры взаимодействия | `IMPLEMENTED` | `DebugWorld`, `TerrainChunkPrototype`, `CubeSpherePrototype`, `PlanetaryPlayer`, управление, взаимодействие и бой | Довести Прототип A до приёмки |
 | `CFG-001` | 1.2 | Основной renderer — Mobile | `IMPLEMENTED` | `renderer/rendering_method="mobile"` | Подтвердить запуском |
 | `CFG-002` | 1.2 | Основной графический API — Vulkan | `IMPLEMENTED` | В `project.godot` явно задано `rendering_device/driver.windows="vulkan"` | Подтвердить фактический драйвер выводом `RenderingServer` при запуске |
 | `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `NOT_STARTED` | Экспортные профили отсутствуют | Вернуться при настройке экспорта |
 | `CFG-004` | 38 | Nullable включён | `IMPLEMENTED` | `<Nullable>enable</Nullable>` присутствует | Пересобрать без предупреждений |
-| `CFG-005` | 38 | Предупреждения контролируются | `IMPLEMENTED` | TASK-140: `-warnaserror` + `ContinuousIntegrationBuild=true` + `Directory.Build.props/TreatWarningsAsErrors` | TASK-141: подтвердить build с 0 warnings в GitHub CI |
+| `CFG-005` | 38 | Предупреждения контролируются | `VERIFIED` | TASK-140 warnings-as-errors implementation; TASK-141 принят владельцем продукта | Сохранять 0-warning CI policy |
 | `CFG-006` | 38 | Нет циклических зависимостей | `IMPLEMENTED` | C#-проект пока один | Проверять при добавлении проектов |
 | `CFG-007` | 38 | Генерация мира не выполняется в `_Process` | `IMPLEMENTED` | `_PhysicsProcess` только обнаруживает переход; worker-задачи считают данные, timer дозированно применяет готовые mesh/collision в main thread | Подтвердить профилированием |
 | `CFG-008` | 37.1 | Хранить import-настройки, исключая `.godot/` | `IMPLEMENTED` | `icon.svg.import` хранится, `.godot/` исключена | Не игнорировать глобально `*.import` |
+| `CFG-009` | 38.1 | Частоты systems 60/60/10/2 Hz, background economy 0.2–1 Hz | `IMPLEMENTED` | `SystemFrequencyPolicy`; explicit Godot 60 Hz; NPC/fauna throttling; TASK-142 gate | TASK-143 runtime smoke |
+| `CFG-010` | 38.2 | Typed domain event bus и 11 нормативных событий | `IMPLEMENTED` | `IDomainEventBus`, `DomainEventBus`, exact 11 records; gameplay integrations + F5 probe | TASK-143 F5 exact 11/11 |
+| `CFG-011` | 38 | Async operations принимают `CancellationToken` | `IMPLEMENTED` | TASK-142 audit охватывает public/private/protected/internal production Task/ValueTask; missing=0 | Поддерживать source gate |
+| `CFG-012` | 38 | SQLite только parameterized persistence boundary, без SQL в scenes | `IMPLEMENTED` | TASK-142 source gate: SQL только Persistence/Developer inspector; `.tscn` SQL=0 | Поддерживать source gate |
+| `CFG-013` | 38 | Public interfaces документированы | `IMPLEMENTED` | XML `<summary>` contract для всех 5 public interfaces | Поддерживать source gate |
+| `CFG-014` | 38 | Exceptions не подавляются | `IMPLEMENTED` | Empty catch scan=0; cancellation фильтруется явно | TASK-143 xUnit/quality |
+| `CFG-015` | 38 | Godot Node не domain model; UI не содержит item business mutations | `IMPLEMENTED` | TASK-142 node/UI/domain separation gates | TASK-143 quality + runtime |
 
 ---
 

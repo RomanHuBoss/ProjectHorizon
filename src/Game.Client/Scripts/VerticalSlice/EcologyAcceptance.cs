@@ -96,7 +96,7 @@ public static class EcologyAcceptanceRunner
             bool updateTiers =
                 Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(8.0) - 10.0) <
                     0.001 &&
-                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) - 4.0) <
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) - 2.0) <
                     0.001 &&
                 Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(80.0)) < 0.001;
 
@@ -201,6 +201,7 @@ public static class EcologyAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(60.0));
             await database.InitializeAsync(cancellationToken)
                 .ConfigureAwait(false);

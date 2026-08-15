@@ -505,6 +505,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeAudioGameplayRuntime();
         InitializeDeveloperDiagnosticsRuntime();
         InitializeTestingRuntime();
+        InitializeArchitectureRuntime();
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -558,7 +559,7 @@ public partial class SalvageRepairSlice : Node3D
         string databasePath = GameProfilePaths.PrimaryDatabasePath;
         SaveDatabase database = new(databasePath);
         _database = database;
-        _autosave = new SaveAutosaveCoordinator(database);
+        _autosave = new SaveAutosaveCoordinator(database, DomainEvents);
         _initializeTask = database.InitializeAsync(
             _lifetimeCancellation.Token);
 
@@ -739,6 +740,7 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _ExitTree()
     {
+        DisposeArchitectureRuntime();
         DisposeLocalizationRuntime();
         GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
         _lifetimeCancellation.Cancel();
@@ -787,6 +789,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdatePlayerSurvival(delta);
         UpdateAudioRuntime(delta);
         UpdateDeveloperDiagnosticsRuntime(delta);
+        UpdateArchitectureRuntime(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
@@ -1551,10 +1554,20 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        _lastDomainEvent = quest.Status == StationServiceQuestStatus.Offered
-            ? $"QuestAccepted({quest.Definition.QuestId})"
-            : $"QuestCompleted({quest.Definition.QuestId})";
-        QueueCurrentSnapshot(trigger);
+        if (quest.Status == StationServiceQuestStatus.Offered)
+        {
+            PublishDomainEvent(new QuestAccepted(
+                quest.Definition.QuestId,
+                "station-services",
+                DateTimeOffset.UtcNow));
+        }
+        else
+        {
+            PublishDomainEvent(new QuestCompleted(
+                quest.Definition.QuestId,
+                "station-services",
+                DateTimeOffset.UtcNow));
+        }
         GD.Print(
             "TASK-102 player quest action PASS: " +
             $"quest={quest.Definition.QuestId}; action=" +
@@ -2557,18 +2570,14 @@ public partial class SalvageRepairSlice : Node3D
 
         EnsureGameplayProductionNetwork();
         GameplayNetwork.AddInventoryAll(definitionId, quantity);
-        int questUpdates = StationServices.RecordObjective(
-            StationServiceObjectiveType.CollectResource,
+        _task142ResourceQuestUpdates = 0;
+        _task142ProceduralQuestUpdates = 0;
+        PublishDomainEvent(new ResourceMined(
+            resourceNodeId,
             definitionId,
-            quantity);
-        int proceduralQuestUpdates = RecordProceduralQuestObjective(
-            ProceduralQuestObjectiveType.CollectResource,
-            definitionId,
-            quantity);
+            quantity,
+            DateTimeOffset.UtcNow));
         RecordPlayerMultitoolUse(PlayerMultitoolFunction.Mining, definitionId);
-        _lastDomainEvent =
-            $"ResourceCollected({resourceNodeId}, definition={definitionId}, " +
-            $"quantity={quantity})";
         _status = result;
         source.SetCollected(true);
         PlayResourceCollectAudio(source.GlobalPosition);
@@ -2577,7 +2586,7 @@ public partial class SalvageRepairSlice : Node3D
         GD.Print(
             $"Vertical slice domain event: {_lastDomainEvent}; " +
             $"available={Session.GetAvailableQuantity(definitionId)}; " +
-            $"questUpdates={questUpdates}; proceduralQuestUpdates={proceduralQuestUpdates}; " +
+            $"questUpdates={_task142ResourceQuestUpdates}; proceduralQuestUpdates={_task142ProceduralQuestUpdates}; " +
             $"interactor={interactor.Name}");
         return true;
     }
@@ -3937,8 +3946,11 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        _lastDomainEvent = $"ShipSystemDamaged({definition.SystemId})";
-        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        PublishDomainEvent(new ShipDamaged(
+            definition.SystemId,
+            25.0,
+            ShipSystems.GetSystemHealth(definition.SystemId),
+            DateTimeOffset.UtcNow));
         GD.Print(
             "TASK-110 player ship damage PASS: " +
             $"system={definition.SystemId}; " +
@@ -4083,6 +4095,11 @@ public partial class SalvageRepairSlice : Node3D
 
         MirrorSessionConsumptionToGameplayNetwork(
             new[] { new CraftingStackDefinition(definitionId, quantity) });
+        PublishDomainEvent(new ItemRemoved(
+            definitionId,
+            quantity,
+            "shared-inventory",
+            DateTimeOffset.UtcNow));
         return true;
     }
 
@@ -4091,6 +4108,11 @@ public partial class SalvageRepairSlice : Node3D
         Session.GrantInventory(definitionId, quantity);
         MirrorSessionGrantToGameplayNetwork(
             new[] { new CraftingStackDefinition(definitionId, quantity) });
+        PublishDomainEvent(new ItemAdded(
+            definitionId,
+            quantity,
+            "shared-inventory",
+            DateTimeOffset.UtcNow));
     }
 
     private static string LocalizeShipSlot(string slotType)
@@ -4306,14 +4328,12 @@ public partial class SalvageRepairSlice : Node3D
         if (placementResult == BasePlacementResult.Placed && placement is not null)
         {
             RebuildBaseConstructionScene();
-            _lastDomainEvent =
-                $"BaseModulePlaced({placement.InstanceId},{placement.ModuleId})";
-            RecordProceduralQuestObjective(
-                ProceduralQuestObjectiveType.BuildModule,
+            PublishDomainEvent(new BaseModulePlaced(
+                placement.InstanceId,
                 placement.ModuleId,
-                1,
-                queueAutosave: false);
-            QueueCurrentSnapshot(AutosaveTrigger.BaseChanged);
+                placement.GridX,
+                placement.GridZ,
+                DateTimeOffset.UtcNow));
             GD.Print(
                 "TASK-106 player base placement PASS: " +
                 $"instance={placement.InstanceId}; module={placement.ModuleId}; " +
@@ -5459,8 +5479,9 @@ public partial class SalvageRepairSlice : Node3D
         RunAudioArchitectureAcceptance();
         RunDeveloperDiagnosticsAcceptance();
         RunTestingArchitectureAcceptance();
+        RunArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5513,7 +5534,8 @@ public partial class SalvageRepairSlice : Node3D
     }
 
     private async Task<GracefulExitResult> FlushGracefulExitAsync(
-        SaveGameSnapshot snapshot)
+        SaveGameSnapshot snapshot,
+        CancellationToken cancellationToken)
     {
         if (_autosave is null)
         {
@@ -5523,7 +5545,7 @@ public partial class SalvageRepairSlice : Node3D
         await _autosave.FlushAsync(
             AutosaveTrigger.GracefulExit,
             snapshot,
-            _lifetimeCancellation.Token).ConfigureAwait(false);
+            cancellationToken).ConfigureAwait(false);
         return new GracefulExitResult(true, snapshot.Revision);
     }
 
@@ -5640,7 +5662,7 @@ public partial class SalvageRepairSlice : Node3D
             $"missionsActive={ProceduralQuests.AcceptedCount}; " +
             $"missionsReady={ProceduralQuests.ReadyCount}; " +
             $"missionsCompleted={ProceduralQuests.CompletedCount}.");
-        _gracefulExitTask = FlushGracefulExitAsync(snapshot);
+        _gracefulExitTask = FlushGracefulExitAsync(snapshot, _lifetimeCancellation.Token);
     }
 
     private void PollInitializeTask()
@@ -7521,7 +7543,8 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",
-            $"TASK-138 (F5): {_task138AcceptanceHud}"
+            $"TASK-138 (F5): {_task138AcceptanceHud}",
+            $"TASK-142 (F5): {_task142AcceptanceHud}"
         });
 
         if (_hudMode == SalvageRepairHudMode.Compact)

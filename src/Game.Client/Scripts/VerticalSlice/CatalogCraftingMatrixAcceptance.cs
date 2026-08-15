@@ -66,6 +66,7 @@ public static class CatalogCraftingMatrixAcceptanceRunner
             using SaveDatabase database = new(databasePath);
             using SaveAutosaveCoordinator autosave = new(
                 database,
+                new DomainEventBus(),
                 TimeSpan.FromMilliseconds(60.0));
             await database.InitializeAsync(cancellationToken)
                 .ConfigureAwait(false);

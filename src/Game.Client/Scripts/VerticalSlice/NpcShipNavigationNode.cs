@@ -53,6 +53,10 @@ public partial class NpcShipNavigationNode : CharacterBody3D
     private int _neighborSamples;
     private int _waypointAdvances;
     private float _minimumObstacleClearance = float.PositiveInfinity;
+    private readonly SystemFrequencyGate _decisionGate =
+        new(SystemFrequencyPolicy.NearbyAiHz);
+    private Vector3 _cachedDesiredVelocity;
+    private int _decisionSamples;
 
     public string ShipId { get; private set; } = string.Empty;
 
@@ -156,48 +160,53 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             Velocity,
             _radius);
 
-        UpdateRoleState();
-        Vector3 desiredVelocity = ComputeDesiredVelocity();
-        Vector3 separation = _steering.ComputeEntitySeparation(
-            ShipId,
-            "npc_ship",
-            GlobalPosition,
-            8.0f,
-            8.5f);
-        IReadOnlyList<AerialEntitySample> neighbors = _steering.QueryNeighbors(
-            GlobalPosition,
-            12.0f,
-            "npc_ship",
-            ShipId);
-        _neighborSamples += neighbors.Count;
-
-        Vector3 obstacleAvoidance = _steering.ComputeObstacleAvoidance(
-            GlobalPosition,
-            desiredVelocity.LengthSquared() > 0.01f ? desiredVelocity : Velocity,
-            _radius,
-            1.6f,
-            18.0f);
-        if (obstacleAvoidance.LengthSquared() > 0.0001f)
+        if (_decisionGate.Consume(delta) || _decisionSamples == 0)
         {
-            _avoidanceActivations++;
-        }
+            UpdateRoleState();
+            Vector3 desiredVelocity = ComputeDesiredVelocity();
+            Vector3 separation = _steering.ComputeEntitySeparation(
+                ShipId,
+                "npc_ship",
+                GlobalPosition,
+                8.0f,
+                8.5f);
+            IReadOnlyList<AerialEntitySample> neighbors = _steering.QueryNeighbors(
+                GlobalPosition,
+                12.0f,
+                "npc_ship",
+                ShipId);
+            _neighborSamples += neighbors.Count;
 
-        desiredVelocity += separation + obstacleAvoidance;
-        desiredVelocity = _steering.ApplyAltitudeEnvelope(
-            desiredVelocity,
-            GlobalPosition.Y,
-            14.0f,
-            PreferredAltitude(),
-            62.0f,
-            0.65f,
-            10.0f);
-        if (desiredVelocity.Length() > _maximumSpeed * 1.2f)
-        {
-            desiredVelocity = desiredVelocity.Normalized() * (_maximumSpeed * 1.2f);
+            Vector3 obstacleAvoidance = _steering.ComputeObstacleAvoidance(
+                GlobalPosition,
+                desiredVelocity.LengthSquared() > 0.01f ? desiredVelocity : Velocity,
+                _radius,
+                1.6f,
+                18.0f);
+            if (obstacleAvoidance.LengthSquared() > 0.0001f)
+            {
+                _avoidanceActivations++;
+            }
+
+            desiredVelocity += separation + obstacleAvoidance;
+            desiredVelocity = _steering.ApplyAltitudeEnvelope(
+                desiredVelocity,
+                GlobalPosition.Y,
+                14.0f,
+                PreferredAltitude(),
+                62.0f,
+                0.65f,
+                10.0f);
+            if (desiredVelocity.Length() > _maximumSpeed * 1.2f)
+            {
+                desiredVelocity = desiredVelocity.Normalized() * (_maximumSpeed * 1.2f);
+            }
+            _cachedDesiredVelocity = desiredVelocity;
+            _decisionSamples++;
         }
 
         float weight = Math.Clamp((float)delta * _acceleration, 0.0f, 1.0f);
-        Velocity = Velocity.Lerp(desiredVelocity, weight);
+        Velocity = Velocity.Lerp(_cachedDesiredVelocity, weight);
         MoveAndSlide();
         _steeringSamples++;
         _steering.RecordShipSample();

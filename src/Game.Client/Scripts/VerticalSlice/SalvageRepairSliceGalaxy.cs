@@ -233,12 +233,10 @@ public partial class SalvageRepairSlice
         _stationServicesOpenedFromVoyage = false;
         ApplyStageOneVoyageToScene();
         RefreshGalaxyMapSystems();
-        RecordProceduralQuestObjective(
-            ProceduralQuestObjectiveType.ExploreSystem,
+        PublishDomainEvent(new SystemDiscovered(
             GalaxyNavigation.CurrentSystem.SystemId,
-            1,
-            queueAutosave: false);
-        QueueCurrentSnapshot(AutosaveTrigger.Hyperspace);
+            GalaxyNavigation.VisitedSystemIds.Count,
+            DateTimeOffset.UtcNow));
         GD.Print(
             "TASK-114 player hyperspace jump PASS: " +
             $"galaxy={GalaxyNavigation.CurrentSystem.GalaxyId}; " +

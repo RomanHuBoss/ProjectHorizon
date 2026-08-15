@@ -339,6 +339,7 @@ public partial class SalvageRepairSlice
                 StructuredGameLogger.Log(GameLogLevel.Debug, category, "TASK-136 category acceptance sample");
             StructuredGameLogger.Log(GameLogLevel.Debug, GameLogCategory.ERROR, "TASK-136 redaction acceptance token=should-never-appear",
                 fields: new Dictionary<string, object?> { ["api_token"] = "sensitive-test-value" });
+            StructuredGameLogger.FlushPending();
             StructuredGameLoggerDiagnostics logger = StructuredGameLogger.GetDiagnostics();
             string logText = File.Exists(logger.LogPath) ? File.ReadAllText(logger.LogPath) : string.Empty;
             bool secretsAbsent =

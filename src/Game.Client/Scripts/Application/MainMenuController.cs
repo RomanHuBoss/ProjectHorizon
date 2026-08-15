@@ -56,6 +56,7 @@ public partial class MainMenuController : Control
 
     public override void _ExitTree()
     {
+        StructuredGameLogger.FlushPending();
         GameLocalizationService.LocaleChanged -= OnLocaleChanged;
         _lifetime.Cancel();
         _lifetime.Dispose();

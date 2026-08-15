@@ -11,6 +11,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
 {
     private readonly object _sync = new();
     private readonly SaveDatabase _database;
+    private readonly IDomainEventBus _eventBus;
     private readonly TimeSpan _coalescingWindow;
     private readonly CancellationTokenSource _lifetimeCancellation = new();
     private readonly HashSet<AutosaveTrigger> _pendingTriggers = new();
@@ -28,9 +29,11 @@ public sealed class SaveAutosaveCoordinator : IDisposable
 
     public SaveAutosaveCoordinator(
         SaveDatabase database,
+        IDomainEventBus eventBus,
         TimeSpan? coalescingWindow = null)
     {
         _database = database ?? throw new ArgumentNullException(nameof(database));
+        _eventBus = eventBus ?? throw new ArgumentNullException(nameof(eventBus));
         _coalescingWindow = coalescingWindow ?? TimeSpan.FromMilliseconds(120.0);
         if (_coalescingWindow < TimeSpan.Zero)
         {
@@ -179,9 +182,15 @@ public sealed class SaveAutosaveCoordinator : IDisposable
             _pendingTriggers.Add(trigger);
             if (_workerTask is null)
             {
-                _workerTask = Task.Run(RunWorkerAsync);
+                _workerTask = Task.Run(() => RunWorkerAsync(_lifetimeCancellation.Token));
             }
         }
+
+        _eventBus.Publish(new SaveRequested(
+            frozenSnapshot.SlotId,
+            frozenSnapshot.Revision,
+            trigger.ToString(),
+            DateTimeOffset.UtcNow));
     }
 
     public async Task FlushAsync(
@@ -252,7 +261,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
         };
     }
 
-    private async Task RunWorkerAsync()
+    private async Task RunWorkerAsync(CancellationToken cancellationToken)
     {
         try
         {
@@ -262,7 +271,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
                 {
                     await Task.Delay(
                         _coalescingWindow,
-                        _lifetimeCancellation.Token).ConfigureAwait(false);
+                        cancellationToken).ConfigureAwait(false);
                 }
 
                 SaveGameSnapshot? snapshot;
@@ -287,7 +296,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
                 {
                     await _database.SaveAsync(
                         snapshot,
-                        _lifetimeCancellation.Token).ConfigureAwait(false);
+                        cancellationToken).ConfigureAwait(false);
                     if (!TryAppendLog(
                         "AUTOSAVE_COMPLETED",
                         $"revision={snapshot.Revision}; triggers={triggerSummary}; " +
@@ -305,7 +314,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
                     }
                 }
                 catch (OperationCanceledException)
-                    when (_lifetimeCancellation.IsCancellationRequested)
+                    when (cancellationToken.IsCancellationRequested)
                 {
                     return;
                 }
@@ -324,7 +333,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
             }
         }
         catch (OperationCanceledException)
-            when (_lifetimeCancellation.IsCancellationRequested)
+            when (cancellationToken.IsCancellationRequested)
         {
             // Disposal intentionally cancels a pending coalescing delay or write.
         }
@@ -344,7 +353,7 @@ public sealed class SaveAutosaveCoordinator : IDisposable
                 _workerTask = null;
                 if (!_disposed && _pendingSnapshot is not null)
                 {
-                    _workerTask = Task.Run(RunWorkerAsync);
+                    _workerTask = Task.Run(() => RunWorkerAsync(cancellationToken));
                 }
             }
         }
@@ -425,6 +434,7 @@ public sealed partial class SaveDatabase
         using SaveDatabase testDatabase = new(testPath);
         using SaveAutosaveCoordinator coordinator = new(
             testDatabase,
+            new DomainEventBus(),
             TimeSpan.FromMilliseconds(80.0));
 
         try

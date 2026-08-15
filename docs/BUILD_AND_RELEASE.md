@@ -60,7 +60,7 @@ are exercised by GitHub CI, or locally by setting `GODOT_BIN` and running:
 - Industry Content schema/catalog version;
 - `ProjectHorizonGenerator.Version`.
 
-A release tag must be exactly `v<VERSION>` (for example `v0.1.0-alpha.140`). The release
+A release tag must be exactly `v<VERSION>` (for example `v0.1.0-alpha.142`). The release
 workflow refuses mismatched tags or a version missing from `CHANGELOG.md`.
 
 ## Release dry-run and tagged release

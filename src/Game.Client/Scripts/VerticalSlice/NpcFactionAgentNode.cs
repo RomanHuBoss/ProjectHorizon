@@ -48,6 +48,12 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         _forcedSnaps,
         _lastPathPointCount);
 
+    private readonly SystemFrequencyGate _behaviorDecisionGate =
+        new(SystemFrequencyPolicy.NearbyAiHz);
+    private Vector3 _cachedBehaviorTarget;
+    private double _cachedBehaviorSpeedScale = 1.0;
+    private int _behaviorDecisionCount;
+
     public event Action<NpcFactionAgentNode, Node3D>? InteractionRequested;
 
     public event Action<NpcFactionAgentNode, NpcFactionCombatOutcome>? CombatResolved;
@@ -172,6 +178,9 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         _nextNavigationTargetRefreshAt = 0.0;
         _nextProgressCheckAt = 0.0;
         _progressAnchor = GlobalPosition;
+        _behaviorDecisionGate.Reset();
+        _cachedBehaviorTarget = GlobalPosition;
+        _cachedBehaviorSpeedScale = 1.0;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -284,15 +293,28 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             _progressAnchor = GlobalPosition;
         }
 
-        Vector3 behaviorTarget = ResolveBehaviorTarget(out double speedScale);
+        Vector3 behaviorTarget;
+        double speedScale;
         if (_ageSeconds < _recoveryUntil)
         {
             behaviorTarget = _recoveryTarget;
-            speedScale = Math.Max(speedScale, 1.15);
+            speedScale = Math.Max(_cachedBehaviorSpeedScale, 1.15);
         }
-        behaviorTarget = ClampTargetToTerritory(behaviorTarget);
-        behaviorTarget = _navigationSurface.GetClosestNavigationPoint(behaviorTarget);
-        behaviorTarget.Y = _home.Y;
+        else
+        {
+            if (_behaviorDecisionGate.Consume(delta) || _behaviorDecisionCount == 0)
+            {
+                _cachedBehaviorTarget = ResolveBehaviorTarget(
+                    out _cachedBehaviorSpeedScale);
+                _cachedBehaviorTarget = ClampTargetToTerritory(_cachedBehaviorTarget);
+                _cachedBehaviorTarget = _navigationSurface.GetClosestNavigationPoint(
+                    _cachedBehaviorTarget);
+                _cachedBehaviorTarget.Y = _home.Y;
+                _behaviorDecisionCount++;
+            }
+            behaviorTarget = _cachedBehaviorTarget;
+            speedScale = _cachedBehaviorSpeedScale;
+        }
 
         bool targetChanged = _lastRequestedTarget.DistanceTo(behaviorTarget) > 0.65f;
         if (targetChanged || _ageSeconds >= _nextNavigationTargetRefreshAt)
@@ -409,43 +431,22 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         {
             return;
         }
-        Vector3 offsetToPlayer = _player.GlobalPosition - GlobalPosition;
-        offsetToPlayer.Y = 0.0f;
-        double distance = offsetToPlayer.Length();
-        Vector3 direction;
-        double speedScale = 1.0;
-        if (_definition.Hostile && distance <= _definition.DetectionRange)
+
+        if (_behaviorDecisionGate.Consume(delta) || _behaviorDecisionCount == 0)
         {
-            direction = offsetToPlayer.LengthSquared() > 0.001f
-                ? offsetToPlayer.Normalized()
-                : Vector3.Zero;
-            if (distance <= _definition.AttackRange)
-            {
-                direction = Vector3.Zero;
-                TryAttackPlayer();
-            }
+            _cachedBehaviorTarget = ResolveBehaviorTarget(
+                out _cachedBehaviorSpeedScale);
+            _cachedBehaviorTarget = ClampTargetToTerritory(_cachedBehaviorTarget);
+            _behaviorDecisionCount++;
         }
-        else if (!_definition.Hostile && _ageSeconds - _lastHitAt <= 4.0 && distance <= 12.0)
-        {
-            direction = offsetToPlayer.LengthSquared() > 0.001f
-                ? -offsetToPlayer.Normalized()
-                : Vector3.Zero;
-            speedScale = 1.35;
-        }
-        else
-        {
-            double phase = _ageSeconds * 0.33 + StablePhase(_definition.NpcId);
-            Vector3 target = _home + new Vector3(
-                (float)Math.Cos(phase) * (float)_definition.PatrolRadius,
-                0.0f,
-                (float)Math.Sin(phase) * (float)_definition.PatrolRadius);
-            Vector3 offset = target - Position;
-            offset.Y = 0.0f;
-            direction = offset.LengthSquared() > 0.04f
-                ? offset.Normalized()
-                : Vector3.Zero;
-        }
-        Vector3 desired = direction * (float)(_definition.WalkSpeed * speedScale);
+
+        Vector3 offset = _cachedBehaviorTarget - GlobalPosition;
+        offset.Y = 0.0f;
+        Vector3 direction = offset.LengthSquared() > 0.04f
+            ? offset.Normalized()
+            : Vector3.Zero;
+        Vector3 desired = direction *
+            (float)(_definition.WalkSpeed * _cachedBehaviorSpeedScale);
         Velocity = new Vector3(
             Mathf.MoveToward(Velocity.X, desired.X, (float)(delta * 5.0)),
             0.0f,
