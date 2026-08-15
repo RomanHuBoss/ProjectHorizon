@@ -162,7 +162,7 @@ public partial class SalvageRepairSlice
         {
             return "barren";
         }
-        string archetype = system.Planets[0].Archetype;
+        string archetype = GalaxyNavigation.CurrentPlanet.Archetype;
         return PlayerSurvivalCatalog.Environments.ContainsKey(archetype)
             ? archetype
             : "barren";

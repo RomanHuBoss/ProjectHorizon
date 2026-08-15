@@ -895,7 +895,25 @@ public static class StarterRepairSnapshotFactory
     private static string ResolveCurrentPlanetId(
         GalaxyNavigationSaveData? galaxyNavigation)
     {
-        if (galaxyNavigation is null || string.Equals(
+        if (galaxyNavigation is null)
+        {
+            return PlanetId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(galaxyNavigation.CurrentPlanetId))
+        {
+            if (!galaxyNavigation.CurrentPlanetId.StartsWith(
+                "planet.",
+                StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    "Galaxy current planet ID must use the planet. prefix.");
+            }
+
+            return galaxyNavigation.CurrentPlanetId;
+        }
+
+        if (string.Equals(
             galaxyNavigation.CurrentSystemId,
             SystemId,
             StringComparison.Ordinal))

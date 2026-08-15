@@ -425,6 +425,7 @@ public partial class SalvageRepairSlice : Node3D
         ShipSystemsCatalog shipSystemsCatalog =
             LoadShipSystemsCatalog(catalog);
         _ecologyCatalog = LoadEcologyCatalog(catalog);
+        _planetEnvironmentCatalog = LoadPlanetEnvironmentCatalog(_ecologyCatalog);
         _npcFactionCatalog = LoadNpcFactionCatalog(stationServicesCatalog);
         _proceduralQuestCatalog = LoadProceduralQuestCatalog(
             stationServicesCatalog);
@@ -497,6 +498,7 @@ public partial class SalvageRepairSlice : Node3D
             stationRecipes);
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
+        InitializePlanetEnvironmentRuntime();
         InitializeStarSystemSimulationRuntime();
         InitializeWorldSceneCoordinator();
         InitializeAerialSteeringRuntime();
@@ -5475,6 +5477,7 @@ public partial class SalvageRepairSlice : Node3D
         BeginNpcNavigationAcceptance();
         BeginAerialNavigationAcceptance();
         BeginStarSystemSimulationAcceptance();
+        RunPlanetEnvironmentAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5484,7 +5487,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7528,6 +7531,7 @@ public partial class SalvageRepairSlice : Node3D
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
+        string planetEnvironmentLine = BuildPlanetEnvironmentHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7561,6 +7565,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-124 (F5): {_npcNavigationAcceptanceHud}",
             $"TASK-126 (F5): {_aerialNavigationAcceptanceHud}",
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
+            $"TASK-150 (F5): {_planetEnvironmentAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7586,6 +7591,7 @@ public partial class SalvageRepairSlice : Node3D
                 voyageLine,
                 galaxyLine,
                 starSystemLine,
+                planetEnvironmentLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7628,6 +7634,7 @@ public partial class SalvageRepairSlice : Node3D
             voyageLine,
             galaxyLine,
             starSystemLine,
+            planetEnvironmentLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

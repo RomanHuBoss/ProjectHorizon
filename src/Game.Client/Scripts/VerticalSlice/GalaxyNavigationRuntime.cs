@@ -85,6 +85,14 @@ public sealed class GalaxyNavigationRuntime
         "gas_giant"
     };
 
+    private static readonly string[] StarterPlanetArchetypes =
+    {
+        "temperate",
+        "desert",
+        "frozen",
+        "volcanic"
+    };
+
     private static readonly string[] EconomyTypes =
     {
         "extractive",
@@ -97,6 +105,7 @@ public sealed class GalaxyNavigationRuntime
 
     private readonly HashSet<string> _visitedSystemIds = new(
         StringComparer.Ordinal);
+    private string _currentPlanetId = string.Empty;
 
     public GalaxyNavigationRuntime(long universeSeed)
     {
@@ -108,6 +117,7 @@ public sealed class GalaxyNavigationRuntime
 
         UniverseSeed = universeSeed;
         CurrentSystem = GenerateSystem(0, 0, 0);
+        _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
         _visitedSystemIds.Add(CurrentSystem.SystemId);
     }
 
@@ -123,6 +133,7 @@ public sealed class GalaxyNavigationRuntime
         if (saveData is null)
         {
             CurrentSystem = GenerateSystem(0, 0, 0);
+            _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
             _visitedSystemIds.Add(CurrentSystem.SystemId);
             return;
         }
@@ -140,6 +151,10 @@ public sealed class GalaxyNavigationRuntime
             throw new InvalidOperationException(
                 "Saved current system does not match deterministic generation.");
         }
+
+        _currentPlanetId = ResolveSavedPlanetId(
+            CurrentSystem,
+            saveData.CurrentPlanetId);
 
         SelectedDestination = string.IsNullOrWhiteSpace(
             saveData.SelectedDestinationSystemId)
@@ -180,7 +195,13 @@ public sealed class GalaxyNavigationRuntime
     public IReadOnlyCollection<string> VisitedSystemIds =>
         _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
-    public string CurrentPlanetId => CurrentSystem.Planets[0].PlanetId;
+    public string CurrentPlanetId => _currentPlanetId;
+
+    public GalaxyPlanetDefinition CurrentPlanet => CurrentSystem.Planets
+        .First(planet => string.Equals(
+            planet.PlanetId,
+            _currentPlanetId,
+            StringComparison.Ordinal));
 
     public GalaxySystemDefinition LoadSystemForDeveloper(
         int sectorX,
@@ -188,6 +209,7 @@ public sealed class GalaxyNavigationRuntime
         int sectorZ)
     {
         CurrentSystem = GenerateSystem(sectorX, sectorY, sectorZ);
+        _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
         SelectedDestination = null;
         _visitedSystemIds.Add(CurrentSystem.SystemId);
         return CurrentSystem;
@@ -207,13 +229,21 @@ public sealed class GalaxyNavigationRuntime
         double jitterY = ToSignedUnit(Mix(hash + 0x91UL)) * 32.0;
         double jitterZ = ToSignedUnit(Mix(hash + 0xD3UL)) * 32.0;
         GalaxyStarType starType = SelectStarType(hash);
-        int planetCount = 1 + (int)((hash >> 9) % 8UL);
+        bool starterSystem = string.Equals(
+            systemId,
+            StarterSystemId,
+            StringComparison.Ordinal);
+        int planetCount = starterSystem
+            ? StarterPlanetArchetypes.Length
+            : 1 + (int)((hash >> 9) % 8UL);
         List<GalaxyPlanetDefinition> planets = new(planetCount);
         for (int index = 0; index < planetCount; index++)
         {
             ulong planetHash = Mix(hash + (ulong)(index + 1) * 0x9E3779B9UL);
-            string archetype = PlanetArchetypes[
-                (int)(planetHash % (ulong)PlanetArchetypes.Length)];
+            string archetype = starterSystem
+                ? StarterPlanetArchetypes[index]
+                : PlanetArchetypes[
+                    (int)(planetHash % (ulong)PlanetArchetypes.Length)];
             bool gasGiant = string.Equals(
                 archetype,
                 "gas_giant",
@@ -234,11 +264,19 @@ public sealed class GalaxyNavigationRuntime
                 archetype,
                 "volcanic",
                 StringComparison.Ordinal);
-            bool hasAtmosphere = gasGiant || !barren ||
-                ((planetHash >> 13) & 1UL) == 1UL;
-            bool hasWater = oceanic || frozen ||
-                (!gasGiant && !volcanic && ((planetHash >> 17) % 5UL) == 0UL);
-            string planetId = systemId == StarterSystemId && index == 0
+            bool hasAtmosphere = starterSystem
+                ? !barren
+                : gasGiant || !barren ||
+                    ((planetHash >> 13) & 1UL) == 1UL;
+            bool hasWater = starterSystem
+                ? oceanic || frozen || string.Equals(
+                    archetype,
+                    "temperate",
+                    StringComparison.Ordinal)
+                : oceanic || frozen ||
+                    (!gasGiant && !volcanic &&
+                     ((planetHash >> 17) % 5UL) == 0UL);
+            string planetId = starterSystem && index == 0
                 ? StarterRepairSnapshotFactory.PlanetId
                 : $"planet.{GetSystemSuffix(systemId)}.{index + 1:00}";
             planets.Add(new GalaxyPlanetDefinition(
@@ -265,6 +303,36 @@ public sealed class GalaxyNavigationRuntime
             EconomyTypes[(int)((hash >> 31) % (ulong)EconomyTypes.Length)],
             1 + (int)((hash >> 37) % 5UL),
             planets);
+    }
+
+    public bool TrySelectCurrentPlanet(
+        string planetId,
+        out string result)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(planetId);
+        GalaxyPlanetDefinition? planet = CurrentSystem.Planets.FirstOrDefault(
+            candidate => string.Equals(
+                candidate.PlanetId,
+                planetId,
+                StringComparison.Ordinal));
+        if (planet is null)
+        {
+            result = $"planet {planetId} does not belong to the current system";
+            return false;
+        }
+
+        if (string.Equals(
+            planet.Archetype,
+            "gas_giant",
+            StringComparison.Ordinal))
+        {
+            result = $"planet {planetId} is a non-landable gas giant";
+            return false;
+        }
+
+        _currentPlanetId = planet.PlanetId;
+        result = $"current planet selected: {planet.PlanetId}";
+        return true;
     }
 
     public IReadOnlyList<GalaxySystemDefinition> GetNearbySystems(
@@ -480,13 +548,10 @@ public sealed class GalaxyNavigationRuntime
         }
 
         CurrentSystem = next;
+        _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
         JumpCount++;
         TotalDistanceLightYears += distance;
         _visitedSystemIds.Add(CurrentSystem.SystemId);
-        bool destinationReached = string.Equals(
-            CurrentSystem.SystemId,
-            SelectedDestination.SystemId,
-            StringComparison.Ordinal);
         result = GameLocalizationService.Format(
             "ui.galaxy.jump_result",
             ("jump", JumpCount),
@@ -511,7 +576,8 @@ public sealed class GalaxyNavigationRuntime
             SelectedDestination?.SectorZ ?? 0,
             JumpCount,
             TotalDistanceLightYears,
-            _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray());
+            _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
+            CurrentPlanetId);
     }
 
     public string BuildSummary()
@@ -519,7 +585,8 @@ public sealed class GalaxyNavigationRuntime
         return $"galaxy={CurrentSystem.GalaxyId}; system={CurrentSystem.SystemId}; " +
             $"sector={CurrentSystem.SectorX},{CurrentSystem.SectorY},{CurrentSystem.SectorZ}; " +
             $"star={CurrentSystem.StarType}; planets={CurrentSystem.Planets.Count}; " +
-            $"visited={_visitedSystemIds.Count}; jumps={JumpCount}; " +
+            $"planet={CurrentPlanetId}; visited={_visitedSystemIds.Count}; " +
+            $"jumps={JumpCount}; " +
             $"distance={TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly";
     }
 
@@ -541,6 +608,43 @@ public sealed class GalaxyNavigationRuntime
         }
 
         return Math.Max(4.0, Math.Ceiling(distanceLightYears / 120.0) * 2.0);
+    }
+
+    private static string SelectDefaultPlanetId(
+        GalaxySystemDefinition system)
+    {
+        GalaxyPlanetDefinition? landable = system.Planets.FirstOrDefault(planet =>
+            !string.Equals(
+                planet.Archetype,
+                "gas_giant",
+                StringComparison.Ordinal));
+        return (landable ?? system.Planets.First()).PlanetId;
+    }
+
+    private static string ResolveSavedPlanetId(
+        GalaxySystemDefinition system,
+        string savedPlanetId)
+    {
+        if (string.IsNullOrWhiteSpace(savedPlanetId))
+        {
+            return SelectDefaultPlanetId(system);
+        }
+
+        GalaxyPlanetDefinition? savedPlanet = system.Planets.FirstOrDefault(
+            planet => string.Equals(
+                planet.PlanetId,
+                savedPlanetId,
+                StringComparison.Ordinal));
+        if (savedPlanet is null || string.Equals(
+                savedPlanet.Archetype,
+                "gas_giant",
+                StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Saved current planet does not match a landable deterministic planet.");
+        }
+
+        return savedPlanet.PlanetId;
     }
 
     private void ValidateSaveData(GalaxyNavigationSaveData saveData)

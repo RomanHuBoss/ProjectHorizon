@@ -178,4 +178,93 @@ public sealed class WorldGenTests
         Assert.Contains(snapshot.Bodies, body => body.Representation != StarSystemRepresentation.DetailedPlanet);
     }
 
+    [Fact]
+    public void StarterSystem_ProvidesFourDistinctStageTwoPlanets()
+    {
+        GalaxyNavigationRuntime runtime = new(GalaxyNavigationRuntime.DefaultUniverseSeed);
+        GalaxySystemDefinition starter = runtime.CurrentSystem;
+
+        Assert.Equal(GalaxyNavigationRuntime.StarterSystemId, starter.SystemId);
+        Assert.Equal(4, starter.Planets.Count);
+        Assert.Equal(4, starter.Planets.Select(planet => planet.Archetype)
+            .Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(
+            new[] { "temperate", "desert", "frozen", "volcanic" },
+            starter.Planets.Select(planet => planet.Archetype).ToArray());
+    }
+
+    [Fact]
+    public void PlanetEnvironmentProfiles_AreDeterministicBoundedAndBiomeSafe()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new(GalaxyNavigationRuntime.DefaultUniverseSeed);
+
+        foreach (GalaxyPlanetDefinition planet in galaxy.CurrentSystem.Planets)
+        {
+            PlanetEnvironmentProfile first = environment.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType);
+            PlanetEnvironmentProfile second = environment.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType);
+            Assert.Equal(
+                JsonSerializer.Serialize(first),
+                JsonSerializer.Serialize(second));
+            Assert.InRange(first.RadiusKm, 20.0, 80.0);
+            Assert.InRange(first.CloudLayerCount, 0, 2);
+            Assert.InRange(first.ActiveBiomeIds.Count, 1, 8);
+            PlanetEnvironmentSample sample = environment.SampleBiome(
+                first,
+                latitudeDegrees: 42.0,
+                normalizedElevation: 0.35,
+                distanceToWaterKm: 8.0,
+                localNoise: 0.25);
+            Assert.Contains(sample.BiomeId, first.ActiveBiomeIds);
+            Assert.InRange(sample.Moisture, 0.0, 1.0);
+        }
+    }
+
+    [Fact]
+    public void CurrentPlanetSelection_RoundTripsThroughGalaxySave()
+    {
+        GalaxyNavigationRuntime runtime = new(GalaxyNavigationRuntime.DefaultUniverseSeed);
+        GalaxyPlanetDefinition target = runtime.CurrentSystem.Planets[2];
+
+        Assert.True(runtime.TrySelectCurrentPlanet(target.PlanetId, out _));
+        GalaxyNavigationRuntime restored = new(runtime.CreateSaveData());
+
+        Assert.Equal(target.PlanetId, restored.CurrentPlanetId);
+        Assert.Equal(target.Archetype, restored.CurrentPlanet.Archetype);
+    }
+
+    [Fact]
+    public void GasGiantEnvironment_IsNonLandableAndHasNoSurfaceBiomes()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyPlanetDefinition gasGiant = new(
+            "planet.test.gas_giant",
+            "gas_giant",
+            1,
+            0,
+            true,
+            false,
+            8_881_331L);
+        PlanetEnvironmentProfile profile = environment.BuildProfile(
+            gasGiant,
+            GalaxyStarType.YellowStar);
+
+        Assert.False(profile.Landable);
+        Assert.Empty(profile.ActiveBiomeIds);
+        Assert.Throws<InvalidOperationException>(() => environment.SampleBiome(
+            profile,
+            0.0,
+            0.0,
+            0.0,
+            0.0));
+    }
+
 }

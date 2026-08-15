@@ -1336,6 +1336,9 @@
     "ui.world_scene.kind.orbit": "orbit",
     "ui.world_scene.kind.station": "station interior",
     "ui.world_scene.kind.surface": "surface",
-    "ui.world_scene.kind.unknown": "unknown"
+    "ui.world_scene.kind.unknown": "unknown",
+    "ui.galaxy.planet_environment_row": "↳ radius={radius} km • g={gravity} • T={temperature} °C • water={water}% • atmosphere={atmosphere} • clouds={clouds} • biomes={biomes} • landable={landable}",
+    "ui.hud.planet_environment.summary": "Planet environment: {planet} • {archetype} • R={radius} km • g={gravity} • T={temperature} °C • water={water}% • clouds={clouds}",
+    "ui.hud.planet_environment.unavailable": "Planet environment: unavailable"
   }
 }

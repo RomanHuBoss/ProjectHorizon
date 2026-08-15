@@ -2298,6 +2298,11 @@ public sealed partial class SaveDatabase : IDisposable
                 GalaxyNavigationRuntime.PrimaryGalaxyId,
                 StringComparison.Ordinal) ||
             !GameContentCatalog.IsStableId(navigation.CurrentSystemId) ||
+            (!string.IsNullOrEmpty(navigation.CurrentPlanetId) &&
+             (!GameContentCatalog.IsStableId(navigation.CurrentPlanetId) ||
+              !navigation.CurrentPlanetId.StartsWith(
+                  "planet.",
+                  StringComparison.Ordinal))) ||
             (!string.IsNullOrEmpty(navigation.SelectedDestinationSystemId) &&
              !GameContentCatalog.IsStableId(
                  navigation.SelectedDestinationSystemId)) ||

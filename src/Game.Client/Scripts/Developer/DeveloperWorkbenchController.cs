@@ -227,8 +227,20 @@ public partial class DeveloperWorkbenchController : Control
         foreach (Vector3 vertex in face.Vertices)
         { double radius = vertex.Length(); minHeight = Math.Min(minHeight, radius - 96.0); maxHeight = Math.Max(maxHeight, radius - 96.0); }
         double density = DeterministicResourceDensity(planet.Seed);
+        PlanetEnvironmentCatalog environmentCatalog =
+            PlanetEnvironmentCatalog.LoadFromJson(
+                FileAccess.GetFileAsString(
+                    "res://Content/planet_environments.json"));
+        PlanetEnvironmentProfile environment =
+            new PlanetEnvironmentRuntime(environmentCatalog).BuildProfile(
+                planet,
+                _selectedSystem?.StarType ?? GalaxyStarType.YellowStar);
         _report!.Text =
             $"Planet: {planet.PlanetId}\nArchetype: {planet.Archetype}  seed={planet.Seed}\nLOD: {lod}  resolution={build.Resolution}\n" +
+            $"Environment: radius={environment.RadiusKm:F1} km  gravity={environment.SurfaceGravityG:F2} g  " +
+            $"meanT={environment.MeanTemperatureC:F0} C  atmosphere={environment.AtmosphereDensity:F2}\n" +
+            $"Water={environment.WaterCoverage:P0}  clouds={environment.CloudLayerCount}  " +
+            $"biomes={environment.ActiveBiomeIds.Count}  landable={(environment.Landable ? 1 : 0)}\n" +
             $"Vertices: {build.TotalVertices:N0}  triangles={build.TotalTriangles:N0}\nGeneration CPU: {stopwatch.Elapsed.TotalMilliseconds:F2} ms\n" +
             $"Height range: {minHeight:F2} .. {maxHeight:F2} m\nResource-density proxy: {density:P1}\n" +
             $"Overlays: grid={Flag(_showGrid)} biomes={Flag(_showBiomes)} height={Flag(_showHeight)} resources={Flag(_showResources)}\n" +
@@ -460,6 +472,11 @@ public partial class DeveloperWorkbenchController : Control
         DeveloperToolContext.PreviewUniverseSeed = _selectedSeed;
         DeveloperToolContext.PreviewPlanetSeed = planet.Seed;
         DeveloperToolContext.PreviewPlanetId = planet.PlanetId;
+        DeveloperToolContext.PreviewPlanetArchetype = planet.Archetype;
+        DeveloperToolContext.PreviewStarType = _selectedSystem?.StarType ??
+            GalaxyStarType.YellowStar;
+        DeveloperToolContext.PreviewHasAtmosphere = planet.HasAtmosphere;
+        DeveloperToolContext.PreviewHasWater = planet.HasWater;
         DeveloperToolContext.PreviewLod = lod;
         DeveloperToolContext.PreviewChunkGrid = _showGrid?.ButtonPressed ?? true;
         DeveloperToolContext.PreviewBiomes = _showBiomes?.ButtonPressed ?? true;

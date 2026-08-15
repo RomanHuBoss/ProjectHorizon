@@ -151,7 +151,7 @@ public partial class SalvageRepairSlice
 
         _planetMapLabel.Text =
             "PLANET MAP • LOCAL SURFACE REGION\n" +
-            $"Planet: {GalaxyNavigation.CurrentSystem.Planets[0].PlanetId} • " +
+            $"Planet: {GalaxyNavigation.CurrentPlanetId} • " +
             $"Player X/Z: {_player.GlobalPosition.X:0.0}/{_player.GlobalPosition.Z:0.0}\n" +
             "Legend: @ player • ? unknown POI • O discovered • X resolved • * overlap\n" +
             map +

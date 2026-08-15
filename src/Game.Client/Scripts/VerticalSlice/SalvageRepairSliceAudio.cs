@@ -73,7 +73,7 @@ public partial class SalvageRepairSlice
 
         if (_galaxyNavigationRuntime is not null &&
             GalaxyNavigation.CurrentSystem.Planets.Count > 0 &&
-            GalaxyNavigation.CurrentSystem.Planets[0].HasAtmosphere)
+            GalaxyNavigation.CurrentPlanet.HasAtmosphere)
         {
             return GameAudioEnvironment.Atmosphere;
         }

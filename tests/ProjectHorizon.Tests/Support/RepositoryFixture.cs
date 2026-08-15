@@ -25,6 +25,15 @@ internal static class RepositoryFixture
         PlanetaryPoiCatalog.LoadFromJson(ReadContent("planetary_pois.json")));
     private static readonly Lazy<ProceduralQuestCatalog> ProceduralQuestLazy = new(() =>
         ProceduralQuestCatalog.LoadFromJson(ReadContent("procedural_quests.json"), StationServices));
+    private static readonly Lazy<EcologyCatalog> EcologyLazy = new(() =>
+        EcologyCatalog.LoadFromJson(ReadContent("ecology.json"), Content));
+    private static readonly Lazy<PlanetEnvironmentCatalog> PlanetEnvironmentLazy = new(() =>
+    {
+        PlanetEnvironmentCatalog catalog = PlanetEnvironmentCatalog.LoadFromJson(
+            ReadContent("planet_environments.json"));
+        catalog.ValidateBiomeReferences(Ecology);
+        return catalog;
+    });
 
     public static string Root => RootLazy.Value;
     public static GameContentCatalog Content => ContentLazy.Value;
@@ -33,6 +42,8 @@ internal static class RepositoryFixture
     public static BaseConstructionCatalog BaseConstruction => BaseLazy.Value;
     public static PlanetaryPoiCatalog Pois => PoiLazy.Value;
     public static ProceduralQuestCatalog ProceduralQuests => ProceduralQuestLazy.Value;
+    public static EcologyCatalog Ecology => EcologyLazy.Value;
+    public static PlanetEnvironmentCatalog PlanetEnvironments => PlanetEnvironmentLazy.Value;
 
     public static string ReadContent(string fileName) =>
         File.ReadAllText(Path.Combine(Root, "src", "Game.Client", "Content", fileName));

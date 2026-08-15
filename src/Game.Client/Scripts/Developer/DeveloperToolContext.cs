@@ -13,7 +13,11 @@ public static class DeveloperToolContext
     public static bool OpenConsoleOnGameplay { get; set; }
     public static long PreviewUniverseSeed { get; set; } = GalaxyNavigationRuntime.DefaultUniverseSeed;
     public static long PreviewPlanetSeed { get; set; } = 20260801;
-    public static string PreviewPlanetId { get; set; } = GalaxyNavigationRuntime.StarterSystemId + ".p1";
+    public static string PreviewPlanetId { get; set; } = StarterRepairSnapshotFactory.PlanetId;
+    public static string PreviewPlanetArchetype { get; set; } = "temperate";
+    public static GalaxyStarType PreviewStarType { get; set; } = GalaxyStarType.OrangeDwarf;
+    public static bool PreviewHasAtmosphere { get; set; } = true;
+    public static bool PreviewHasWater { get; set; } = true;
     public static int PreviewLod { get; set; } = 1;
     public static bool PreviewChunkGrid { get; set; } = true;
     public static bool PreviewBiomes { get; set; } = true;

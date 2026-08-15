@@ -36,6 +36,7 @@ REQUIRED: dict[str, tuple[str, ...]] = {
     "localization.ru.json": ("schemaVersion", "strings"),
     "npc_factions.json": ("schemaVersion", "worldSeed", "regionKey", "archetypes", "agents", "dialogues"),
     "planetary_pois.json": ("schemaVersion", "worldSeed", "regionKey", "minimumPoiSpacing", "definitions"),
+    "planet_environments.json": ("SchemaVersion", "Archetypes"),
     "player_survival.json": ("schemaVersion", "suitSlotLimit", "multitoolSlotLimit", "baseStats", "suitModules", "multitoolModules", "consumables", "environments"),
     "procedural_quests.json": ("schemaVersion", "worldSeed", "boardSize", "maximumActive", "objectiveTypes"),
     "ships.json": ("schemaVersion", "starterClassId", "classes", "systems", "modules"),

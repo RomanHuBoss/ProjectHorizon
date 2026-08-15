@@ -1336,6 +1336,9 @@
     "ui.world_scene.kind.orbit": "орбита",
     "ui.world_scene.kind.station": "интерьер станции",
     "ui.world_scene.kind.surface": "поверхность",
-    "ui.world_scene.kind.unknown": "неизвестно"
+    "ui.world_scene.kind.unknown": "неизвестно",
+    "ui.galaxy.planet_environment_row": "↳ радиус={radius} км • g={gravity} • T={temperature} °C • вода={water}% • атмосфера={atmosphere} • облака={clouds} • биомы={biomes} • посадка={landable}",
+    "ui.hud.planet_environment.summary": "Окружение планеты: {planet} • {archetype} • R={radius} км • g={gravity} • T={temperature} °C • вода={water}% • облака={clouds}",
+    "ui.hud.planet_environment.unavailable": "Окружение планеты: недоступно"
   }
 }

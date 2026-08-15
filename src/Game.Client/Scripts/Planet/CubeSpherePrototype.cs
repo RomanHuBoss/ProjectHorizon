@@ -333,6 +333,7 @@ public partial class CubeSpherePrototype : Node3D
         }
 
         BuildPlanet();
+        InitializePlanetEnvironmentPresentation();
         InitializeCollisionLod();
         ApplyCameraMode();
         UpdateHud();
@@ -2122,6 +2123,7 @@ public partial class CubeSpherePrototype : Node3D
 
         return
             "ПРОТОТИП C — VERIFIED  •  HUD: компактный  •  H — режим\n" +
+            BuildPlanetEnvironmentPrototypeHudLine() + "\n" +
             $"Visual {_patches.Count}/{_targetResidentLeaves.Count}/" +
             $"{_logicalLeaves.Count}  •  L1/L2/L3=" +
             $"{_lodLevelBasePatchCount}/{_lodLevelMidPatchCount}/" +
@@ -2159,6 +2161,7 @@ public partial class CubeSpherePrototype : Node3D
         return
             "ПРОТОТИП C — ASYNC VISUAL + COLLISION LOD\n" +
             "HUD: подробный  •  H — компактный/скрытый  •  колесо мыши — прокрутка\n" +
+            BuildPlanetEnvironmentPrototypeHudLine() + "\n" +
             $"Applied/resident/logical: {_patches.Count}/" +
             $"{_targetResidentLeaves.Count}/{_logicalLeaves.Count}  •  " +
             $"L{GetBaseLevel()}: {_lodLevelBasePatchCount}/{_logicalBasePatchCount}  •  " +

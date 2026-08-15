@@ -218,7 +218,8 @@ public sealed record GalaxyNavigationSaveData(
     int SelectedSectorZ,
     int JumpCount,
     double TotalDistanceLightYears,
-    IReadOnlyList<string> VisitedSystemIds);
+    IReadOnlyList<string> VisitedSystemIds,
+    string CurrentPlanetId = "");
 
 public sealed record EcologySaveData(
     long WorldSeed,

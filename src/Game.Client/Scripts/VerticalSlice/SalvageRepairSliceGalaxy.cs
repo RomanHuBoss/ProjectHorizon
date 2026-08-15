@@ -275,12 +275,14 @@ public partial class SalvageRepairSlice
             string planets = string.Join("\n", current.Planets.Select((planet, index) =>
             {
                 string marker = index == _galaxyMapSelection ? ">" : " ";
-                return $"{marker} " + LF("ui.galaxy.planet_row",
+                string header = $"{marker} " + LF("ui.galaxy.planet_row",
                     ("index", planet.OrbitIndex.ToString("00", CultureInfo.InvariantCulture)),
                     ("archetype", LocalizeGalaxyPlanetArchetype(planet.Archetype)),
                     ("moons", planet.MoonCount),
                     ("atmosphere", planet.HasAtmosphere ? 1 : 0),
                     ("water", planet.HasWater ? 1 : 0));
+                return header + "\n  " +
+                    BuildPlanetEnvironmentMapDetail(planet, current.StarType);
             }));
             _galaxyMapLabel.Text = string.Join("\n", new[]
             {

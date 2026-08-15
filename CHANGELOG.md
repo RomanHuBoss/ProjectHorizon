@@ -11,6 +11,22 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.150] - 2026-08-15
+
+### Added
+
+- Added `planet_environments.json`, a strict nine-archetype planet-environment catalog covering temperate, desert, frozen, volcanic, toxic, radioactive, barren, oceanic and non-landable gas-giant worlds.
+- Added deterministic `PlanetEnvironmentRuntime` climate/biome sampling plus TASK-150 acceptance and four xUnit regressions for the four-planet starter system, deterministic bounded profiles, current-planet persistence and gas-giant landing rules.
+- Added stylized spherical water, simplified atmosphere and one/two-layer scrolling cloud shaders to Planet Preview, without physical fluid simulation or volumetric ray marching.
+- Added TASK-150 static contract validation to Windows/Linux section-37 quality gates and a dedicated `docs/PLANET_ENVIRONMENT.md` subsystem note.
+
+### Changed
+
+- Expanded the starter system from one procedural planet to four stable landable planets with distinct archetypes (`temperate`, `desert`, `frozen`, `volcanic`) while preserving the original starter planet ID as planet 1.
+- Galaxy navigation now carries a backward-compatible `CurrentPlanetId`, validates selected planets against deterministic system generation and persists/restores the active landable planet without a SQLite schema bump.
+- System map, gameplay HUD and Developer Planet Preview now expose deterministic radius, gravity, temperature, water, atmosphere, cloud and biome information for the selected/current planet.
+- Accepted TASK-149 and its runtime-regression closure by explicit product-owner waiver; exact missing build/manual metrics are not reconstructed.
+
 ## [0.1.0-alpha.149] - 2026-08-15
 
 ### Changed

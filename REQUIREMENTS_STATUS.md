@@ -2,13 +2,65 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task149-runtime-regression-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task150-multi-planet-environments.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — TASK-149 transactional World Scene Coordinator acceptance
+## 0. Текущая mega-итерация 2026-08-15 — TASK-150 Multi-Planet Environment subsystem
+
+### Синхронизация принятой TASK-149 / technical acceptance tail
+
+Владелец продукта после передачи `ProjectHorizon-main-task149-runtime-regression-hotfix.zip` прямо указал: **«будем считать, что всё работает»** и потребовал перейти к следующей итерации. По правилам `DEVELOPMENT_ITERATION_PROTOCOL.md` это фиксируется как explicit **product-owner acceptance waiver** для оставшегося acceptance-tail предыдущего технического блока. Уже полученные фактические показатели не заменяются выдуманными: реальный TASK-148 F5 остаётся доказан строкой `livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; sceneLoadFailures=0; rollbacks=0`; отсутствующие exact clean-build/manual/Compatibility метрики задним числом не реконструируются.
+
+Статусы синхронизированы перед выбором новой функции:
+
+- `TASK-148`: `IMPLEMENTED → VERIFIED`;
+- `TASK-149`: `IN_PROGRESS → VERIFIED`;
+- `WORLD-100..109`: `IMPLEMENTED → VERIFIED`;
+- `WORLD-ACC-100/101/103`: `IN_PROGRESS → VERIFIED` по explicit product-owner acceptance waiver; `WORLD-ACC-102` уже был `VERIFIED` по фактическому F5 output;
+- `TASK-142/TASK-144`: `IMPLEMENTED → VERIFIED`, `TASK-143/TASK-145`: `IN_PROGRESS → VERIFIED` по тому же waiver, закрывающему оставшийся architecture/renderer acceptance-tail; точные отсутствующие Compatibility/build строки не приписываются;
+- связанные `ARCH-001..003`, `CFG-001..004`, `CFG-006`, `CFG-009..015` переводятся в `VERIFIED` как принятая техническая foundation;
+- `TASK-006` остаётся `BLOCKED`: в доступном снимке нет `.git`, поэтому SHA фактического GitHub commit установить нельзя.
+
+### TASK-150 — mega-итерация: Multi-Planet Environment / Stage 2 planetary foundation
+
+**Исходный снимок:** `ProjectHorizon-main-task149-runtime-regression-hotfix.zip` — newest code revision, доступная в file surface текущего рабочего пространства. Отдельный новый пользовательский GitHub ZIP после команды на TASK-150 в доступном file surface не появился, поэтому регламентно сохранена последняя фактически доступная кодовая база, чтобы не потерять принятые TASK-149.4 исправления.  
+**Подготовленный снимок:** `ProjectHorizon-main-task150-multi-planet-environments.zip`.  
+**Версия:** `0.1.0-alpha.150`.  
+**Связанные требования PDF-ТЗ v2.0:** §3.3 — девять типов планет; §9.1–9.3 — cube sphere, радиусы `20–80 км`, quadtree LOD; §9.5 — biome selection по latitude/elevation/temperature/moisture/atmosphere/distance-to-water/local-noise/planet params, максимум восемь активных биомов; §9.6 — сферическая вода фиксированного уровня без физической симуляции жидкости; §9.7 — упрощённая атмосферная оболочка без дорогого ray marching на слабом профиле; §9.8 — `0–2` облачных shell layers; Stage 2 — `3–5` планет, разные биомы, вода и атмосфера; §34.2 — Planet Preview.
+
+**Почему это mega-итерация:** после принятия Stage 1/world-scene foundation ближайшая крупная функциональная граница ТЗ — не отдельный «ещё один planet mesh», а связанная Stage 2 подсистема **planet identity → deterministic environment → biome policy → water/atmosphere/cloud presentation → map/preview → persistence**. Реализовать эти части отдельно означало бы несколько итераций с временно несогласованными planet definitions. TASK-150 закрывает их единым data-driven contract.
+
+**Реализовано:**
+
+- новый строгий `Content/planet_environments.json` с ровно девятью archetypes: `temperate/desert/frozen/volcanic/toxic/radioactive/barren/oceanic/gas_giant`;
+- `PlanetEnvironmentCatalog` валидирует schema, radius/gravity/climate ranges, `0–2` cloud layers, colors, landability и `1–8` ecology biome references для каждой landable планеты; gas giant обязан быть non-landable и не иметь surface biomes;
+- `GalaxyNavigationRuntime` сохраняет общий procedural rule `1–8 planets` для остальных systems, но starter system теперь детерминированно имеет четыре landable планеты разных archetypes: temperate/desert/frozen/volcanic; исходный `StarterRepairSnapshotFactory.PlanetId` сохранён как planet 1;
+- `PlanetEnvironmentRuntime` без global sequential RNG выводит radius, gravity, mean temperature, atmosphere density, water coverage, cloud count/density и risk/color parameters из planet seed + archetype + star type;
+- biome sampler учитывает latitude, normalized elevation, distance to water, local noise, climate/moisture и выбирает только из catalog-approved ecology biomes;
+- `GalaxyNavigationSaveData` получил backward-compatible optional `CurrentPlanetId`; current planet валидируется против deterministic current system, gas giant не может стать current landable planet, legacy save без поля выбирает первую landable планету; SQLite schema не повышается;
+- system map и gameplay HUD показывают environment detail текущей/перечисленных планет;
+- Developer Planet Preview использует тот же environment runtime и добавляет spherical water shell, simplified atmosphere shell и `0–2` scrolling cloud shells через три bounded Godot shaders;
+- вода не моделируется физически, atmosphere не использует volumetric/multi-scattering ray marching; существующий cube-sphere terrain/LOD не заменён;
+- F5 acceptance matrix расширена `TASK-150 planet environment acceptance` с exact `4/4 starter planets`, `4/4 starter archetypes`, `9/9 catalog archetypes`, deterministic/radius/biome/water/atmosphere/cloud/gas-giant/current-planet invariants и `samples=16`;
+- добавлены четыре xUnit regression tests и `validate-task150-planet-environment.py`; validator включён в Windows/Linux section-37 local quality gates;
+- добавлен `docs/PLANET_ENVIRONMENT.md`, обновлены README/CHANGELOG/локализация RU/EN и этот журнал.
+
+**Добавленные файлы:** `docs/PLANET_ENVIRONMENT.md`; `Content/planet_environments.json`; `PlanetEnvironmentCatalog.cs`; `PlanetEnvironmentRuntime.cs`; `PlanetEnvironmentAcceptance.cs`; `SalvageRepairSlicePlanetEnvironment.cs`; `CubeSpherePrototypeEnvironment.cs`; три `Shaders/planet_*_shell.gdshader`; `tools/validate-task150-planet-environment.py`.
+
+**Изменённые файлы:** `VERSION`, `CHANGELOG.md`, `README.md`, `REQUIREMENTS_STATUS.md`; `localization.en.json`, `localization.ru.json`; `DeveloperToolContext.cs`, `DeveloperWorkbenchController.cs`; `SaveDatabase.cs`, `SaveGameModels.cs`; `CubeSpherePrototype.cs`; `GalaxyNavigationRuntime.cs`, `SalvageRepairSlice.cs`, `SalvageRepairSliceAudio.cs`, `SalvageRepairSliceGalaxy.cs`, `SalvageRepairSlicePlanetMap.cs`, `SalvageRepairSlicePlayerSurvival.cs`, `StarterRepairDomain.cs`; `RepositoryFixture.cs`, `WorldGenTests.cs`; `run-section37-quality.cmd/.sh`, `validate-json-content.py`; `validate-task148-world-scene-coordinator.py` (version guard made forward-compatible with alpha.149+ so later releases do not falsely fail the already closed TASK-148 contract).
+
+**Сознательная граница TASK-150:** это environment generation/presentation foundation, а не полный межпланетный flight loop. Игрок не получает мгновенный teleport UI между четырьмя планетами. Физический выбор цели, перелёт Orbit→другая PlanetRuntime и transactional world-shell handoff должны быть отдельной `TASK-152` после runtime-приёмки TASK-150.
+
+**Статическая проверка в среде подготовки:** repository validators PASS, в том числе JSON/localization, Godot text-resource structure, audio/developer diagnostics, §36/§37/§38 contracts, TASK-146/TASK-148/TASK-149.4 regression gates и новый `TASK-150 PLANET ENVIRONMENT CONTRACT PASS: starterPlanets=4/4; archetypes=9/9; radius=20-80km; biomes=max8; water=1; atmosphere=1; clouds=0-2; climateFactors=1; persistence=1; systemMap=1; planetPreview=1; currentPlanetConsumers=1; persistenceBoundary=1; starDirection=1; shaders=3/3; f5=1; xunit=4/4.`
+
+**Ограничение среды:** `dotnet`, Godot и C# compiler в среде подготовки отсутствуют; реальная compilation/xUnit/Godot runtime здесь не заявляются. `TASK-150` поэтому имеет статус `IMPLEMENTED`, а `TASK-151` — `IN_PROGRESS` как приёмочная задача.
+
+**Минимальная runtime-приёмка TASK-151:** clean build `0 warnings / 0 errors`; local quality green; в gameplay один `F5` должен вывести TASK-150 `PASS` со всеми перечисленными invariants и `samples=16`; `M` должен показать четыре starter planets с различными environment rows; Developer Tools → Planet Preview должен визуально показать atmosphere/clouds и воду у water-bearing preview planet без parse/runtime errors; перезапуск после сохранения должен восстановить тот же `CurrentPlanetId` в `TASK-150 ... READY/HUD`.
+
+## 0A. История предыдущей mega-итерации — TASK-149 transactional World Scene Coordinator acceptance
 
 ### TASK-149 — mega-итерация: transactional world-scene acceptance hardening
 
@@ -4400,25 +4452,25 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Раздел ТЗ | Требование | Статус | Доказательство / замечание | Следующее действие |
 |---|---:|---|---|---|---|
-| `ARCH-001` | 4.1 | Многослойная архитектура | `IMPLEMENTED` | TASK-144: compiled `Game.Domain <- Game.Application <- Game.Client`; xUnit + static no-reverse-dependency gates | TASK-145 clean build/F5 |
-| `ARCH-002` | 4.1 | Доменная логика не зависит от `Godot.Node` | `IMPLEMENTED` | TASK-142 gate: runtime/catalog/domain classes и typed event contracts не используют `Godot.Node` как модель; event bus Godot-independent | TASK-143 runtime/quality gate |
-| `ARCH-003` | 4.2 | Godot-клиент в `src/Game.Client` | `IMPLEMENTED` | Структура соответствует ТЗ | Подтвердить сборкой из чистого клона |
+| `ARCH-001` | 4.1 | Многослойная архитектура | `VERIFIED` | TASK-144 compiled boundaries + static/xUnit contract; remaining runtime tail accepted by product-owner waiver 2026-08-15 | Maintain regression gates |
+| `ARCH-002` | 4.1 | Доменная логика не зависит от `Godot.Node` | `VERIFIED` | TASK-142 static/event-bus contract; runtime tail accepted by product-owner waiver 2026-08-15 | Maintain source gate |
+| `ARCH-003` | 4.2 | Godot-клиент в `src/Game.Client` | `VERIFIED` | Repository layout + accepted technical foundation | Maintain source layout |
 | `ARCH-006` | 4.3 | Клиент содержит сцены, камеры, управление и адаптеры взаимодействия | `IMPLEMENTED` | `DebugWorld`, `TerrainChunkPrototype`, `CubeSpherePrototype`, `PlanetaryPlayer`, управление, взаимодействие и бой | Довести Прототип A до приёмки |
-| `CFG-001` | 1.2 | Основной renderer — Mobile | `IMPLEMENTED` | `renderer/rendering_method="mobile"` | Подтвердить запуском |
-| `CFG-002` | 1.2 | Основной графический API — Vulkan | `IMPLEMENTED` | В `project.godot` явно задано `rendering_device/driver.windows="vulkan"` | Подтвердить фактический драйвер выводом `RenderingServer` при запуске |
-| `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `IMPLEMENTED` | TASK-144: Windows/Linux Compatibility presets, custom feature override, OpenGL 3 driver, CI/release artifacts | TASK-145 Compatibility runtime/export smoke |
-| `CFG-004` | 38 | Nullable включён | `IMPLEMENTED` | `<Nullable>enable</Nullable>` присутствует | Пересобрать без предупреждений |
+| `CFG-001` | 1.2 | Основной renderer — Mobile | `VERIFIED` | project.godot + TASK-144 primary runtime evidence; technical tail accepted 2026-08-15 | Maintain renderer gate |
+| `CFG-002` | 1.2 | Основной графический API — Vulkan | `VERIFIED` | project.godot + фактический Forward Mobile/Vulkan runtime evidence | Maintain renderer gate |
+| `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `VERIFIED` | TASK-144 presets/static contract; omitted Compatibility smoke accepted by explicit product-owner waiver 2026-08-15 | Maintain Compatibility export gate |
+| `CFG-004` | 38 | Nullable включён | `VERIFIED` | `<Nullable>enable</Nullable>` + section-38 gate; technical tail accepted 2026-08-15 | Maintain 0-warning policy |
 | `CFG-005` | 38 | Предупреждения контролируются | `VERIFIED` | TASK-140 warnings-as-errors implementation; TASK-141 принят владельцем продукта | Сохранять 0-warning CI policy |
-| `CFG-006` | 38 | Нет циклических зависимостей | `IMPLEMENTED` | TASK-144: три production projects, one-way `Domain <- Application <- Client`; static graph gate `projectCycles=0` + xUnit assembly gate | TASK-145 clean build |
+| `CFG-006` | 38 | Нет циклических зависимостей | `VERIFIED` | TASK-144 one-way project graph + `projectCycles=0`; accepted technical foundation | Maintain graph gate |
 | `CFG-007` | 38 | Генерация мира не выполняется в `_Process` | `IMPLEMENTED` | `_PhysicsProcess` только обнаруживает переход; worker-задачи считают данные, timer дозированно применяет готовые mesh/collision в main thread | Подтвердить профилированием |
 | `CFG-008` | 37.1 | Хранить import-настройки, исключая `.godot/` | `IMPLEMENTED` | `icon.svg.import` хранится, `.godot/` исключена | Не игнорировать глобально `*.import` |
-| `CFG-009` | 38.1 | Частоты systems 60/60/10/2 Hz, background economy 0.2–1 Hz | `IMPLEMENTED` | `SystemFrequencyPolicy`; explicit Godot 60 Hz; NPC/fauna throttling; TASK-142 gate | TASK-143 runtime smoke |
-| `CFG-010` | 38.2 | Typed domain event bus и 11 нормативных событий | `IMPLEMENTED` | `IDomainEventBus`, `DomainEventBus`, exact 11 records; gameplay integrations + F5 probe | TASK-143 F5 exact 11/11 |
-| `CFG-011` | 38 | Async operations принимают `CancellationToken` | `IMPLEMENTED` | TASK-142 audit охватывает public/private/protected/internal production Task/ValueTask; missing=0 | Поддерживать source gate |
-| `CFG-012` | 38 | SQLite только parameterized persistence boundary, без SQL в scenes | `IMPLEMENTED` | TASK-142 source gate: SQL только Persistence/Developer inspector; `.tscn` SQL=0 | Поддерживать source gate |
-| `CFG-013` | 38 | Public interfaces документированы | `IMPLEMENTED` | XML `<summary>` contract для всех 5 public interfaces | Поддерживать source gate |
-| `CFG-014` | 38 | Exceptions не подавляются | `IMPLEMENTED` | Empty catch scan=0; cancellation фильтруется явно | TASK-143 xUnit/quality |
-| `CFG-015` | 38 | Godot Node не domain model; UI не содержит item business mutations | `IMPLEMENTED` | TASK-142 node/UI/domain separation gates | TASK-143 quality + runtime |
+| `CFG-009` | 38.1 | Частоты systems 60/60/10/2 Hz, background economy 0.2–1 Hz | `VERIFIED` | `SystemFrequencyPolicy`; TASK-149.4 boundary fix; runtime tail accepted 2026-08-15 | Maintain frequency regression tests |
+| `CFG-010` | 38.2 | Typed domain event bus и 11 нормативных событий | `VERIFIED` | exact 11 typed events + F5 probe; technical tail accepted 2026-08-15 | Maintain exact 11/11 gate |
+| `CFG-011` | 38 | Async operations принимают `CancellationToken` | `VERIFIED` | TASK-142 audit охватывает public/private/protected/internal production Task/ValueTask; missing=0 | Поддерживать source gate |
+| `CFG-012` | 38 | SQLite только parameterized persistence boundary, без SQL в scenes | `VERIFIED` | TASK-142 source gate: SQL только Persistence/Developer inspector; `.tscn` SQL=0 | Поддерживать source gate |
+| `CFG-013` | 38 | Public interfaces документированы | `VERIFIED` | XML `<summary>` contract для всех 5 public interfaces | Поддерживать source gate |
+| `CFG-014` | 38 | Exceptions не подавляются | `VERIFIED` | Empty catch scan=0; cancellation фильтруется явно | Maintain source gate |
+| `CFG-015` | 38 | Godot Node не domain model; UI не содержит item business mutations | `VERIFIED` | TASK-142 node/UI/domain separation gates; accepted technical foundation | Maintain separation gates |
 
 ---
 
@@ -5148,20 +5200,42 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `WORLD-100` | Четыре явных world contexts Surface/Orbit/StationInterior/HyperspaceTransit | `IMPLEMENTED` | `WorldSceneKind`; application runtime |
-| `WORLD-101` | Разрешён только связный transition graph без произвольных телепортов | `IMPLEMENTED` | `WorldSceneCoordinatorRuntime.IsAllowedTransition`; rejected counter |
-| `WORLD-102` | System/planet могут смениться только на завершении hyperspace | `IMPLEMENTED` | same-system/same-planet guards; Hyper→Station destination edge |
-| `WORLD-103` | Одновременно активен ровно один PackedScene context shell | `IMPLEMENTED` | `WorldSceneCoordinatorNode`; `HostChildren==1`; four shell scenes |
-| `WORLD-104` | Surface/Orbit heavy runtime управляется bounded residency policy | `IMPLEMENTED` | surface suspension from TASK-128 + orbit save/suspend/restore |
-| `WORLD-105` | StationInterior и HyperspaceTransit не держат Surface/Orbit runtime | `IMPLEMENTED` | both residency flags false; collision/process/visibility suspended |
-| `WORLD-106` | Star-system proxies видимы только в Orbit | `IMPLEMENTED` | `renderSystemProxies` gated by current world kind |
-| `WORLD-107` | Hyperspace scene transition транзакционен с galaxy jump | `IMPLEMENTED` | begin transit; success destination completion; failed-jump rollback |
-| `WORLD-108` | Scene state не дублирует persistence location | `IMPLEMENTED` | context derived from existing voyage+galaxy; no `world_scene` save key/schema bump |
-| `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `IMPLEMENTED` | RU/EN world-scene HUD + TASK-148 acceptance |
-| `WORLD-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-149: выполнить three-layer clean build |
-| `WORLD-ACC-101` | Local/CI quality и xUnit green | `IN_PROGRESS` | Все Python quality gates green; TASK-148 validator требует xunit=4/4, но фактический `dotnet test` недоступен в среде подготовки |
+| `WORLD-100` | Четыре явных world contexts Surface/Orbit/StationInterior/HyperspaceTransit | `VERIFIED` | `WorldSceneKind`; application runtime |
+| `WORLD-101` | Разрешён только связный transition graph без произвольных телепортов | `VERIFIED` | `WorldSceneCoordinatorRuntime.IsAllowedTransition`; rejected counter |
+| `WORLD-102` | System/planet могут смениться только на завершении hyperspace | `VERIFIED` | same-system/same-planet guards; Hyper→Station destination edge |
+| `WORLD-103` | Одновременно активен ровно один PackedScene context shell | `VERIFIED` | `WorldSceneCoordinatorNode`; `HostChildren==1`; four shell scenes |
+| `WORLD-104` | Surface/Orbit heavy runtime управляется bounded residency policy | `VERIFIED` | surface suspension from TASK-128 + orbit save/suspend/restore |
+| `WORLD-105` | StationInterior и HyperspaceTransit не держат Surface/Orbit runtime | `VERIFIED` | both residency flags false; collision/process/visibility suspended |
+| `WORLD-106` | Star-system proxies видимы только в Orbit | `VERIFIED` | `renderSystemProxies` gated by current world kind |
+| `WORLD-107` | Hyperspace scene transition транзакционен с galaxy jump | `VERIFIED` | begin transit; success destination completion; failed-jump rollback |
+| `WORLD-108` | Scene state не дублирует persistence location | `VERIFIED` | context derived from existing voyage+galaxy; no `world_scene` save key/schema bump |
+| `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `VERIFIED` | RU/EN world-scene HUD + TASK-148 acceptance |
+| `WORLD-ACC-100` | Clean build `0/0` | `VERIFIED` | Explicit product-owner acceptance waiver 2026-08-15; exact omitted build line is not reconstructed |
+| `WORLD-ACC-101` | Local/CI quality и xUnit green | `VERIFIED` | Explicit product-owner acceptance waiver 2026-08-15; static quality is green, omitted exact xUnit output is not reconstructed |
 | `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `VERIFIED` | 2026-08-15 runtime: livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; sceneLoadFailures=0; rollbacks=0 |
-| `WORLD-ACC-103` | Manual Surface→Orbit→Station→Hyper→Station→Orbit→Surface + cold restore | `IN_PROGRESS` | Выполнить TASK-149 runtime smoke |
+| `WORLD-ACC-103` | Manual Surface→Orbit→Station→Hyper→Station→Orbit→Surface + cold restore | `VERIFIED` | Explicit product-owner acceptance waiver 2026-08-15; omitted manual metrics are not reconstructed |
+
+### 8.24. Multi-Planet Environment / Stage 2 planetary foundation
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `ENV-100` | Каталог содержит ровно 9 нормативных archetypes | `IMPLEMENTED` | `planet_environments.json`; TASK-150 static gate `archetypes=9/9` |
+| `ENV-101` | Starter system содержит 3–5 планет; TASK-150 baseline — 4 разных landable archetypes | `IMPLEMENTED` | `StarterPlanetArchetypes`; `starterPlanets=4/4`, `starterArchetypes=4/4` static contract |
+| `ENV-102` | Radius каждой планеты детерминирован и лежит в 20–80 км | `IMPLEMENTED` | `PlanetEnvironmentRuntime`; static range validation |
+| `ENV-103` | Landable planet имеет 1–8 active biomes и climate-factor selection | `IMPLEMENTED` | ecology cross-reference + latitude/elevation/water/noise sampler |
+| `ENV-104` | Water — spherical fixed-level presentation без fluid simulation | `IMPLEMENTED` | `planet_water_shell.gdshader`; no fluid solver |
+| `ENV-105` | Atmosphere — simplified spherical shell | `IMPLEMENTED` | `planet_atmosphere_shell.gdshader`; density/horizon/sunset parameters |
+| `ENV-106` | Clouds — 0–2 scrolling shell layers | `IMPLEMENTED` | `planet_cloud_shell.gdshader`; catalog bounds 0..2 |
+| `ENV-107` | Gas giant non-landable и не имеет surface biome set | `IMPLEMENTED` | catalog validation + runtime + xUnit contract |
+| `ENV-108` | Environment отражён в System Map и gameplay HUD | `IMPLEMENTED` | localized map row + HUD summary |
+| `ENV-109` | Developer Planet Preview визуализирует environment profile | `IMPLEMENTED` | cube-sphere preview + water/atmosphere/cloud shells |
+| `ENV-110` | Current planet сохраняется backward-compatible без SQLite schema bump | `IMPLEMENTED` | optional `GalaxyNavigationSaveData.CurrentPlanetId`; legacy fallback |
+| `ENV-111` | Environment детерминирован от stable planet seed, без global sequential RNG | `IMPLEMENTED` | stable hash/mix; repeated-profile acceptance |
+| `ENV-112` | Existing cube-sphere/quadtree terrain остаётся source geometry | `IMPLEMENTED` | presentation shells layered over `CubeSpherePrototype`; terrain pipeline unchanged |
+| `ENV-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | выполнить TASK-151 на Windows/Godot .NET |
+| `ENV-ACC-101` | Section-37 quality + xUnit environment tests green | `IN_PROGRESS` | static gates PASS; actual `dotnet test` unavailable in preparation environment |
+| `ENV-ACC-102` | F5 выдаёт TASK-150 PASS с exact 4/4, 9/9 и samples=16 | `IN_PROGRESS` | выполнить TASK-151 runtime acceptance |
+| `ENV-ACC-103` | Manual System Map + Planet Preview + cold current-planet restore | `IN_PROGRESS` | выполнить visual/manual smoke TASK-151 |
 
 ## 9. Очередь ближайших задач
 
@@ -5169,13 +5243,14 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-149` | Runtime acceptance World Scene Coordinator | Clean build `0/0`; xUnit; F5 livePath=7/stateRestored=1; manual Surface/Orbit/Station/Hyperspace/cold-restore smoke |
-| 2 | `TASK-143/TASK-145` | Закрыть отдельные architecture/renderer runtime evidence | F5 assembly evidence + primary/Compatibility renderer evidence |
-| 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-151` | Runtime acceptance Multi-Planet Environment | Clean build `0/0`; xUnit/quality; F5 TASK-150 `PASS`; System Map/Planet Preview/cold-restore smoke |
+| 2 | `TASK-152` | Stage 2 interplanetary travel / active-planet handoff | Player-selected orbital target, deterministic travel, Orbit→Planet world-shell transition, landing on another starter planet |
+| 3 | `TASK-153` | Stage 2 multi-planet content expansion | Water/atmosphere/ecology/exploration variation across the 4-planet starter system after travel is real |
+| 4 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Принято владельцем продукта:** TASK-146/TASK-147 и core Base Construction.  
-**Текущая реализация:** TASK-148 World Scene Coordinator + TASK-149 transactional acceptance hardening.  
-**Текущая приёмочная задача:** TASK-149.
+**Принято владельцем продукта:** TASK-149 World Scene Coordinator/runtime-regression closure и оставшийся TASK-143/TASK-145 technical acceptance-tail.  
+**Текущая реализация:** TASK-150 Multi-Planet Environment.  
+**Текущая приёмочная задача:** TASK-151.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
