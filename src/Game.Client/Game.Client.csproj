@@ -12,4 +12,42 @@
     <ProjectReference Include="../Game.Domain/Game.Domain.csproj" />
     <ProjectReference Include="../Game.Application/Game.Application.csproj" />
   </ItemGroup>
+  <!--
+    TASK-146 migration guard: these types moved to Game.Domain/Game.Application in TASK-144.
+    Excluding the historical paths keeps overlay upgrades from compiling stale copies left
+    behind by an older checkout/extraction and prevents CS0436 type-shadowing regressions.
+  -->
+  <ItemGroup>
+    <Compile Remove="Scripts/Infrastructure/Architecture/**/*.cs" />
+    <Compile Remove="Scripts/Infrastructure/ProjectHorizonGenerator.cs" />
+  </ItemGroup>
+
+  <!--
+    Source hygiene policy:
+    * build may delete only exact, retired TASK-144 source artifacts whose canonical
+      implementations now live in Game.Domain/Game.Application;
+    * arbitrary/unknown files are never deleted automatically;
+    * any other .cs left in the retired Architecture folder fails the build instead
+      of risking destructive cleanup.
+  -->
+  <ItemGroup>
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/DomainEvents.cs" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/DomainEvents.cs.uid" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/SystemFrequencyPolicy.cs" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/SystemFrequencyPolicy.cs.uid" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/DomainEventBus.cs" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/Architecture/DomainEventBus.cs.uid" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/ProjectHorizonGenerator.cs" />
+    <Task144LegacyArtifact Include="Scripts/Infrastructure/ProjectHorizonGenerator.cs.uid" />
+  </ItemGroup>
+
+  <Target Name="ProjectHorizonSourceHygiene" BeforeTargets="CoreCompile">
+    <Delete Files="@(Task144LegacyArtifact)" TreatErrorsAsWarnings="false" />
+    <ItemGroup>
+      <UnexpectedRetiredArchitectureSource Include="Scripts/Infrastructure/Architecture/**/*.cs" />
+    </ItemGroup>
+    <Error
+      Condition="'@(UnexpectedRetiredArchitectureSource)' != ''"
+      Text="Project Horizon source hygiene blocked the build: unexpected C# source remains in retired Scripts/Infrastructure/Architecture. Remove or deliberately migrate it; automatic cleanup never deletes unknown source files. Files: @(UnexpectedRetiredArchitectureSource, ', ')" />
+  </Target>
 </Project>

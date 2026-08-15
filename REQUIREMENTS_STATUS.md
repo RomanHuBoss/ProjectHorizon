@@ -2,13 +2,56 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task144-platform-architecture-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task146-base-construction-build-closure-hotfix1.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Layered Architecture + Compatibility Renderer / platform foundation closure
+## 0. Текущая mega-итерация 2026-08-15 — Base Construction subsystem closure + Windows build recovery
+
+### TASK-146 — mega-итерация: Base Construction closure + TASK-144 Windows build recovery
+
+**Исходный снимок:** `ProjectHorizon-main-task144-platform-architecture-closure.zip`.  
+**Связанные требования:** `BASE-100..BASE-113`, `BASE-ACC-100..103`, `ARCH-001`, `CFG-005/006`, TASK-143/145 build acceptance.
+
+**Фактический внешний build evidence от 2026-08-15 14:20:** реальный Godot/.NET Windows build TASK-144 завершился `148 warnings / 16 errors`. Основная масса `CS0436` вызвана stale pre-TASK-144 source copies, оставшимися при overlay extraction; дополнительно подтверждены intrinsic compile errors: `GameSettingsPanel.cs` delegate conversion, `StructuredGameLogger.cs` `System.Environment` ambiguity, `StageOneVoyageRuntime.cs` missing `CultureInfo`, плюс независимый nullable warning в ecology. Поэтому TASK-145 не переводится в VERIFIED до повторного clean build.
+
+**Повторный внешний build evidence от 2026-08-15 14:35:** после TASK-146 type-shadowing и прежние compile defects устранены фактически: `CS0436` отсутствует, предупреждений `0`, прежние 16 ошибок отсутствуют. Сборка остановилась на `2 errors CS1061` в `SalvageRepairSlice.cs`: closure-вывод ошибочно обращался к `MalformedSaveRejected` у `PlanetaryExplorationAcceptanceReport` и `StationServicesAcceptanceReport`. Hotfix1 удаляет только эти две чужие ссылки, оставляя property в `BaseConstructionAcceptanceReport`, и добавляет static report-scope guard. TASK-147 остаётся `IN_PROGRESS` до следующего реального `0 warnings / 0 errors` build.
+
+**Что исправлено и закрыто одной подсистемной итерацией:**
+
+- `Game.Client.csproj` жёстко исключает legacy `Scripts/Infrastructure/Architecture/**/*.cs` и старый `ProjectHorizonGenerator.cs`, поэтому stale overlay больше не создаёт type shadowing даже до физической очистки;
+- build-time `ProjectHorizonSourceHygiene` автоматически удаляет только восемь точно известных TASK-144 legacy artifacts; неизвестные `.cs` никогда не удаляются автоматически — наличие исходника в retired architecture path останавливает сборку с диагностикой;
+- `tools\clean-build-windows10.cmd` удаляет legacy source copies и build outputs `Game.Domain`, `Game.Application`, `Game.Client`, гарантируя реальный `CoreCompile` всех трёх production layers;
+- устранены все 16 ошибок из присланного build log: Godot Toggled delegate адаптирован lambda-wrapper, `System.Environment` квалифицирован, `CultureInfo` импортирован; ecology использует nullable-safe local player capture;
+- base builder больше не дублирует placement rules: новый `BaseConstructionRuntime.EvaluatePlacement()` является единым non-mutating preflight, а `TryPlace()` и green/red preview используют его; сюда входят anchor, stock, overlap, cardinal snap и limits;
+- disabled battery больше не входит в доступную network capacity; toggle немедленно пересчитывает capacity/power snapshot;
+- restore отклоняет non-finite stored energy и energy выше enabled battery capacity вместо silent normalization повреждённого state;
+- F6 acceptance расширена `preflightParity`, `batteryIsolation`, `malformedSaveRejected`, сохраняя прежние 50 modules/17 categories, 500-module stress, connectivity, persistence, round-trip и legacy fallback;
+- добавлены 4 xUnit regression tests и статический `tools/validate-task146-base-construction-closure.py`, включённый в Windows/Linux quality scripts;
+- runtime при успешном F6 дополнительно печатает `TASK-146 base construction closure PASS`.
+
+**Статическая приёмка:**
+
+```text
+TASK-146 BASE CONSTRUCTION CLOSURE CONTRACT PASS: buildFixes=4/4; legacyShadowGuard=1; sourceHygiene=1; cleanThreeLayers=1; preflightParity=1; batteryIsolation=1; malformedSaveRejection=1; reportScopeGuard=1; xunit=4/4; runtimeEvidence=1.
+TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS: layers=3/3; domainGodotFree=1; applicationGodotFree=1; projectCycles=0; primaryRenderer=mobile/vulkan; compatibilityRenderer=gl_compatibility/opengl3; desktopPresets=4/4; debugExports=4/4; releaseExports=4/4; runtimeRendererEvidence=1.
+TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
+```
+
+**Статусы:**
+
+- `TASK-146`: `NOT_STARTED → IMPLEMENTED`;
+- `TASK-147`: `NOT_STARTED → IN_PROGRESS` — build attempt #2 достиг `0 warnings / 2 errors`; hotfix1 исправляет последние две CS1061, требуется повторный real build + xUnit/quality + F6/manual base-construction acceptance;
+- `TASK-145`: остаётся `IN_PROGRESS`; присланный build является подтверждённым failed attempt, исправления включены в TASK-146;
+- `BASE-100..BASE-113`: остаются `IMPLEMENTED`, теперь с closure-hardening против preview/runtime divergence, battery-toggle inconsistency и malformed save;
+- `BASE-ACC-100..103`: остаются `IN_PROGRESS` до TASK-147;
+- `ARCH-001/CFG-003`: остаются `IMPLEMENTED`, повторная verification разблокируется после чистого build без legacy shadowing.
+
+**Критерий TASK-147:** `tools\clean-build-windows10.cmd` должен дать `0 warnings / 0 errors` и реальный `CoreCompile` всех трёх assemblies; `tools\run-section37-quality.cmd` — green включая TASK-146; F6 — `TASK-106 ... PASS` и `TASK-146 base construction closure PASS` с `preflightParity=1; batteryIsolation=1; malformedSaveRejected=1; stress500=1; coldRestore=1; roundTrip=1`. После ручного builder smoke раздела 18I `TASK-107/TASK-147` и `BASE-ACC-100..103` могут быть переведены в VERIFIED, после чего core base-construction subsystem считается закрытой.
+
+---
 
 ### TASK-144 — compiled layer boundaries and executable Compatibility/OpenGL fallback
 
@@ -4936,8 +4979,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | Snapshot integration, no offline power tick, scene rebuild/reset |
 | `BASE-112` | Legacy save без base block загружается | `IMPLEMENTED` | Null fallback: empty base + full starter stock |
 | `BASE-113` | Terrain geometry не модифицируется | `IMPLEMENTED` | Modules sit above existing surface; PDF 20.4 respected |
-| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с реальным `CoreCompile` |
-| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | Ожидается `TASK-106 ... PASS` |
+| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | TASK-144 build attempt: 148 warnings/16 errors; TASK-146 attempt #2: 0 warnings/2 CS1061; hotfix1 prepared, повторить three-layer build |
+| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | TASK-146 добавляет preflight/battery/save invariants; ожидаются `TASK-106` + `TASK-146 ... PASS` |
 | `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `IN_PROGRESS` | Выполнить раздел 18I |
 | `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F6 |
 

@@ -4555,14 +4555,12 @@ public partial class SalvageRepairSlice : Node3D
 
         BaseModuleDefinition definition = BaseBuildDefinitions[_baseBuildIndex];
         (int gridX, int gridZ, Vector3 worldPosition) = GetBaseBuildTarget();
-        bool hasAdjacent = BaseConstruction.ModuleCount == 0
-            ? definition.IsAnchor
-            : BaseConstruction.Placements.Any(placement =>
-                Math.Abs(placement.GridX - gridX) +
-                Math.Abs(placement.GridZ - gridZ) == 1);
-        bool valid = BaseConstruction.GetStock(definition.ModuleId) > 0 &&
-            BaseConstruction.FindAt(gridX, gridZ) is null &&
-            hasAdjacent;
+        BasePlacementResult previewResult = BaseConstruction.EvaluatePlacement(
+            definition.ModuleId,
+            gridX,
+            gridZ,
+            out _);
+        bool valid = previewResult == BasePlacementResult.Placed;
         EnsureBaseBuildPreviewMesh(definition);
         _baseBuildPreview.GlobalPosition = new Vector3(
             worldPosition.X,
@@ -6459,7 +6457,9 @@ public partial class SalvageRepairSlice : Node3D
                   $"placed={report.PlacedModules}, " +
                   $"snap={(report.Snapping ? 1 : 0)}, " +
                   $"collision={(report.CollisionRejected ? 1 : 0)}, " +
+                  $"preflight={(report.PlacementPreflightParity ? 1 : 0)}, " +
                   $"power={(report.PowerGraph ? 1 : 0)}, " +
+                  $"batteryIsolation={(report.BatteryIsolation ? 1 : 0)}, " +
                   $"limits={(report.Limits ? 1 : 0)}, " +
                   $"stress500={(report.Stress500 ? 1 : 0)}, " +
                   $"restore={(report.ColdRestore ? 1 : 0)}, " +
@@ -6479,14 +6479,17 @@ public partial class SalvageRepairSlice : Node3D
                 $"snapping={(report.Snapping ? 1 : 0)}; " +
                 $"collisionRejected={(report.CollisionRejected ? 1 : 0)}; " +
                 $"disconnectedRejected={(report.DisconnectedRejected ? 1 : 0)}; " +
+                $"preflightParity={(report.PlacementPreflightParity ? 1 : 0)}; " +
                 $"powerGraph={(report.PowerGraph ? 1 : 0)}; " +
                 $"battery={(report.Battery ? 1 : 0)}; " +
+                $"batteryIsolation={(report.BatteryIsolation ? 1 : 0)}; " +
                 $"toggle={(report.Toggle ? 1 : 0)}; " +
                 $"removalRefund={(report.RemovalRefund ? 1 : 0)}; " +
                 $"limits={(report.Limits ? 1 : 0)}; " +
                 $"stress500={(report.Stress500 ? 1 : 0)}; " +
                 $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
                 $"legacyFallback={(report.LegacyFallback ? 1 : 0)}; " +
+                $"malformedSaveRejected={(report.MalformedSaveRejected ? 1 : 0)}; " +
                 $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}; " +
                 $"logWritten={(report.LogWritten ? 1 : 0)}; " +
                 $"maxWriters={report.Diagnostics.MaximumConcurrentWriters}; " +
@@ -6496,10 +6499,20 @@ public partial class SalvageRepairSlice : Node3D
             if (report.Passed)
             {
                 GD.Print(output);
+                GD.Print(
+                    "TASK-146 base construction closure PASS: " +
+                    $"preflightParity={(report.PlacementPreflightParity ? 1 : 0)}; " +
+                    $"batteryIsolation={(report.BatteryIsolation ? 1 : 0)}; " +
+                    $"malformedSaveRejected={(report.MalformedSaveRejected ? 1 : 0)}; " +
+                    $"stress500={(report.Stress500 ? 1 : 0)}; " +
+                    $"coldRestore={(report.ColdRestore ? 1 : 0)}; " +
+                    $"roundTrip={(report.ExactRoundTrip ? 1 : 0)}.");
             }
             else
             {
                 GD.PushError(output);
+                GD.PushError(
+                    "TASK-146 base construction closure FAIL: " + report.Result);
             }
         }
         catch (Exception exception)

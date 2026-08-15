@@ -16,14 +16,17 @@ public sealed record BaseConstructionAcceptanceReport(
     bool Snapping,
     bool CollisionRejected,
     bool DisconnectedRejected,
+    bool PlacementPreflightParity,
     bool PowerGraph,
     bool Battery,
+    bool BatteryIsolation,
     bool Toggle,
     bool RemovalRefund,
     bool Limits,
     bool Stress500,
     bool ColdRestore,
     bool LegacyFallback,
+    bool MalformedSaveRejected,
     bool ExactRoundTrip,
     bool LogWritten,
     SaveDatabaseDiagnostics Diagnostics,
@@ -61,6 +64,11 @@ public static class BaseConstructionAcceptanceRunner
                 .OrderBy(moduleId => moduleId, StringComparer.Ordinal)
                 .ToArray();
 
+            BasePlacementResult anchorPreflight = runtime.EvaluatePlacement(
+                remaining[0],
+                0,
+                0,
+                out _);
             BasePlacementResult firstRejected = runtime.TryPlace(
                 remaining[0],
                 0,
@@ -70,12 +78,22 @@ public static class BaseConstructionAcceptanceRunner
                 out _);
             bool anchorRule = firstRejected == BasePlacementResult.AnchorRequired;
             EnsurePlaced(runtime, anchorId, 0, 0, 0);
+            BasePlacementResult collisionPreflight = runtime.EvaluatePlacement(
+                remaining[0],
+                0,
+                0,
+                out _);
             BasePlacementResult collisionResult = runtime.TryPlace(
                 remaining[0],
                 0,
                 0,
                 0,
                 out _,
+                out _);
+            BasePlacementResult disconnectedPreflight = runtime.EvaluatePlacement(
+                remaining[0],
+                20,
+                20,
                 out _);
             BasePlacementResult disconnectedResult = runtime.TryPlace(
                 remaining[0],
@@ -88,6 +106,18 @@ public static class BaseConstructionAcceptanceRunner
                 collisionResult == BasePlacementResult.Overlap;
             bool disconnectedRejected =
                 disconnectedResult == BasePlacementResult.NotSnapped;
+            bool placementPreflightParity =
+                anchorPreflight == firstRejected &&
+                collisionPreflight == collisionResult &&
+                disconnectedPreflight == disconnectedResult;
+
+            BasePlacementResult firstAllowedPreflight = runtime.EvaluatePlacement(
+                remaining[0],
+                1,
+                0,
+                out _);
+            placementPreflightParity &=
+                firstAllowedPreflight == BasePlacementResult.Placed;
 
             for (int index = 0; index < remaining.Length; index++)
             {
@@ -105,6 +135,29 @@ public static class BaseConstructionAcceptanceRunner
             bool battery = powered.BatteryCapacity > 0.0 &&
                 runtime.StoredEnergy > 0.0 &&
                 runtime.StoredEnergy <= runtime.Power.BatteryCapacity;
+
+            BaseModulePlacement batteryBank = runtime.Placements.Single(placement =>
+                string.Equals(
+                    placement.ModuleId,
+                    "module.battery_bank",
+                    StringComparison.Ordinal));
+            double batteryCapacityBeforeToggle = runtime.Power.BatteryCapacity;
+            double batteryBankCapacity = constructionCatalog
+                .GetModule(batteryBank.ModuleId)
+                .BatteryCapacity;
+            bool batteryDisabled = runtime.TryToggle(batteryBank.InstanceId, out _) &&
+                !runtime.Placements.Single(placement =>
+                    placement.InstanceId == batteryBank.InstanceId).Enabled;
+            double batteryCapacityWhileDisabled = runtime.Power.BatteryCapacity;
+            bool batteryEnabled = runtime.TryToggle(batteryBank.InstanceId, out _) &&
+                runtime.Placements.Single(placement =>
+                    placement.InstanceId == batteryBank.InstanceId).Enabled;
+            bool batteryIsolation = batteryDisabled && batteryEnabled &&
+                Math.Abs(
+                    batteryCapacityBeforeToggle - batteryCapacityWhileDisabled -
+                    batteryBankCapacity) < 0.000001 &&
+                Math.Abs(runtime.Power.BatteryCapacity - batteryCapacityBeforeToggle) <
+                    0.000001;
 
             BaseModulePlacement solar = runtime.Placements.Single(placement =>
                 string.Equals(
@@ -176,13 +229,23 @@ public static class BaseConstructionAcceptanceRunner
                     "Construction catalog lacks spare stock for limit rejection.");
             }
 
+            string limitCandidate = stressPalette.Dequeue();
+            BasePlacementResult moduleLimitPreflight =
+                stressRuntime.EvaluatePlacement(
+                    limitCandidate,
+                    limitsDefinition.MaximumModules,
+                    0,
+                    out _);
             BasePlacementResult moduleLimitRejected = stressRuntime.TryPlace(
-                stressPalette.Dequeue(),
+                limitCandidate,
                 limitsDefinition.MaximumModules,
                 0,
                 0,
                 out _,
                 out _);
+            placementPreflightParity &=
+                moduleLimitPreflight == moduleLimitRejected &&
+                moduleLimitRejected == BasePlacementResult.LimitExceeded;
             bool stress500 = stressRuntime.ModuleCount ==
                     limitsDefinition.MaximumModules &&
                 stressRuntime.Power.ConnectedComponents == 1 &&
@@ -288,6 +351,19 @@ public static class BaseConstructionAcceptanceRunner
                     legacy.GetStock(definition.ModuleId) ==
                         definition.StarterStock);
 
+            BaseConstructionSaveData validBaseSave = runtime.CreateSaveData();
+            bool nonFiniteEnergyRejected = RejectsSave(
+                constructionCatalog,
+                validBaseSave with { StoredEnergy = double.NaN });
+            bool overCapacityEnergyRejected = RejectsSave(
+                constructionCatalog,
+                validBaseSave with
+                {
+                    StoredEnergy = runtime.Power.BatteryCapacity + 1.0
+                });
+            bool malformedSaveRejected =
+                nonFiniteEnergyRejected && overCapacityEnergyRejected;
+
             SaveDatabaseDiagnostics diagnostics =
                 await database.ReadDiagnosticsAsync(
                     slotId,
@@ -314,23 +390,27 @@ public static class BaseConstructionAcceptanceRunner
                     BaseConstructionCatalog.ExpectedModuleCount &&
                 categories == 17 &&
                 anchorRule && snapping && collisionRejected &&
-                disconnectedRejected && powerGraph && battery && toggle &&
+                disconnectedRejected && placementPreflightParity &&
+                powerGraph && battery && batteryIsolation && toggle &&
                 removalRefund && limits && stress500 && coldRestore && legacyFallback &&
-                exactRoundTrip && logWritten &&
+                malformedSaveRejected && exactRoundTrip && logWritten &&
                 diagnostics.MaximumConcurrentWriters == 1 && integrityOk;
             List<string> failures = new();
             if (!anchorRule) failures.Add("anchor=0");
             if (!snapping) failures.Add("snapping=0");
             if (!collisionRejected) failures.Add("collision=0");
             if (!disconnectedRejected) failures.Add("disconnected=0");
+            if (!placementPreflightParity) failures.Add("preflight=0");
             if (!powerGraph) failures.Add("power=0");
             if (!battery) failures.Add("battery=0");
+            if (!batteryIsolation) failures.Add("batteryIsolation=0");
             if (!toggle) failures.Add("toggle=0");
             if (!removalRefund) failures.Add("refund=0");
             if (!limits) failures.Add("limits=0");
             if (!stress500) failures.Add("stress500=0");
             if (!coldRestore) failures.Add("restore=0");
             if (!legacyFallback) failures.Add("legacy=0");
+            if (!malformedSaveRejected) failures.Add("malformedSave=0");
             if (!exactRoundTrip) failures.Add($"roundTrip=0({mismatch})");
             if (!logWritten) failures.Add("log=0");
             if (diagnostics.MaximumConcurrentWriters != 1)
@@ -340,7 +420,8 @@ public static class BaseConstructionAcceptanceRunner
                 ? "fifty data-driven base modules across all PDF construction " +
                   "categories snapped into one persistent graph with collision " +
                   "rejection, an exact 500-module stress boundary, power, " +
-                  "battery storage, device toggles and safe dismantle refund"
+                  "battery storage/isolation, shared placement preflight, " +
+                  "malformed-save rejection, device toggles and safe dismantle refund"
                 : string.Join(", ", failures);
             stopwatch.Stop();
             return new BaseConstructionAcceptanceReport(
@@ -353,14 +434,17 @@ public static class BaseConstructionAcceptanceRunner
                 snapping,
                 collisionRejected,
                 disconnectedRejected,
+                placementPreflightParity,
                 powerGraph,
                 battery,
+                batteryIsolation,
                 toggle,
                 removalRefund,
                 limits,
                 stress500,
                 coldRestore,
                 legacyFallback,
+                malformedSaveRejected,
                 exactRoundTrip,
                 logWritten,
                 diagnostics,
@@ -370,26 +454,29 @@ public static class BaseConstructionAcceptanceRunner
         {
             stopwatch.Stop();
             return new BaseConstructionAcceptanceReport(
-                false,
-                $"{exception.GetType().Name}: {exception.Message}",
-                constructionCatalog.Modules.Count,
-                0,
-                0,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                new SaveDatabaseDiagnostics(
+                Passed: false,
+                Result: $"{exception.GetType().Name}: {exception.Message}",
+                CatalogModules: constructionCatalog.Modules.Count,
+                Categories: 0,
+                PlacedModules: 0,
+                AnchorRule: false,
+                Snapping: false,
+                CollisionRejected: false,
+                DisconnectedRejected: false,
+                PlacementPreflightParity: false,
+                PowerGraph: false,
+                Battery: false,
+                BatteryIsolation: false,
+                Toggle: false,
+                RemovalRefund: false,
+                Limits: false,
+                Stress500: false,
+                ColdRestore: false,
+                LegacyFallback: false,
+                MalformedSaveRejected: false,
+                ExactRoundTrip: false,
+                LogWritten: false,
+                Diagnostics: new SaveDatabaseDiagnostics(
                     0,
                     "unknown",
                     false,
@@ -402,7 +489,7 @@ public static class BaseConstructionAcceptanceRunner
                     0,
                     0,
                     0),
-                stopwatch.Elapsed.TotalMilliseconds);
+                ElapsedMilliseconds: stopwatch.Elapsed.TotalMilliseconds);
         }
         finally
         {
@@ -427,6 +514,21 @@ public static class BaseConstructionAcceptanceRunner
         if (result != BasePlacementResult.Placed)
         {
             throw new InvalidOperationException(message);
+        }
+    }
+
+    private static bool RejectsSave(
+        BaseConstructionCatalog catalog,
+        BaseConstructionSaveData saveData)
+    {
+        try
+        {
+            _ = new BaseConstructionRuntime(catalog, saveData);
+            return false;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
         }
     }
 

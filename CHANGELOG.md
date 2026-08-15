@@ -11,6 +11,23 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.146] - 2026-08-15
+
+### Added
+
+- Shared base-construction placement preflight used by both UI preview and the mutating placement path.
+- Base-construction closure regression coverage for preflight parity, interactive limits, battery isolation and malformed-save rejection.
+- TASK-146 static closure gate integrated into local quality scripts.
+
+### Fixed
+
+- Windows build regression reported from TASK-144: Godot `Toggled` delegate binding, `System.Environment` ambiguity and missing `CultureInfo` import.
+- Overlay upgrades can no longer compile stale pre-TASK-144 architecture sources: `Game.Client.csproj` excludes them, build-time `ProjectHorizonSourceHygiene` removes only the known retired artifacts, and unknown source in the retired path fails safely instead of being deleted.
+- `clean-build-windows10.cmd` now forces recompilation of `Game.Domain`, `Game.Application` and `Game.Client` instead of leaving referenced-layer `CoreCompile` up-to-date.
+- Disabled battery modules no longer contribute available network capacity; corrupted non-finite or over-capacity base energy is rejected on restore.
+- Nullable ecology player binding is captured safely before fauna configuration.
+- TASK-146 hotfix1 removes two accidental `MalformedSaveRejected` references from planetary-exploration and station-services acceptance output; the field remains scoped only to base-construction acceptance, with a static scope guard added to prevent recurrence.
+
 ## [0.1.0-alpha.144] - 2026-08-15
 
 ### Added

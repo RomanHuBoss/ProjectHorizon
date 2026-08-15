@@ -242,7 +242,7 @@ public partial class GameSettingsPanel : PanelContainer
     private void AddCheck(VBoxContainer root, string key, Func<bool> getter, Action<bool> setter)
     {
         CheckButton check = new() { Text = key, ButtonPressed = getter() };
-        check.Toggled += setter;
+        check.Toggled += toggledOn => setter(toggledOn);
         _refreshers.Add(() => check.ButtonPressed = getter());
         root.AddChild(check);
     }

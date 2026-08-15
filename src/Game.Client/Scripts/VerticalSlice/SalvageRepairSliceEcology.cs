@@ -95,8 +95,9 @@ public partial class SalvageRepairSlice
 
     private void RebuildEcologyScene()
     {
+        PlayerController? player = _player;
         if (_ecologyRoot is null || _ecologyPlan is null ||
-            _ecologyRuntime is null || _ecologyCatalog is null)
+            _ecologyRuntime is null || _ecologyCatalog is null || player is null)
         {
             return;
         }
@@ -182,7 +183,7 @@ public partial class SalvageRepairSlice
             faunaNode.Configure(
                 EcologyCatalog.GetFauna(spawn.FaunaId),
                 spawn,
-                _player,
+                player,
                 _aerialSteeringRuntime);
             faunaNode.Observed += OnEcologyFaunaObserved;
             _ecologyRoot.AddChild(faunaNode);

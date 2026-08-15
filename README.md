@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice и ранее принятые подсистемы сохранены; §37 Build/CI/Release Engineering принят, а §38 Architecture & Code-Quality Hardening реализован и ожидает реальный clean-build/F5 smoke (`TASK-143`). Текущая mega-итерация `TASK-144` закрывает оставшийся platform/architecture foundation: физические .NET-границы `Game.Domain ← Game.Application ← Game.Client` и исполняемый Compatibility/OpenGL fallback для Windows/Linux, включая CI/release profiles и runtime evidence.
+Stage 1 vertical slice и ранее принятые подсистемы сохранены; §37 Build/CI/Release Engineering принят, а §38 Architecture & Code-Quality Hardening реализован и ожидает реальный clean-build/F5 smoke (`TASK-143`). После принятия TASK-144 реальный Windows build выявил compile-regression и stale-overlay shadowing. Текущая mega-итерация `TASK-146` одновременно восстанавливает clean build contract и закрывает core base-construction implementation: единый placement preflight, корректное отключение battery capacity и строгий save-state validation.
 
-### TASK-144 platform/architecture foundation — `IMPLEMENTED`; runtime acceptance TASK-143/TASK-145 — `IN_PROGRESS`
+### TASK-146 base-construction + build-regression mega-closure — `IMPLEMENTED`; runtime acceptance TASK-147 — `IN_PROGRESS`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -295,7 +295,8 @@ HUD builder показывает target grid/world coordinates, category, stock,
 
 ```text
 TASK-072 legacy fourth path (F6): PASS resources=2, blocked=1, timed=1, isolated=1, all3=1, output=1, roundTrip=1
-TASK-106 base construction (F6): PASS modules=50, placed=50, snap=1, collision=1, power=1, limits=1, stress500=1, restore=1, roundTrip=1
+TASK-106 base construction (F6): PASS modules=50, placed=50, snap=1, collision=1, preflight=1, power=1, batteryIsolation=1, limits=1, stress500=1, restore=1, roundTrip=1
+TASK-146 base construction closure PASS: preflightParity=1; batteryIsolation=1; malformedSaveRejected=1; stress500=1; coldRestore=1; roundTrip=1.
 ```
 
 `TASK-106` использует отдельную БД `save_1.base-construction-test.db` и проверяет 50 modules / 17 catalog categories (all 16 PDF categories plus Structure), обязательный anchor, grid collision, disconnected placement/removal rejection, connected power graph, battery charge, device toggle, dismantle refund, связный stress graph из 500 modules и отказ на 501-м, отдельный interactive-device limit, exact cold restore, legacy fallback, autosave log, `maxWriters=1` и `integrity=ok`. Gameplay-slot тестом не изменяется.
@@ -529,7 +530,8 @@ python tools/validate-section38-architecture-contract.py
 TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
 ```
 
-После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
+После замены файлов поверх существующей рабочей копии необходимо запускать `tools\clean-build-windows10.cmd`. TASK-146 удаляет stale pre-TASK-144 architecture copies и очищает build outputs всех трёх production layers; в полном логе `CoreCompile` должен реально выполняться для `Game.Domain`, `Game.Application` и `Game.Client`.
+Обычный `dotnet build` также запускает `ProjectHorizonSourceHygiene`: он удаляет только известные retired TASK-144 файлы. Неизвестные исходники автоматически не стираются; если `.cs` остаётся в retired `Scripts/Infrastructure/Architecture`, сборка завершается понятным FAIL, чтобы не потерять пользовательский код.
 
 
 ### Прототип A. Персонаж — `VERIFIED`

@@ -60,8 +60,8 @@ public static class StructuredGameLogger
                 "; ",
                 $"os={OS.GetName()}",
                 $"osVersion={OS.GetVersion()}",
-                $"dotnet={Environment.Version}",
-                $"cpu={Environment.ProcessorCount}");
+                $"dotnet={System.Environment.Version}",
+                $"cpu={System.Environment.ProcessorCount}");
             _scene = tree.CurrentScene?.SceneFilePath ?? "bootstrap";
             _initialized = true;
         }
@@ -134,7 +134,7 @@ public static class StructuredGameLogger
             {
                 return;
             }
-            string payload = string.Join(Environment.NewLine, PendingLines) + Environment.NewLine;
+            string payload = string.Join(System.Environment.NewLine, PendingLines) + System.Environment.NewLine;
             File.AppendAllText(_logPath, payload);
             _entriesWritten += PendingLines.Count;
             PendingLines.Clear();
@@ -171,13 +171,13 @@ public static class StructuredGameLogger
             return prefix + "=[REDACTED]";
         });
 
-        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        string userProfile = System.Environment.GetFolderPath(System.Environment.SpecialFolder.UserProfile);
         if (!string.IsNullOrWhiteSpace(userProfile) && safe.Contains(userProfile, StringComparison.OrdinalIgnoreCase))
         {
             safe = safe.Replace(userProfile, "[USER_HOME]", StringComparison.OrdinalIgnoreCase);
             _redactedValues++;
         }
-        string userName = Environment.UserName;
+        string userName = System.Environment.UserName;
         if (!string.IsNullOrWhiteSpace(userName) && userName.Length >= 3 && safe.Contains(userName, StringComparison.OrdinalIgnoreCase))
         {
             safe = safe.Replace(userName, "[USER]", StringComparison.OrdinalIgnoreCase);

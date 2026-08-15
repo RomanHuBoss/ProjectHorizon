@@ -31,6 +31,23 @@ Every pull request runs `.github/workflows/ci.yml`:
 The export job uses the Godot editor binary with `--headless`. It never uses an export
 template as the editor executable.
 
+## Clean local Windows build
+
+After replacing a project snapshot over an older working directory, run:
+
+```bat
+tools\clean-build-windows10.cmd
+```
+
+TASK-146 treats overlay upgrades as a supported migration path. The script removes the historical
+pre-TASK-144 architecture source copies if they were left behind, clears Godot C# output plus
+`bin/obj` for `Game.Domain`, `Game.Application` and `Game.Client`, then builds the client project.
+Acceptance requires `CoreCompile` to execute for all three production assemblies with zero warnings
+and zero errors. `Game.Client.csproj` also excludes the historical paths as a defense-in-depth guard.
+A normal build runs `ProjectHorizonSourceHygiene`: only the exact retired TASK-144 artifacts are deleted.
+Unknown source files are never auto-deleted; unexpected `.cs` in the retired architecture path blocks
+the build with a diagnostic so locally authored code cannot be destroyed by cleanup.
+
 ## Local quality gate
 
 Windows:
@@ -60,7 +77,7 @@ are exercised by GitHub CI, or locally by setting `GODOT_BIN` and running:
 - Industry Content schema/catalog version;
 - `ProjectHorizonGenerator.Version`.
 
-A release tag must be exactly `v<VERSION>` (for example `v0.1.0-alpha.144`). The release
+A release tag must be exactly `v<VERSION>` (for example `v0.1.0-alpha.146`). The release
 workflow refuses mismatched tags or a version missing from `CHANGELOG.md`.
 
 ## Release dry-run and tagged release

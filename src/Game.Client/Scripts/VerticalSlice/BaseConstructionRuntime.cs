@@ -94,26 +94,32 @@ public sealed class BaseConstructionRuntime
         return _stock.TryGetValue(moduleId, out int quantity) ? quantity : 0;
     }
 
-    public BasePlacementResult TryPlace(
+    /// <summary>
+    /// Evaluates the exact placement rules used by <see cref="TryPlace"/> without
+    /// mutating stock, sequence counters, placements or the power graph. UI preview
+    /// and automation must use this preflight instead of duplicating placement rules.
+    /// </summary>
+    public BasePlacementResult EvaluatePlacement(
         string moduleId,
         int gridX,
         int gridZ,
-        int rotationQuarterTurns,
-        out BaseModulePlacement? placement,
         out string result)
     {
-        placement = null;
         if (!_catalog.Modules.TryGetValue(
                 moduleId,
                 out BaseModuleDefinition? definition))
         {
-            result = GameLocalizationService.Format("ui.base.unknown_module", ("module", moduleId));
+            result = GameLocalizationService.Format(
+                "ui.base.unknown_module",
+                ("module", moduleId));
             return BasePlacementResult.UnknownModule;
         }
 
         if (GetStock(moduleId) <= 0)
         {
-            result = GameLocalizationService.Format("ui.base.out_of_stock", ("module", moduleId));
+            result = GameLocalizationService.Format(
+                "ui.base.out_of_stock",
+                ("module", moduleId));
             return BasePlacementResult.OutOfStock;
         }
 
@@ -125,7 +131,10 @@ public sealed class BaseConstructionRuntime
 
         if (FindAt(gridX, gridZ) is not null)
         {
-            result = GameLocalizationService.Format("ui.base.cell_occupied", ("x", gridX), ("z", gridZ));
+            result = GameLocalizationService.Format(
+                "ui.base.cell_occupied",
+                ("x", gridX),
+                ("z", gridZ));
             return BasePlacementResult.Overlap;
         }
 
@@ -141,6 +150,30 @@ public sealed class BaseConstructionRuntime
             return BasePlacementResult.LimitExceeded;
         }
 
+        result = string.Empty;
+        return BasePlacementResult.Placed;
+    }
+
+    public BasePlacementResult TryPlace(
+        string moduleId,
+        int gridX,
+        int gridZ,
+        int rotationQuarterTurns,
+        out BaseModulePlacement? placement,
+        out string result)
+    {
+        placement = null;
+        BasePlacementResult preflight = EvaluatePlacement(
+            moduleId,
+            gridX,
+            gridZ,
+            out result);
+        if (preflight != BasePlacementResult.Placed)
+        {
+            return preflight;
+        }
+
+        BaseModuleDefinition definition = _catalog.GetModule(moduleId);
         int normalizedRotation = ((rotationQuarterTurns % 4) + 4) % 4;
         string instanceId = $"base.module.{_nextSequence:000000}";
         _nextSequence++;
@@ -273,6 +306,7 @@ public sealed class BaseConstructionRuntime
     {
         if (!string.Equals(saveData.BaseId, BaseId, StringComparison.Ordinal) ||
             saveData.NextSequence <= 0 ||
+            !double.IsFinite(saveData.StoredEnergy) ||
             saveData.StoredEnergy < 0.0 ||
             saveData.Stock is null ||
             saveData.Modules is null)
@@ -344,6 +378,12 @@ public sealed class BaseConstructionRuntime
         }
 
         BasePowerNetworkSnapshot counts = CalculatePowerSnapshot();
+        if (_storedEnergy > counts.BatteryCapacity + 0.000001)
+        {
+            throw new InvalidOperationException(
+                "Restored base construction energy exceeds enabled battery capacity.");
+        }
+
         if (counts.Modules > _catalog.Limits.MaximumModules ||
             counts.InteractiveDevices >
                 _catalog.Limits.MaximumInteractiveDevices ||
@@ -460,8 +500,8 @@ public sealed class BaseConstructionRuntime
             _catalog.GetModule(placement.ModuleId).PowerGeneration);
         double consumption = enabled.Sum(placement =>
             _catalog.GetModule(placement.ModuleId).PowerConsumption);
-        double capacity = definitions.Sum(definition =>
-            definition.BatteryCapacity);
+        double capacity = enabled.Sum(placement =>
+            _catalog.GetModule(placement.ModuleId).BatteryCapacity);
         int enabledConsumers = enabled.Count(placement =>
             _catalog.GetModule(placement.ModuleId).PowerConsumption > 0.0);
         bool powered = generation >= consumption || _storedEnergy > 0.0001;
