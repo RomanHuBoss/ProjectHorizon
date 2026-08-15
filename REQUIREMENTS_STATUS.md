@@ -2,13 +2,140 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-ground-npc-navigation-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-aerial-navigation-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0. Текущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+
+### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и немедленно перейти к следующей. Поэтому до начала нового шага
+статусы синхронизированы так:
+
+- `TASK-124` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-125` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка в среде подготовки не приписываются задним числом.
+
+### TASK-126 — flying-fauna + NPC-ship navigation core
+
+**Исходный снимок:** `ProjectHorizon-main-ground-npc-navigation-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-aerial-navigation-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §30.2 «Flying creatures» и §30.3 «NPC ships».
+Наземная часть §30.1 уже закрыта `TASK-124/125`, поэтому эта mega-итерация
+закрывает оставшийся навигационный контур §30 без расширения persistence schema.
+
+**Реализовано:**
+
+- добавлен общий `AerialSteeringRuntime` для flying fauna и NPC ships вместо двух
+  независимых steering-систем; runtime держит только занятые ячейки локальной 3D
+  spatial hash grid с cell size `10 m` и выполняет radius-neighbor queries по
+  локальному набору cells, не создавая глобальную пространственную структуру мира;
+- статические `Box/Cylinder/Capsule/Sphere` collision shapes переводятся в
+  spherical avoidance proxies и индексируются в той же локальной 3D grid по всем
+  пересекаемым cells; `GroundBody` исключён, чтобы горизонтальная поверхность не
+  становилась одной гигантской запретной сферой;
+- environment refresh связан с уже существующими rebuild base/POI/resource flows,
+  поэтому authored и построенные препятствия попадают в aerial avoidance после
+  изменения сцены;
+- создан общий набор POI: water/landing-pad/ridges для flying fauna и dock/traffic
+  lanes вокруг orbital station для NPC ships; nearest-POI selection исполняется
+  runtime и учитывается diagnostics/acceptance;
+- все четыре активных flying fauna species из ecology catalog используют shared
+  steering runtime: local separation, spherical obstacle avoidance, POI steering и
+  ограниченный altitude envelope относительно собственного territory center;
+- старый sinus-only flying motion оставлен только как fallback для изолированного
+  запуска `EcologyFaunaNode` без shared runtime; штатный vertical slice передаёт
+  runtime всем flying nodes;
+- добавлен отдельный `Gameplay/NpcShipTraffic` и четыре физических
+  `CharacterBody3D` NPC ships, использующих уже существующие ship-class stats:
+  Aegis patrol leader, formation wing, Frontier trader arrival и hostile raider;
+- patrol/trader используют `arrive`, wing — `formation`, hostile raider —
+  predicted `pursuit`; combat loop реально переключает `Pursuit → CombatApproach →
+  BreakAway → Evade → Pursuit`; break-away/evade используют predicted threat motion;
+- для всех кораблей поверх role steering одновременно применяются local-grid ship
+  separation, spherical static avoidance и altitude envelope; movement/heading
+  выполняются физическим `CharacterBody3D`, а не телепортацией между waypoint;
+- hostile raider в обычном gameplay преследует piloted player ship, а когда игрок
+  не пилотирует корабль — patrol leader; acceptance принудительно фиксирует leader
+  target, чтобы combat-state cycle был воспроизводимым;
+- HUD получил строку `Aerial navigation` с coverage fauna/ships, occupied grid cells,
+  obstacle/POI counts, avoidance activations и текущими состояниями четырёх ships;
+- `F5` расширен `TASK-126` acceptance: все четыре flying species должны быть
+  подключены к shared runtime, spatial-grid/obstacle/POI probes должны исполняться,
+  altitude envelope — соблюдаться, четыре NPC ships — давать реальные steering
+  samples, а счётчики `pursuit/evade/arrive/formation/combat transitions` должны
+  увеличиться в runtime; отдельно проверяется отсутствие существенного проникновения
+  NPC ships внутрь spherical static obstacle proxies;
+- навигационное состояние transient: новые save settings/SQLite tables не введены,
+  schema остаётся `2`; после load/reset traffic и runtime воспроизводимо rebuild-ятся
+  из catalog/scene state.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/AerialSteeringRuntime.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcShipNavigationNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/AerialNavigationAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAerialNavigation.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyFaunaNode.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceEcology.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-124`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-125`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-126`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-127`: `NOT_STARTED` → `IN_PROGRESS` — clean build + единый F5/runtime smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в исходном архиве.
+
+**Проверки среды подготовки:**
+
+- выполнены структурные проверки C# новых/изменённых файлов, scene wiring, NodePath,
+  `.uid` uniqueness, `res://` references и parse всех JSON;
+- отдельно проверяются точные baseline counts Industry Content, NPC/factions и
+  ecology flying coverage — новая навигация не меняет каталоги ради прохождения ТЗ;
+- проверяется release ZIP после повторной распаковки, отсутствие `.godot/bin/obj`,
+  `.git`, runtime DB/log и других build artefacts;
+- .NET SDK/MSBuild и Godot в среде подготовки отсутствуют, поэтому локальные
+  `dotnet build` и фактический Godot runtime не заявляются.
+
+**Минимальная runtime-приёмка TASK-127:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`,
+   `0 errors`.
+2. Запустить `SalvageRepairSlice`; ожидаются `TASK-126 aerial steering READY` и
+   `TASK-126 NPC ship traffic READY`.
+3. На поверхности один раз нажать `F5`. Ключевой критерий:
+
+```text
+TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells=>0; obstacles=>0; poi=>=8; faunaCoverage=1; sharedRuntime=1; localGrid=1; sphericalAvoidance=1; altitude=1; poiSteering=1; shipSteering=1; pursuit=1; evade=1; arrive=1; formation=1; combatStates=1; clearance=1; runtimeSamples=1; ...
+```
+
+4. Manual fauna smoke: 20–30 s наблюдать несколько flying creatures около terrain
+   objects/POI; они не должны пролетать сквозь крупные статические collision objects
+   и не должны бесконтрольно уходить по высоте.
+5. Manual ship smoke: после доступа к voyage наблюдать orbital-station traffic:
+   wing держит formation относительно leader, trader проходит approach route, raider
+   циклически сближается/уходит и при пилотировании переключает target на player ship;
+   корабли не должны проходить через orbital station.
+6. При `FAIL` предоставить clean-build log, полную строку `TASK-126 ... FAIL`,
+   последние ~200 строк Godot Output и screenshot HUD со строкой `Aerial navigation`.
+
+**Следующий рекомендуемый mega-шаг после TASK-127:** провести новый gap-analysis
+по всему PDF-ТЗ уже после полного закрытия §30 и выбрать следующую самостоятельную
+подсистему; дальнейшие navigation-патчи не планировать без выявленного regression.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 

@@ -402,6 +402,7 @@ public partial class SalvageRepairSlice : Node3D
         BindStageOneVoyageSceneNodes();
         BindGalaxyNavigationSceneNodes();
         BindEcologySceneNodes();
+        BindAerialNavigationSceneNodes();
         BindNpcFactionSceneNodes();
         BindNpcNavigationSceneNodes();
         BindProceduralQuestSceneNodes();
@@ -489,6 +490,7 @@ public partial class SalvageRepairSlice : Node3D
             stationRecipes);
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
+        InitializeAerialSteeringRuntime();
         InitializeEcologyRuntime(saveData: null);
         InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
@@ -539,6 +541,7 @@ public partial class SalvageRepairSlice : Node3D
             legacySaveData: null);
         RebuildBaseConstructionScene();
         RebuildPlanetaryPoiScene();
+        RebuildNpcShipTraffic();
         RebuildNpcFactionScene();
         InitializeNpcNavigationSurface();
 
@@ -701,6 +704,12 @@ public partial class SalvageRepairSlice : Node3D
             "reputation=per-faction; dialogue=localized+conditional+consequences; " +
             "combat=physical-hostile; persistence=delta-state; proceduralCombatObjectives=enabled; F5=acceptance.");
         GD.Print(
+            "TASK-126 aerial navigation READY: " +
+            $"flyingFauna={_ecologyFaunaNodes.Count(node => string.Equals(node.MovementMode, "Flying", StringComparison.Ordinal))}; " +
+            $"npcShips={_npcShipNavigationNodes.Count}; " +
+            "sharedGrid=local-3D; obstacles=spherical; altitude=bounded; poi=enabled; " +
+            "shipModes=arrive+formation+pursuit+evade+combat; F5=acceptance.");
+        GD.Print(
             "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -760,6 +769,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdateTimedCraft(delta);
         UpdateStageOneVoyage(delta);
         UpdateEcology(delta);
+        UpdateAerialNavigation(delta);
         UpdatePlayerSurvival(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
@@ -2531,6 +2541,7 @@ public partial class SalvageRepairSlice : Node3D
         _status = result;
         source.SetCollected(true);
         RefreshNpcNavigationObstacles();
+        RefreshAerialNavigationEnvironment();
         GD.Print(
             $"Vertical slice domain event: {_lastDomainEvent}; " +
             $"available={Session.GetAvailableQuantity(definitionId)}; " +
@@ -4579,6 +4590,7 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionModulesRoot.AddChild(node);
         }
         RefreshNpcNavigationObstacles();
+        RefreshAerialNavigationEnvironment();
     }
 
     private void RebuildPlanetaryPoiScene()
@@ -4611,6 +4623,7 @@ public partial class SalvageRepairSlice : Node3D
             right.InstanceId,
             StringComparison.Ordinal));
         RefreshNpcNavigationObstacles();
+        RefreshAerialNavigationEnvironment();
     }
 
     private void ApplyPlanetaryPoiStateToScene()
@@ -4938,6 +4951,7 @@ public partial class SalvageRepairSlice : Node3D
             _proceduralQuestAcceptanceTask is null &&
             _playerSurvivalAcceptanceTask is null &&
             _npcFactionAcceptanceTask is null &&
+            !_aerialNavigationAcceptanceRunning &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -5395,8 +5409,9 @@ public partial class SalvageRepairSlice : Node3D
         BeginPlayerSurvivalAcceptance(directory);
         BeginNpcFactionAcceptance(directory);
         BeginNpcNavigationAcceptance();
+        BeginAerialNavigationAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions and navigation acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, ground and aerial navigation acceptance running";
     }
 
     private void BeginReset()
@@ -5671,6 +5686,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseNpcInteraction();
             RebuildBaseConstructionScene();
             RebuildNpcFactionScene();
+            RebuildNpcShipTraffic();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
@@ -5862,6 +5878,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseNpcInteraction();
             RebuildBaseConstructionScene();
             RebuildNpcFactionScene();
+            RebuildNpcShipTraffic();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
             _activeCraftingStation = null;
@@ -6509,6 +6526,7 @@ public partial class SalvageRepairSlice : Node3D
             _playerSurvivalAcceptanceTask is not null ||
             _npcFactionAcceptanceTask is not null ||
             NpcNavigationAcceptanceRunning ||
+            _aerialNavigationAcceptanceRunning ||
             _catalogMatrixAcceptanceReport is null ||
             _shipSystemsAcceptanceReport is null ||
             _stageOneVoyageAcceptanceReport is null ||
@@ -6517,7 +6535,8 @@ public partial class SalvageRepairSlice : Node3D
             _proceduralQuestAcceptanceReport is null ||
             _playerSurvivalAcceptanceReport is null ||
             _npcFactionAcceptanceReport is null ||
-            _npcNavigationAcceptanceReport is null)
+            _npcNavigationAcceptanceReport is null ||
+            _aerialNavigationAcceptanceReport is null)
         {
             return;
         }
@@ -6530,13 +6549,14 @@ public partial class SalvageRepairSlice : Node3D
             _proceduralQuestAcceptanceReport.Passed &&
             _playerSurvivalAcceptanceReport.Passed &&
             _npcFactionAcceptanceReport.Passed &&
-            _npcNavigationAcceptanceReport.Passed;
+            _npcNavigationAcceptanceReport.Passed &&
+            _aerialNavigationAcceptanceReport.Passed;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7122,6 +7142,7 @@ public partial class SalvageRepairSlice : Node3D
                 Session.CollectedNodeIds.Contains(node.ResourceNodeId));
         }
         RefreshNpcNavigationObstacles();
+        RefreshAerialNavigationEnvironment();
 
         _shipTerminal?.SetRepaired(Session.ShipRepaired);
         foreach (PortableCraftingStation station in _craftingStations)
@@ -7362,6 +7383,7 @@ public partial class SalvageRepairSlice : Node3D
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
         string npcNavigationLine = BuildNpcNavigationHudLine();
+        string aerialNavigationLine = BuildAerialNavigationHudLine();
         string missionLine = BuildProceduralQuestHudLine();
 
         if (_hudMode == SalvageRepairHudMode.Compact)
@@ -7383,6 +7405,7 @@ public partial class SalvageRepairSlice : Node3D
                 ecologyLine + "\n" +
                 npcFactionLine + "\n" +
                 npcNavigationLine + "\n" +
+                aerialNavigationLine + "\n" +
                 missionLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
@@ -7407,11 +7430,12 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
                 $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
                 $"TASK-124 NPC navigation (F5): {_npcNavigationAcceptanceHud}\n" +
+                $"TASK-126 aerial navigation (F5): {_aerialNavigationAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
                 "E - interact/select • I - exosuit/multitool • Q - mission journal on foot • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology + procedural quests + player survival + NPC/factions + NPC navigation • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology + procedural quests + player survival + NPC/factions + ground/aerial navigation • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
@@ -7434,6 +7458,7 @@ public partial class SalvageRepairSlice : Node3D
             ecologyLine + "\n" +
             npcFactionLine + "\n" +
             npcNavigationLine + "\n" +
+            aerialNavigationLine + "\n" +
             missionLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
@@ -7467,6 +7492,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
             $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
             $"TASK-124 NPC navigation (F5): {_npcNavigationAcceptanceHud}\n" +
+            $"TASK-126 aerial navigation (F5): {_aerialNavigationAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -7480,7 +7506,7 @@ public partial class SalvageRepairSlice : Node3D
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology + procedural quests + player survival + NPC/factions + NPC navigation • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology + procedural quests + player survival + NPC/factions + ground/aerial navigation • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
     }

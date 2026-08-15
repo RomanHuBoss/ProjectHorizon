@@ -11,6 +11,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private double _lastHitAge = -100.0;
     private double _nextAttackAtAge;
     private Vector3 _wanderDirection = Vector3.Forward;
+    private AerialSteeringRuntime? _aerialSteering;
 
     public string InstanceId { get; private set; } = string.Empty;
 
@@ -24,18 +25,30 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
     public int DecisionCount { get; private set; }
 
+    public string MovementMode => _definition?.MovementMode ?? string.Empty;
+
+    public bool AerialSteeringBound => _aerialSteering is not null &&
+        string.Equals(MovementMode, "Flying", StringComparison.Ordinal);
+
+    public bool InsideFlyingAltitudeEnvelope => _definition is null ||
+        !string.Equals(MovementMode, "Flying", StringComparison.Ordinal) ||
+        (GlobalPosition.Y >= _territoryCenter.Y + 1.25f &&
+         GlobalPosition.Y <= _territoryCenter.Y + 7.55f);
+
     public event Action<EcologyFaunaNode>? Observed;
 
     public void Configure(
         EcologyFaunaDefinition definition,
         EcologyFaunaSpawn spawn,
-        Node3D player)
+        Node3D player,
+        AerialSteeringRuntime? aerialSteering = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(spawn);
         ArgumentNullException.ThrowIfNull(player);
         _definition = definition;
         _player = player;
+        _aerialSteering = aerialSteering;
         InstanceId = spawn.InstanceId;
         Name = spawn.InstanceId.Replace('.', '_');
         Position = new Vector3(
@@ -178,6 +191,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             CollisionLayer = 0u;
             CollisionMask = 0u;
             Velocity = Vector3.Zero;
+            _aerialSteering?.RemoveEntity(InstanceId);
         }
     }
 
@@ -257,13 +271,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             "Flying",
             StringComparison.Ordinal))
         {
-            float targetY = _territoryCenter.Y +
-                1.8f +
-                (float)(1.2 * Math.Sin(_ageSeconds * 0.33));
-            targetVelocity.Y = Mathf.Clamp(
-                (targetY - Position.Y) * 1.8f,
-                -2.5f,
-                2.5f);
+            targetVelocity = ApplyFlyingSteering(targetVelocity, speed);
         }
         else if (string.Equals(
             _definition.MovementMode,
@@ -313,6 +321,84 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         {
             LookAt(GlobalPosition + horizontal, Vector3.Up);
         }
+    }
+
+
+    private Vector3 ApplyFlyingSteering(Vector3 targetVelocity, float speed)
+    {
+        if (_definition is null || _aerialSteering is null)
+        {
+            float fallbackY = _territoryCenter.Y +
+                1.8f +
+                (float)(1.2 * Math.Sin(_ageSeconds * 0.33));
+            targetVelocity.Y = Mathf.Clamp(
+                (fallbackY - Position.Y) * 1.8f,
+                -2.5f,
+                2.5f);
+            return targetVelocity;
+        }
+
+        float radius = (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15);
+        _aerialSteering.UpsertEntity(
+            InstanceId,
+            "flying_fauna",
+            GlobalPosition,
+            Velocity,
+            radius);
+        _aerialSteering.RecordFlyingFaunaSample();
+
+        Vector3 desired = targetVelocity;
+        AerialPointOfInterest? poi = _aerialSteering.FindClosestPointOfInterest(
+            GlobalPosition,
+            "fauna",
+            24.0f);
+        bool exploratoryState = string.Equals(BehaviorState, "Idle", StringComparison.Ordinal) ||
+            string.Equals(BehaviorState, "Investigate", StringComparison.Ordinal) ||
+            string.Equals(BehaviorState, "FollowGroup", StringComparison.Ordinal);
+        if (poi is not null && exploratoryState && speed > 0.01f)
+        {
+            Vector3 poiVelocity = _aerialSteering.Arrive(
+                GlobalPosition,
+                poi.Position,
+                speed,
+                6.0f,
+                Math.Max(1.0f, poi.Radius));
+            desired = desired.Lerp(poiVelocity, 0.28f);
+        }
+
+        Vector3 separation = _aerialSteering.ComputeEntitySeparation(
+            InstanceId,
+            "flying_fauna",
+            GlobalPosition,
+            5.5f,
+            Math.Max(1.2f, speed * 0.75f));
+        Vector3 avoidance = _aerialSteering.ComputeObstacleAvoidance(
+            GlobalPosition,
+            desired.LengthSquared() > 0.01f ? desired : Velocity,
+            radius,
+            1.25f,
+            Math.Max(2.0f, speed * 1.35f));
+        desired += separation + avoidance;
+
+        float phase = (float)(_ageSeconds * 0.33 +
+            (EcologyPlanner.StableHash(InstanceId) % 31) * 0.17);
+        float preferredY = _territoryCenter.Y + 3.4f +
+            (float)Math.Sin(phase) * 1.15f;
+        desired = _aerialSteering.ApplyAltitudeEnvelope(
+            desired,
+            GlobalPosition.Y,
+            _territoryCenter.Y + 1.6f,
+            preferredY,
+            _territoryCenter.Y + 7.2f,
+            1.65f,
+            3.0f);
+
+        float maximumSpeed = Math.Max(0.5f, speed * 1.35f);
+        if (desired.Length() > maximumSpeed)
+        {
+            desired = desired.Normalized() * maximumSpeed;
+        }
+        return desired;
     }
 
     private Vector3 DirectionTo(Vector3 target)

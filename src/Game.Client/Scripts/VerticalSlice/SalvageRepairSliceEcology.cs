@@ -101,6 +101,7 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        _aerialSteeringRuntime?.RemoveGroup("flying_fauna");
         foreach (Node child in _ecologyRoot.GetChildren())
         {
             _ecologyRoot.RemoveChild(child);
@@ -178,7 +179,11 @@ public partial class SalvageRepairSlice
         foreach (EcologyFaunaSpawn spawn in EcologyPlan.ActiveFauna)
         {
             EcologyFaunaNode faunaNode = new();
-            faunaNode.Configure(EcologyCatalog.GetFauna(spawn.FaunaId), spawn, _player);
+            faunaNode.Configure(
+                EcologyCatalog.GetFauna(spawn.FaunaId),
+                spawn,
+                _player,
+                _aerialSteeringRuntime);
             faunaNode.Observed += OnEcologyFaunaObserved;
             _ecologyRoot.AddChild(faunaNode);
             _ecologyFaunaNodes.Add(faunaNode);

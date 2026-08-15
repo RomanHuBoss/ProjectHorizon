@@ -179,6 +179,8 @@ shape = SubResource("PlayerWaterShape")
 
 [node name="Ecology" type="Node3D" parent="Gameplay"]
 
+[node name="NpcShipTraffic" type="Node3D" parent="Gameplay"]
+
 [node name="VoyageShip" parent="Gameplay" instance=ExtResource("7_voyage_ship")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -10)
 StartPilotEnabled = false
