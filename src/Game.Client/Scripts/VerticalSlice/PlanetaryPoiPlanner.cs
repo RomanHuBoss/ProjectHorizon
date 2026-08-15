@@ -36,14 +36,60 @@ public static class PlanetaryPoiPlanner
         IReadOnlyCollection<string>? activeQuestTags = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        return PlanInternal(
+            catalog,
+            catalog.WorldSeed,
+            catalog.RegionKey,
+            activeQuestTags,
+            environmentRuntime: null,
+            environmentProfile: null);
+    }
+
+    public static IReadOnlyList<PlanetaryPoiPlacement> PlanPlanet(
+        PlanetaryPoiCatalog catalog,
+        long worldSeed,
+        string regionKey,
+        PlanetEnvironmentRuntime environmentRuntime,
+        PlanetEnvironmentProfile environmentProfile,
+        IReadOnlyCollection<string>? activeQuestTags = null)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(environmentRuntime);
+        ArgumentNullException.ThrowIfNull(environmentProfile);
+        if (worldSeed <= 0 ||
+            !GameContentCatalog.IsStableId(regionKey) ||
+            !regionKey.StartsWith("region.", StringComparison.Ordinal) ||
+            !environmentProfile.Landable)
+        {
+            throw new InvalidOperationException(
+                "Planetary POI profile identity is invalid.");
+        }
+
+        return PlanInternal(
+            catalog,
+            worldSeed,
+            regionKey,
+            activeQuestTags,
+            environmentRuntime,
+            environmentProfile);
+    }
+
+    private static IReadOnlyList<PlanetaryPoiPlacement> PlanInternal(
+        PlanetaryPoiCatalog catalog,
+        long worldSeed,
+        string regionKey,
+        IReadOnlyCollection<string>? activeQuestTags,
+        PlanetEnvironmentRuntime? environmentRuntime,
+        PlanetEnvironmentProfile? environmentProfile)
+    {
         HashSet<string> questTags = activeQuestTags is null
             ? new HashSet<string>(StringComparer.Ordinal)
             : activeQuestTags
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .ToHashSet(StringComparer.Ordinal);
         List<(double X, double Z)> candidates = BuildCandidates(
-            catalog.WorldSeed,
-            catalog.RegionKey);
+            worldSeed,
+            regionKey);
         List<PlanetaryPoiPlacement> placements = new();
         PlanetaryPoiDefinition[] orderedDefinitions = catalog.Definitions.Values
             .OrderByDescending(definition => definition.Rarity)
@@ -61,10 +107,12 @@ public static class PlanetaryPoiPlanner
                     candidate.Z,
                     placements,
                     catalog,
-                    catalog.WorldSeed))
+                    worldSeed,
+                    environmentRuntime,
+                    environmentProfile))
                 .OrderBy(candidate => CandidateScore(
-                    catalog.WorldSeed,
-                    catalog.RegionKey,
+                    worldSeed,
+                    regionKey,
                     definition.PoiTypeId,
                     candidate.X,
                     candidate.Z,
@@ -81,11 +129,13 @@ public static class PlanetaryPoiPlanner
 
             (double X, double Z) selected = validCandidates[0];
             PlanetaryPoiEnvironmentSample environment = SampleEnvironment(
-                catalog.WorldSeed,
+                worldSeed,
                 selected.X,
-                selected.Z);
+                selected.Z,
+                environmentRuntime,
+                environmentProfile);
             ulong hash = StableHash(
-                $"{catalog.WorldSeed}|{catalog.RegionKey}|" +
+                $"{worldSeed}|{regionKey}|" +
                 $"{definition.PoiTypeId}|rotation");
             placements.Add(new PlanetaryPoiPlacement(
                 $"poi.instance.{index + 1:000000}",
@@ -110,9 +160,13 @@ public static class PlanetaryPoiPlanner
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(environment);
-        return definition.AllowedBiomes.Contains(
+        bool biomeAllowed = definition.AllowedBiomes.Contains(
                 environment.BiomeId,
-                StringComparer.Ordinal) &&
+                StringComparer.Ordinal) ||
+            definition.AllowedBiomes.Contains(
+                "biome.test_plain",
+                StringComparer.Ordinal);
+        return biomeAllowed &&
             environment.SlopeDegrees >= definition.MinimumSlopeDegrees &&
             environment.SlopeDegrees <= definition.MaximumSlopeDegrees &&
             environment.Height >= definition.MinimumHeight &&
@@ -194,7 +248,9 @@ public static class PlanetaryPoiPlanner
         double z,
         IReadOnlyList<PlanetaryPoiPlacement> placements,
         PlanetaryPoiCatalog catalog,
-        long worldSeed)
+        long worldSeed,
+        PlanetEnvironmentRuntime? environmentRuntime,
+        PlanetEnvironmentProfile? environmentProfile)
     {
         if (!ClearsVerticalSliceInfrastructure(definition, x, z))
         {
@@ -204,7 +260,9 @@ public static class PlanetaryPoiPlanner
         PlanetaryPoiEnvironmentSample environment = SampleEnvironment(
             worldSeed,
             x,
-            z);
+            z,
+            environmentRuntime,
+            environmentProfile);
         if (!MeetsDefinitionConstraints(definition, environment))
         {
             return false;
@@ -233,7 +291,9 @@ public static class PlanetaryPoiPlanner
     private static PlanetaryPoiEnvironmentSample SampleEnvironment(
         long worldSeed,
         double x,
-        double z)
+        double z,
+        PlanetEnvironmentRuntime? environmentRuntime = null,
+        PlanetEnvironmentProfile? environmentProfile = null)
     {
         ulong hash = StableHash(string.Format(
             CultureInfo.InvariantCulture,
@@ -243,10 +303,40 @@ public static class PlanetaryPoiPlanner
             z));
         double height = ((long)(hash % 401UL) - 200L) / 100.0;
         double slope = ((hash / 401UL) % 1201UL) / 100.0;
-        double distanceToWater = Math.Abs(x + 34.0);
-        int danger = (int)((hash / 481601UL) % 101UL);
+        int localDanger = (int)((hash / 481601UL) % 31UL);
+        if (environmentRuntime is null || environmentProfile is null)
+        {
+            return new PlanetaryPoiEnvironmentSample(
+                "biome.test_plain",
+                height,
+                slope,
+                Math.Abs(x + 34.0),
+                (int)((hash / 481601UL) % 101UL));
+        }
+
+        double coverage = Math.Clamp(environmentProfile.WaterCoverage, 0.0, 1.0);
+        double shorelineX = 34.0 - coverage * 68.0;
+        double distanceToWater = coverage <= 0.001
+            ? 80.0
+            : Math.Clamp(Math.Abs(x - shorelineX), 0.0, 80.0);
+        double latitude = Math.Clamp(z / CandidateMaximum * 58.0, -58.0, 58.0);
+        double elevation01 = Math.Clamp((height + 2.0) / 4.0, 0.0, 1.0);
+        double localNoise = (((hash >> 23) & 0xFFFFUL) / 32767.5) - 1.0;
+        PlanetEnvironmentSample climate = environmentRuntime.SampleBiome(
+            environmentProfile,
+            latitude,
+            elevation01,
+            distanceToWater * 0.5,
+            localNoise);
+        double hazard = Math.Max(
+            environmentProfile.RadiationLevel,
+            environmentProfile.ToxicityLevel);
+        int danger = Math.Clamp(
+            (int)Math.Round(hazard * 60.0) + localDanger,
+            0,
+            100);
         return new PlanetaryPoiEnvironmentSample(
-            "biome.test_plain",
+            climate.BiomeId,
             height,
             slope,
             distanceToWater,

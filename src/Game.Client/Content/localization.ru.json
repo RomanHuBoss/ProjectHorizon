@@ -967,6 +967,8 @@
     "ui.hud.pending.some": "Ожидающие рецепты: {preview}",
     "ui.hud.planet_environment.summary": "Окружение планеты: {planet} • {archetype} • R={radius} км • g={gravity} • T={temperature} °C • вода={water}% • облака={clouds}",
     "ui.hud.planet_environment.unavailable": "Окружение планеты: недоступно",
+    "ui.hud.planet_surface.summary": "Поверхность {archetype}: биомы={biomes}; флора={flora}; фауна={fauna}; вода={water}",
+    "ui.hud.planet_surface.unavailable": "Поверхность планеты: недоступна",
     "ui.hud.progress": "Прогресс: лом={salvage}/{required} • компоненты={crafted}/{total} • рев={revision}",
     "ui.hud.recipe_progress": "{recipe} [{inputs} → {state}, {seconds}с, {station}]",
     "ui.hud.recipe_state.locked": "ЗАБЛОКИРОВАНО:{technology}",

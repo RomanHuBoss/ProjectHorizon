@@ -112,22 +112,33 @@ public partial class SalvageRepairSlice
         _promotedFloraNodes.Clear();
         _ecologyFloraGroups.Clear();
 
-        MeshInstance3D habitat = new()
+        if (_planetSurfaceContentProfile?.WaterHabitatEnabled != false)
         {
-            Name = "AquaticHabitat",
-            Position = new Vector3(-25.5f, 0.04f, 25.5f),
-            Mesh = new BoxMesh
+            PlanetEnvironmentColor? waterColor =
+                _planetSurfaceContentProfile?.Environment.WaterColor;
+            MeshInstance3D habitat = new()
             {
-                Size = new Vector3(15.0f, 0.08f, 15.0f),
-                Material = new StandardMaterial3D
+                Name = "AquaticHabitat",
+                Position = new Vector3(-25.5f, 0.04f, 25.5f),
+                Mesh = new BoxMesh
                 {
-                    AlbedoColor = new Color(0.03f, 0.20f, 0.30f, 0.72f),
-                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-                    Roughness = 0.18f
+                    Size = new Vector3(15.0f, 0.08f, 15.0f),
+                    Material = new StandardMaterial3D
+                    {
+                        AlbedoColor = waterColor is null
+                            ? new Color(0.03f, 0.20f, 0.30f, 0.72f)
+                            : new Color(
+                                (float)waterColor.R,
+                                (float)waterColor.G,
+                                (float)waterColor.B,
+                                0.72f),
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        Roughness = 0.18f
+                    }
                 }
-            }
-        };
-        _ecologyRoot.AddChild(habitat);
+            };
+            _ecologyRoot.AddChild(habitat);
+        }
 
         foreach (IGrouping<string, EcologyFloraPlacement> group in EcologyPlan.Flora
             .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))

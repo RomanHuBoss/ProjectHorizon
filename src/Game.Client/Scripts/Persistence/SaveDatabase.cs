@@ -2177,6 +2177,15 @@ public sealed partial class SaveDatabase : IDisposable
         {
             Pois = exploration.Pois
                 .OrderBy(state => state.InstanceId, StringComparer.Ordinal)
+                .ToArray(),
+            PlanetStates = exploration.PlanetStates?
+                .OrderBy(state => state.PlanetId, StringComparer.Ordinal)
+                .Select(state => state with
+                {
+                    Pois = state.Pois
+                        .OrderBy(poi => poi.InstanceId, StringComparer.Ordinal)
+                        .ToArray()
+                })
                 .ToArray()
         };
     }
@@ -2187,27 +2196,63 @@ public sealed partial class SaveDatabase : IDisposable
         ArgumentNullException.ThrowIfNull(exploration);
         if (exploration.WorldSeed <= 0 ||
             !GameContentCatalog.IsStableId(exploration.RegionKey) ||
+            !exploration.RegionKey.StartsWith("region.", StringComparison.Ordinal) ||
             exploration.DiscoveryPoints < 0 ||
             exploration.Pois is null ||
-            exploration.Pois.Count > 10000)
+            exploration.Pois.Count > 10000 ||
+            (!string.IsNullOrWhiteSpace(exploration.PlanetId) &&
+                (!GameContentCatalog.IsStableId(exploration.PlanetId) ||
+                 !exploration.PlanetId.StartsWith("planet.", StringComparison.Ordinal))) ||
+            exploration.PlanetStates?.Count > 64)
         {
             throw new InvalidDataException(
                 "planetary_exploration contains invalid identity or scalar values.");
         }
 
-        HashSet<string> instanceIds = new(StringComparer.Ordinal);
-        foreach (PlanetaryPoiStateSaveData state in exploration.Pois)
+        ValidatePoiStates(exploration.Pois);
+        if (exploration.PlanetStates is null)
         {
-            if (!GameContentCatalog.IsStableId(state.InstanceId) ||
-                !GameContentCatalog.IsStableId(state.PoiTypeId) ||
-                !state.PoiTypeId.StartsWith("poi.", StringComparison.Ordinal) ||
-                !instanceIds.Add(state.InstanceId) ||
-                (state.Resolved && !state.Discovered) ||
-                state.CustomName is null ||
-                state.CustomName.Length > 40)
+            return;
+        }
+
+        HashSet<string> planetIds = new(StringComparer.Ordinal);
+        foreach (PlanetaryExplorationPlanetSaveData planet in
+            exploration.PlanetStates)
+        {
+            if (!GameContentCatalog.IsStableId(planet.PlanetId) ||
+                !planet.PlanetId.StartsWith("planet.", StringComparison.Ordinal) ||
+                !planetIds.Add(planet.PlanetId) ||
+                planet.WorldSeed <= 0 ||
+                !GameContentCatalog.IsStableId(planet.RegionKey) ||
+                !planet.RegionKey.StartsWith("region.", StringComparison.Ordinal) ||
+                planet.DiscoveryPoints < 0 ||
+                planet.Pois is null ||
+                planet.Pois.Count > 10000)
             {
                 throw new InvalidDataException(
-                    "planetary_exploration contains invalid or duplicate POI state.");
+                    "planetary_exploration contains invalid planet archive state.");
+            }
+
+            ValidatePoiStates(planet.Pois);
+        }
+
+        static void ValidatePoiStates(
+            IReadOnlyList<PlanetaryPoiStateSaveData> states)
+        {
+            HashSet<string> instanceIds = new(StringComparer.Ordinal);
+            foreach (PlanetaryPoiStateSaveData state in states)
+            {
+                if (!GameContentCatalog.IsStableId(state.InstanceId) ||
+                    !GameContentCatalog.IsStableId(state.PoiTypeId) ||
+                    !state.PoiTypeId.StartsWith("poi.", StringComparison.Ordinal) ||
+                    !instanceIds.Add(state.InstanceId) ||
+                    (state.Resolved && !state.Discovered) ||
+                    state.CustomName is null ||
+                    state.CustomName.Length > 40)
+                {
+                    throw new InvalidDataException(
+                        "planetary_exploration contains invalid or duplicate POI state.");
+                }
             }
         }
     }
@@ -2363,6 +2408,21 @@ public sealed partial class SaveDatabase : IDisposable
                 .ToArray(),
             RemovedFloraInstanceIds = ecology.RemovedFloraInstanceIds
                 .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray(),
+            PlanetStates = ecology.PlanetStates?
+                .OrderBy(state => state.PlanetId, StringComparer.Ordinal)
+                .Select(state => state with
+                {
+                    DiscoveredFloraIds = state.DiscoveredFloraIds
+                        .OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray(),
+                    DiscoveredFaunaIds = state.DiscoveredFaunaIds
+                        .OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray(),
+                    RemovedFloraInstanceIds = state.RemovedFloraInstanceIds
+                        .OrderBy(id => id, StringComparer.Ordinal)
+                        .ToArray()
+                })
                 .ToArray()
         };
     }
@@ -2379,33 +2439,78 @@ public sealed partial class SaveDatabase : IDisposable
             ecology.RemovedFloraInstanceIds is null ||
             ecology.DiscoveredFloraIds.Count > EcologyCatalog.ExpectedFloraCount ||
             ecology.DiscoveredFaunaIds.Count > EcologyCatalog.ExpectedFaunaCount ||
-            ecology.RemovedFloraInstanceIds.Count > EcologyPlanner.GameplayFloraInstanceCount)
+            ecology.RemovedFloraInstanceIds.Count > EcologyPlanner.GameplayFloraInstanceCount ||
+            (!string.IsNullOrWhiteSpace(ecology.PlanetId) &&
+                (!GameContentCatalog.IsStableId(ecology.PlanetId) ||
+                 !ecology.PlanetId.StartsWith("planet.", StringComparison.Ordinal))) ||
+            ecology.PlanetStates?.Count > 64)
         {
             throw new InvalidDataException(
                 "ecology contains invalid identity, counters or collection sizes.");
         }
 
-        static bool HasUniqueStableIds(
-            IReadOnlyList<string> ids,
-            string prefix)
+        ValidateEcologyIds(
+            ecology.DiscoveredFloraIds,
+            ecology.DiscoveredFaunaIds,
+            ecology.RemovedFloraInstanceIds);
+        if (ecology.PlanetStates is null)
         {
-            return ids.All(id =>
-                    GameContentCatalog.IsStableId(id) &&
-                    id.StartsWith(prefix, StringComparison.Ordinal)) &&
-                ids.Distinct(StringComparer.Ordinal).Count() == ids.Count;
+            return;
         }
 
-        if (!HasUniqueStableIds(ecology.DiscoveredFloraIds, "flora.") ||
-            !HasUniqueStableIds(ecology.DiscoveredFaunaIds, "fauna.") ||
-            ecology.RemovedFloraInstanceIds.Any(id =>
-                string.IsNullOrWhiteSpace(id) ||
-                !id.StartsWith("ecology.flora.", StringComparison.Ordinal)) ||
-            ecology.RemovedFloraInstanceIds
-                .Distinct(StringComparer.Ordinal).Count() !=
-                ecology.RemovedFloraInstanceIds.Count)
+        HashSet<string> planetIds = new(StringComparer.Ordinal);
+        foreach (EcologyPlanetSaveData planet in ecology.PlanetStates)
         {
-            throw new InvalidDataException(
-                "ecology contains invalid or duplicate discovery/delta IDs.");
+            if (!GameContentCatalog.IsStableId(planet.PlanetId) ||
+                !planet.PlanetId.StartsWith("planet.", StringComparison.Ordinal) ||
+                !planetIds.Add(planet.PlanetId) ||
+                planet.WorldSeed <= 0 ||
+                !GameContentCatalog.IsStableId(planet.RegionKey) ||
+                !planet.RegionKey.StartsWith("region.", StringComparison.Ordinal) ||
+                planet.DiscoveryPoints < 0 ||
+                planet.DiscoveredFloraIds is null ||
+                planet.DiscoveredFaunaIds is null ||
+                planet.RemovedFloraInstanceIds is null ||
+                planet.DiscoveredFloraIds.Count > EcologyCatalog.ExpectedFloraCount ||
+                planet.DiscoveredFaunaIds.Count > EcologyCatalog.ExpectedFaunaCount ||
+                planet.RemovedFloraInstanceIds.Count > EcologyPlanner.GameplayFloraInstanceCount)
+            {
+                throw new InvalidDataException(
+                    "ecology contains invalid planet archive state.");
+            }
+
+            ValidateEcologyIds(
+                planet.DiscoveredFloraIds,
+                planet.DiscoveredFaunaIds,
+                planet.RemovedFloraInstanceIds);
+        }
+
+        static void ValidateEcologyIds(
+            IReadOnlyList<string> floraIds,
+            IReadOnlyList<string> faunaIds,
+            IReadOnlyList<string> removedFloraIds)
+        {
+            static bool HasUniqueStableIds(
+                IReadOnlyList<string> ids,
+                string prefix)
+            {
+                return ids.All(id =>
+                        GameContentCatalog.IsStableId(id) &&
+                        id.StartsWith(prefix, StringComparison.Ordinal)) &&
+                    ids.Distinct(StringComparer.Ordinal).Count() == ids.Count;
+            }
+
+            if (!HasUniqueStableIds(floraIds, "flora.") ||
+                !HasUniqueStableIds(faunaIds, "fauna.") ||
+                removedFloraIds.Any(id =>
+                    string.IsNullOrWhiteSpace(id) ||
+                    !id.StartsWith("ecology.flora.", StringComparison.Ordinal)) ||
+                removedFloraIds.Distinct(StringComparer.Ordinal).Count() !=
+                    removedFloraIds.Count)
+            {
+                throw new InvalidDataException(
+                    "ecology contains invalid or duplicate discovery/delta IDs.");
+            }
         }
     }
 

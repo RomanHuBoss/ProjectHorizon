@@ -161,6 +161,7 @@ public partial class SalvageRepairSlice
         string sourcePlanetId = InterplanetaryTravel.SourcePlanetId;
         string destinationPlanetId = InterplanetaryTravel.TargetPlanetId;
         double plannedDistance = InterplanetaryTravel.PlannedDistanceMeters;
+        CaptureCurrentPlanetSurfaceState();
         if (!InterplanetaryTravel.TryCompleteArrival(
                 GalaxyNavigation,
                 distance,
@@ -177,6 +178,7 @@ public partial class SalvageRepairSlice
 
         StageOneVoyage.ArriveAtPlanetaryApproach();
         _voyageNavigationAssist = true;
+        ActivateCurrentPlanetSurfaceContent();
         ApplyStageOneVoyageToScene();
         QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
         _lastDomainEvent = "InterplanetaryPlanetApproach";

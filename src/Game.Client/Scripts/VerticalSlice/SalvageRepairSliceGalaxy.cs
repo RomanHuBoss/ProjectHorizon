@@ -245,6 +245,7 @@ public partial class SalvageRepairSlice
         }
 
         bool worldTransit = BeginWorldHyperspaceTransit();
+        CaptureCurrentPlanetSurfaceState();
         GalaxyTravelActionResult result = GalaxyNavigation.TryJumpToSelected(
             ShipSystems,
             StageOneVoyage.Location,
@@ -262,6 +263,7 @@ public partial class SalvageRepairSlice
 
         StageOneVoyage.ArriveAtOrbitalStationFromHyperspace();
         _stationServicesOpenedFromVoyage = false;
+        ActivateCurrentPlanetSurfaceContent();
         if (worldTransit)
         {
             CompleteWorldHyperspaceTransit(successfulJump: true);

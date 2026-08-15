@@ -313,4 +313,125 @@ public sealed class WorldGenTests
         Assert.Equal("planet.approach", voyage.LastCheckpoint);
     }
 
+    [Fact]
+    public void PlanetSurfaceContent_VariesAcrossFourStarterPlanets()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetSurfaceContentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => surface.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .ToArray();
+
+        Assert.Equal(4, profiles.Length);
+        Assert.Equal(4, profiles.Select(profile => profile.RegionKey)
+            .Distinct(StringComparer.Ordinal).Count());
+        Assert.Equal(4, profiles.Select(profile =>
+                string.Join("|", profile.ActiveBiomeIds))
+            .Distinct(StringComparer.Ordinal).Count());
+        Assert.All(profiles, profile =>
+        {
+            EcologyPlan plan = surface.BuildEcologyPlan(profile);
+            Assert.InRange(plan.Flora.Count, 180, EcologyPlanner.GameplayFloraInstanceCount);
+            Assert.All(plan.Flora, flora => Assert.Contains(
+                flora.BiomeId,
+                profile.ActiveBiomeIds));
+        });
+    }
+
+    [Fact]
+    public void PlanetSurfaceContent_DryPlanetExcludesAquaticFauna()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        GalaxyPlanetDefinition volcanic = galaxy.CurrentSystem.Planets
+            .Single(planet => string.Equals(
+                planet.Archetype,
+                "volcanic",
+                StringComparison.Ordinal));
+        PlanetSurfaceContentProfile profile = surface.BuildProfile(
+            volcanic,
+            galaxy.CurrentSystem.StarType);
+        EcologyPlan plan = surface.BuildEcologyPlan(profile);
+
+        Assert.False(profile.WaterHabitatEnabled);
+        Assert.DoesNotContain(
+            plan.ActiveFauna.Concat(plan.SimplifiedFauna),
+            spawn => string.Equals(
+                RepositoryFixture.Ecology.GetFauna(spawn.FaunaId).MovementMode,
+                "Aquatic",
+                StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void PlanetSurfaceContent_PoiAndEcologyStateRoundTripByPlanetIdentity()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        GalaxyPlanetDefinition planet = galaxy.CurrentSystem.Planets[1];
+        PlanetSurfaceContentProfile profile = surface.BuildProfile(
+            planet,
+            galaxy.CurrentSystem.StarType);
+
+        IReadOnlyList<PlanetaryPoiPlacement> firstPois = surface.BuildPoiPlan(profile);
+        IReadOnlyList<PlanetaryPoiPlacement> secondPois = surface.BuildPoiPlan(profile);
+        Assert.Equal(JsonSerializer.Serialize(firstPois), JsonSerializer.Serialize(secondPois));
+        Assert.All(firstPois, poi => Assert.Contains(
+            poi.Environment.BiomeId,
+            profile.ActiveBiomeIds));
+
+        PlanetaryExplorationRuntime exploration = new(
+            RepositoryFixture.Pois,
+            firstPois,
+            profile.WorldSeed,
+            profile.RegionKey);
+        Assert.Equal(
+            PlanetaryPoiScanResult.Discovered,
+            exploration.Scan(firstPois[0].InstanceId, out _));
+        PlanetaryExplorationRuntime explorationRestore = new(
+            RepositoryFixture.Pois,
+            firstPois,
+            profile.WorldSeed,
+            profile.RegionKey,
+            exploration.CreateSaveData());
+        Assert.Equal(1, explorationRestore.DiscoveredCount);
+
+        EcologyPlan ecologyPlan = surface.BuildEcologyPlan(profile);
+        EcologyRuntime ecology = new(
+            RepositoryFixture.Ecology,
+            ecologyPlan,
+            profile.WorldSeed,
+            profile.RegionKey);
+        Assert.True(ecology.TryScanFlora(
+            ecologyPlan.Flora[0].InstanceId,
+            out _,
+            out _));
+        EcologyRuntime ecologyRestore = new(
+            RepositoryFixture.Ecology,
+            ecologyPlan,
+            profile.WorldSeed,
+            profile.RegionKey,
+            ecology.CreateSaveData());
+        Assert.Equal(1, ecologyRestore.DiscoveredFloraCount);
+    }
+
 }

@@ -431,8 +431,6 @@ public partial class SalvageRepairSlice : Node3D
         _proceduralQuestCatalog = LoadProceduralQuestCatalog(
             stationServicesCatalog);
         _playerSurvivalCatalog = LoadPlayerSurvivalCatalog(catalog);
-        IReadOnlyList<PlanetaryPoiPlacement> planetaryPoiPlacements =
-            PlanetaryPoiPlanner.Plan(planetaryPoiCatalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
         CraftingRecipeDefinition repairRecipe = catalog.GetRecipe(
             StarterRepairContentIds.RecipeId);
@@ -481,10 +479,6 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionRuntime = new BaseConstructionRuntime(
             baseConstructionCatalog);
         _planetaryPoiCatalog = planetaryPoiCatalog;
-        _planetaryPoiPlacements = planetaryPoiPlacements;
-        _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
-            planetaryPoiCatalog,
-            planetaryPoiPlacements);
         _shipSystemsCatalog = shipSystemsCatalog;
         _shipSystemsRuntime = new ShipSystemsRuntime(shipSystemsCatalog);
         _technologyProgression = technologyProgression;
@@ -500,10 +494,11 @@ public partial class SalvageRepairSlice : Node3D
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
         InitializePlanetEnvironmentRuntime();
+        InitializePlanetSurfaceContentArchives(null, null);
+        ActivateCurrentPlanetSurfaceContent();
         InitializeStarSystemSimulationRuntime();
         InitializeWorldSceneCoordinator();
         InitializeAerialSteeringRuntime();
-        InitializeEcologyRuntime(saveData: null);
         InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
         InitializePlayerSurvivalRuntime(saveData: null);
@@ -5489,6 +5484,7 @@ public partial class SalvageRepairSlice : Node3D
         BeginStarSystemSimulationAcceptance();
         RunPlanetEnvironmentAcceptance();
         RunInterplanetaryTravelAcceptance();
+        RunPlanetSurfaceContentAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5498,7 +5494,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5537,11 +5533,11 @@ public partial class SalvageRepairSlice : Node3D
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
-            planetaryExploration: PlanetaryExploration.CreateSaveData(),
+            planetaryExploration: CreatePlanetaryExplorationArchiveSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
             stageOneVoyage: StageOneVoyage.CreateSaveData(),
             galaxyNavigation: GalaxyNavigation.CreateSaveData(),
-            ecology: Ecology.CreateSaveData(),
+            ecology: CreateEcologyArchiveSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
             playerSurvival: PlayerSurvival.CreateSaveData(),
             npcFactions: NpcFactions.CreateSaveData());
@@ -5638,11 +5634,11 @@ public partial class SalvageRepairSlice : Node3D
                 _gameplayProductionNetwork?.CreateSaveData(),
             stationServices: StationServices.CreateSaveData(),
             baseConstruction: BaseConstruction.CreateSaveData(),
-            planetaryExploration: PlanetaryExploration.CreateSaveData(),
+            planetaryExploration: CreatePlanetaryExplorationArchiveSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
             stageOneVoyage: StageOneVoyage.CreateSaveData(),
             galaxyNavigation: GalaxyNavigation.CreateSaveData(),
-            ecology: Ecology.CreateSaveData(),
+            ecology: CreateEcologyArchiveSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
             playerSurvival: PlayerSurvival.CreateSaveData(),
             npcFactions: NpcFactions.CreateSaveData());
@@ -5745,19 +5741,18 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionRuntime = new BaseConstructionRuntime(
                 BaseConstructionCatalog,
                 snapshot?.BaseConstruction);
-            _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
-                PlanetaryPoiCatalog,
-                _planetaryPoiPlacements,
-                snapshot?.PlanetaryExploration);
             _shipSystemsRuntime = new ShipSystemsRuntime(
                 ShipSystemsCatalog,
                 snapshot?.ShipSystems,
                 commissioned: Session.ShipRepaired);
             InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
+            InitializePlanetSurfaceContentArchives(
+                snapshot?.PlanetaryExploration,
+                snapshot?.Ecology);
+            ActivateCurrentPlanetSurfaceContent();
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
-            InitializeEcologyRuntime(snapshot?.Ecology);
             InitializeNpcFactionRuntime(snapshot?.NpcFactions);
             InitializeProceduralQuestRuntime(snapshot?.ProceduralQuests);
             InitializePlayerSurvivalRuntime(snapshot?.PlayerSurvival);
@@ -5953,15 +5948,13 @@ public partial class SalvageRepairSlice : Node3D
                 StationServicesAcceptanceRunner.NpcId);
             _baseConstructionRuntime = new BaseConstructionRuntime(
                 BaseConstructionCatalog);
-            _planetaryExplorationRuntime = new PlanetaryExplorationRuntime(
-                PlanetaryPoiCatalog,
-                _planetaryPoiPlacements);
             _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
             InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
+            InitializePlanetSurfaceContentArchives(null, null);
+            ActivateCurrentPlanetSurfaceContent();
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
-            InitializeEcologyRuntime(saveData: null);
             InitializeNpcFactionRuntime(saveData: null);
             InitializeProceduralQuestRuntime(saveData: null);
             InitializePlayerSurvivalRuntime(saveData: null);
@@ -7557,6 +7550,7 @@ public partial class SalvageRepairSlice : Node3D
         string interplanetaryLine = BuildInterplanetaryTravelHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
         string planetEnvironmentLine = BuildPlanetEnvironmentHudLine();
+        string planetSurfaceContentLine = BuildPlanetSurfaceContentHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7592,6 +7586,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
             $"TASK-150 (F5): {_planetEnvironmentAcceptanceHud}",
             $"TASK-152 (F5): {_interplanetaryTravelAcceptanceHud}",
+            $"TASK-154 (F5): {_planetSurfaceContentAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7619,6 +7614,7 @@ public partial class SalvageRepairSlice : Node3D
                 interplanetaryLine,
                 starSystemLine,
                 planetEnvironmentLine,
+                planetSurfaceContentLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7663,6 +7659,7 @@ public partial class SalvageRepairSlice : Node3D
             interplanetaryLine,
             starSystemLine,
             planetEnvironmentLine,
+            planetSurfaceContentLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

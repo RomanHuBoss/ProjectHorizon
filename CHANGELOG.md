@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.154] - 2026-08-15
+
+### Added
+- `TASK-154` planet-scoped surface-content orchestration for the four-planet starter system: deterministic biome/ecology/POI activation follows the actual `CurrentPlanetId`.
+- Per-planet ecology and planetary-exploration delta archives inside the existing backward-compatible save settings; no SQLite schema bump.
+- Planet-aware ground/sky/water presentation, dry-world aquatic suppression, F5 `TASK-154` acceptance, three xUnit regressions, and a section-37 static contract gate.
+
+### Changed
+- Interplanetary arrival and hyperspace lifecycle now capture the previous surface state before changing planet/system and activate the destination surface content when landable.
+- Ecology planning now accepts planet seed, active biome set, water coverage and habitability; POI placement samples the real planet climate instead of the fixed `biome.test_plain` environment.
+- Legacy `planet.vertical_slice` keeps its historical ecology/POI seeds, region keys and instance IDs so existing saves remain loadable.
+- Planet-surface HUD summary is routed through the existing RU/EN localization catalogs, including localized archetype and water-state labels.
+
 ## [0.1.0-alpha.152] - 2026-08-15
 
 ### Added

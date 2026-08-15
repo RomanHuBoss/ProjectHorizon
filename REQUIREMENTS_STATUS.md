@@ -2,13 +2,71 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task152-interplanetary-travel.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — TASK-152 Interplanetary Travel & Planet Activation Handoff
+## 0. Текущая mega-итерация 2026-08-15 — TASK-154 Planet-Scoped Surface Content
+
+**Исходный снимок:** `ProjectHorizon-main(20260815-192529).zip` — последняя приложенная пользователем редакция с GitHub.  
+**Подготовленный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`.  
+**Версия:** `0.1.0-alpha.154`.  
+**Статус:** TASK-154 `IMPLEMENTED`; runtime acceptance TASK-155 `IN_PROGRESS`; ранее открытая TASK-153 Interplanetary Travel acceptance остаётся `IN_PROGRESS` и не объявляется закрытой без реального Windows/Godot запуска.
+
+### Выбор mega-итерации и граница протокола
+
+По очереди журнала ближайшей формальной задачей остаётся TASK-153 — runtime-приёмка уже реализованной TASK-152. В среде подготовки отсутствуют `dotnet`, `csc/msbuild` и Godot, поэтому выполнить требуемые clean build/F5/manual доказательства TASK-153 здесь невозможно. Пользователь отдельно запросил проверить возможность очередной «мега-итерации». Поэтому новая кодовая работа не выдаётся за закрытие TASK-153: она реализована как TASK-154, а TASK-153 сохраняет приоритет в acceptance queue.
+
+В приложенном GitHub ZIP файлы PDF-ТЗ являются Git LFS pointer files, а не PDF payload; прямой render/screenshot нормативного PDF в этой среде невозможен. Связанные требования берутся из уже зафиксированной в этом журнале карты PDF v2.0: §3.3, §9.5–9.8 и Stage 2 (`3–5` планет с различными биомами/водой/атмосферой), плюс связка с §15/межпланетным перелётом TASK-152. Нормативный PDF не подменяется и его содержимое не реконструируется сверх уже записанных требований.
+
+### Почему это цельная подсистема
+
+После TASK-152 смена `CurrentPlanetId` была реальной, а water/atmosphere metadata уже зависели от планеты, но gameplay content поверхности оставался глобальным: `EcologyPlanner` всегда использовал один `vertical_slice` seed и четыре фиксированных biome ID, а `PlanetaryPoiPlanner` всегда семплировал `biome.test_plain`. В результате физический перелёт менял планету в навигации, но не менял реальную экологию и исследовательский слой. TASK-154 закрывает весь разрыв **planet identity → environment → ecology → POI → presentation → per-planet persistence → arrival activation** одной итерацией.
+
+### Реализовано
+
+- добавлен `PlanetSurfaceContentRuntime`: для landable `CurrentPlanetId` строит deterministic surface profile из существующего `PlanetEnvironmentRuntime`, stable planet seed, 1–8 active biomes, water coverage и bounded habitability;
+- `EcologyPlanner.PlanPlanet` теперь строит flora/fauna только из активных биомов текущей планеты, варьирует bounded population budgets по habitability и исключает aquatic fauna при `waterCoverage < 0.12`;
+- `PlanetaryPoiPlanner.PlanPlanet` сохраняет 20 нормативных POI types, но вместо hard-coded `biome.test_plain` использует `PlanetEnvironmentRuntime.SampleBiome`; water distance и danger зависят от профиля текущей планеты и deterministic local sample;
+- legacy `planet.vertical_slice` намеренно оставлен на исторических ecology/POI planner identity, seed/region и instance IDs, чтобы старые saves продолжали загружаться без несовместимости;
+- `EcologyRuntime` и `PlanetaryExplorationRuntime` получили явную planet-scoped identity (`worldSeed`, `regionKey`) при сохранении legacy constructors;
+- existing JSON save settings `ecology` и `planetary_exploration` расширены optional `PlanetId` + `PlanetStates`; deltas архивируются отдельно для каждой посещённой планеты без SQLite schema bump; старый root без `PlanetId` мигрирует в памяти как state `planet.vertical_slice`;
+- save boundary канонизирует и валидирует вложенные planet archives, stable IDs, region identity и duplicate planet IDs;
+- interplanetary arrival теперь выполняет `CaptureCurrentPlanetSurfaceState()` перед commit и `ActivateCurrentPlanetSurfaceContent()` после успешного transfer; hyperspace сохраняет предыдущую surface-state и активирует новый landable body, non-landable body не уничтожает предыдущий архив;
+- presentation поверхности переключает ground tint, atmosphere/ambient color и water color; dry profile отключает `Gameplay/WaterPool`, а ecology rebuild не создаёт `AquaticHabitat`;
+- F5 matrix дополнена `TASK-154 multi-planet surface content acceptance`; acceptance проверяет 4/4 starter planets, distinct biome/region profiles, climate-aware ecology, aquatic policy, deterministic climate-aware POI, per-planet state round-trip и legacy starter compatibility;
+- добавлены 3 xUnit regression tests и `tools/validate-task154-multi-planet-surface-content.py`; validator включён в оба section-37 quality scripts;
+- добавлена документация `docs/MULTI_PLANET_SURFACE_CONTENT.md`; `README.md`, `CHANGELOG.md`, `VERSION` и этот журнал обновлены.
+
+### Изменённые/добавленные ключевые файлы
+
+`SaveGameModels.cs`, `SaveDatabase.cs`, `EcologyPlanner.cs`, `EcologyRuntime.cs`, `PlanetaryPoiPlanner.cs`, `PlanetaryExplorationRuntime.cs`, `PlanetSurfaceContentRuntime.cs`, `PlanetSurfaceContentAcceptance.cs`, `SalvageRepairSlicePlanetSurfaceContent.cs`, `SalvageRepairSliceEcology.cs`, `SalvageRepairSliceInterplanetaryTravel.cs`, `SalvageRepairSliceGalaxy.cs`, `SalvageRepairSlice.cs`, `WorldGenTests.cs`, `localization.en.json`, `localization.ru.json`, section-37 scripts, TASK-154 validator, README/CHANGELOG/VERSION и `docs/MULTI_PLANET_SURFACE_CONTENT.md`.
+
+### Фактические проверки в среде подготовки
+
+Доступные repository static gates проходят после интеграции TASK-154: JSON content, Godot text-resource structure, localization, audio, developer diagnostics, §36 testing contract, §37 build contract, §38 architecture, platform architecture, TASK-146, TASK-148, TASK-149.4, TASK-150, TASK-152 и новый TASK-154. Новый gate выдаёт:
+
+`TASK-154 MULTI-PLANET SURFACE CONTENT CONTRACT PASS: starterPlanets=4/4; distinctBiomes=4/4; ecologyClimate=1; aquaticPolicy=1; poiClimate=1; perPlanetArchives=1; legacyStarter=1; arrivalSwitch=1; hyperspacePreserve=1; visualSurface=1; f5=1; xunit=3/3.`
+
+Все 14 изменённых C# sources дополнительно проверены: строковые и символьные литералы закрыты, block comments закрыты, braces/parentheses/brackets сбалансированы. Реальная `dotnet build`, xUnit execution и Godot runtime/F5 не выполнялись: соответствующих исполняемых инструментов в среде нет. Статус `VERIFIED` поэтому не присваивается.
+
+### Критерии runtime-приёмки TASK-154 / TASK-155
+
+1. Windows: `tools\clean-build-windows10.cmd` → `0 warnings / 0 errors`.
+2. F5: обязательна строка `TASK-154 multi-planet surface content acceptance PASS` с `starterPlanets=4/4; biomeProfiles=4/4; regions=4/4; ecologyClimateAware=1; aquaticPolicy=1; poiClimateAware=1; poiDeterministic=1; perPlanetPersistence=1; legacyStarter=1`.
+3. Manual starter planet: убедиться, что прежний `planet.vertical_slice` выглядит и работает без потери старых discovery/ecology deltas.
+4. `M → System → другая landable planet → Enter`, затем реальный перелёт/`K`; после `TASK-152 interplanetary transfer PASS` HUD должен показать другой `Surface <archetype>`, а Output — `TASK-154 planet surface content READY` с новым planet ID/biome list/region.
+5. Проверить минимум desert, frozen и volcanic: flora/fauna/POI biome должны отличаться от starter; на dry volcanic water pool и `AquaticHabitat` отсутствуют, aquatic fauna не создаётся.
+6. На двух разных планетах открыть/просканировать разные POI или ecology specimen, сделать graceful exit/Continue, затем вернуться на первую планету: discovery/removal state каждой планеты должен восстановиться независимо и не «перетечь» между планетами.
+7. Для доказательства прислать: строку clean build, весь `TASK-154 ... acceptance PASS`, `TASK-154 planet surface content READY` минимум для двух разных planet IDs, один screenshot dry volcanic surface и один screenshot water-bearing surface. При FAIL — прислать первую ошибку/stack trace, текущий planet ID/archetype и ближайшую строку `TASK-154 ... READY/STANDBY`.
+
+**Known boundary:** TASK-154 делает surface content planet-correct внутри существующего bounded vertical slice. Это не бесшовный full-planet terrain streamer и не параллельная загрузка нескольких detailed PlanetRuntime. Gas giant остаётся non-landable и не получает surface plan.
+
+---
+
+## 0. Предыдущая mega-итерация 2026-08-15 — TASK-152 Interplanetary Travel & Planet Activation Handoff
 
 **Исходный снимок:** `ProjectHorizon-main-task150.1-build-graceful-exit-hotfix.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task152-interplanetary-travel.zip`.  
@@ -5319,6 +5377,26 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `TRAVEL-ACC-102` | F5 TASK-152 PASS | `IN_PROGRESS` | выполнить runtime acceptance |
 | `TRAVEL-ACC-103` | Manual target→cruise→arrival→landing→cold restore | `IN_PROGRESS` | выполнить gameplay smoke |
 
+### 8.26. Planet-Scoped Surface Content / Stage 2 real post-travel variation
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `SURFACE-100` | Current landable planet имеет deterministic planet-scoped surface identity | `IMPLEMENTED` | `PlanetSurfaceContentRuntime`; stable planet seed + `region.surface.*` |
+| `SURFACE-101` | Ecology использует только active biomes текущей планеты | `IMPLEMENTED` | `EcologyPlanner.PlanPlanet`; TASK-154 gate |
+| `SURFACE-102` | Flora/fauna budgets bounded и варьируются по habitability | `IMPLEMENTED` | 180–360 flora; active/simplified не превышают catalog limits |
+| `SURFACE-103` | Dry planet не создаёт aquatic fauna/habitat | `IMPLEMENTED` | water threshold 0.12; `WaterHabitatEnabled`; scene suppression |
+| `SURFACE-104` | 20 POI планируются по реальному planet biome/water/danger sample | `IMPLEMENTED` | `PlanetaryPoiPlanner.PlanPlanet`; `PlanetEnvironmentRuntime.SampleBiome` |
+| `SURFACE-105` | Interplanetary arrival переключает surface content после planet commit | `IMPLEMENTED` | capture before transfer + destination activation after success |
+| `SURFACE-106` | Ecology/POI deltas сохраняются независимо по PlanetId | `IMPLEMENTED` | optional `PlanetStates`; nested canonicalization/validation; no schema bump |
+| `SURFACE-107` | Legacy starter saves сохраняют historical seed/region/instance IDs | `IMPLEMENTED` | dedicated `planet.vertical_slice` compatibility path |
+| `SURFACE-108` | Ground/atmosphere/water presentation отражает current planet | `IMPLEMENTED` | material/environment/water binding in `SalvageRepairSlicePlanetSurfaceContent` |
+| `SURFACE-109` | Non-landable body не создаёт surface plan и не уничтожает landable archive | `IMPLEMENTED` | STANDBY branch; prior archive retained |
+| `SURFACE-110` | Static/F5/xUnit acceptance проверяет подсистему целиком | `IMPLEMENTED` | TASK-154 validator; F5 acceptance; xUnit 3/3 source coverage |
+| `SURFACE-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-155 Windows/Godot .NET acceptance |
+| `SURFACE-ACC-101` | Section-37 + xUnit execution green | `IN_PROGRESS` | static gates PASS; actual dotnet unavailable in preparation environment |
+| `SURFACE-ACC-102` | F5 TASK-154 PASS | `IN_PROGRESS` | выполнить runtime acceptance |
+| `SURFACE-ACC-103` | Manual 4-planet variation + independent cold restore | `IN_PROGRESS` | выполнить gameplay smoke по критериям §0 |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -5326,12 +5404,12 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
 | 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | Clean build `0/0`; quality/xUnit; F5 TASK-152 PASS; manual target→cruise→landing→cold restore |
-| 2 | `TASK-154` | Stage 2 multi-planet content expansion | Water/atmosphere/ecology/exploration variation across the 4-planet starter system after travel is real |
+| 2 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 TASK-154 PASS; manual variation on starter 4 planets; independent discovery/ecology cold restore |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
 **Принято владельцем продукта:** TASK-149 technical foundation и TASK-150/TASK-151 Multi-Planet Environment acceptance.  
-**Текущая реализация:** TASK-152 Interplanetary Travel & Planet Activation Handoff.  
-**Текущая приёмочная задача:** TASK-153.
+**Текущая кодовая реализация:** TASK-154 Planet-Scoped Surface Content (`IMPLEMENTED`).  
+**Формально первая незакрытая приёмочная задача:** TASK-153; TASK-155 следует сразу после неё.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 

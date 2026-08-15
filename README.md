@@ -28,7 +28,17 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice и принятая TASK-150 planetary-environment foundation сохранены. После подтверждения владельца продукта «всё работает» TASK-150/TASK-151 считаются `VERIFIED` без реконструкции отсутствующих численных метрик. Текущая mega-итерация `TASK-152` закрывает следующую связанную границу Stage 2 — **Interplanetary Travel & Planet Activation Handoff**: выбор планеты в System Map, физический assisted cruise по живым proxy-позициям, расход топлива, transactional world-shell handoff и persisted current-planet transfer.
+Stage 1 vertical slice и принятая TASK-150 planetary-environment foundation сохранены. После подтверждения владельца продукта «всё работает» TASK-150/TASK-151 считаются `VERIFIED` без реконструкции отсутствующих численных метрик. `TASK-152` реализовал реальный same-system planetary transfer; его формальный Windows/Godot runtime-tail `TASK-153` остаётся `IN_PROGRESS`. Текущая кодовая mega-итерация `TASK-154` закрывает следующий связанный Stage 2 разрыв — **Planet-Scoped Surface Content**: после физического перелёта меняются не только environment metadata, но и реальные биомы, флора/фауна, POI, вода и presentation поверхности, а прогресс каждой планеты сохраняется независимо.
+
+### TASK-154 Planet-Scoped Surface Content mega-iteration — `IMPLEMENTED`, runtime acceptance — `IN_PROGRESS`
+
+- четыре стартовые планеты (`temperate/desert/frozen/volcanic`) получают собственные deterministic surface profiles и region identity;
+- ecology density/species выбираются из активных биомов текущей планеты; на сухих планетах aquatic fauna/habitat выключаются;
+- planetary POI остаются теми же 20 типами, но их размещение и biome/danger/water samples вычисляются из реального planet environment;
+- interplanetary arrival выполняет `capture old planet → commit transfer → activate destination`; hyperspace сохраняет предыдущую surface-state и активирует новый landable body;
+- ecology/POI deltas архивируются по `PlanetId` внутри существующих JSON save settings без повышения SQLite schema; legacy `planet.vertical_slice` сохраняет исторические seed/region/instance IDs;
+- поверхность визуально переключает ground/atmosphere/water profile; water pool и aquatic habitat отсутствуют на dry-world profile;
+- `F5` включает `TASK-154 multi-planet surface content acceptance`, а section-37 quality — `validate-task154-multi-planet-surface-content.py`; добавлены три xUnit regression tests.
 
 ### TASK-152 Interplanetary Travel mega-iteration — `IMPLEMENTED`, runtime acceptance — `IN_PROGRESS`
 

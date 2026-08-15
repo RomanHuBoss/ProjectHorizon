@@ -967,6 +967,8 @@
     "ui.hud.pending.some": "Pending recipes: {preview}",
     "ui.hud.planet_environment.summary": "Planet environment: {planet} • {archetype} • R={radius} km • g={gravity} • T={temperature} °C • water={water}% • clouds={clouds}",
     "ui.hud.planet_environment.unavailable": "Planet environment: unavailable",
+    "ui.hud.planet_surface.summary": "Surface {archetype}: biomes={biomes}; flora={flora}; fauna={fauna}; water={water}",
+    "ui.hud.planet_surface.unavailable": "Planet surface: unavailable",
     "ui.hud.progress": "Progress: salvage={salvage}/{required} • components={crafted}/{total} • rev={revision}",
     "ui.hud.recipe_progress": "{recipe} [{inputs} → {state}, {seconds}s, {station}]",
     "ui.hud.recipe_state.locked": "LOCKED:{technology}",

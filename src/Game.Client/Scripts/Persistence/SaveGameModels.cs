@@ -163,11 +163,20 @@ public sealed record PlanetaryPoiStateSaveData(
     bool Resolved,
     string CustomName);
 
-public sealed record PlanetaryExplorationSaveData(
+public sealed record PlanetaryExplorationPlanetSaveData(
+    string PlanetId,
     long WorldSeed,
     string RegionKey,
     int DiscoveryPoints,
     IReadOnlyList<PlanetaryPoiStateSaveData> Pois);
+
+public sealed record PlanetaryExplorationSaveData(
+    long WorldSeed,
+    string RegionKey,
+    int DiscoveryPoints,
+    IReadOnlyList<PlanetaryPoiStateSaveData> Pois,
+    string PlanetId = "",
+    IReadOnlyList<PlanetaryExplorationPlanetSaveData>? PlanetStates = null);
 
 public sealed record ShipModuleInstallationSaveData(
     string ModuleId,
@@ -224,13 +233,24 @@ public sealed record GalaxyNavigationSaveData(
     int InterplanetaryTransferCount = 0,
     double TotalInterplanetaryDistanceMeters = 0.0);
 
-public sealed record EcologySaveData(
+public sealed record EcologyPlanetSaveData(
+    string PlanetId,
     long WorldSeed,
     string RegionKey,
     int DiscoveryPoints,
     IReadOnlyList<string> DiscoveredFloraIds,
     IReadOnlyList<string> DiscoveredFaunaIds,
     IReadOnlyList<string> RemovedFloraInstanceIds);
+
+public sealed record EcologySaveData(
+    long WorldSeed,
+    string RegionKey,
+    int DiscoveryPoints,
+    IReadOnlyList<string> DiscoveredFloraIds,
+    IReadOnlyList<string> DiscoveredFaunaIds,
+    IReadOnlyList<string> RemovedFloraInstanceIds,
+    string PlanetId = "",
+    IReadOnlyList<EcologyPlanetSaveData>? PlanetStates = null);
 
 public sealed record ProceduralQuestStateSaveData(
     string QuestId,

@@ -27,15 +27,40 @@ public sealed record PlanetaryPoiRuntimeState(
 public sealed class PlanetaryExplorationRuntime
 {
     private readonly PlanetaryPoiCatalog _catalog;
+    private readonly long _worldSeed;
+    private readonly string _regionKey;
     private readonly Dictionary<string, PlanetaryPoiRuntimeState> _states;
 
     public PlanetaryExplorationRuntime(
         PlanetaryPoiCatalog catalog,
         IReadOnlyList<PlanetaryPoiPlacement> placements,
         PlanetaryExplorationSaveData? saveData = null)
+        : this(
+            catalog,
+            placements,
+            catalog?.WorldSeed ?? 0,
+            catalog?.RegionKey ?? string.Empty,
+            saveData)
+    {
+    }
+
+    public PlanetaryExplorationRuntime(
+        PlanetaryPoiCatalog catalog,
+        IReadOnlyList<PlanetaryPoiPlacement> placements,
+        long worldSeed,
+        string regionKey,
+        PlanetaryExplorationSaveData? saveData = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(placements);
+        if (worldSeed <= 0 ||
+            !GameContentCatalog.IsStableId(regionKey) ||
+            !regionKey.StartsWith("region.", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Planetary exploration runtime identity is invalid.");
+        }
+
         if (placements.Count != PlanetaryPoiCatalog.ExpectedPoiTypeCount)
         {
             throw new InvalidOperationException(
@@ -44,6 +69,8 @@ public sealed class PlanetaryExplorationRuntime
         }
 
         _catalog = catalog;
+        _worldSeed = worldSeed;
+        _regionKey = regionKey;
         _states = new Dictionary<string, PlanetaryPoiRuntimeState>(
             StringComparer.Ordinal);
         Dictionary<string, PlanetaryPoiStateSaveData> savedStates = saveData is null
@@ -83,9 +110,9 @@ public sealed class PlanetaryExplorationRuntime
         }
     }
 
-    public long WorldSeed => _catalog.WorldSeed;
+    public long WorldSeed => _worldSeed;
 
-    public string RegionKey => _catalog.RegionKey;
+    public string RegionKey => _regionKey;
 
     public int DiscoveryPoints { get; private set; }
 

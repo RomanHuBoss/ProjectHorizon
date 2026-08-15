@@ -16,6 +16,8 @@ public sealed class EcologyRuntime
 {
     private readonly EcologyCatalog _catalog;
     private readonly EcologyPlan _plan;
+    private readonly long _worldSeed;
+    private readonly string _regionKey;
     private readonly HashSet<string> _discoveredFloraIds =
         new(StringComparer.Ordinal);
     private readonly HashSet<string> _discoveredFaunaIds =
@@ -29,11 +31,36 @@ public sealed class EcologyRuntime
         EcologyCatalog catalog,
         EcologyPlan plan,
         EcologySaveData? saveData = null)
+        : this(
+            catalog,
+            plan,
+            catalog?.WorldSeed ?? 0,
+            catalog?.RegionKey ?? string.Empty,
+            saveData)
+    {
+    }
+
+    public EcologyRuntime(
+        EcologyCatalog catalog,
+        EcologyPlan plan,
+        long worldSeed,
+        string regionKey,
+        EcologySaveData? saveData = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(plan);
+        if (worldSeed <= 0 ||
+            !GameContentCatalog.IsStableId(regionKey) ||
+            !regionKey.StartsWith("region.", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Ecology runtime identity is invalid.");
+        }
+
         _catalog = catalog;
         _plan = plan;
+        _worldSeed = worldSeed;
+        _regionKey = regionKey;
 
         if (plan.ActiveFauna.Count > catalog.ActiveFaunaLimit ||
             plan.SimplifiedFauna.Count > catalog.SimplifiedFaunaLimit)
@@ -47,10 +74,10 @@ public sealed class EcologyRuntime
             return;
         }
 
-        if (saveData.WorldSeed != catalog.WorldSeed ||
+        if (saveData.WorldSeed != _worldSeed ||
             !string.Equals(
                 saveData.RegionKey,
-                catalog.RegionKey,
+                _regionKey,
                 StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
@@ -97,6 +124,10 @@ public sealed class EcologyRuntime
                 "Ecology discovery-point total does not match saved deltas.");
         }
     }
+
+    public long WorldSeed => _worldSeed;
+
+    public string RegionKey => _regionKey;
 
     public int DiscoveredFloraCount => _discoveredFloraIds.Count;
 
@@ -234,8 +265,8 @@ public sealed class EcologyRuntime
     public EcologySaveData CreateSaveData()
     {
         return new EcologySaveData(
-            _catalog.WorldSeed,
-            _catalog.RegionKey,
+            _worldSeed,
+            _regionKey,
             DiscoveryPoints,
             DiscoveredFloraIds.ToArray(),
             DiscoveredFaunaIds.ToArray(),

@@ -42,20 +42,86 @@ public static class EcologyPlanner
     public static EcologyPlan Plan(EcologyCatalog catalog)
     {
         ArgumentNullException.ThrowIfNull(catalog);
+        return BuildPlan(
+            catalog,
+            catalog.WorldSeed,
+            GameplayBiomes,
+            GameplayFloraInstanceCount,
+            catalog.ActiveFaunaLimit,
+            catalog.SimplifiedFaunaLimit,
+            allowAquatic: true);
+    }
+
+    public static EcologyPlan PlanPlanet(
+        EcologyCatalog catalog,
+        long worldSeed,
+        IReadOnlyList<string> activeBiomeIds,
+        double waterCoverage,
+        double habitability)
+    {
+        ArgumentNullException.ThrowIfNull(catalog);
+        ArgumentNullException.ThrowIfNull(activeBiomeIds);
+        if (worldSeed <= 0 || activeBiomeIds.Count is < 1 or > 8 ||
+            activeBiomeIds.Distinct(StringComparer.Ordinal).Count() !=
+                activeBiomeIds.Count ||
+            activeBiomeIds.Any(id => !catalog.Biomes.ContainsKey(id)) ||
+            !double.IsFinite(waterCoverage) || waterCoverage is < 0.0 or > 1.0 ||
+            !double.IsFinite(habitability) || habitability is < 0.0 or > 1.0)
+        {
+            throw new InvalidOperationException(
+                "Planet ecology profile is invalid.");
+        }
+
+        int floraCount = Math.Clamp(
+            (int)Math.Round(180.0 + habitability * 180.0),
+            180,
+            GameplayFloraInstanceCount);
+        int activeFauna = Math.Clamp(
+            (int)Math.Round(8.0 + habitability * 12.0),
+            8,
+            catalog.ActiveFaunaLimit);
+        int simplifiedFauna = Math.Clamp(
+            (int)Math.Round(32.0 + habitability * 48.0),
+            32,
+            catalog.SimplifiedFaunaLimit);
+        return BuildPlan(
+            catalog,
+            worldSeed,
+            activeBiomeIds,
+            floraCount,
+            activeFauna,
+            simplifiedFauna,
+            allowAquatic: waterCoverage >= 0.12);
+    }
+
+    private static EcologyPlan BuildPlan(
+        EcologyCatalog catalog,
+        long worldSeed,
+        IReadOnlyList<string> activeBiomeIds,
+        int floraCount,
+        int activeFaunaCount,
+        int simplifiedFaunaCount,
+        bool allowAquatic)
+    {
         List<EcologyFloraPlacement> flora = BuildFlora(
             catalog,
-            GameplayFloraInstanceCount,
-            catalog.WorldSeed);
+            floraCount,
+            worldSeed,
+            activeBiomeIds);
         List<EcologyFaunaSpawn> active = BuildFauna(
             catalog,
-            catalog.ActiveFaunaLimit,
+            activeFaunaCount,
             simplified: false,
-            catalog.WorldSeed ^ 0x5D39B1A7L);
+            worldSeed ^ 0x5D39B1A7L,
+            activeBiomeIds,
+            allowAquatic);
         List<EcologyFaunaSpawn> simplified = BuildFauna(
             catalog,
-            catalog.SimplifiedFaunaLimit,
+            simplifiedFaunaCount,
             simplified: true,
-            catalog.WorldSeed ^ 0x2F77C4D9L);
+            worldSeed ^ 0x2F77C4D9L,
+            activeBiomeIds,
+            allowAquatic);
         return new EcologyPlan(flora, active, simplified);
     }
 
@@ -155,7 +221,8 @@ public static class EcologyPlanner
     private static List<EcologyFloraPlacement> BuildFlora(
         EcologyCatalog catalog,
         int count,
-        long seed)
+        long seed,
+        IReadOnlyList<string> activeBiomeIds)
     {
         StableRandom random = new(unchecked((ulong)seed));
         List<EcologyFloraPlacement> placements = new(count);
@@ -170,7 +237,8 @@ public static class EcologyPlanner
                     "Ecology planner exhausted flora placement attempts.");
             }
 
-            string biomeId = GameplayBiomes[placements.Count % GameplayBiomes.Length];
+            string biomeId = activeBiomeIds[
+                placements.Count % activeBiomeIds.Count];
             EcologyFloraDefinition[] candidates = catalog.Flora.Values
                 .Where(flora => flora.BiomeIds.Contains(
                     biomeId,
@@ -233,18 +301,43 @@ public static class EcologyPlanner
         EcologyCatalog catalog,
         int count,
         bool simplified,
-        long seed)
+        long seed,
+        IReadOnlyList<string> activeBiomeIds,
+        bool allowAquatic)
     {
         StableRandom random = new(unchecked((ulong)seed));
+        HashSet<string> activeBiomes = activeBiomeIds.ToHashSet(
+            StringComparer.Ordinal);
         EcologyFaunaDefinition[] definitions = catalog.Fauna.Values
+            .Where(fauna =>
+                fauna.BiomeIds.Any(activeBiomes.Contains) &&
+                (allowAquatic || !string.Equals(
+                    fauna.MovementMode,
+                    "Aquatic",
+                    StringComparison.Ordinal)))
             .OrderBy(fauna => fauna.FaunaId, StringComparer.Ordinal)
             .ToArray();
+        if (definitions.Length == 0)
+        {
+            definitions = catalog.Fauna.Values
+                .Where(fauna => !string.Equals(
+                    fauna.MovementMode,
+                    "Aquatic",
+                    StringComparison.Ordinal))
+                .OrderBy(fauna => fauna.FaunaId, StringComparer.Ordinal)
+                .ToArray();
+        }
         List<EcologyFaunaSpawn> spawns = new(count);
         for (int index = 0; index < count; index++)
         {
             EcologyFaunaDefinition definition = definitions[index % definitions.Length];
-            string biomeId = definition.BiomeIds[
-                random.NextInt(definition.BiomeIds.Count)];
+            string[] compatibleBiomes = definition.BiomeIds
+                .Where(activeBiomes.Contains)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray();
+            string biomeId = compatibleBiomes.Length > 0
+                ? compatibleBiomes[random.NextInt(compatibleBiomes.Length)]
+                : activeBiomeIds[random.NextInt(activeBiomeIds.Count)];
             (double x, double y, double z) = SampleFaunaHabitat(
                 random,
                 definition.MovementMode,
