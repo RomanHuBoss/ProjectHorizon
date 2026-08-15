@@ -9,9 +9,10 @@ using Godot;
 public enum PlayerEquipmentTab
 {
     Overview = 0,
-    Suit = 1,
-    Multitool = 2,
-    Consumables = 3
+    Inventory = 1,
+    Suit = 2,
+    Multitool = 3,
+    Consumables = 4
 }
 
 public partial class SalvageRepairSlice
@@ -137,7 +138,9 @@ public partial class SalvageRepairSlice
             safeInterior);
         if (!PlayerSurvival.IsAlive && activeOnFoot)
         {
-            _status = "player incapacitated: use survival supplies after reset/restore";
+            _status = "player incapacitated: return to main menu or start a new profile";
+            ShowApplicationDeathScreen(
+                "Life-support failure • health depleted • gameplay simulation paused");
         }
         if (_playerEquipmentOpen)
         {
@@ -266,6 +269,12 @@ public partial class SalvageRepairSlice
     private IReadOnlyList<string> PlayerEquipmentEntries =>
         _playerEquipmentTab switch
         {
+            PlayerEquipmentTab.Inventory => Session.AvailableInventory
+                .Where(stack => stack.Quantity > 0)
+                .Select(stack => stack.DefinitionId)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray(),
             PlayerEquipmentTab.Suit => PlayerSurvivalCatalog.SuitModules.Keys
                 .OrderBy(id => id, StringComparer.Ordinal).ToArray(),
             PlayerEquipmentTab.Multitool => PlayerSurvivalCatalog.MultitoolModules.Keys
@@ -298,6 +307,12 @@ public partial class SalvageRepairSlice
             return;
         }
         string id = entries[Math.Clamp(_playerEquipmentSelection, 0, entries.Count - 1)];
+        if (_playerEquipmentTab == PlayerEquipmentTab.Inventory)
+        {
+            _playerEquipmentFeedback = $"inventory item selected: {id}";
+            UpdatePlayerEquipmentPanel();
+            return;
+        }
         if (_playerEquipmentTab == PlayerEquipmentTab.Consumables)
         {
             UseSelectedSurvivalConsumable(id);
@@ -408,8 +423,8 @@ public partial class SalvageRepairSlice
             ResolveCurrentEnvironmentArchetype();
         List<string> lines = new()
         {
-            "EXOSUIT & MULTITOOL — TASK-120",
-            $"Tab={_playerEquipmentTab} | I/Esc close | Tab switch | Enter install/use | X uninstall",
+            "INVENTORY / EXOSUIT & MULTITOOL — TASK-120/TASK-130",
+            $"Tab={_playerEquipmentTab} | I/Esc close | Tab switch | Enter inspect/install/use | X uninstall",
             $"Environment={environment} | swimming={(PlayerSurvival.Swimming ? 1 : 0)} | alive={(PlayerSurvival.IsAlive ? 1 : 0)}",
             $"Health {PlayerSurvival.Health:0.#}/{stats.MaximumHealth:0.#} | Shield {PlayerSurvival.Shield:0.#}/{stats.MaximumShield:0.#} | Stamina {PlayerSurvival.Stamina:0.#}/{stats.MaximumStamina:0.#}",
             $"LifeSupport {PlayerSurvival.LifeSupport:0.#}/{stats.MaximumLifeSupport:0.#} | Hazard {PlayerSurvival.HazardProtection:0.#}/{stats.MaximumHazardProtection:0.#} | Oxygen {PlayerSurvival.Oxygen:0.#}/{stats.MaximumOxygen:0.#}",
@@ -433,6 +448,9 @@ public partial class SalvageRepairSlice
                 int inventory = Session.GetAvailableQuantity(id);
                 string state = _playerEquipmentTab switch
                 {
+                    PlayerEquipmentTab.Inventory => ContentCatalog.Items.TryGetValue(id, out GameItemDefinition? item)
+                        ? item.Category.ToUpperInvariant()
+                        : "ITEM",
                     PlayerEquipmentTab.Suit => PlayerSurvival.InstalledSuitModules.Contains(id, StringComparer.Ordinal) ? "INSTALLED" : "AVAILABLE",
                     PlayerEquipmentTab.Multitool => PlayerSurvival.InstalledMultitoolModules.Contains(id, StringComparer.Ordinal) ? "INSTALLED" : "AVAILABLE",
                     _ => "CONSUMABLE"

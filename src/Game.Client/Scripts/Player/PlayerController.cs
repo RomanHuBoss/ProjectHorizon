@@ -24,6 +24,12 @@ public partial class PlayerController : CharacterBody3D
     [Export]
     public float MouseSensitivity { get; set; } = 0.0025f;
 
+    [Export]
+    public bool InvertLookX { get; set; }
+
+    [Export]
+    public bool InvertLookY { get; set; }
+
     [Export(PropertyHint.Range, "1.0,6.0,0.1")]
     public float InteractionFallbackRadius { get; set; } = 2.75f;
 
@@ -67,6 +73,7 @@ public partial class PlayerController : CharacterBody3D
             .GetSetting("physics/3d/default_gravity")
             .AsSingle();
 
+        GameUserSettingsService.ApplyToPlayer(this);
         Input.MouseMode = Input.MouseModeEnum.Captured;
     }
 
@@ -75,8 +82,10 @@ public partial class PlayerController : CharacterBody3D
         if (inputEvent is InputEventMouseMotion mouseMotion &&
             Input.MouseMode == Input.MouseModeEnum.Captured)
         {
-            RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-            _head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
+            float yawSign = InvertLookX ? 1.0f : -1.0f;
+            float pitchSign = InvertLookY ? 1.0f : -1.0f;
+            RotateY(mouseMotion.Relative.X * MouseSensitivity * yawSign);
+            _head.RotateX(mouseMotion.Relative.Y * MouseSensitivity * pitchSign);
 
             Vector3 headRotation = _head.Rotation;
             headRotation.X = Mathf.Clamp(
@@ -164,13 +173,21 @@ public partial class PlayerController : CharacterBody3D
         MovementResources?.SetSwimming(swimming);
     }
 
+    public void SetFieldOfView(float degrees)
+    {
+        if (_camera is not null)
+        {
+            _camera.Fov = Mathf.Clamp(degrees, 60.0f, 110.0f);
+        }
+    }
+
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)Math.Max(0.0, delta);
         Vector3 velocity = Velocity;
         bool jumpHeld = Input.IsActionPressed("jump");
-        bool sprintRequested = Input.IsPhysicalKeyPressed(Key.Shift);
-        bool crouchRequested = Input.IsPhysicalKeyPressed(Key.Ctrl);
+        bool sprintRequested = Input.IsActionPressed("player_sprint");
+        bool crouchRequested = Input.IsActionPressed("player_crouch");
         Vector2 input = Input.GetVector(
             "move_left",
             "move_right",

@@ -2,13 +2,140 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-star-system-simulation-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-ui-application-shell-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0. Текущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+
+### Закрытие star-system итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-130 журнал синхронизирован:
+
+- `TASK-128` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-129` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка не приписываются среде подготовки задним числом.
+
+### TASK-130 — application shell, pause, controls and accessibility settings
+
+**Исходный снимок:** `ProjectHorizon-main-star-system-simulation-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-ui-application-shell-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §31.1 «Обязательные экраны», §31.2
+«Управление», §31.4 «Доступность». Существующие HUD/inventory-like equipment,
+technologies, mission journal, system/galaxy navigation, trade, construction,
+discovery catalogue и ship management не дублируются: TASK-130 добавляет отсутствующий
+application-level shell, отдельный Planet Map поверх существующего exploration state и
+подключает shell к уже существующим gameplay screens. Полная
+§31.3 Localization намеренно остаётся отдельной задачей, поскольку существующие
+hardcoded gameplay strings ещё не переведены целиком на localization keys.
+
+**Реализовано:**
+
+- `project.godot` больше не стартует непосредственно в vertical slice: новый
+  `Scenes/UI/MainMenu.tscn` является application entry point и содержит Continue,
+  New Game, Load Game, Settings и Quit;
+- Main Menu асинхронно открывает тот же `SaveDatabase`/primary slot, что и gameplay,
+  показывает revision/update/system/ship summary и блокирует Continue/Load для пустого
+  slot; путь `profile_vertical_slice/save_1.db` вынесен в единый `GameProfilePaths`;
+- New Game использует штатный persistence flow `InitializeAsync → ResetSlotAsync`,
+  поэтому не удаляет SQLite/WAL/backup family вручную и не затрагивает user settings;
+- user preferences вынесены из save schema в `user://settings.cfg` через Godot
+  `ConfigFile`: on-foot/ship mouse sensitivity, отдельная axis inversion, FOV `60–110`,
+  UI scale `0.8–1.5`, subtitles, camera-shake/motion-blur flags, Music/SFX/Voice volumes
+  и keyboard bindings; SQLite schema остаётся `2`;
+- `GameUserSettingsService` создаёт/перестраивает runtime `InputMap`, сохраняет
+  keyboard binding отдельно от fixed standard-gamepad events и применяет настройки
+  к живым `PlayerController`/`ArcadeShipController`;
+- on-foot sprint/crouch переведены с `IsPhysicalKeyPressed` на actions; ручной корабль
+  полностью переведён с physical `W/S/A/D/C/Space/Q/E/arrows/B/X/F2/G` polling на
+  отдельный ship action-set; поэтому переназначение клавиш реально влияет на gameplay;
+- gamepad baseline добавлен для движения, jump/interact/sprint/crouch, pause и всего
+  основного 6-DOF ship управления; keyboard и gamepad bindings сосуществуют;
+- `PlayerController` и обе ship cameras получают runtime FOV, sensitivity и inversion;
+  root `Window.ContentScaleFactor` исполняет accessibility UI scale;
+- Music/SFX/Voice имеют независимые runtime bus volumes; если bus отсутствует в
+  текущем vertical slice, settings service создаёт его без изменения gameplay save;
+- vertical slice получил `ApplicationShell`/`GamePauseOverlay` с
+  `ProcessMode=Always`: вне открытого gameplay UI action `pause` выставляет
+  `SceneTree.Paused=true`, показывает mouse и предоставляет Resume/Settings/
+  Save & Main Menu/Save & Quit; gameplay UI сначала закрывается своим прежним Escape;
+- `Save & Main Menu` не обходит persistence: tree unpause выполняется только для
+  продолжения graceful-exit state machine, затем существующий autosave flush завершается
+  и только после PASS выполняется `ChangeSceneToFile(MainMenu)`;
+- terminal survival state показывает отдельный blocking death screen и паузит gameplay;
+  цветовой смысл shell status продублирован текстовыми tokens `[PAUSED]`/`[CRITICAL]`;
+- обязательный Inventory screen закрыт расширением существующего `I` equipment UI: отдельная
+  вкладка Inventory показывает весь текущий `Session.AvailableInventory`, не создавая второй
+  inventory store; Suit/Multitool/Consumables остаются соседними вкладками того же экрана;
+- добавлен отдельный Planet Map (`planet_map`, default `N` + gamepad Back): карта не
+  заводит собственную exploration-модель, а отображает текущего игрока и существующие
+  planetary POI как unknown/discovered/resolved; action не перехватывает контекстный `N`,
+  когда уже открыт другой gameplay screen;
+- `F5` дополнен TASK-130 acceptance: application main-scene wiring, pause overlay
+  ProcessMode, exact settings round-trip, единый profile path/slot contract, keyboard+
+  gamepad events on-foot/ship, separate control sets и accessibility ranges.
+
+**Добавленные/изменённые ключевые файлы:**
+
+- `src/Game.Client/Scripts/Application/GameUserSettings.cs` + `.uid`;
+- `src/Game.Client/Scripts/Application/GameSettingsPanel.cs` + `.uid`;
+- `src/Game.Client/Scripts/Application/MainMenuController.cs` + `.uid`;
+- `src/Game.Client/Scripts/Application/GamePauseOverlay.cs` + `.uid`;
+- `src/Game.Client/Scenes/UI/MainMenu.tscn`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceApplicationShell.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetMap.cs` + `.uid`;
+- `src/Game.Client/Scripts/Player/PlayerController.cs`;
+- `src/Game.Client/Scripts/Ship/ArcadeShipController.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlayerSurvival.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `src/Game.Client/project.godot`;
+- `README.md`; `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-128`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-129`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-130`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-131`: `NOT_STARTED` → `IN_PROGRESS` — clean build + Main Menu/pause/F5 smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Минимальная runtime-приёмка TASK-131:**
+
+1. `tools\clean-build-windows10.cmd` → реальный `CoreCompile`, `0 errors`.
+2. Запустить проект обычной кнопкой Run: первой сценой обязан быть Main Menu, а не
+   `SalvageRepairSlice`; при существующем slot Continue/Load активны, при пустом — нет.
+3. Открыть Settings, изменить UI scale/FOV/одну клавишу on-foot/одну ship-клавишу,
+   Apply, перейти в игру и убедиться, что новые actions исполняются; вернуться в меню
+   и подтвердить сохранение настроек между scene transitions.
+4. В игре вне открытых panel нажать pause/Escape: gameplay/physics должны остановиться,
+   Settings остаться интерактивными; Resume возвращает simulation. Если открыт station/
+   journal/ship manager и т.п., первый Escape закрывает этот UI, а не открывает pause.
+5. Нажать `N`: отдельный Planet Map должен показать `@` player и POI-маркеры `?/O/X`;
+   открыть Discovery Catalog и убедиться, что его контекстный `N` не перехватывается картой.
+6. `SAVE & MAIN MENU` должен вывести graceful-exit autosave PASS и вернуть Main Menu.
+7. Один `F5`; ключевая строка:
+
+```text
+TASK-130 application shell acceptance PASS: mainMenu=1; newGame=1; load=1; settings=1; pauseOverlay=1; deathScreen=1; settingsRoundTrip=1; profileContract=1; onFootActions=1; shipActions=1; separateControlSets=1; keyboardRemap=1; inventory=1; planetMap=1; gamepad=1; accessibility=1; audioBuses=1; ... localizationBoundary=31.3-deferred.
+```
+
+**Граница закрытия:** TASK-130 не объявляет завершённой §31.3 Localization и не
+объявляет завершённым §32 Sound. Он закрывает отсутствующий application shell,
+обязательные application screens, реальную pause/control-remap интеграцию и settings/
+accessibility baseline, переиспользуя ранее созданные gameplay screens.
+
+**Следующий рекомендуемый mega-шаг после TASK-131:** gap-analysis оставшихся крупных
+разделов с приоритетом полной §31.3 localization или §32 audio architecture в зависимости
+от фактического объёма незакрытых требований.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -138,7 +265,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0B. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -265,7 +392,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0C. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -376,7 +503,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0C. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0D. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -525,7 +652,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0D. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0E. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -621,7 +748,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0E. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0F. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -753,7 +880,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0F. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0G. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 

@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice и навигационная глава PDF v2.0 §30 through TASK-127 закрыты принятой владельцем продукта приёмкой. Текущая mega-итерация TASK-128 реализует runtime звёздной системы PDF v2.0 §15: детерминированную иерархию star → planets → moons → station/traffic contacts, аналитические предвычисляемые орбиты без N-body, representation LOD `DetailedPlanet / Proxy / Marker / Statistical`, перестройку после hyperspace и активацию только одного подробного PlanetRuntime около игрока.
+Stage 1 vertical slice, навигационная глава PDF v2.0 §30 и star-system runtime §15 through TASK-129 закрыты принятой владельцем продукта приёмкой. Текущая mega-итерация TASK-130 добавляет полноценный application/UI shell PDF v2.0 §31.1, §31.2 и accessibility baseline §31.4: Main Menu, New Game, Load Game, Settings, настоящую pause через `SceneTree.Paused`, death screen, раздельные переназначаемые on-foot/ship controls, стандартный gamepad baseline и отдельный `user://settings.cfg`.
 
-### Подсистемы through TASK-127 — `VERIFIED`; star-system simulation / single-planet activation — `IMPLEMENTED`
+### Подсистемы through TASK-129 — `VERIFIED`; UI/application shell — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -102,6 +102,8 @@ src/Game.Client/Content/catalog_manifest.json
 
 `TASK-128` закрывает vertical-slice runtime звёздной системы PDF v2.0 §15. Уже существующий `GalaxyNavigationRuntime` остаётся единственным источником system/planet seeds и после hyperspace автоматически перестраивает `StarSystemSimulationRuntime`: одна звезда, 1–8 планет, 0–4 спутника на планету, station proxies и локальные ship contacts. Орбиты вычисляются аналитически в наклонённых плоскостях с постоянным радиусом и замедленным simulation time; гравитационные взаимодействия/N-body намеренно отсутствуют по ТЗ. `Gameplay/StarSystemSimulation` создаёт только lightweight visual proxies и переключает representation `Proxy / Marker / Statistical`; текущая планета имеет `DetailedPlanet`, причём одновременно подробной может быть только одна. При удалении корабля более чем на `72 m` от surface checkpoint наземный PlanetRuntime переводится в suspended state: скрываются и перестают process/collide ground, resources, crafting stations, ecology, NPC, ground navigation, base и POI, а orbital station/ship traffic остаются активны; при возвращении восстанавливаются точные прежние visibility/process/collision states. После hyperspace old system model уничтожается и детерминированно строится новая. `F5` добавляет `TASK-128` acceptance на deterministic hierarchy, exact planet/moon bounds, invariant analytic orbits, все три дальних LOD-уровня, single-detailed-planet invariant, system transition, visual projection и PlanetRuntime activation pipeline. Persistence schema не меняется: system runtime восстанавливается из уже сохраняемого `galaxy_navigation`.
 
+`TASK-130` переводит проект с прямого запуска gameplay-сцены на полноценный application shell. `project.godot` теперь запускает `Scenes/UI/MainMenu.tscn`; меню асинхронно инспектирует primary SQLite slot и имеет отдельные экраны Continue/New Game/Load Game/Settings. New Game сбрасывает `save_1` через штатные `SaveDatabase.InitializeAsync → ResetSlotAsync`, не удаляя SQLite-файлы вручную и не затрагивая пользовательские настройки. Settings сохраняются отдельно в `user://settings.cfg` через `ConfigFile`: on-foot/ship sensitivity и inversion, FOV, UI scale, subtitles/camera-shake/motion-blur flags, Music/SFX/Voice volumes и keyboard bindings. On-foot sprint/crouch и вся ручная схема корабля переведены с physical-key polling на `InputMap`, поэтому remapping исполняется реальным gameplay; standard gamepad events остаются параллельными keyboard bindings. В vertical slice `ApplicationShell` работает в `ProcessMode.Always`: Escape/pause останавливает `SceneTree`, Settings остаются доступны во время паузы, `SAVE & MAIN MENU` сначала проходит существующий graceful autosave, а death state показывает отдельный blocking screen. Отдельный `Planet Map` (`N`) проецирует уже существующее planetary-exploration state в локальную карту поверхности с player/unknown/discovered/resolved POI и не дублирует exploration data. Полная §31.3 localization по-прежнему выделена отдельно: TASK-130 не выдаёт существующие hardcoded gameplay strings за локализованные. `F5` добавляет TASK-130 structural/runtime contract acceptance.
+
 В состав v2 входят:
 
 - 18 refining recipes;
@@ -117,7 +119,13 @@ src/Game.Client/Content/catalog_manifest.json
 
 Recipe schema v2 поддерживает несколько inputs/outputs, catalysts, byproducts, dismantle returns, station/technology tiers, craft time, energy cost, batch size, температуру, давление, вакуум, качество и hazards. `GameContentCatalog` проверяет stable IDs, все ссылки, совместимость station/category/tier, technology graph, циклы и достижимость каждого recipe от мирового сырья.
 
-Текущая стартовая сцена:
+Текущая стартовая сцена приложения:
+
+```text
+src/Game.Client/Scenes/UI/MainMenu.tscn
+```
+
+Gameplay vertical slice:
 
 ```text
 src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
@@ -130,10 +138,11 @@ WASD / Space   движение и прыжок
 Shift          бег (расход Stamina)
 Ctrl           присесть; в воде — погружение
 Space hold     в воздухе — jetpack; в воде — всплытие
-I              Exosuit & Multitool
+I              Inventory / Exosuit & Multitool (Tab: Overview/Inventory/Suit/Multitool/Consumables)
 Z              переключить функцию мультитула
 E              собрать ресурс / ремонтировать / открыть station, trader или наземного NPC / подтвердить выбор
 Q              на поверхности вне UI открыть/закрыть procedural mission journal
+N              открыть / закрыть Planet Map (игрок + unknown/discovered/resolved POI)
 Up / Down      выбрать recipe, technology, queue job, market item или quest
 Tab            station: Recipes/Research/Queue/Dismantle; services: Dialogue/Buy/Sell/Quests
 R              station terminal: переключить Recipes / Research
@@ -142,7 +151,7 @@ B / S / Q      station services: Buy / Sell / Quests
 Enter / E      выполнить выбранное station/service действие
 Q              station Recipes: поставить recipe в очередь; из других station tabs открыть Queue
 C / Delete     отменить выбранный queue job с полным возвратом reservations
-Esc            закрыть station UI / освободить курсор
+Esc            сначала закрыть активный gameplay UI; вне UI — настоящая пауза / Resume / Settings / Save & Main Menu / Save & Quit
 H              detailed / compact / hidden HUD; координаты игрока остаются видимыми
 U              на поверхности открыть / закрыть управление системами и модулями корабля
 Up / Down      в ship manager выбрать модуль или систему
@@ -174,7 +183,7 @@ F1             TASK-090/092/093/096/098: queue, properties, multi-station indust
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080 + TASK-108: Industry Content v2 и planetary exploration acceptance
-F5             TASK-076 + TASK-110 + TASK-112 + TASK-114 + TASK-116 + TASK-118 + TASK-120 + TASK-122 + TASK-124 + TASK-126 + TASK-128 mega-acceptance
+F5             TASK-076 + TASK-110 + TASK-112 + TASK-114 + TASK-116 + TASK-118 + TASK-120 + TASK-122 + TASK-124 + TASK-126 + TASK-128 + TASK-130 mega-acceptance
 F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
 F8             очистить gameplay-slot, включая ship systems, voyage, galaxy, survival, quests и NPC/faction deltas

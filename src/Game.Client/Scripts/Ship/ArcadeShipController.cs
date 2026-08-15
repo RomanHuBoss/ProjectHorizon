@@ -88,6 +88,12 @@ public partial class ArcadeShipController : CharacterBody3D
     [Export(PropertyHint.Range, "0.0001,0.02,0.0001")]
     public float MouseSensitivity { get; set; } = 0.0035f;
 
+    [Export]
+    public bool InvertPitchLook { get; set; }
+
+    [Export]
+    public bool InvertYawLook { get; set; }
+
     [Export(PropertyHint.Range, "0.05,2.0,0.05")]
     public float MouseInputDecay { get; set; } = 0.32f;
 
@@ -140,6 +146,7 @@ public partial class ArcadeShipController : CharacterBody3D
         InitializeAtmosphere();
         InitializeLandingSystem();
         InitializeTouchdownSystem();
+        GameUserSettingsService.ApplyToShip(this);
         SetCameraMode(ShipCameraMode.Chase, false);
         SetPilotEnabled(StartPilotEnabled);
         UpdateDiagnostics();
@@ -173,23 +180,22 @@ public partial class ArcadeShipController : CharacterBody3D
                 return;
             }
 
-            if (physical == Key.F2 || logical == Key.F2)
-            {
-                ToggleCamera();
-                GetViewport().SetInputAsHandled();
-                return;
-            }
+        }
 
-            if ((physical == Key.G || logical == Key.G) &&
-                !_externalControlActive)
-            {
-                AutoStabilizationEnabled = !AutoStabilizationEnabled;
-                GD.Print(
-                    "Ship auto stabilization: " +
-                    (AutoStabilizationEnabled ? "ON" : "OFF"));
-                GetViewport().SetInputAsHandled();
-                return;
-            }
+        if (inputEvent.IsActionPressed("ship_camera"))
+        {
+            ToggleCamera();
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (inputEvent.IsActionPressed("ship_stabilize") && !_externalControlActive)
+        {
+            AutoStabilizationEnabled = !AutoStabilizationEnabled;
+            GD.Print("Ship auto stabilization: " +
+                (AutoStabilizationEnabled ? "ON" : "OFF"));
+            GetViewport().SetInputAsHandled();
+            return;
         }
 
         if (!_manualControlEnabled || _externalControlActive)
@@ -200,9 +206,11 @@ public partial class ArcadeShipController : CharacterBody3D
         if (inputEvent is InputEventMouseMotion mouseMotion &&
             Input.MouseMode == Input.MouseModeEnum.Captured)
         {
+            float pitchSign = InvertPitchLook ? 1.0f : -1.0f;
+            float yawSign = InvertYawLook ? 1.0f : -1.0f;
             _mouseLookInput += new Vector2(
-                -mouseMotion.Relative.Y * MouseSensitivity,
-                -mouseMotion.Relative.X * MouseSensitivity);
+                mouseMotion.Relative.Y * MouseSensitivity * pitchSign,
+                mouseMotion.Relative.X * MouseSensitivity * yawSign);
             _mouseLookInput = _mouseLookInput.Clamp(
                 new Vector2(-1.0f, -1.0f),
                 new Vector2(1.0f, 1.0f));
@@ -399,6 +407,19 @@ public partial class ArcadeShipController : CharacterBody3D
             AutoStabilizationEnabled);
     }
 
+    public void SetFieldOfView(float degrees)
+    {
+        float clamped = Mathf.Clamp(degrees, 60.0f, 110.0f);
+        if (_chaseCamera is not null)
+        {
+            _chaseCamera.Fov = clamped;
+        }
+        if (_cockpitCamera is not null)
+        {
+            _cockpitCamera.Fov = clamped;
+        }
+    }
+
     public void RestoreRuntimeState(ArcadeShipRuntimeState state)
     {
         CancelTouchdownSequence(false);
@@ -417,12 +438,12 @@ public partial class ArcadeShipController : CharacterBody3D
 
     private ShipControlCommand ReadManualCommand()
     {
-        float forward = Axis(Key.S, Key.W);
-        float strafe = Axis(Key.A, Key.D);
-        float lift = Axis(Key.C, Key.Space);
-        float roll = Axis(Key.Q, Key.E);
-        float pitchKeyboard = Axis(Key.Down, Key.Up);
-        float yawKeyboard = Axis(Key.Right, Key.Left);
+        float forward = Input.GetAxis("ship_reverse", "ship_forward");
+        float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right");
+        float lift = Input.GetAxis("ship_lift_down", "ship_lift_up");
+        float roll = Input.GetAxis("ship_roll_left", "ship_roll_right");
+        float pitchKeyboard = Input.GetAxis("ship_pitch_down", "ship_pitch_up");
+        float yawKeyboard = Input.GetAxis("ship_yaw_right", "ship_yaw_left");
 
         return new ShipControlCommand(
             forward,
@@ -431,14 +452,8 @@ public partial class ArcadeShipController : CharacterBody3D
             Mathf.Clamp(_mouseLookInput.X + pitchKeyboard, -1.0f, 1.0f),
             Mathf.Clamp(_mouseLookInput.Y + yawKeyboard, -1.0f, 1.0f),
             roll,
-            Input.IsPhysicalKeyPressed(Key.B),
-            Input.IsPhysicalKeyPressed(Key.X));
-    }
-
-    private static float Axis(Key negative, Key positive)
-    {
-        return (Input.IsPhysicalKeyPressed(positive) ? 1.0f : 0.0f) -
-            (Input.IsPhysicalKeyPressed(negative) ? 1.0f : 0.0f);
+            Input.IsActionPressed("ship_boost"),
+            Input.IsActionPressed("ship_brake"));
     }
 
     private void ApplyLinearFlight(

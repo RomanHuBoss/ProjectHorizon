@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://dps120watervol01" path="res://Scripts/Player/PlayerEnvironmentVolume.cs" id="8_player_environment"]
 [ext_resource type="Script" uid="uid://dn124navsurface01" path="res://Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs" id="9_npc_navigation"]
 [ext_resource type="Script" uid="uid://ss128node00001" path="res://Scripts/VerticalSlice/StarSystemSimulationNode.cs" id="10_star_system_simulation"]
+[ext_resource type="Script" uid="uid://c130pauseovr01" path="res://Scripts/Application/GamePauseOverlay.cs" id="11_application_shell"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -897,6 +898,23 @@ theme_override_font_sizes/font_size = 14
 text = "EXOSUIT & MULTITOOL"
 autowrap_mode = 2
 
+[node name="PlanetMap" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 170.0
+offset_top = 28.0
+offset_right = 1210.0
+offset_bottom = 670.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/PlanetMap"]
+mouse_filter = 2
+custom_minimum_size = Vector2(1000, 600)
+theme_override_colors/font_color = Color(0.86, 0.96, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "PLANET MAP"
+autowrap_mode = 2
+
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
 mouse_filter = 2
 anchor_left = 1.0
@@ -952,3 +970,8 @@ theme_override_font_sizes/font_size = 24
 text = "+"
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="ApplicationShell" type="CanvasLayer" parent="."]
+process_mode = 3
+layer = 100
+script = ExtResource("11_application_shell")

@@ -408,6 +408,8 @@ public partial class SalvageRepairSlice : Node3D
         BindNpcNavigationSceneNodes();
         BindProceduralQuestSceneNodes();
         BindPlayerSurvivalSceneNodes();
+        BindPlanetMapSceneNodes();
+        BindApplicationShellSceneNodes();
 
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
@@ -547,12 +549,7 @@ public partial class SalvageRepairSlice : Node3D
         RebuildNpcFactionScene();
         InitializeNpcNavigationSurface();
 
-        string userDirectory = ProjectSettings.GlobalizePath("user://");
-        string databasePath = Path.Combine(
-            userDirectory,
-            "profiles",
-            "profile_vertical_slice",
-            "save_1.db");
+        string databasePath = GameProfilePaths.PrimaryDatabasePath;
         SaveDatabase database = new(databasePath);
         _database = database;
         _autosave = new SaveAutosaveCoordinator(database);
@@ -780,6 +777,7 @@ public partial class SalvageRepairSlice : Node3D
         PollGracefulExitTask();
         UpdatePeriodicAutosave(delta);
         TryBeginGracefulExit();
+        UpdatePlanetMapPanel();
         UpdateHud();
     }
 
@@ -806,6 +804,12 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _UnhandledInput(InputEvent inputEvent)
     {
+        if (inputEvent.IsActionPressed("planet_map") && HandlePlanetMapAction())
+        {
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (inputEvent is not InputEventKey keyEvent)
         {
             return;
@@ -841,6 +845,11 @@ public partial class SalvageRepairSlice : Node3D
 
         if (keyEvent.Echo)
         {
+            return;
+        }
+        if (HandlePlanetMapInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
             return;
         }
         if (HandleNpcFactionInput(physical, logical))
@@ -5414,8 +5423,9 @@ public partial class SalvageRepairSlice : Node3D
         BeginNpcNavigationAcceptance();
         BeginAerialNavigationAcceptance();
         BeginStarSystemSimulationAcceptance();
+        RunApplicationShellAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, ground/aerial navigation and star-system simulation acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, navigation, star-system and application-shell acceptance running";
     }
 
     private void BeginReset()
@@ -5499,6 +5509,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseMissionJournal();
         ClosePlayerEquipment();
         CloseNpcInteraction();
+        ClosePlanetMap();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -5689,6 +5700,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseMissionJournal();
             ClosePlayerEquipment();
             CloseNpcInteraction();
+            ClosePlanetMap();
             RebuildBaseConstructionScene();
             RebuildNpcFactionScene();
             RebuildNpcShipTraffic();
@@ -7114,11 +7126,29 @@ public partial class SalvageRepairSlice : Node3D
                 "Vertical slice graceful-exit autosave PASS: " +
                 $"saved={(result.Saved ? 1 : 0)}; " +
                 $"revision={result.Revision}; pending=0");
-            GetTree().Quit();
+            if (_returnToMainMenuAfterGracefulExit)
+            {
+                _returnToMainMenuAfterGracefulExit = false;
+                GetTree().Paused = false;
+                Error transition = GetTree().ChangeSceneToFile(MainMenuScenePath);
+                if (transition != Error.Ok)
+                {
+                    throw new InvalidOperationException(
+                        $"Unable to return to main menu: {transition}.");
+                }
+                GD.Print(
+                    "TASK-130 graceful main-menu transition PASS: " +
+                    $"saved={(result.Saved ? 1 : 0)}; revision={result.Revision}.");
+            }
+            else
+            {
+                GetTree().Quit();
+            }
         }
         catch (Exception exception)
         {
             _closeRequested = false;
+            _returnToMainMenuAfterGracefulExit = false;
             Fail("graceful exit", exception);
         }
     }
