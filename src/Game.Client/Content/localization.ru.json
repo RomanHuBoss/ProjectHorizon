@@ -1328,6 +1328,7 @@
     "ui.voyage.takeoff_requires": "Взлёт требует PlanetSurface; сейчас={location}.",
     "ui.voyage.travel_key_location": "Клавиша T доступна на посадочной площадке или при стыковке.",
     "ui.voyage.undock_requires": "Отстыковка требует OrbitalStation; сейчас={location}.",
-    "ui.voyage.undocked": "Отстыковка выполнена; возвращайтесь к посадочной площадке; топливо={fuel}."
+    "ui.voyage.undocked": "Отстыковка выполнена; возвращайтесь к посадочной площадке; топливо={fuel}.",
+    "ui.dev.tools": "Инструменты разработчика"
   }
 }

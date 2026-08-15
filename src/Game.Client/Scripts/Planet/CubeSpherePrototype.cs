@@ -10,7 +10,8 @@ public enum CubeSphereDebugMode
 {
     FaceIds = 0,
     LodLevels = 1,
-    RadialNormals = 2
+    RadialNormals = 2,
+    DeveloperPreview = 3
 }
 
 public enum CubeSphereCameraMode
@@ -314,6 +315,23 @@ public partial class CubeSpherePrototype : Node3D
                 Math.Clamp(MaxPatchWorkers, 1, 4),
                 Math.Max(1, System.Environment.ProcessorCount - 2)));
 
+        if (DeveloperToolContext.ReturnToWorkbenchOnF6)
+        {
+            NoiseSeed = unchecked((int)DeveloperToolContext.PreviewPlanetSeed);
+            LodBaseLevel = Math.Clamp(DeveloperToolContext.PreviewLod, 0, 4);
+            int[] previewResolutions = { 17, 33, 65, 97, 129 };
+            FaceResolution = previewResolutions[Math.Clamp(DeveloperToolContext.PreviewLod, 0, 4)];
+            _debugMode = CubeSphereDebugMode.DeveloperPreview;
+            GD.Print(
+                "TASK-136 Planet Preview interactive launch: " +
+                $"planet={DeveloperToolContext.PreviewPlanetId}; " +
+                $"seed={DeveloperToolContext.PreviewPlanetSeed}; lod={DeveloperToolContext.PreviewLod}; " +
+                $"grid={(DeveloperToolContext.PreviewChunkGrid ? 1 : 0)}; " +
+                $"biomes={(DeveloperToolContext.PreviewBiomes ? 1 : 0)}; " +
+                $"height={(DeveloperToolContext.PreviewHeight ? 1 : 0)}; " +
+                $"resources={(DeveloperToolContext.PreviewResourceDensity ? 1 : 0)}.");
+        }
+
         BuildPlanet();
         InitializeCollisionLod();
         ApplyCameraMode();
@@ -389,6 +407,13 @@ public partial class CubeSpherePrototype : Node3D
             return;
         }
 
+        if (keyEvent.Keycode == Key.F6 && DeveloperToolContext.ReturnToWorkbenchOnF6)
+        {
+            DeveloperToolContext.ReturnToWorkbench(GetTree());
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
         if (keyEvent.Keycode == Key.H ||
             keyEvent.PhysicalKeycode == Key.H)
         {
@@ -399,7 +424,7 @@ public partial class CubeSpherePrototype : Node3D
         }
         else if (keyEvent.Keycode == Key.F1)
         {
-            _debugMode = (CubeSphereDebugMode)(((int)_debugMode + 1) % 3);
+            _debugMode = (CubeSphereDebugMode)(((int)_debugMode + 1) % 4);
             RebuildVisualMeshes();
             UpdateHud();
             GetViewport().SetInputAsHandled();
@@ -1275,13 +1300,16 @@ public partial class CubeSpherePrototype : Node3D
             Vector3 normal = patchData.Normals[i];
             surfaceTool.SetNormal(normal);
             surfaceTool.SetUV(patchData.Uvs[i]);
-            surfaceTool.SetColor(_debugMode == CubeSphereDebugMode.RadialNormals
-                ? new Color(
+            surfaceTool.SetColor(_debugMode switch
+            {
+                CubeSphereDebugMode.RadialNormals => new Color(
                     (normal.X * 0.5f) + 0.5f,
                     (normal.Y * 0.5f) + 0.5f,
                     (normal.Z * 0.5f) + 0.5f,
-                    1.0f)
-                : patchColor);
+                    1.0f),
+                CubeSphereDebugMode.DeveloperPreview => GetDeveloperPreviewColor(patchData, i),
+                _ => patchColor
+            });
             surfaceTool.AddVertex(patchData.Vertices[i]);
         }
 
@@ -1313,6 +1341,60 @@ public partial class CubeSpherePrototype : Node3D
         }
 
         return surfaceTool.Commit();
+    }
+
+    private Color GetDeveloperPreviewColor(CubeSpherePatchData patchData, int vertexIndex)
+    {
+        Vector3 vertex = patchData.Vertices[vertexIndex];
+        Vector3 normal = patchData.Normals[vertexIndex];
+        float amplitude = Math.Max(0.001f, HeightAmplitude);
+        float height01 = Mathf.Clamp(((vertex.Length() - PlanetRadius) / (2.0f * amplitude)) + 0.5f, 0.0f, 1.0f);
+        bool hasLayer = false;
+        Color color = new(0.18f, 0.34f, 0.48f, 1.0f);
+
+        if (DeveloperToolContext.PreviewBiomes)
+        {
+            float latitude = Math.Abs(normal.Y);
+            color = latitude > 0.76f
+                ? new Color(0.78f, 0.88f, 0.94f, 1.0f)
+                : height01 > 0.70f
+                    ? new Color(0.42f, 0.36f, 0.28f, 1.0f)
+                    : latitude < 0.20f
+                        ? new Color(0.70f, 0.57f, 0.30f, 1.0f)
+                        : new Color(0.22f, 0.55f, 0.30f, 1.0f);
+            hasLayer = true;
+        }
+
+        if (DeveloperToolContext.PreviewHeight)
+        {
+            Color heightColor = new(height01, 0.22f + ((1.0f - Math.Abs((height01 * 2.0f) - 1.0f)) * 0.55f), 1.0f - height01, 1.0f);
+            color = hasLayer ? color.Lerp(heightColor, 0.46f) : heightColor;
+            hasLayer = true;
+        }
+
+        if (DeveloperToolContext.PreviewResourceDensity)
+        {
+            double phase = (vertex.X * 0.173) + (vertex.Y * 0.311) + (vertex.Z * 0.227) + (DeveloperToolContext.PreviewPlanetSeed * 0.000001);
+            float resourceSignal = (float)((Math.Sin(phase) + Math.Sin(phase * 2.173 + 1.7) + 2.0) * 0.25);
+            if (resourceSignal > 0.69f)
+            {
+                Color resourceColor = resourceSignal > 0.86f
+                    ? new Color(1.0f, 0.34f, 0.12f, 1.0f)
+                    : new Color(1.0f, 0.80f, 0.18f, 1.0f);
+                color = hasLayer ? color.Lerp(resourceColor, 0.72f) : resourceColor;
+                hasLayer = true;
+            }
+        }
+
+        if (DeveloperToolContext.PreviewChunkGrid)
+        {
+            bool alternate = ((patchData.Key.X + patchData.Key.Y + patchData.Key.Level + (int)patchData.Key.FaceId) & 1) == 0;
+            float multiplier = alternate ? 0.78f : 1.0f;
+            color = new Color(color.R * multiplier, color.G * multiplier, color.B * multiplier, 1.0f);
+            hasLayer = true;
+        }
+
+        return hasLayer ? color : patchData.DebugColor;
     }
 
     private Color GetPatchColor(CubeSpherePatchData patchData)
@@ -2145,6 +2227,7 @@ public partial class CubeSpherePrototype : Node3D
         {
             CubeSphereDebugMode.FaceIds => "цвета граней",
             CubeSphereDebugMode.LodLevels => "уровни LOD",
+            CubeSphereDebugMode.DeveloperPreview => "developer preview",
             _ => "радиальные нормали"
         };
 

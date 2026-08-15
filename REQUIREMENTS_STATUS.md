@@ -2,13 +2,189 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-audio-architecture-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-developer-diagnostics-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
+## 0. Текущая mega-итерация 2026-08-15 — Developer & Diagnostics Suite / §34 + §35 closure
+
+### Закрытие sound-итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-136 журнал синхронизирован:
+
+- `TASK-134` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-135` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка не приписываются среде подготовки задним числом.
+
+### TASK-136 — Developer Workbench, debug console and structured diagnostics
+
+**Исходный снимок:** `ProjectHorizon-main-audio-architecture-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-developer-diagnostics-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §34.1–34.5 «Developer tools» и §35
+«Logging and diagnostics». §36 «Testing» намеренно не смешивается с этой задачей:
+следующая testing mega-итерация должна использовать уже готовые profiler/inspector/logging
+контракты, а не дублировать их.
+
+**Реализовано:**
+
+- добавлен закрытый developer-mode `Developer Workbench`, доступный из Main Menu только
+  в debug build либо при явном user argument `--developer`; прямой запуск workbench и
+  внутриигровая console используют тот же gate, поэтому инструменты не становятся
+  случайной публичной частью release UI;
+- **Seed Explorer** использует существующий `GalaxyNavigationRuntime`, а не второй
+  генератор: принимает arbitrary positive Int64 universe seed и integer sector X/Y/Z,
+  показывает system/star/economy/danger и полный список 1–8 planets, позволяет копировать
+  stable system ID и экспортировать deterministic JSON report;
+- для Seed Explorer добавлен явный constructor `GalaxyNavigationRuntime(long seed)` и
+  developer-only `LoadSystemForDeveloper(x,y,z)`; обычный save/hyperspace pipeline не
+  меняется;
+- **Planet Preview** использует канонический `CubeSphereMeshBuilder`: выбирает планету
+  из результата Seed Explorer, LOD 0–4, строит sample, показывает resolution,
+  vertices/triangles, CPU generation time, height range, deterministic resource-density
+  proxy и состояние overlays `chunk grid / biomes / height / resources`; interactive
+  launch переиспользует существующий `CubeSpherePrototype`, получает выбранные seed/LOD
+  параметры и реально включает `DeveloperPreview`: patch-grid contrast, biome colouring,
+  height gradient и resource-density highlights комбинируются по выбранным toggles; `F6`
+  возвращает в Workbench;
+- **Chunk Profiler** не дублирует terrain streaming: расширен существующий
+  `TerrainChunkManager`. Новый `TerrainChunkProfilerSnapshot` содержит loaded chunks,
+  queued work, active workers, worker CPU ms, main-thread mesh/GPU-upload submission ms,
+  managed memory, vertex count, generated collisions, cancelled jobs и stale jobs;
+  live HUD показывает эти показатели, `F10`/`P` сохраняют существующие stress/soak tests,
+  `F6` возвращает в Workbench;
+- **Save Inspector** принимает primary либо произвольный SQLite path. Source открывается
+  read-only и через `SqliteConnection.BackupDatabase` снимается WAL-consistent snapshot;
+  только snapshot затем открывается `SaveDatabase`, поэтому обычный `Inspect` не может
+  запустить migration на исходном файле. Показываются schema version, integrity,
+  WAL/foreign-key/busy-timeout diagnostics, database size, player, ship, current/visited
+  systems и inventory rows; `Export All Tables` перечисляет `sqlite_master` и выгружает
+  все пользовательские таблицы source DB в CSV через read-only connection;
+- операция `Migrate Validated Copy` создаёт отдельный consistent copy в
+  `user://developer_reports/save_1.migration-copy.db` и запускает migrations/integrity/load
+  только на копии. Source/primary DB не мигрируется в рамках developer experiment;
+- **Debug Console** реализует все обязательные команды §34.5: `teleport`, `spawn`,
+  `give`, `damage`, `heal`, `set_time`, `set_weather`, `load_system`, `load_planet`,
+  `show_chunks`, `show_navmesh`, `show_ai`, `profile_worldgen`, `save`, `reload_content`;
+  console открывается `Ctrl+Shift+D` либо автоматически из Workbench;
+- `show_navmesh` не полагается на editor-only runtime-toggle `SceneTree.debug_navigation_hint`:
+  строится собственный overlay текущих bounded TASK-124 navigation tiles из
+  `NpcNavigationSurfaceSnapshot`; `show_chunks` аналогично визуализирует локальную сетку, а `show_ai` добавляет цветные маркеры непосредственно к ground NPC / NPC ships / fauna и поэтому следует за движущимися агентами;
+- `save` проходит через существующий autosave coordinator, `reload_content` выполняет
+  полную перезагрузку gameplay scene, поэтому данные загружаются штатными catalog/runtime
+  initialization paths;
+- добавлен `StructuredGameLogger`: line-delimited JSON (`*.jsonl`) с UTC timestamp,
+  level, category, session ID, message, exception, cached system info, current scene,
+  world seed, current world object и structured fields. Godot APIs используются только
+  при main-thread initialization/context update; `Log()` потокобезопасен и пригоден для
+  worker threads;
+- реализованы все 14 нормативных категорий §35: `BOOT`, `CONTENT`, `WORLDGEN`,
+  `STREAMING`, `DATABASE`, `SAVE`, `PLAYER`, `SHIP`, `AI`, `QUEST`, `NETWORK`, `SERVER`,
+  `PERFORMANCE`, `ERROR`;
+- logger не записывает command-line payload и не сохраняет персональные identifiers. Keys,
+  содержащие password/passwd/token/secret/authorization/bearer/cookie/api-key, а также
+  email/username/full-name/phone/address, заменяются `[REDACTED]`; аналогичные secret
+  `key=value` fragments санитизируются в message/exception text, а случайно попавшие
+  user-home paths и локальное имя пользователя заменяются `[USER_HOME]` / `[USER]`;
+- Main Menu и vertical slice инициализируют единый logging session; vertical slice раз в
+  секунду обновляет cached world context без обращения worker threads к SceneTree;
+- `F5` дополнен `TASK-136` runtime acceptance: deterministic seed explorer probe,
+  real cube-sphere generation profile, presence of live chunk profiler API, Save Inspector
+  primary DB contract, 15-command console registry, записи всех 14 log categories и
+  adversarial redaction sample. Acceptance затем перечитывает JSONL и требует отсутствия
+  исходных secret test values;
+- добавлен `tools/validate-developer-diagnostics-contract.py`, который статически
+  проверяет 5/5 tools, 15/15 commands, 14/14 categories, обязательные structured-log
+  fields, developer gating, Save Inspector copy-migration/export, planet/worldgen metrics
+  и Chunk Profiler coverage;
+- предыдущие строгие TASK-132 localization и TASK-134 audio gates проходят без
+  ослабления: Developer UI размещён в internal tool layer, а shipping Main Menu добавляет
+  только новый локализованный key `ui.dev.tools`.
+
+**Добавленные/изменённые ключевые файлы:**
+
+- `src/Game.Client/Scripts/Infrastructure/StructuredGameLogger.cs` + `.uid`;
+- `src/Game.Client/Scripts/Developer/DeveloperToolContext.cs` + `.uid`;
+- `src/Game.Client/Scripts/Developer/DeveloperWorkbenchController.cs` + `.uid`;
+- `src/Game.Client/Scripts/Developer/DeveloperDiagnosticsSuite.cs` + `.uid`;
+- `src/Game.Client/Scripts/Developer/SalvageRepairSliceDeveloperBridge.cs` + `.uid`;
+- `src/Game.Client/Scenes/Developer/DeveloperWorkbench.tscn`;
+- `src/Game.Client/Scripts/Terrain/TerrainChunkManager.cs`;
+- `src/Game.Client/Scripts/Planet/CubeSpherePrototype.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/GalaxyNavigationRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/PlayerSurvivalRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceStarSystem.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/Application/MainMenuController.cs`;
+- `src/Game.Client/Content/localization.en.json` / `localization.ru.json`;
+- `tools/validate-developer-diagnostics-contract.py`;
+- `README.md`; `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-134`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-135`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-136`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-137`: `NOT_STARTED` → `IN_PROGRESS` — clean build + developer workbench/F5 smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Статическая приёмка TASK-136:**
+
+```text
+python tools/validate-localization-contract.py
+TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1329; parity=1; ... sourceSinks=0; legacyLiterals=0.
+
+python tools/validate-audio-contract.py
+TASK-134 AUDIO CONTRACT PASS: buses=8/8; cues=19; pool2d=8; pool3d=16; maxTransient=24; maxConcurrent=29; ...
+
+python tools/validate-developer-diagnostics-contract.py
+TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS: tools=5/5; commands=15/15; logCategories=14/14; logFields=10/10; devGate=1; seedExplorer=1; planetPreview=1; chunkProfiler=1; saveInspector=1; debugConsole=1; redaction=1.
+
+Repository static pre-release:
+files=313; added=12; changed=11; removed=0;
+JSON=18/18; C# lexical=131/131; resRefs=59/broken=0;
+UID owners=137/137 unique; forbiddenArtifacts=0;
+industry=174/42/128/15/32; NPC=3/8/8/8; ecology=16/60/20/flying4.
+```
+
+**Ограничение среды:** `dotnet`, `msbuild`, `csc`, `mcs`, `godot`, `godot4` в
+среде подготовки отсутствуют. Поэтому `TASK-136` остаётся `IMPLEMENTED`, а реальный
+compile/runtime gate вынесен в `TASK-137`; сборка или Godot PASS статически не
+приписываются.
+
+**Минимальная runtime-приёмка TASK-137:**
+
+1. `tools\clean-build-windows10.cmd` → реальный `CoreCompile`, `0 errors`.
+2. Debug run: Main Menu содержит `Developer Tools`; release run без `--developer` не
+   должен предоставлять доступ к Workbench. С `--developer` доступ разрешён.
+3. Seed Explorer: сменить seed/sector, сгенерировать system, скопировать ID, export JSON;
+   повтор того же seed/sector обязан дать тот же ID/planet list.
+4. Planet Preview: получить metrics, поочерёдно проверить `chunk grid / biomes / height /
+   resources` в interactive preview, сменить camera/LOD, `F6` вернуть Workbench.
+5. Chunk Profiler: во время движения увидеть изменения loaded/queue/workers/CPU/apply/
+   memory/vertices/collisions; `F10` stress, `P` soak, `F6` возврат.
+6. Save Inspector: проверить primary и произвольный путь, `integrity=ok`, `Export All Tables`
+   создаёт CSV для пользовательских SQLite tables; `Migrate Validated Copy` создаёт только
+   `developer_reports/save_1.migration-copy.db`, source save остаётся неизменным/читаемым.
+7. Debug Console: `Ctrl+Shift+D`; проверить минимум `teleport`, `give`, `damage/heal`,
+   `show_chunks`, `show_navmesh`, `profile_worldgen`, `save`.
+8. Один `F5`; ключевая строка:
+
+```text
+TASK-136 developer diagnostics acceptance PASS: tools=5/5; commands=15/15; devGate=1; seedExplorer=1; planetPreview=1; chunkProfiler=1; saveInspector=1; debugConsole=1; logCategories=14/14; utc=1; session=1; context=1; redaction=1; secretLeak=0; jsonl=1; result=section-34-35-developer-diagnostics.
+```
+
+**Граница закрытия:** после `TASK-137 → VERIFIED` §34 и §35 считаются закрытыми для
+текущего проекта. §36 «Testing» остаётся отдельным крупным блоком: unit/golden-seed/save/
+stress/coverage automation должна опираться на TASK-136 diagnostics, а не создавать
+параллельные инспекторы.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
 
 ### Закрытие localization-итерации по решению владельца продукта
 
@@ -147,7 +323,7 @@ TASK-134 audio architecture acceptance PASS: buses=8/8; cues=19/19; pool2d=8; po
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
+## 0B. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
 
 ### Закрытие UI/application-shell итерации по решению владельца продукта
 
@@ -243,7 +419,7 @@ Music/SFX/Voice buses, но полноценный игровой sound runtime 
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+## 0C. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
 
 ### Закрытие star-system итерации по решению владельца продукта
 
@@ -370,7 +546,7 @@ accessibility baseline, переиспользуя ранее созданные
 
 ---
 
-## 0C. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0D. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -500,7 +676,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0D. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0E. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -627,7 +803,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0E. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0F. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -738,7 +914,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0F. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0G. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -887,7 +1063,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0G. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0H. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -983,7 +1159,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0H. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0I. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -1115,7 +1291,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0I. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0J. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 

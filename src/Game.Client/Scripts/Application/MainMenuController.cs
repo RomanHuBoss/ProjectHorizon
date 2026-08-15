@@ -28,6 +28,12 @@ public partial class MainMenuController : Control
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GameUserSettingsService.ReloadAndApply();
+        StructuredGameLogger.EnsureInitialized(GetTree());
+        StructuredGameLogger.UpdateContext("MainMenu", 0, "application");
+        StructuredGameLogger.Log(
+            GameLogLevel.Information,
+            GameLogCategory.BOOT,
+            "main menu ready");
         AudioDirector audio = AudioDirector.EnsureInstalled(GetTree());
         audio.SetEnvironment(GameAudioEnvironment.Vacuum, force: true);
         audio.SetMusicState(GameMusicState.Menu);
@@ -120,6 +126,13 @@ public partial class MainMenuController : Control
         Button settings = MenuButton("ui.main.settings");
         settings.Pressed += ShowSettings;
         nav.AddChild(settings);
+        if (DeveloperToolContext.IsDeveloperModeAllowed())
+        {
+            Button developerTools = MenuButton("ui.dev.tools");
+            developerTools.Pressed += () =>
+                GetTree().ChangeSceneToFile(DeveloperToolContext.WorkbenchScene);
+            nav.AddChild(developerTools);
+        }
         Button quit = MenuButton("ui.main.quit");
         quit.Pressed += () => GetTree().Quit();
         nav.AddChild(quit);

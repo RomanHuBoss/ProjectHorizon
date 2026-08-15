@@ -311,6 +311,16 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
             Enum.GetValues<PlayerMultitoolFunction>().Length);
     }
 
+    public void RestoreHealth(double amount)
+    {
+        if (amount <= 0.0 || !double.IsFinite(amount) || !IsAlive)
+        {
+            return;
+        }
+        PlayerSurvivalEffectiveStats stats = GetEffectiveStats();
+        Health = Math.Min(stats.MaximumHealth, Health + amount);
+    }
+
     public void ApplyDamage(double damage)
     {
         if (damage <= 0.0 || !double.IsFinite(damage) || !IsAlive)

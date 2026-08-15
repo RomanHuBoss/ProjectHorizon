@@ -1328,6 +1328,7 @@
     "ui.voyage.takeoff_requires": "Takeoff requires PlanetSurface; current={location}.",
     "ui.voyage.travel_key_location": "T is available on the landing pad or while docked.",
     "ui.voyage.undock_requires": "Undock requires OrbitalStation; current={location}.",
-    "ui.voyage.undocked": "Undocked; return to planetary landing pad; fuel={fuel}."
+    "ui.voyage.undocked": "Undocked; return to planetary landing pad; fuel={fuel}.",
+    "ui.dev.tools": "Developer Tools"
   }
 }

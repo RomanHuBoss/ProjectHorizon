@@ -97,6 +97,19 @@ public sealed class GalaxyNavigationRuntime
     private readonly HashSet<string> _visitedSystemIds = new(
         StringComparer.Ordinal);
 
+    public GalaxyNavigationRuntime(long universeSeed)
+    {
+        if (universeSeed <= 0)
+        {
+            throw new InvalidOperationException(
+                "Universe seed must be positive.");
+        }
+
+        UniverseSeed = universeSeed;
+        CurrentSystem = GenerateSystem(0, 0, 0);
+        _visitedSystemIds.Add(CurrentSystem.SystemId);
+    }
+
     public GalaxyNavigationRuntime(GalaxyNavigationSaveData? saveData = null)
     {
         UniverseSeed = saveData?.UniverseSeed ?? DefaultUniverseSeed;
@@ -167,6 +180,17 @@ public sealed class GalaxyNavigationRuntime
         _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
     public string CurrentPlanetId => CurrentSystem.Planets[0].PlanetId;
+
+    public GalaxySystemDefinition LoadSystemForDeveloper(
+        int sectorX,
+        int sectorY,
+        int sectorZ)
+    {
+        CurrentSystem = GenerateSystem(sectorX, sectorY, sectorZ);
+        SelectedDestination = null;
+        _visitedSystemIds.Add(CurrentSystem.SystemId);
+        return CurrentSystem;
+    }
 
     public GalaxySystemDefinition GenerateSystem(
         int sectorX,

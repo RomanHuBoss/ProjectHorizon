@@ -89,7 +89,7 @@ public partial class SalvageRepairSlice
         bool renderSystemProxies = !shouldActivateSurface;
         _starSystemSimulationNode.UpdateSimulation(
             delta,
-            GalaxyNavigation.CurrentPlanetId,
+            GetActiveDeveloperPlanetId(),
             shouldActivateSurface,
             renderSystemProxies);
     }

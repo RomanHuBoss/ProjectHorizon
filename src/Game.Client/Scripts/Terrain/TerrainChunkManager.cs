@@ -1,10 +1,24 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using CancellationToken = System.Threading.CancellationToken;
 using CancellationTokenSource = System.Threading.CancellationTokenSource;
 using System.Threading.Tasks;
 using Godot;
+
+public sealed record TerrainChunkProfilerSnapshot(
+    int LoadedChunks,
+    int QueuedWork,
+    int ActiveWorkers,
+    double WorkerCpuMilliseconds,
+    double MainThreadApplyMilliseconds,
+    double GpuUploadSubmissionMilliseconds,
+    long ManagedMemoryBytes,
+    int Vertices,
+    int Collisions,
+    int CancelledJobs,
+    int StaleJobs);
 
 public partial class TerrainChunkManager : Node3D
 {
@@ -167,6 +181,8 @@ public partial class TerrainChunkManager : Node3D
     private int _soakTestLastMeshCount;
     private int _soakTestLastCollisionCount;
     private int _soakTestLastVertexCount;
+    private double _lastWorkerCpuMilliseconds;
+    private double _lastMainThreadApplyMilliseconds;
 
     public override void _Ready()
     {
@@ -205,6 +221,12 @@ public partial class TerrainChunkManager : Node3D
             !eventKey.Pressed ||
             eventKey.IsEcho())
         {
+            return;
+        }
+
+        if (eventKey.Keycode == Key.F6 && DeveloperToolContext.ReturnToWorkbenchOnF6)
+        {
+            DeveloperToolContext.ReturnToWorkbench(GetTree());
             return;
         }
 
@@ -381,6 +403,8 @@ public partial class TerrainChunkManager : Node3D
                 continue;
             }
 
+            _lastWorkerCpuMilliseconds = completedJob.Result.WorkerElapsedMilliseconds;
+            Stopwatch applyStopwatch = Stopwatch.StartNew();
             GD.Print(
                 $"Terrain worker: applying job={completedJob.JobId}; " +
                 $"revision={completedJob.Revision}; " +
@@ -390,6 +414,8 @@ public partial class TerrainChunkManager : Node3D
             ApplyCompletedGeneration(
                 activeJob.Operation,
                 completedJob.Result);
+            applyStopwatch.Stop();
+            _lastMainThreadApplyMilliseconds = applyStopwatch.Elapsed.TotalMilliseconds;
             _operationsCompletedLastStep++;
         }
     }
@@ -2065,6 +2091,31 @@ public partial class TerrainChunkManager : Node3D
         return enabled ? "вкл" : "выкл";
     }
 
+    public TerrainChunkProfilerSnapshot CaptureProfilerSnapshot()
+    {
+        int vertices = 0;
+        int collisions = 0;
+        foreach (TerrainChunk chunk in _activeChunks.Values)
+        {
+            vertices += chunk.TopSurfaceVertexCount;
+            if (chunk.HasGeneratedCollisionShape) collisions++;
+        }
+        int queued = _pendingOperations.Count + _jobApplyOrder.Count +
+            _readyJobs.Count + _completedJobs.Count;
+        return new TerrainChunkProfilerSnapshot(
+            _activeChunks.Count,
+            queued,
+            _activeJobs.Count,
+            _lastWorkerCpuMilliseconds,
+            _lastMainThreadApplyMilliseconds,
+            _lastMainThreadApplyMilliseconds,
+            GC.GetTotalMemory(false),
+            vertices,
+            collisions,
+            _totalCancelledJobs,
+            _totalDiscardedStaleJobs);
+    }
+
     private void UpdateHud()
     {
         if (_statusLabel is null || _player is null)
@@ -2093,6 +2144,12 @@ public partial class TerrainChunkManager : Node3D
             $"LOD0: {highDetailCount}  •  LOD1: {lowDetailCount}  •  " +
             $"переход: {transitionState}  •  очередь: {queuedWork}  •  " +
             $"workers: {_activeJobs.Count}/{_workerLimit}\n" +
+            $"Profiler: workerCPU={_lastWorkerCpuMilliseconds:F2} ms  •  " +
+            $"mainApply={_lastMainThreadApplyMilliseconds:F2} ms  •  " +
+            $"gpuSubmit={_lastMainThreadApplyMilliseconds:F2} ms  •  " +
+            $"memory={GC.GetTotalMemory(false) / (1024.0 * 1024.0):F1} MiB  •  " +
+            $"vertices={CaptureProfilerSnapshot().Vertices}  •  collisions={CaptureProfilerSnapshot().Collisions}  •  " +
+            $"cancelled={_totalCancelledJobs}\n" +
             $"Вид: {GetDebugViewName(DebugViewMode)}  •  " +
             $"сетка: {GetToggleState(ShowWorldGrid)}  •  " +
             $"wireframe: {GetToggleState(ShowWireframe)}  •  " +
@@ -2104,7 +2161,7 @@ public partial class TerrainChunkManager : Node3D
             $"Глобальные нормали  •  stitching  •  " +
             $"гистерезис: {ChunkSwitchHysteresis:F1} м  •  seed: {NoiseSeed}\n" +
             "F1 — режим цвета, F2 — мировая сетка, F3 — wireframe, " +
-            "F4 — границы, F10 — stress, P — soak/stop\n" +
+            "F4 — границы, F10 — stress, P — soak/stop, F6 — developer workbench\n" +
             "WASD — движение, Space — прыжок, мышь — обзор, " +
             "Esc — освободить курсор";
     }
