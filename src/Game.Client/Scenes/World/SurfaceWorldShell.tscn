@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://w148surfacescn"]
+
+[ext_resource type="Script" uid="uid://w148shell00001" path="res://Scripts/VerticalSlice/WorldSceneShell.cs" id="1_shell"]
+
+[node name="SurfaceWorldShell" type="Node3D" groups=["world_scene_shell"]]
+script = ExtResource("1_shell")
+Kind = 0
+EnvironmentProfile = "surface"

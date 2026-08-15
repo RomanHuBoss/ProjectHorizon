@@ -86,7 +86,9 @@ public partial class SalvageRepairSlice
 
         bool shouldActivateSurface = ResolveSurfaceRuntimeActive();
         ApplySurfaceRuntimeActivation(shouldActivateSurface, force: false);
-        bool renderSystemProxies = !shouldActivateSurface;
+        bool renderSystemProxies = !shouldActivateSurface &&
+            (_worldSceneCoordinatorRuntime is null ||
+             WorldScenes.Current.Kind == WorldSceneKind.Orbit);
         _starSystemSimulationNode.UpdateSimulation(
             delta,
             GetActiveDeveloperPlanetId(),

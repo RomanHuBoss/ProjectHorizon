@@ -2,13 +2,76 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task146-base-construction-build-closure-hotfix1.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Base Construction subsystem closure + Windows build recovery
+## 0. Текущая mega-итерация 2026-08-15 — World Scene Coordinator / §5 vertical-slice closure
+
+### Синхронизация принятой TASK-146/TASK-147
+
+Владелец продукта после hotfix1 сообщил «вроде, работает» и прямо распорядился переходить к следующей итерации. Это фиксируется как **qualitative runtime acceptance / acceptance waiver by product owner**: `TASK-146`, `TASK-147`, `TASK-107` и `BASE-ACC-100..103` переводятся в `VERIFIED`, но отсутствующие точные F6/build строки не выдумываются и не приписываются задним числом. Все `BASE-100..113` также переводятся в `VERIFIED` как принятая подсистема.
+
+### TASK-148 — mega-итерация: World Scene Coordinator / bounded scene residency
+
+**Исходный снимок:** `ProjectHorizon-main-task146-base-construction-build-closure-hotfix1.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure.zip`.  
+**Связанные требования:** ранее извлечённые в этом журнале архитектурный принцип §5.2 «не загружать всю галактику в одну сцену», §15 runtime звёздной системы и зафиксированный TASK-128 gap «общий scene coordinator §5»; интеграция с `TASK-112` voyage, `TASK-114` galaxy/hyperspace и `TASK-128` single-planet activation.
+
+**Ограничение первичного источника:** вложенный PDF ТЗ в исходном ZIP по-прежнему является Git LFS pointer (`oid sha256:1facda8e...`, payload `1774256` bytes), а не PDF payload. Поэтому TASK-148 не добавляет новых трактовок PDF: используются только требования/границы, уже ранее извлечённые и зафиксированные в данном журнале.
+
+**Реализовано:**
+
+- в `Game.Application` добавлен Godot-независимый `WorldSceneCoordinatorRuntime` с четырьмя контекстами `Surface / Orbit / StationInterior / HyperspaceTransit` и строгим graph `Surface ↔ Orbit ↔ StationInterior → HyperspaceTransit → StationInterior`;
+- stable `SystemId/PlanetId` обязательны; произвольный `Surface→Station`, смена system вне hyperspace и другие нелегальные переходы отклоняются без мутации current context;
+- добавлены четыре лёгких PackedScene-shell и `Gameplay/WorldSceneCoordinator`; host держит ровно один shell, валидирует его kind и пишет system/planet/generation metadata для runtime evidence;
+- `Surface` включает surface runtime и выключает orbit objects; `Orbit` включает orbit objects и сохраняет уже принятую bounded `72 m` surface-overlap только у планеты; `StationInterior` и `HyperspaceTransit` suspend both surface+orbit;
+- orbital station, dock marker, approach marker и NPC ship traffic сохраняют исходные Visible/ProcessMode/CollisionLayer/Mask и восстанавливаются после возврата в Orbit;
+- star-system proxy visuals теперь рендерятся только в `Orbit`; Station/Hyperspace не оставляют пространственные system proxies активными;
+- hyperspace jump обёрнут транзакционным scene transition: до `TryJumpToSelected` вход в `HyperspaceTransit`; при успехе — destination `StationInterior` с новым system/planet; при отказе — rollback в source station;
+- coordinator **не имеет отдельного persistence block**: new/load/reset выводят context из существующих `StageOneVoyage.Location` + `GalaxyNavigation.CurrentSystem/CurrentPlanetId`, SQLite schema остаётся прежней;
+- HUD получил локализованную строку World scene; F5 запускает `TASK-148 world scene coordinator acceptance`;
+- xUnit `WorldSceneCoordinatorTests` проверяет полный graph, illegal transition и ID normalization; `tools/validate-task148-world-scene-coordinator.py` интегрирован в local quality, CI и release gates;
+- документация архитектуры вынесена в `docs/WORLD_SCENE_COORDINATION.md`; VERSION = `0.1.0-alpha.148`.
+
+**Изменения относительно принятого TASK-146 hotfix1:** `added=16`, `changed=15`, `removed=0`.
+
+**Фактически выполненные статические проверки:**
+
+```text
+TASK-140 VERSION PASS: version=0.1.0-alpha.148; changelog=1
+TASK-140 JSON CONTRACT PASS: json=21; parsed=21; industrySchema=5/5; localizationParity=1
+TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1336; parity=1; sourceSinks=0
+TASK-134 AUDIO CONTRACT PASS
+TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS
+TASK-138 SECTION-36 CONTRACT PASS
+TASK-140 SECTION-37 CONTRACT PASS: debugExports=4/4; releaseExports=4/4
+TASK-142 SECTION-38 CONTRACT PASS
+TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS
+TASK-146 BASE CONSTRUCTION CLOSURE CONTRACT PASS
+TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; f5Acceptance=1; xunit=3/3
+XML PASS: 4/4; YAML PASS: 2/2; Python syntax PASS: 13/13; Bash syntax PASS
+C# lexical structural check PASS: 6/6 new TASK-148 files
+UID PASS: 139/139 unique; res:// references: broken=0; world scenes=4/4 with kinds 0/1/2/3
+```
+
+**Ограничение проверки:** в среде подготовки отсутствуют `dotnet`, `godot`, `godot4`; поэтому реальная C# компиляция, xUnit execution и Godot runtime/export не заявляются. Они являются TASK-149.
+
+**Статусы:**
+
+- `TASK-148`: `NOT_STARTED → IMPLEMENTED`;
+- `TASK-149`: `NOT_STARTED → IN_PROGRESS` — требуется реальный clean build, quality/xUnit и F5/manual transition smoke;
+- `WORLD-100..WORLD-109`: `IMPLEMENTED`;
+- `WORLD-ACC-100..103`: `IN_PROGRESS`;
+- `TASK-143/TASK-145`: без изменения — их отдельные §38/Compatibility runtime criteria не подменяются TASK-148.
+
+**TASK-149 minimum acceptance:** `tools\clean-build-windows10.cmd` → `0 warnings / 0 errors`; `tools\run-section37-quality.cmd` → green с `TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS`; в gameplay `F5` → `TASK-148 ... PASS` с `transitionGraph=1; illegalRejected=1; hyperspaceSystemChange=1; packedScenes=1; singleLiveScene=1; liveContextMatch=1; residencyPolicy=1`. Manual smoke: Surface → takeoff/Orbit → dock/StationInterior → hyperspace/destination StationInterior → undock/Orbit → landing/Surface; во всех состояниях hostChildren=1, Station/Hyperspace не держат surface/orbit runtime, cold restart выводит тот же контекст из voyage+galaxy save.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Base Construction subsystem closure + Windows build recovery
 
 ### TASK-146 — mega-итерация: Base Construction closure + TASK-144 Windows build recovery
 
@@ -42,11 +105,11 @@ TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfa
 
 **Статусы:**
 
-- `TASK-146`: `NOT_STARTED → IMPLEMENTED`;
-- `TASK-147`: `NOT_STARTED → IN_PROGRESS` — build attempt #2 достиг `0 warnings / 2 errors`; hotfix1 исправляет последние две CS1061, требуется повторный real build + xUnit/quality + F6/manual base-construction acceptance;
+- `TASK-146`: `NOT_STARTED → IMPLEMENTED → VERIFIED` (qualitative product-owner acceptance after hotfix1);
+- `TASK-147`: `NOT_STARTED → IN_PROGRESS → VERIFIED` — закрыт acceptance waiver владельца продукта после hotfix1; точные отсутствующие build/F6 метрики не реконструируются;
 - `TASK-145`: остаётся `IN_PROGRESS`; присланный build является подтверждённым failed attempt, исправления включены в TASK-146;
-- `BASE-100..BASE-113`: остаются `IMPLEMENTED`, теперь с closure-hardening против preview/runtime divergence, battery-toggle inconsistency и malformed save;
-- `BASE-ACC-100..103`: остаются `IN_PROGRESS` до TASK-147;
+- `BASE-100..BASE-113`: `IMPLEMENTED → VERIFIED` по принятой владельцем продукта подсистеме;
+- `BASE-ACC-100..103`: `IN_PROGRESS → VERIFIED` по acceptance waiver владельца продукта; конкретные отсутствующие F6/build строки не приписываются;
 - `ARCH-001/CFG-003`: остаются `IMPLEMENTED`, повторная verification разблокируется после чистого build без legacy shadowing.
 
 **Критерий TASK-147:** `tools\clean-build-windows10.cmd` должен дать `0 warnings / 0 errors` и реальный `CoreCompile` всех трёх assemblies; `tools\run-section37-quality.cmd` — green включая TASK-146; F6 — `TASK-106 ... PASS` и `TASK-146 base construction closure PASS` с `preflightParity=1; batteryIsolation=1; malformedSaveRejected=1; stress500=1; coldRestore=1; roundTrip=1`. После ручного builder smoke раздела 18I `TASK-107/TASK-147` и `BASE-ACC-100..103` могут быть переведены в VERIFIED, после чего core base-construction subsystem считается закрытой.
@@ -4965,40 +5028,58 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `BASE-100` | Catalog содержит не менее 50 construction modules | `IMPLEMENTED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
-| `BASE-101` | Покрыты все категории PDF 20.1 | `IMPLEMENTED` | Exact 17-category coverage including structural, devices and decoration |
-| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `IMPLEMENTED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
-| `BASE-103` | Overlap и disconnected placement отклоняются | `IMPLEMENTED` | Cell collision + graph connectivity preflight |
-| `BASE-104` | Действуют limits `500/100/200/20` | `IMPLEMENTED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
-| `BASE-105` | Base electrical network представлена graph | `IMPLEMENTED` | generation/consumption/battery/enabled/powered/deficit snapshot |
-| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `IMPLEMENTED` | `TryToggle`; structural modules rejected as non-switchable |
-| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `IMPLEMENTED` | Remove-then-connectivity-check; exact refund |
-| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `IMPLEMENTED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
-| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `IMPLEMENTED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
-| `BASE-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.base_construction`; schema remains 2 |
-| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | Snapshot integration, no offline power tick, scene rebuild/reset |
-| `BASE-112` | Legacy save без base block загружается | `IMPLEMENTED` | Null fallback: empty base + full starter stock |
-| `BASE-113` | Terrain geometry не модифицируется | `IMPLEMENTED` | Modules sit above existing surface; PDF 20.4 respected |
-| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | TASK-144 build attempt: 148 warnings/16 errors; TASK-146 attempt #2: 0 warnings/2 CS1061; hotfix1 prepared, повторить three-layer build |
-| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | TASK-146 добавляет preflight/battery/save invariants; ожидаются `TASK-106` + `TASK-146 ... PASS` |
-| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `IN_PROGRESS` | Выполнить раздел 18I |
-| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F6 |
+| `BASE-100` | Catalog содержит не менее 50 construction modules | `VERIFIED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
+| `BASE-101` | Покрыты все категории PDF 20.1 | `VERIFIED` | Exact 17-category coverage including structural, devices and decoration |
+| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `VERIFIED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
+| `BASE-103` | Overlap и disconnected placement отклоняются | `VERIFIED` | Cell collision + graph connectivity preflight |
+| `BASE-104` | Действуют limits `500/100/200/20` | `VERIFIED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
+| `BASE-105` | Base electrical network представлена graph | `VERIFIED` | generation/consumption/battery/enabled/powered/deficit snapshot |
+| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `VERIFIED` | `TryToggle`; structural modules rejected as non-switchable |
+| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `VERIFIED` | Remove-then-connectivity-check; exact refund |
+| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `VERIFIED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
+| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `VERIFIED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
+| `BASE-110` | State сохраняется без SQLite schema bump | `VERIFIED` | Optional `save_settings.base_construction`; schema remains 2 |
+| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `VERIFIED` | Snapshot integration, no offline power tick, scene rebuild/reset |
+| `BASE-112` | Legacy save без base block загружается | `VERIFIED` | Null fallback: empty base + full starter stock |
+| `BASE-113` | Terrain geometry не модифицируется | `VERIFIED` | Modules sit above existing surface; PDF 20.4 respected |
+| `BASE-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | Product-owner qualitative runtime acceptance after TASK-146 hotfix1; exact omitted metrics are not reconstructed |
+| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `VERIFIED` | Product-owner qualitative runtime acceptance after TASK-146 hotfix1; exact omitted metrics are not reconstructed |
+| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `VERIFIED` | Product-owner qualitative runtime acceptance after TASK-146 hotfix1; exact omitted metrics are not reconstructed |
+| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `VERIFIED` | Product-owner qualitative runtime acceptance after TASK-146 hotfix1; exact omitted metrics are not reconstructed |
+
+
+### 8.23. World Scene Coordinator / bounded scene residency
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `WORLD-100` | Четыре явных world contexts Surface/Orbit/StationInterior/HyperspaceTransit | `IMPLEMENTED` | `WorldSceneKind`; application runtime |
+| `WORLD-101` | Разрешён только связный transition graph без произвольных телепортов | `IMPLEMENTED` | `WorldSceneCoordinatorRuntime.IsAllowedTransition`; rejected counter |
+| `WORLD-102` | System/planet могут смениться только на завершении hyperspace | `IMPLEMENTED` | same-system/same-planet guards; Hyper→Station destination edge |
+| `WORLD-103` | Одновременно активен ровно один PackedScene context shell | `IMPLEMENTED` | `WorldSceneCoordinatorNode`; `HostChildren==1`; four shell scenes |
+| `WORLD-104` | Surface/Orbit heavy runtime управляется bounded residency policy | `IMPLEMENTED` | surface suspension from TASK-128 + orbit save/suspend/restore |
+| `WORLD-105` | StationInterior и HyperspaceTransit не держат Surface/Orbit runtime | `IMPLEMENTED` | both residency flags false; collision/process/visibility suspended |
+| `WORLD-106` | Star-system proxies видимы только в Orbit | `IMPLEMENTED` | `renderSystemProxies` gated by current world kind |
+| `WORLD-107` | Hyperspace scene transition транзакционен с galaxy jump | `IMPLEMENTED` | begin transit; success destination completion; failed-jump rollback |
+| `WORLD-108` | Scene state не дублирует persistence location | `IMPLEMENTED` | context derived from existing voyage+galaxy; no `world_scene` save key/schema bump |
+| `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `IMPLEMENTED` | RU/EN world-scene HUD + TASK-148 acceptance |
+| `WORLD-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-149: выполнить three-layer clean build |
+| `WORLD-ACC-101` | Local/CI quality и xUnit green | `IN_PROGRESS` | TASK-148 validator + 3 xUnit tests; выполнить на .NET окружении |
+| `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `IN_PROGRESS` | Выполнить в Godot 4.7.1 .NET |
+| `WORLD-ACC-103` | Manual Surface→Orbit→Station→Hyper→Station→Orbit→Surface + cold restore | `IN_PROGRESS` | Выполнить TASK-149 runtime smoke |
 
 ## 9. Очередь ближайших задач
 
-Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
-
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD.
+Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-107` | Выполнить build/runtime/manual acceptance base construction subsystem | Clean build `0/0`; F6 TASK-072+106; 50 modules/17 catalog categories; manual snap/collision/power/toggle/refund/cold restore/F8; regressions |
-| 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-108` | После закрытия base construction выбрать следующий связный subsystem block | Рассмотреть ship systems, points of interest или world exploration по зависимостям ТЗ |
+| 1 | `TASK-149` | Runtime acceptance World Scene Coordinator | Clean build `0/0`; quality/xUnit; F5 TASK-148 PASS; manual Surface/Orbit/Station/Hyperspace/cold-restore smoke |
+| 2 | `TASK-143/TASK-145` | Закрыть отдельные architecture/renderer runtime evidence | F5 assembly evidence + primary/Compatibility renderer evidence |
+| 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Подтверждено:** `TASK-060`–`TASK-105`, persistence, vertical slice, Industry Content v2, resources, station services и coordinate HUD.  
-**Реализовано:** `TASK-106` — 50-module base construction subsystem.  
-**Текущая приёмочная задача:** `TASK-107`. После её закрытия core construction runtime не требует отдельных итераций; новые modules добавляются data-driven.
+**Принято владельцем продукта:** TASK-146/TASK-147 и core Base Construction.  
+**Текущая реализация:** TASK-148 World Scene Coordinator.  
+**Текущая приёмочная задача:** TASK-149.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 

@@ -402,6 +402,7 @@ public partial class SalvageRepairSlice : Node3D
         BindStageOneVoyageSceneNodes();
         BindGalaxyNavigationSceneNodes();
         BindStarSystemSimulationSceneNodes();
+        BindWorldSceneCoordinatorSceneNodes();
         BindEcologySceneNodes();
         BindAerialNavigationSceneNodes();
         BindNpcFactionSceneNodes();
@@ -497,6 +498,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
         InitializeStarSystemSimulationRuntime();
+        InitializeWorldSceneCoordinator();
         InitializeAerialSteeringRuntime();
         InitializeEcologyRuntime(saveData: null);
         InitializeNpcFactionRuntime(saveData: null);
@@ -783,6 +785,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
         UpdateStageOneVoyage(delta);
+        SynchronizeWorldSceneCoordinator();
         UpdateStarSystemSimulation(delta);
         UpdateEcology(delta);
         UpdateAerialNavigation(delta);
@@ -5472,6 +5475,7 @@ public partial class SalvageRepairSlice : Node3D
         BeginNpcNavigationAcceptance();
         BeginAerialNavigationAcceptance();
         BeginStarSystemSimulationAcceptance();
+        RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
         RunAudioArchitectureAcceptance();
@@ -5480,7 +5484,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5732,6 +5736,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
             InitializeStarSystemSimulationRuntime();
+            InitializeWorldSceneCoordinator();
             InitializeEcologyRuntime(snapshot?.Ecology);
             InitializeNpcFactionRuntime(snapshot?.NpcFactions);
             InitializeProceduralQuestRuntime(snapshot?.ProceduralQuests);
@@ -5935,6 +5940,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
             InitializeStarSystemSimulationRuntime();
+            InitializeWorldSceneCoordinator();
             InitializeEcologyRuntime(saveData: null);
             InitializeNpcFactionRuntime(saveData: null);
             InitializeProceduralQuestRuntime(saveData: null);
@@ -7522,6 +7528,7 @@ public partial class SalvageRepairSlice : Node3D
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
+        string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
         string npcNavigationLine = BuildNpcNavigationHudLine();
@@ -7554,6 +7561,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-124 (F5): {_npcNavigationAcceptanceHud}",
             $"TASK-126 (F5): {_aerialNavigationAcceptanceHud}",
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
+            $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",
@@ -7578,6 +7586,7 @@ public partial class SalvageRepairSlice : Node3D
                 voyageLine,
                 galaxyLine,
                 starSystemLine,
+                worldSceneLine,
                 audioLine,
                 ecologyLine,
                 npcFactionLine,
@@ -7619,6 +7628,7 @@ public partial class SalvageRepairSlice : Node3D
             voyageLine,
             galaxyLine,
             starSystemLine,
+            worldSceneLine,
             audioLine,
             ecologyLine,
             npcFactionLine,

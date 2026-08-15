@@ -787,6 +787,7 @@
     "ui.death.default": "Отказ системы жизнеобеспечения. Вернитесь в главное меню для восстановления или начните новый профиль.",
     "ui.death.life_support": "Отказ жизнеобеспечения • здоровье исчерпано • игровая симуляция приостановлена",
     "ui.death.title": "[КРИТИЧЕСКИ] ИГРОК НЕДЕЕСПОСОБЕН",
+    "ui.dev.tools": "Инструменты разработчика",
     "ui.ecology.closed": "Каталог экологии закрыт.",
     "ui.ecology.fauna_row": "{name} {movement} {body} питание={diet} агрессия={aggression}",
     "ui.ecology.flora_row": "{name} {shape} сбор={harvest} опасность={hazard}",
@@ -980,6 +981,8 @@
     "ui.hud.title.full": "VERTICAL SLICE 1 — ЛОМ → РЕМОНТ → ПРОМЫШЛЕННОСТЬ → ИССЛЕДОВАНИЕ → ПОСАДКА В КОРАБЛЬ → ВЗЛЁТ → СТАНЦИЯ → ВОЗВРАТ → ПОСАДКА → АВТОСОХРАНЕНИЕ • H — HUD",
     "ui.hud.voyage.summary": "Путешествие этапа 1: местоположение={location} • пилотирование={piloted} • контрольная точка={checkpoint} • циклы={loops} • станция посещена={visited} • ассистент={assist} • дистанция={approach} • управление=T/Enter/K/F2",
     "ui.hud.voyage.unavailable": "Путешествие этапа 1: недоступно",
+    "ui.hud.world_scene.summary": "Мировая сцена: {kind} | среда={environment} | поколение={generation} | переходы={transitions} | Поверхность={surface} Орбита={orbit}",
+    "ui.hud.world_scene.unavailable": "Мировая сцена: недоступна",
     "ui.industry.batch_positive": "Количество партий должно быть положительным.",
     "ui.industry.category": "Станция {station} не поддерживает категорию {category}.",
     "ui.industry.dismantled": "Разобрано {quantity} × {item}: возврат={efficiency}; получено={returns}.",
@@ -1329,6 +1332,10 @@
     "ui.voyage.travel_key_location": "Клавиша T доступна на посадочной площадке или при стыковке.",
     "ui.voyage.undock_requires": "Отстыковка требует OrbitalStation; сейчас={location}.",
     "ui.voyage.undocked": "Отстыковка выполнена; возвращайтесь к посадочной площадке; топливо={fuel}.",
-    "ui.dev.tools": "Инструменты разработчика"
+    "ui.world_scene.kind.hyperspace": "гиперпереход",
+    "ui.world_scene.kind.orbit": "орбита",
+    "ui.world_scene.kind.station": "интерьер станции",
+    "ui.world_scene.kind.surface": "поверхность",
+    "ui.world_scene.kind.unknown": "неизвестно"
   }
 }

@@ -162,6 +162,7 @@ public partial class SalvageRepairSlice
         }
 
         UpdateVoyageMarkers();
+        SynchronizeWorldSceneCoordinator();
         if (!piloted)
         {
             Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -176,12 +177,12 @@ public partial class SalvageRepairSlice
         }
 
         ConfigureVoyageShipFromDerivedStats();
-        if (_orbitalDockMarker is not null)
+        if (_orbitRuntimeActive && _orbitalDockMarker is not null)
         {
             _orbitalDockMarker.RotateY((float)(delta * 0.85));
         }
 
-        if (_planetApproachMarker is not null)
+        if (_orbitRuntimeActive && _planetApproachMarker is not null)
         {
             _planetApproachMarker.RotateZ((float)(delta * 0.45));
         }

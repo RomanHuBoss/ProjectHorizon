@@ -68,6 +68,8 @@ jobs:
           python3 tools/validate-section37-build-contract.py
           python3 tools/validate-section38-architecture-contract.py
           python3 tools/validate-platform-architecture-contract.py
+          python3 tools/validate-task146-base-construction-closure.py
+          python3 tools/validate-task148-world-scene-coordinator.py
 
       - name: Unit tests and coverage
         run: >-

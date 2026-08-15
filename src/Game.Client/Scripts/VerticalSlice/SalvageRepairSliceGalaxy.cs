@@ -218,6 +218,7 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        bool worldTransit = BeginWorldHyperspaceTransit();
         GalaxyTravelActionResult result = GalaxyNavigation.TryJumpToSelected(
             ShipSystems,
             StageOneVoyage.Location,
@@ -225,12 +226,20 @@ public partial class SalvageRepairSlice
         _galaxyMapFeedback = description;
         if (result != GalaxyTravelActionResult.Applied)
         {
+            if (worldTransit)
+            {
+                CompleteWorldHyperspaceTransit(successfulJump: false);
+            }
             UpdateGalaxyMapPanel();
             return;
         }
 
         StageOneVoyage.ArriveAtOrbitalStationFromHyperspace();
         _stationServicesOpenedFromVoyage = false;
+        if (worldTransit)
+        {
+            CompleteWorldHyperspaceTransit(successfulJump: true);
+        }
         ApplyStageOneVoyageToScene();
         RefreshGalaxyMapSystems();
         PublishDomainEvent(new SystemDiscovered(

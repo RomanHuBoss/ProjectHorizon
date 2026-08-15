@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://dn124navsurface01" path="res://Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs" id="9_npc_navigation"]
 [ext_resource type="Script" uid="uid://ss128node00001" path="res://Scripts/VerticalSlice/StarSystemSimulationNode.cs" id="10_star_system_simulation"]
 [ext_resource type="Script" uid="uid://c130pauseovr01" path="res://Scripts/Application/GamePauseOverlay.cs" id="11_application_shell"]
+[ext_resource type="Script" uid="uid://w148coordnode1" path="res://Scripts/VerticalSlice/WorldSceneCoordinatorNode.cs" id="12_world_scene_coordinator"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -161,6 +162,9 @@ size = Vector3(8, 0.35, 6)
 size = Vector3(8, 2.4, 6)
 
 [node name="Gameplay" type="Node3D" parent="."]
+
+[node name="WorldSceneCoordinator" type="Node3D" parent="Gameplay"]
+script = ExtResource("12_world_scene_coordinator")
 
 [node name="AtmospherePlanet" type="Node3D" parent="Gameplay"]
 position = Vector3(0, -120, 0)

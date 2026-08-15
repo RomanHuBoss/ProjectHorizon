@@ -787,6 +787,7 @@
     "ui.death.default": "Life-support failure. Return to the main menu to recover or start a new profile.",
     "ui.death.life_support": "Life-support failure • health depleted • gameplay simulation paused",
     "ui.death.title": "[CRITICAL] PLAYER INCAPACITATED",
+    "ui.dev.tools": "Developer Tools",
     "ui.ecology.closed": "Ecology catalog closed.",
     "ui.ecology.fauna_row": "{name} {movement} {body} diet={diet} aggression={aggression}",
     "ui.ecology.flora_row": "{name} {shape} harvest={harvest} hazard={hazard}",
@@ -980,6 +981,8 @@
     "ui.hud.title.full": "VERTICAL SLICE 1 — SALVAGE → REPAIR → INDUSTRY → EXPLORE → BOARD → TAKEOFF → STATION → RETURN → LAND → AUTOSAVE • H — HUD",
     "ui.hud.voyage.summary": "Stage 1 voyage: location={location} • piloted={piloted} • checkpoint={checkpoint} • loops={loops} • stationVisited={visited} • assist={assist} • approach={approach} • controls=T/Enter/K/F2",
     "ui.hud.voyage.unavailable": "Stage 1 voyage: unavailable",
+    "ui.hud.world_scene.summary": "World scene: {kind} | env={environment} | generation={generation} | transitions={transitions} | Surface={surface} Orbit={orbit}",
+    "ui.hud.world_scene.unavailable": "World scene: unavailable",
     "ui.industry.batch_positive": "Requested batch count must be positive.",
     "ui.industry.category": "Station {station} does not support category {category}.",
     "ui.industry.dismantled": "Dismantled {quantity} × {item}: recovery={efficiency}; returns={returns}.",
@@ -1329,6 +1332,10 @@
     "ui.voyage.travel_key_location": "T is available on the landing pad or while docked.",
     "ui.voyage.undock_requires": "Undock requires OrbitalStation; current={location}.",
     "ui.voyage.undocked": "Undocked; return to planetary landing pad; fuel={fuel}.",
-    "ui.dev.tools": "Developer Tools"
+    "ui.world_scene.kind.hyperspace": "hyperspace transit",
+    "ui.world_scene.kind.orbit": "orbit",
+    "ui.world_scene.kind.station": "station interior",
+    "ui.world_scene.kind.surface": "surface",
+    "ui.world_scene.kind.unknown": "unknown"
   }
 }
