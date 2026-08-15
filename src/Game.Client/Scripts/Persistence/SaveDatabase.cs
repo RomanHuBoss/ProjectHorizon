@@ -320,7 +320,7 @@ public sealed partial class SaveDatabase : IDisposable
         return new SaveGameSnapshot(
             slotId,
             revision,
-            GeneratorVersion: 1,
+            GeneratorVersion: ProjectHorizonGenerator.Version,
             ContentVersion: CurrentContentVersion,
             updatedUtc,
             new PlayerSaveData(

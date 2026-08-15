@@ -2,13 +2,123 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-developer-diagnostics-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-section36-verification-suite.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Developer & Diagnostics Suite / §34 + §35 closure
+## 0. Текущая mega-итерация 2026-08-15 — Verification & Automated Testing Suite / §36 closure
+
+### Закрытие Developer & Diagnostics по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-138 журнал синхронизирован:
+
+- `TASK-136` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-137` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; отсутствовавший в среде
+  подготовки Godot/.NET runtime не приписывается задним числом.
+
+### TASK-138 — standalone automated verification, golden seeds, persistence/load tests and coverage gates
+
+**Исходный снимок:** `ProjectHorizon-main-developer-diagnostics-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-section36-verification-suite.zip`.  
+**Связанные требования ТЗ v2.0:** §36.1–36.5 «Testing».
+
+**Реализовано:**
+
+- добавлен отдельный `tests/ProjectHorizon.Tests` на `xUnit` + `Microsoft.NET.Test.Sdk` +
+  `coverlet.collector`; тесты запускаются `dotnet test` без открытия игрового UI и
+  ссылаются на production `Game.Client.csproj`, поэтому не создают вторую реализацию domain/worldgen/save;
+- §36.1 формализован как 10 обязательных test groups: seed hierarchy, stable IDs,
+  inventory, industry/recipe/technology/station graph, economy, quests, migrations,
+  derived stats, serialization и coordinate transforms;
+- введён единый `ProjectHorizonGenerator.Version`. `GalaxyNavigationRuntime` и новые
+  snapshot builders используют один generator-version; deterministic generation нельзя
+  изменить молча, сохранив старый golden manifest;
+- добавлен versioned `src/Game.Client/Testing/golden-seeds.v1.json`: 4 фиксированных
+  system cases с star type/planet count/full planet parameters/SHA-256 и отдельный
+  fixed POI fixture из 20 объектов с контрольными height/slope/position и checksum;
+  значения manifest были подготовлены независимо от C# golden verifier;
+- `GoldenSeedContract` проверяет manifest против реальных `GalaxyNavigationRuntime` и
+  `PlanetaryPoiPlanner`; F5 дополнительно выполняет repeatable `CubeSphereMeshBuilder`
+  visual/worldgen smoke и seam invariant;
+- §36.3 покрыт normal exact save, simulated abnormal shutdown inside an uncommitted SQLite transaction, corrupted primary, protected
+  backup recovery, old-version migration, aliases/unknown item+ship, removed technology
+  и changed-content normalization; для этого `TechnologyProgression` теперь безопасно
+  игнорирует исчезнувший technology ID и удаляет его из следующего нормализованного save;
+- §36.4 автоматизирован отдельными load/stress cases: 2h analytic flight, 8h virtual
+  automatic aerial movement, 100 последовательных voyage docking/landing loops с persistence round-trip (и дублирующий F5 probe), 100 реальных hyperspace jumps через существующий TASK-114 acceptance runner, base на
+  500 modules, inventory 10,000 entries, 1000 visited systems, repeated abnormal
+  recovery; реальный 1 GiB SQLite scenario помечен `FullSoak` и запускается только
+  `tools\run-section36-tests.cmd --full-soak`, чтобы обычный gate не создавал гигабайтный файл;
+- добавлены `tests/coverage-scope.json`, `tests/coverlet.runsettings` и
+  `tools/verify-section36-coverage.py`: build gate требует line coverage `Domain >=80%`,
+  `WorldGen >=70%`, `Persistence >=80%`; ниже порога команда завершается FAIL;
+- `tools/run-section36-tests.cmd` выполняет test suite, собирает Cobertura coverage и
+  автоматически запускает threshold verifier; `tools/restore-section36-tests.cmd`
+  оставлен для явного package restore;
+- добавлен machine-readable `src/Game.Client/Testing/section36-suite.json` и статический
+  `tools/validate-section36-testing-contract.py`, который требует 10/10 unit groups,
+  8/8 save scenarios, все нормативные load scenarios, golden/version contract,
+  thresholds 80/70/80 и F5 integration;
+- `F5` дополнен `TASK-138`: он не подменяет standalone tests, а проверяет доступность
+  suite manifest, generator-version, fixed golden systems/POI, checksums/control heights
+  и repeatable cube-sphere visual smoke.
+
+**Статусы:**
+
+- `TASK-136`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-137`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-138`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-139`: `NOT_STARTED` → `IN_PROGRESS` — clean build + `dotnet test`/coverage + F5 smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Статическая приёмка TASK-138:**
+
+```text
+python tools/validate-section36-testing-contract.py
+TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; goldenVersion=1; goldenSystems=4; goldenPoi=20; coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1.
+```
+
+**Статический pre-release audit:**
+
+```text
+files eligible for release: 337
+vs accepted TASK-136 archive: +24 / ~10 / -0
+JSON: 21/21 PASS
+C# lexical: 143/143 PASS
+UID: 134/134 unique
+res:// references: 65; broken=0
+TASK-132 localization gate: PASS
+TASK-134 audio gate: PASS
+TASK-136 diagnostics gate: PASS
+TASK-138 section-36 gate: PASS
+```
+
+**Ограничение среды:** в среде подготовки по-прежнему отсутствуют `dotnet` и Godot,
+поэтому test execution, фактические coverage percentages и F5 runtime не выдаются за
+выполненные. До реального `TASK-139` статус новой подсистемы остаётся `IMPLEMENTED`.
+
+**Минимальная приёмка TASK-139:**
+
+1. `tools\clean-build-windows10.cmd` → `0 errors`.
+2. `tools\run-section36-tests.cmd` → xUnit PASS и итоговая строка `TASK-138 COVERAGE PASS`
+   с `Domain>=80%`, `WorldGen>=70%`, `Persistence>=80%`.
+3. По необходимости полный тяжёлый сценарий: `tools\run-section36-tests.cmd --full-soak`;
+   он дополнительно создаёт и проверяет реальную SQLite БД размером не менее 1 GiB.
+4. Запустить игру и один раз нажать `F5`; требуется строка:
+
+```text
+TASK-138 verification suite acceptance PASS: generatorVersion=1; goldenSystems=4/4; goldenPoi=1; controlHeights=1; checksums=1; unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8; landingStress=100/100; visualSmoke=1; visualComponents=1; coverageThresholds=80/70/80; ... result=section-36-verification-runtime.
+```
+
+**Граница закрытия:** `TASK-139 → VERIFIED` закрывает §36 для текущего проекта.
+Фактические coverage percentages должны быть внесены в журнал после запуска; статический
+наличественный контракт не заменяет выполнение `dotnet test`.
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Developer & Diagnostics Suite / §34 + §35 closure
 
 ### Закрытие sound-итерации по решению владельца продукта
 
@@ -184,7 +294,7 @@ stress/coverage automation должна опираться на TASK-136 diagnos
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
+## 0B. Предыдущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
 
 ### Закрытие localization-итерации по решению владельца продукта
 
@@ -323,7 +433,7 @@ TASK-134 audio architecture acceptance PASS: buses=8/8; cues=19/19; pool2d=8; po
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
+## 0C. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
 
 ### Закрытие UI/application-shell итерации по решению владельца продукта
 
@@ -419,7 +529,7 @@ Music/SFX/Voice buses, но полноценный игровой sound runtime 
 
 ---
 
-## 0C. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+## 0D. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
 
 ### Закрытие star-system итерации по решению владельца продукта
 
@@ -546,7 +656,7 @@ accessibility baseline, переиспользуя ранее созданные
 
 ---
 
-## 0D. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0E. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -676,7 +786,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0E. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0F. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -803,7 +913,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0F. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0G. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -914,7 +1024,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0G. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0H. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -1063,7 +1173,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0H. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0I. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -1159,7 +1269,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0I. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0J. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -1291,7 +1401,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0J. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0K. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 

@@ -459,7 +459,7 @@ public static class ChemicalProcessAcceptanceRunner
         return new SaveGameSnapshot(
             slotId,
             Revision: 1,
-            GeneratorVersion: 1,
+            GeneratorVersion: ProjectHorizonGenerator.Version,
             ContentVersion: SaveDatabase.CurrentContentVersion,
             updatedUtc,
             new PlayerSaveData(

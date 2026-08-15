@@ -77,18 +77,27 @@ public static class GameLocalizationService
         Catalogs[EnglishLocale] = LoadCatalog(EnglishPath, EnglishLocale);
         Catalogs[RussianLocale] = LoadCatalog(RussianPath, RussianLocale);
 
-        HashSet<string> english = Catalogs[EnglishLocale].Keys.ToHashSet(StringComparer.Ordinal);
-        HashSet<string> russian = Catalogs[RussianLocale].Keys.ToHashSet(StringComparer.Ordinal);
-        _keyParity = english.SetEquals(russian);
-        _missingValueCount = Catalogs.Values.Sum(catalog =>
-            catalog.Values.Count(string.IsNullOrWhiteSpace));
-        if (!_keyParity || _missingValueCount != 0)
-        {
-            throw new InvalidOperationException(
-                $"Localization catalog invalid: parity={(_keyParity ? 1 : 0)}; " +
-                $"missingValues={_missingValueCount}; en={english.Count}; ru={russian.Count}.");
-        }
+        ValidateCatalogs();
+        _initialized = true;
+    }
 
+    public static void InitializeForStandaloneTests(
+        string englishJson,
+        string russianJson)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(englishJson);
+        ArgumentException.ThrowIfNullOrWhiteSpace(russianJson);
+        Catalogs.Clear();
+        Catalogs[EnglishLocale] = ParseCatalog(
+            englishJson,
+            EnglishPath,
+            EnglishLocale);
+        Catalogs[RussianLocale] = ParseCatalog(
+            russianJson,
+            RussianPath,
+            RussianLocale);
+        ValidateCatalogs();
+        _activeLocale = EnglishLocale;
         _initialized = true;
     }
 
@@ -282,6 +291,14 @@ public static class GameLocalizationService
     private static IReadOnlyDictionary<string, string> LoadCatalog(string path, string locale)
     {
         string json = FileAccess.GetFileAsString(path);
+        return ParseCatalog(json, path, locale);
+    }
+
+    private static IReadOnlyDictionary<string, string> ParseCatalog(
+        string json,
+        string path,
+        string locale)
+    {
         if (string.IsNullOrWhiteSpace(json))
         {
             throw new InvalidOperationException($"Localization file {path} is empty or missing.");
@@ -304,6 +321,21 @@ public static class GameLocalizationService
             }
         }
         return normalized;
+    }
+
+    private static void ValidateCatalogs()
+    {
+        HashSet<string> english = Catalogs[EnglishLocale].Keys.ToHashSet(StringComparer.Ordinal);
+        HashSet<string> russian = Catalogs[RussianLocale].Keys.ToHashSet(StringComparer.Ordinal);
+        _keyParity = english.SetEquals(russian);
+        _missingValueCount = Catalogs.Values.Sum(catalog =>
+            catalog.Values.Count(string.IsNullOrWhiteSpace));
+        if (!_keyParity || _missingValueCount != 0)
+        {
+            throw new InvalidOperationException(
+                $"Localization catalog invalid: parity={(_keyParity ? 1 : 0)}; " +
+                $"missingValues={_missingValueCount}; en={english.Count}; ru={russian.Count}.");
+        }
     }
 
     private sealed class LocalizationDocument

@@ -15,6 +15,7 @@ public sealed class TechnologyProgression
 {
     private readonly IReadOnlyDictionary<string, TechnologyDefinition> _technologies;
     private readonly HashSet<string> _unlocked = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _ignoredUnknownUnlocks = new(StringComparer.Ordinal);
 
     public TechnologyProgression(
         IReadOnlyDictionary<string, TechnologyDefinition> technologies,
@@ -37,9 +38,15 @@ public sealed class TechnologyProgression
             {
                 if (!_technologies.ContainsKey(technologyId))
                 {
-                    throw new ArgumentException(
-                        $"Unknown unlocked technology {technologyId}.",
-                        nameof(unlockedTechnologyIds));
+                    // Content catalogs evolve independently from player saves. A removed
+                    // technology must not make an otherwise valid save unloadable. Keep a
+                    // diagnostic record for the current session and omit it from the next
+                    // normalized save.
+                    if (!string.IsNullOrWhiteSpace(technologyId))
+                    {
+                        _ignoredUnknownUnlocks.Add(technologyId);
+                    }
+                    continue;
                 }
 
                 _unlocked.Add(technologyId);
@@ -62,6 +69,9 @@ public sealed class TechnologyProgression
         .ToArray();
 
     public int UnlockedCount => _unlocked.Count;
+
+    public IReadOnlyList<string> IgnoredUnknownTechnologyIds =>
+        _ignoredUnknownUnlocks.OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
     public bool IsUnlocked(string technologyId)
     {

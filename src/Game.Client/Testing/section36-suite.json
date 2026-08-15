@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "task": "TASK-138",
+  "unitGroups": [
+    "seed_hierarchy",
+    "stable_id_generation",
+    "inventory",
+    "industry_graph",
+    "economy",
+    "quests",
+    "migrations",
+    "stats_calculation",
+    "serialization",
+    "coordinate_transforms"
+  ],
+  "saveScenarios": [
+    "normal_save",
+    "shutdown_during_save",
+    "corrupt_primary",
+    "backup_recovery",
+    "old_version_migration",
+    "unknown_item",
+    "removed_technology",
+    "changed_content_catalog"
+  ],
+  "loadScenarios": [
+    "two_hour_flight",
+    "eight_hour_automatic_movement",
+    "one_hundred_landings",
+    "one_hundred_hyperspace_jumps",
+    "five_hundred_module_base",
+    "ten_thousand_inventory_entries",
+    "one_thousand_visited_systems",
+    "one_gib_save_database_and_abnormal_recovery"
+  ],
+  "coverage": {
+    "domain": 0.80,
+    "worldGen": 0.70,
+    "persistence": 0.80
+  },
+  "visualSmokeRequired": true
+}

@@ -59,6 +59,7 @@ public sealed record GalaxyRoutePlan(
 public sealed class GalaxyNavigationRuntime
 {
     public const long DefaultUniverseSeed = 2_026_080_5L;
+    public const int GeneratorVersion = ProjectHorizonGenerator.Version;
     public const string PrimaryGalaxyId = "galaxy.g1";
     public const string StarterSystemId = "system.vertical_slice";
     public const double SectorScaleLightYears = 180.0;

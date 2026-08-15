@@ -1,0 +1,377 @@
+{
+  "schemaVersion": 1,
+  "generatorVersion": 1,
+  "systemCases": [
+    {
+      "universeSeed": 20260805,
+      "sectorX": 0,
+      "sectorY": 0,
+      "sectorZ": 0,
+      "systemId": "system.vertical_slice",
+      "displayName": "Dawn Cross 000",
+      "starType": "OrangeDwarf",
+      "economyType": "industrial",
+      "dangerLevel": 2,
+      "planetCount": 1,
+      "planets": [
+        {
+          "planetId": "planet.vertical_slice",
+          "archetype": "radioactive",
+          "orbitIndex": 1,
+          "moonCount": 2,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 2098602563083061118
+        }
+      ],
+      "checksum": "122c191b338922e38a24dadd60f4ec14d82eb82f05228c85ac31b3ab739c010b"
+    },
+    {
+      "universeSeed": 20260805,
+      "sectorX": 3,
+      "sectorY": -2,
+      "sectorZ": 1,
+      "systemId": "system.g1.xp3_yn2_zp1",
+      "displayName": "Helix Reach 072",
+      "starType": "RedDwarf",
+      "economyType": "agricultural",
+      "dangerLevel": 5,
+      "planetCount": 3,
+      "planets": [
+        {
+          "planetId": "planet.g1_xp3_yn2_zp1.01",
+          "archetype": "gas_giant",
+          "orbitIndex": 1,
+          "moonCount": 3,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 8037041216533923212
+        },
+        {
+          "planetId": "planet.g1_xp3_yn2_zp1.02",
+          "archetype": "radioactive",
+          "orbitIndex": 2,
+          "moonCount": 2,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 1695741747666682893
+        },
+        {
+          "planetId": "planet.g1_xp3_yn2_zp1.03",
+          "archetype": "barren",
+          "orbitIndex": 3,
+          "moonCount": 0,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 1819709097105353388
+        }
+      ],
+      "checksum": "9161b5b4fd68641a2936c4de057ed30602ce8bcc726b8f5f1551a65213b120cd"
+    },
+    {
+      "universeSeed": 73199217,
+      "sectorX": -7,
+      "sectorY": 4,
+      "sectorZ": 9,
+      "systemId": "system.g1.xn7_yp4_zp9",
+      "displayName": "Icarus Span 032",
+      "starType": "RedDwarf",
+      "economyType": "industrial",
+      "dangerLevel": 2,
+      "planetCount": 2,
+      "planets": [
+        {
+          "planetId": "planet.g1_xn7_yp4_zp9.01",
+          "archetype": "frozen",
+          "orbitIndex": 1,
+          "moonCount": 2,
+          "hasAtmosphere": true,
+          "hasWater": true,
+          "seed": 4639208176885862757
+        },
+        {
+          "planetId": "planet.g1_xn7_yp4_zp9.02",
+          "archetype": "temperate",
+          "orbitIndex": 2,
+          "moonCount": 3,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 1597831107187120255
+        }
+      ],
+      "checksum": "40b341eeb03494c7afd9704eb39528ea56c5b1951df779883b4600499ab0a262"
+    },
+    {
+      "universeSeed": 99000123,
+      "sectorX": 18,
+      "sectorY": -11,
+      "sectorZ": -5,
+      "systemId": "system.g1.xp18_yn11_zn5",
+      "displayName": "Dawn Haven 306",
+      "starType": "YellowStar",
+      "economyType": "agricultural",
+      "dangerLevel": 1,
+      "planetCount": 1,
+      "planets": [
+        {
+          "planetId": "planet.g1_xp18_yn11_zn5.01",
+          "archetype": "frozen",
+          "orbitIndex": 1,
+          "moonCount": 1,
+          "hasAtmosphere": true,
+          "hasWater": true,
+          "seed": 2357290014199671269
+        }
+      ],
+      "checksum": "dca35588608579242a317e62351a4715b35232acb03522a1da0c2f4d7df8bde1"
+    }
+  ],
+  "poiFixture": {
+    "worldSeed": 1082026,
+    "regionKey": "region.vertical_slice.frontier_plain",
+    "expectedCount": 20,
+    "checksum": "ad8d7cdd96f1a5b72b75c8b76f1f1e812bd71aed29e4eff6ddab6b8d329cc9f3",
+    "placements": [
+      {
+        "instanceId": "poi.instance.000001",
+        "poiTypeId": "poi.alien_archive",
+        "positionX": 2.0,
+        "positionY": 1.7000000000000002,
+        "positionZ": -26.0,
+        "rotationDegrees": 90.0,
+        "controlHeight": 0.47,
+        "slopeDegrees": 11.68,
+        "distanceToWater": 36.0,
+        "danger": 47
+      },
+      {
+        "instanceId": "poi.instance.000002",
+        "poiTypeId": "poi.ancient_artifact",
+        "positionX": -28.0,
+        "positionY": 2.5,
+        "positionZ": -24.0,
+        "rotationDegrees": 0.0,
+        "controlHeight": 1.7,
+        "slopeDegrees": 9.64,
+        "distanceToWater": 6.0,
+        "danger": 53
+      },
+      {
+        "instanceId": "poi.instance.000003",
+        "poiTypeId": "poi.monolith",
+        "positionX": 30.0,
+        "positionY": 3.1,
+        "positionZ": 22.0,
+        "rotationDegrees": 90.0,
+        "controlHeight": -1.34,
+        "slopeDegrees": 1.55,
+        "distanceToWater": 64.0,
+        "danger": 90
+      },
+      {
+        "instanceId": "poi.instance.000004",
+        "poiTypeId": "poi.underground_vault",
+        "positionX": -26.0,
+        "positionY": 0.7,
+        "positionZ": -4.0,
+        "rotationDegrees": 90.0,
+        "controlHeight": 1.24,
+        "slopeDegrees": 2.46,
+        "distanceToWater": 8.0,
+        "danger": 64
+      },
+      {
+        "instanceId": "poi.instance.000005",
+        "poiTypeId": "poi.pirate_base",
+        "positionX": -30.0,
+        "positionY": 1.6,
+        "positionZ": 12.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": -1.12,
+        "slopeDegrees": 3.01,
+        "distanceToWater": 4.0,
+        "danger": 73
+      },
+      {
+        "instanceId": "poi.instance.000006",
+        "poiTypeId": "poi.upgrade_capsule",
+        "positionX": 34.0,
+        "positionY": 1.1,
+        "positionZ": 32.0,
+        "rotationDegrees": 270.0,
+        "controlHeight": -1.8,
+        "slopeDegrees": 5.45,
+        "distanceToWater": 68.0,
+        "danger": 30
+      },
+      {
+        "instanceId": "poi.instance.000007",
+        "poiTypeId": "poi.abandoned_base",
+        "positionX": 30.0,
+        "positionY": 1.2000000000000002,
+        "positionZ": -22.0,
+        "rotationDegrees": 90.0,
+        "controlHeight": -1.78,
+        "slopeDegrees": 4.4,
+        "distanceToWater": 64.0,
+        "danger": 26
+      },
+      {
+        "instanceId": "poi.instance.000008",
+        "poiTypeId": "poi.crashed_probe",
+        "positionX": 16.0,
+        "positionY": 1.2000000000000002,
+        "positionZ": -26.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": 0.75,
+        "slopeDegrees": 2.19,
+        "distanceToWater": 50.0,
+        "danger": 89
+      },
+      {
+        "instanceId": "poi.instance.000009",
+        "poiTypeId": "poi.industrial_site",
+        "positionX": -24.0,
+        "positionY": 1.5,
+        "positionZ": 28.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": -0.17,
+        "slopeDegrees": 2.55,
+        "distanceToWater": 10.0,
+        "danger": 90
+      },
+      {
+        "instanceId": "poi.instance.000010",
+        "poiTypeId": "poi.science_station",
+        "positionX": -16.0,
+        "positionY": 2.1,
+        "positionZ": -28.0,
+        "rotationDegrees": 0.0,
+        "controlHeight": 1.41,
+        "slopeDegrees": 4.15,
+        "distanceToWater": 18.0,
+        "danger": 70
+      },
+      {
+        "instanceId": "poi.instance.000011",
+        "poiTypeId": "poi.trading_outpost",
+        "positionX": 24.0,
+        "positionY": 1.35,
+        "positionZ": -14.0,
+        "rotationDegrees": 270.0,
+        "controlHeight": -0.83,
+        "slopeDegrees": 2.3,
+        "distanceToWater": 58.0,
+        "danger": 27
+      },
+      {
+        "instanceId": "poi.instance.000012",
+        "poiTypeId": "poi.weather_observatory",
+        "positionX": -16.0,
+        "positionY": 2.3000000000000003,
+        "positionZ": -20.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": 1.02,
+        "slopeDegrees": 3.18,
+        "distanceToWater": 18.0,
+        "danger": 2
+      },
+      {
+        "instanceId": "poi.instance.000013",
+        "poiTypeId": "poi.cargo_container",
+        "positionX": 26.0,
+        "positionY": 0.7999999999999999,
+        "positionZ": 32.0,
+        "rotationDegrees": 270.0,
+        "controlHeight": -0.76,
+        "slopeDegrees": 2.76,
+        "distanceToWater": 60.0,
+        "danger": 37
+      },
+      {
+        "instanceId": "poi.instance.000014",
+        "poiTypeId": "poi.cave_entrance",
+        "positionX": 24.0,
+        "positionY": 1.3,
+        "positionZ": -34.0,
+        "rotationDegrees": 270.0,
+        "controlHeight": 0.45,
+        "slopeDegrees": 7.12,
+        "distanceToWater": 58.0,
+        "danger": 86
+      },
+      {
+        "instanceId": "poi.instance.000015",
+        "poiTypeId": "poi.distress_shelter",
+        "positionX": -34.0,
+        "positionY": 1.1,
+        "positionZ": -14.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": 0.17,
+        "slopeDegrees": 1.47,
+        "distanceToWater": 0.0,
+        "danger": 76
+      },
+      {
+        "instanceId": "poi.instance.000016",
+        "poiTypeId": "poi.emergency_beacon",
+        "positionX": 30.0,
+        "positionY": 1.5,
+        "positionZ": -2.0,
+        "rotationDegrees": 270.0,
+        "controlHeight": -0.33,
+        "slopeDegrees": 0.92,
+        "distanceToWater": 64.0,
+        "danger": 80
+      },
+      {
+        "instanceId": "poi.instance.000017",
+        "poiTypeId": "poi.landing_pad",
+        "positionX": 32.0,
+        "positionY": 0.275,
+        "positionZ": 6.0,
+        "rotationDegrees": 0.0,
+        "controlHeight": -0.27,
+        "slopeDegrees": 3.67,
+        "distanceToWater": 66.0,
+        "danger": 54
+      },
+      {
+        "instanceId": "poi.instance.000018",
+        "poiTypeId": "poi.relay",
+        "positionX": -24.0,
+        "positionY": 2.7,
+        "positionZ": -14.0,
+        "rotationDegrees": 0.0,
+        "controlHeight": -1.67,
+        "slopeDegrees": 4.68,
+        "distanceToWater": 10.0,
+        "danger": 49
+      },
+      {
+        "instanceId": "poi.instance.000019",
+        "poiTypeId": "poi.resource_deposit",
+        "positionX": -34.0,
+        "positionY": 1.0,
+        "positionZ": 34.0,
+        "rotationDegrees": 180.0,
+        "controlHeight": -1.76,
+        "slopeDegrees": 1.23,
+        "distanceToWater": 0.0,
+        "danger": 62
+      },
+      {
+        "instanceId": "poi.instance.000020",
+        "poiTypeId": "poi.ship_wreck",
+        "positionX": 10.0,
+        "positionY": 0.7999999999999999,
+        "positionZ": -34.0,
+        "rotationDegrees": 0.0,
+        "controlHeight": -1.04,
+        "slopeDegrees": 11.69,
+        "distanceToWater": 44.0,
+        "danger": 34
+      }
+    ]
+  }
+}

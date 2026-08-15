@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "areas": {
+    "Domain": {
+      "minimumLineCoverage": 0.80,
+      "files": [
+        "Scripts/Content/GameContentCatalog.cs",
+        "Scripts/VerticalSlice/StarterRepairDomain.cs",
+        "Scripts/VerticalSlice/TechnologyProgression.cs",
+        "Scripts/VerticalSlice/StationServicesRuntime.cs",
+        "Scripts/VerticalSlice/ProceduralQuestRuntime.cs",
+        "Scripts/VerticalSlice/ShipSystemsRuntime.cs",
+        "Scripts/VerticalSlice/BaseConstructionRuntime.cs"
+      ]
+    },
+    "WorldGen": {
+      "minimumLineCoverage": 0.70,
+      "files": [
+        "Scripts/VerticalSlice/GalaxyNavigationRuntime.cs",
+        "Scripts/VerticalSlice/StarSystemSimulationRuntime.cs",
+        "Scripts/VerticalSlice/PlanetaryPoiPlanner.cs",
+        "Scripts/VerticalSlice/CatalogResourceFieldPlanner.cs",
+        "Scripts/Testing/GoldenSeedContract.cs"
+      ]
+    },
+    "Persistence": {
+      "minimumLineCoverage": 0.80,
+      "files": [
+        "Scripts/Persistence/SaveDatabase.cs",
+        "Scripts/Persistence/SaveDatabase.Autosave.cs",
+        "Scripts/Persistence/SaveDatabase.Migration.cs",
+        "Scripts/Persistence/SaveDatabase.Recovery.cs"
+      ]
+    }
+  }
+}

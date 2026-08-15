@@ -444,7 +444,7 @@ public static class ProductionQueueAcceptanceRunner
         return new SaveGameSnapshot(
             slotId,
             revision,
-            GeneratorVersion: 1,
+            GeneratorVersion: ProjectHorizonGenerator.Version,
             ContentVersion: SaveDatabase.CurrentContentVersion,
             updatedUtc,
             new PlayerSaveData(

@@ -504,6 +504,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializePlayerSurvivalRuntime(saveData: null);
         InitializeAudioGameplayRuntime();
         InitializeDeveloperDiagnosticsRuntime();
+        InitializeTestingRuntime();
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -5457,8 +5458,9 @@ public partial class SalvageRepairSlice : Node3D
         RunLocalizationAcceptance();
         RunAudioArchitectureAcceptance();
         RunDeveloperDiagnosticsAcceptance();
+        RunTestingArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7518,7 +7520,8 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
-            $"TASK-136 (F5): {_task136AcceptanceHud}"
+            $"TASK-136 (F5): {_task136AcceptanceHud}",
+            $"TASK-138 (F5): {_task138AcceptanceHud}"
         });
 
         if (_hudMode == SalvageRepairHudMode.Compact)
