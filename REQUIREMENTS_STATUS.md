@@ -2,13 +2,64 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure-hotfix2.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task149-transactional-world-scene-acceptance.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — World Scene Coordinator / §5 vertical-slice closure
+## 0. Текущая mega-итерация 2026-08-15 — TASK-149 transactional World Scene Coordinator acceptance
+
+### TASK-149 — mega-итерация: transactional world-scene acceptance hardening
+
+**Исходный снимок:** `ProjectHorizon-main(10)(1).zip` (последняя приложенная GitHub-редакция).  
+**Подготовленный снимок:** `ProjectHorizon-main-task149-transactional-world-scene-acceptance.zip`.  
+**Связанные требования PDF-ТЗ v2.0:** §4.4 `SceneCoordinator` как допустимый глобальный orchestration service; §5.2 — одновременно загружается только необходимый уровень представления; §5.3 — переходы поверхность/космос/станция/гиперпереход; §22.8 — autosave после посадки, взлёта и гиперперехода; Stage 1 — игрок взлетает, посещает станцию и возвращается.
+
+**Восстановление нормативных файлов:** исходный ZIP содержал `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf` и `.docx` только как Git LFS pointer-файлы. В подготовленный снимок возвращены полные исходные бинарные документы: PDF `1774256` bytes, SHA-256 `1facda8ebc41f1fd161f4b3ce9d2c3847b61a3aae0f9283e45bf9999f50f3dd8` (точно совпадает с LFS oid), DOCX `112226` bytes, SHA-256 `c57207aa7e4ee245cadb50da2dd7ae92575294d664684afbaa56d2bb9f56fc23`. Дополнительно восстановлен точный payload `Technical_Specification/1.0/Project_Horizon_Technical_Specification_v1.0.pdf`: `574489` bytes, SHA-256 `19468fcaa1116601ef1afd3b963263711a3a76eaa69414e5c72e2f61ffa92f14`, совпадающий с его LFS oid. Эти документы не пересобирались и не редактировались скриптами. Для v1.0 DOCX точный LFS payload в доступных исходниках не найден, поэтому его pointer намеренно не подменялся реконструированным файлом.
+
+**Почему это именно mega-итерация, а не переход к следующей подсистеме:** регламент требует сначала завершить приёмку уже реализованной функции. Ближайшая задача — `TASK-149`, поэтому перескакивать к новой подсистеме нельзя. Вместо точечного hotfix вся граница world-scene transition/acceptance усилена как один связный closure-блок.
+
+**Реализовано:**
+
+- `WorldSceneCoordinatorRuntime` получил exact volatile snapshot (`Current`, `Generation`, transition/rejection/hyperspace counters) и exact restore без искусственного увеличения counters; snapshot не сериализуется и не создаёт нового persistence source;
+- `WorldSceneCoordinatorNode.TryTransition` переведён на staged transaction: destination PackedScene сначала `load → instantiate → AddChild` и проверяется как реально вошедший в coordinator tree; только после успешного preflight применяется application-state transition; прежний shell удаляется последним;
+- при load/instantiate/add-child/state-mutation failure staged shell удаляется, runtime восстанавливается из exact snapshot, а прежний shell/context остаются активными; diagnostics получили `SceneLoadFailures` и `Rollbacks`;
+- `Restore`, forced reload и acceptance cleanup используют тот же safe staged-shell path; `WorldSceneCoordinatorNodeSnapshot` позволяет F5 вернуть не только context, но и generation/reload/failure counters;
+- F5 `TASK-148` acceptance теперь проходит **живой** путь `Surface(alpha) → Orbit(alpha) → Station(alpha) → Hyperspace(alpha) → Station(beta) → Orbit(beta) → Surface(beta)`; на каждом из 7 состояний проверяются `HostChildren==1`, shell metadata/path и surface/orbit residency; затем live Surface→Station rejection проверяется без reload;
+- F5 runner выполняет restore исходного node/runtime snapshot в `finally` и отдельно требует `stateRestored=1`; residency policy применяется без forced-переинициализации, а диагностические `_surfaceActivationTransitions`/`_planetActivationPipelineMask` возвращаются к pre-test значениям; успешный путь имеет `steps=7`, `maxHostChildren=1`, `testTransitions=6`, `testReloads=7`, `testRejected=1`, `testHyperspace=1`;
+- xUnit contract расширен `SnapshotRestore_IsExactAndDoesNotAdvanceCounters`; static TASK-148 validator теперь требует staged-before-mutation ordering, rollback restore, live seven-state acceptance и self-restore; VERSION = `0.1.0-alpha.149`;
+- `README.md`, `docs/WORLD_SCENE_COORDINATION.md`, `CHANGELOG.md` и настоящий журнал синхронизированы с новым acceptance contract.
+
+**Фактически выполнено в среде подготовки:**
+
+```text
+TASK-140 VERSION PASS: version=0.1.0-alpha.149; tag=<not-required>; changelog=1
+TASK-140 JSON CONTRACT PASS: json=21; parsed=21; industrySchema=5/5; localizationParity=1
+GODOT TEXT RESOURCE STRUCTURE PASS: scenes=15; refs=277; resourceOrder=1; uniqueIds=1; resolvedRefs=1
+TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1336; parity=1; sourceSinks=0
+TASK-134 AUDIO CONTRACT PASS: ... deferredInstall=1; preReadyPlaybackGuard=1
+TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS: tools=5/5; commands=15/15; logCategories=14/14
+TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; coverage=80/70/80
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=4/4; releaseExports=4/4
+TASK-142 SECTION-38 CONTRACT PASS: typedEvents=11/11; projectCycles=0; nodeDomainSeparation=1
+TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS: layers=3/3; projectCycles=0; desktopPresets=4/4
+TASK-146 BASE CONSTRUCTION CLOSURE CONTRACT PASS: ... xunit=4/4; runtimeEvidence=1
+TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; transactionalSwap=1; rollbackRestore=1; livePath=7/7; stateRestore=1; gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1; f5Acceptance=1; xunit=4/4
+C# lexical structural check PASS: 5/5 changed C# files; dotnet/godot executables unavailable in preparation environment
+```
+
+**Недоступные проверки:** в среде подготовки отсутствуют `dotnet`, `godot` и `godot4`. Поэтому clean C# build, фактическое исполнение xUnit и Godot F5/runtime не заявляются. По регламенту `TASK-149` и `WORLD-ACC-100..103` остаются `IN_PROGRESS` до внешней runtime-приёмки.
+
+**Минимальная пользовательская приёмка TASK-149:**
+
+1. `tools\clean-build-windows10.cmd` → реальный three-layer `CoreCompile`, `0 warnings / 0 errors`.
+2. «Новая игра → Начать стандартную игру» → gameplay открывается без `CantOpen`, `.tscn Parse Error`, `Parent node is busy...`, `Playback can only happen...`.
+3. Нажать `F5`; итоговая строка `TASK-148 world scene coordinator acceptance PASS` должна содержать: `transitionGraph=1; illegalRejected=1; hyperspaceSystemChange=1; packedScenes=1; singleLiveScene=1; liveContextMatch=1; residencyPolicy=1; livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; testTransitions=6; testReloads=7; testRejected=1; testHyperspace=1`.
+4. После F5 текущий world context/HUD должен остаться тем же, что до теста: acceptance не должен телепортировать игрока и не должен менять gameplay save location.
+5. Затем вручную пройти Surface → Orbit → StationInterior → hyperspace → destination StationInterior → Orbit → Surface и выполнить graceful exit/restart. После restart location/system/planet должны восстановиться из voyage+galaxy persistence.
+
+**Статус:** `TASK-148` остаётся `IMPLEMENTED`; `TASK-149` остаётся `IN_PROGRESS` до clean build + F5 + manual/cold-restore evidence.
 
 ### TASK-148.2 — runtime hotfix: Godot text-scene parse + AudioDirector startup lifecycle
 
@@ -5086,8 +5137,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WORLD-108` | Scene state не дублирует persistence location | `IMPLEMENTED` | context derived from existing voyage+galaxy; no `world_scene` save key/schema bump |
 | `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `IMPLEMENTED` | RU/EN world-scene HUD + TASK-148 acceptance |
 | `WORLD-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-149: выполнить three-layer clean build |
-| `WORLD-ACC-101` | Local/CI quality и xUnit green | `IN_PROGRESS` | TASK-148 validator + 3 xUnit tests; выполнить на .NET окружении |
-| `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `IN_PROGRESS` | Выполнить в Godot 4.7.1 .NET |
+| `WORLD-ACC-101` | Local/CI quality и xUnit green | `IN_PROGRESS` | Все Python quality gates green; TASK-148 validator требует xunit=4/4, но фактический `dotnet test` недоступен в среде подготовки |
+| `WORLD-ACC-102` | F5 выдаёт TASK-148 PASS с one-shell/residency invariants | `IN_PROGRESS` | Требуется livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1 в Godot 4.7.1 .NET |
 | `WORLD-ACC-103` | Manual Surface→Orbit→Station→Hyper→Station→Orbit→Surface + cold restore | `IN_PROGRESS` | Выполнить TASK-149 runtime smoke |
 
 ## 9. Очередь ближайших задач
@@ -5096,12 +5147,12 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-149` | Runtime acceptance World Scene Coordinator | Clean build `0/0`; quality/xUnit; F5 TASK-148 PASS; manual Surface/Orbit/Station/Hyperspace/cold-restore smoke |
+| 1 | `TASK-149` | Runtime acceptance World Scene Coordinator | Clean build `0/0`; xUnit; F5 livePath=7/stateRestored=1; manual Surface/Orbit/Station/Hyperspace/cold-restore smoke |
 | 2 | `TASK-143/TASK-145` | Закрыть отдельные architecture/renderer runtime evidence | F5 assembly evidence + primary/Compatibility renderer evidence |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
 **Принято владельцем продукта:** TASK-146/TASK-147 и core Base Construction.  
-**Текущая реализация:** TASK-148 World Scene Coordinator.  
+**Текущая реализация:** TASK-148 World Scene Coordinator + TASK-149 transactional acceptance hardening.  
 **Текущая приёмочная задача:** TASK-149.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

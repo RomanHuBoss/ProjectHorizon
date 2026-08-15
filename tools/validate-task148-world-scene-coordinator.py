@@ -36,6 +36,7 @@ for edge in (
     need(edge in runtime, f'transition edge {edge}', failures)
 need('RejectedTransitions++' in runtime, 'illegal transition guard', failures)
 need('HyperspaceTransitions++' in runtime, 'hyperspace transition counter', failures)
+need('WorldSceneCoordinatorRuntimeSnapshot' in runtime and 'CaptureSnapshot()' in runtime and 'RestoreSnapshot(WorldSceneCoordinatorRuntimeSnapshot snapshot)' in runtime, 'exact runtime snapshot/restore', failures)
 need('using Godot' not in runtime and 'Godot.' not in runtime, 'application coordinator is Godot-independent', failures)
 
 scene_paths=(
@@ -47,6 +48,12 @@ for name in scene_paths:
     need((ROOT/'src/Game.Client/Scenes/World'/name).exists(), f'packed scene {name}', failures)
     need(name in node, f'coordinator scene path {name}', failures)
 need('hostChildren == 1 && validShell' in node, 'single live shell invariant', failures)
+need('WorldSceneCoordinatorNodeSnapshot' in node and 'RestoreSnapshot(WorldSceneCoordinatorNodeSnapshot snapshot)' in node, 'exact node snapshot/restore', failures)
+need('TryAttachStagedShell' in node and 'CommitStagedShell' in node and 'Runtime.RestoreSnapshot(runtimeSnapshot)' in node, 'transactional shell swap with rollback', failures)
+stage_idx=node.find('stagedShell = StageShell(')
+attach_idx=node.find('TryAttachStagedShell(stagedShell')
+mutation_idx=node.find('Runtime.TryTransition(context', attach_idx)
+need(0 <= stage_idx < attach_idx < mutation_idx, 'staged shell enters tree before application-state mutation', failures)
 need('GetNodeOrNull<Node3D>("Gameplay")' in slice_world, 'gameplay coordinator host binding', failures)
 need('new WorldSceneCoordinatorNode' in slice_world and 'gameplay.AddChild(_worldSceneCoordinatorNode);' in slice_world, 'runtime coordinator bootstrap', failures)
 need('WorldSceneCoordinatorNode.cs' not in scene and '12_world_scene_coordinator' not in scene, 'gameplay scene has no hard coordinator script dependency', failures)
@@ -79,7 +86,12 @@ need('CompleteWorldHyperspaceTransit(successfulJump: true);' in galaxy, 'hypersp
 need('CompleteWorldHyperspaceTransit(successfulJump: false);' in galaxy, 'hyperspace failure rollback', failures)
 need('WorldScenes.Current.Kind == WorldSceneKind.Orbit' in star, 'system proxies restricted to Orbit', failures)
 need('hyperspaceSystemChange' in accept and 'illegalRejected' in accept, 'runtime acceptance graph coverage', failures)
-for token in ('TransitionGraph_CoversSurfaceOrbitStationAndHyperspace','DirectSurfaceToStation_IsRejectedWithoutMutatingContext','ContextIds_AreNormalizedAndBlankIdsAreRejected'):
+need('LiveTransitionPath' in accept and 'liveSteps == 7' in accept and 'reloads == 7' in accept, 'live seven-context F5 path and reload count', failures)
+need('RestoreSnapshot(original)' in accept and 'StateRestored' in accept, 'self-restoring F5 acceptance', failures)
+need('TransactionalSwap' in accept, 'transactional swap acceptance evidence', failures)
+need('livePath=' in slice_world and 'stateRestored=' in slice_world and 'transactionalSwap=' in slice_world and 'testReloads=' in slice_world, 'F5 live transaction output', failures)
+need('surfaceActivationTransitionsBefore' in slice_world and 'planetActivationPipelineMaskBefore' in slice_world and 'ApplyWorldResidencyPolicy(force: false)' in slice_world, 'F5 peripheral counter cleanup', failures)
+for token in ('TransitionGraph_CoversSurfaceOrbitStationAndHyperspace','DirectSurfaceToStation_IsRejectedWithoutMutatingContext','ContextIds_AreNormalizedAndBlankIdsAreRejected','SnapshotRestore_IsExactAndDoesNotAdvanceCounters'):
     need(token in tests, f'xUnit {token}', failures)
 
 # Coordinator derives state from existing voyage/galaxy persistence. No new save key/schema is allowed.
@@ -88,9 +100,9 @@ all_save_text='\n'.join(text(p) for p in (
     'src/Game.Client/Scripts/Persistence/SaveDatabase.cs',
     'src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs'))
 need('world_scene' not in all_save_text.lower(), 'no duplicate world-scene persistence', failures)
-need(version == '0.1.0-alpha.148.2', 'VERSION alpha.148.2', failures)
+need(version == '0.1.0-alpha.149', 'VERSION alpha.149', failures)
 
 if failures:
     print('TASK-148 WORLD SCENE COORDINATOR CONTRACT FAIL: ' + '; '.join(failures))
     sys.exit(1)
-print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1; f5Acceptance=1; xunit=3/3.')
+print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; transactionalSwap=1; rollbackRestore=1; livePath=7/7; stateRestore=1; gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1; f5Acceptance=1; xunit=4/4.')

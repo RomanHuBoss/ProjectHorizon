@@ -44,6 +44,19 @@ public sealed record WorldSceneContext(
 }
 
 /// <summary>
+/// Exact in-memory snapshot used by self-restoring runtime acceptance and by the
+/// Godot coordinator when a staged scene transition has to roll back. This is
+/// deliberately not persistence state: voyage/galaxy remain the save source of
+/// truth for the active world location.
+/// </summary>
+public sealed record WorldSceneCoordinatorRuntimeSnapshot(
+    WorldSceneContext Current,
+    int Generation,
+    int TransitionCount,
+    int RejectedTransitions,
+    int HyperspaceTransitions);
+
+/// <summary>
 /// Owns the application-level world-scene state machine. It contains no Godot
 /// objects and derives scene residency from already persisted voyage/galaxy state.
 /// </summary>
@@ -66,6 +79,16 @@ public sealed class WorldSceneCoordinatorRuntime
     public int RejectedTransitions { get; private set; }
 
     public int HyperspaceTransitions { get; private set; }
+
+    public WorldSceneCoordinatorRuntimeSnapshot CaptureSnapshot()
+    {
+        return new WorldSceneCoordinatorRuntimeSnapshot(
+            Current,
+            Generation,
+            TransitionCount,
+            RejectedTransitions,
+            HyperspaceTransitions);
+    }
 
     public WorldSceneTransitionResult TryTransition(
         WorldSceneContext next,
@@ -105,6 +128,31 @@ public sealed class WorldSceneCoordinatorRuntime
         ValidateContext(context);
         Current = context;
         Generation++;
+    }
+
+    /// <summary>
+    /// Restores the exact volatile coordinator state without incrementing any
+    /// counters. Used only for transactional rollback / acceptance cleanup.
+    /// </summary>
+    public void RestoreSnapshot(WorldSceneCoordinatorRuntimeSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ValidateContext(snapshot.Current);
+        if (snapshot.Generation < 1 ||
+            snapshot.TransitionCount < 0 ||
+            snapshot.RejectedTransitions < 0 ||
+            snapshot.HyperspaceTransitions < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(snapshot),
+                "World scene coordinator snapshot counters are invalid.");
+        }
+
+        Current = snapshot.Current;
+        Generation = snapshot.Generation;
+        TransitionCount = snapshot.TransitionCount;
+        RejectedTransitions = snapshot.RejectedTransitions;
+        HyperspaceTransitions = snapshot.HyperspaceTransitions;
     }
 
     public static bool IsAllowedTransition(

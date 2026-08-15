@@ -14,8 +14,16 @@ public sealed record WorldSceneCoordinatorDiagnostics(
     int Reloads,
     int RejectedTransitions,
     int HyperspaceTransitions,
+    int SceneLoadFailures,
+    int Rollbacks,
     bool SingleScene,
     bool ShellMatchesContext);
+
+public sealed record WorldSceneCoordinatorNodeSnapshot(
+    WorldSceneCoordinatorRuntimeSnapshot Runtime,
+    int Reloads,
+    int SceneLoadFailures,
+    int Rollbacks);
 
 public partial class WorldSceneCoordinatorNode : Node3D
 {
@@ -41,6 +49,8 @@ public partial class WorldSceneCoordinatorNode : Node3D
     private WorldSceneShell? _activeShell;
     private string _activeScenePath = string.Empty;
     private int _reloadCount;
+    private int _sceneLoadFailures;
+    private int _rollbackCount;
 
     public WorldSceneCoordinatorRuntime Runtime =>
         _runtime ?? throw new InvalidOperationException(
@@ -53,68 +63,201 @@ public partial class WorldSceneCoordinatorNode : Node3D
         ReloadCurrentShell(force: true);
     }
 
+    public WorldSceneCoordinatorNodeSnapshot CaptureSnapshot()
+    {
+        return new WorldSceneCoordinatorNodeSnapshot(
+            Runtime.CaptureSnapshot(),
+            _reloadCount,
+            _sceneLoadFailures,
+            _rollbackCount);
+    }
+
+    /// <summary>
+    /// Applies a world-context transition as a scene transaction. The target
+    /// PackedScene is loaded, instantiated and attached before application state
+    /// is mutated; the previous shell remains live until the new shell is proven
+    /// resident. Any failure discards the staged shell and leaves the old context
+    /// and shell intact.
+    /// </summary>
     public WorldSceneTransitionResult TryTransition(
         WorldSceneContext context,
         out string result)
     {
-        WorldSceneTransitionResult transition =
-            Runtime.TryTransition(context, out result);
-        if (transition == WorldSceneTransitionResult.Applied)
+        ArgumentNullException.ThrowIfNull(context);
+        WorldSceneCoordinatorRuntime.ValidateContext(context);
+
+        if (Runtime.Current == context ||
+            !WorldSceneCoordinatorRuntime.IsAllowedTransition(
+                Runtime.Current,
+                context))
         {
-            ReloadCurrentShell(force: false);
+            return Runtime.TryTransition(context, out result);
         }
 
-        return transition;
+        WorldSceneShell? stagedShell = null;
+        WorldSceneCoordinatorRuntimeSnapshot runtimeSnapshot =
+            Runtime.CaptureSnapshot();
+        try
+        {
+            stagedShell = StageShell(
+                context,
+                Runtime.Generation + 1,
+                out string scenePath);
+            if (!TryAttachStagedShell(stagedShell, out string attachFailure))
+            {
+                _sceneLoadFailures++;
+                _rollbackCount++;
+                result =
+                    $"World scene transition aborted before state mutation: {attachFailure}";
+                return WorldSceneTransitionResult.Rejected;
+            }
+
+            WorldSceneTransitionResult transition =
+                Runtime.TryTransition(context, out string runtimeResult);
+            if (transition != WorldSceneTransitionResult.Applied)
+            {
+                DiscardShell(stagedShell);
+                result = runtimeResult;
+                return transition;
+            }
+
+            CommitStagedShell(stagedShell, scenePath);
+            result = runtimeResult;
+            return WorldSceneTransitionResult.Applied;
+        }
+        catch (Exception exception)
+        {
+            Runtime.RestoreSnapshot(runtimeSnapshot);
+            if (stagedShell is not null &&
+                GodotObject.IsInstanceValid(stagedShell) &&
+                stagedShell != _activeShell)
+            {
+                DiscardShell(stagedShell);
+            }
+
+            _sceneLoadFailures++;
+            _rollbackCount++;
+            result =
+                "World scene transition rolled back after staged-shell failure: " +
+                exception.Message;
+            return WorldSceneTransitionResult.Rejected;
+        }
     }
 
     public void Restore(WorldSceneContext context)
     {
-        Runtime.Restore(context);
-        ReloadCurrentShell(force: true);
+        ArgumentNullException.ThrowIfNull(context);
+        WorldSceneCoordinatorRuntime.ValidateContext(context);
+
+        WorldSceneShell? stagedShell = null;
+        WorldSceneCoordinatorRuntimeSnapshot runtimeSnapshot =
+            Runtime.CaptureSnapshot();
+        try
+        {
+            stagedShell = StageShell(
+                context,
+                Runtime.Generation + 1,
+                out string scenePath);
+            if (!TryAttachStagedShell(stagedShell, out string attachFailure))
+            {
+                _sceneLoadFailures++;
+                _rollbackCount++;
+                throw new InvalidOperationException(attachFailure);
+            }
+
+            Runtime.Restore(context);
+            CommitStagedShell(stagedShell, scenePath);
+        }
+        catch
+        {
+            Runtime.RestoreSnapshot(runtimeSnapshot);
+            if (stagedShell is not null &&
+                GodotObject.IsInstanceValid(stagedShell) &&
+                stagedShell != _activeShell)
+            {
+                DiscardShell(stagedShell);
+            }
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Exact non-persistent restore used by F5 acceptance cleanup. Counters and
+    /// active context are restored to their pre-test values after a fresh shell
+    /// for that context has successfully entered the coordinator tree.
+    /// </summary>
+    public void RestoreSnapshot(WorldSceneCoordinatorNodeSnapshot snapshot)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        WorldSceneCoordinatorRuntimeSnapshot beforeRuntime =
+            Runtime.CaptureSnapshot();
+        WorldSceneShell? stagedShell = null;
+        try
+        {
+            stagedShell = StageShell(
+                snapshot.Runtime.Current,
+                snapshot.Runtime.Generation,
+                out string scenePath);
+            if (!TryAttachStagedShell(stagedShell, out string attachFailure))
+            {
+                _sceneLoadFailures++;
+                _rollbackCount++;
+                throw new InvalidOperationException(attachFailure);
+            }
+
+            Runtime.RestoreSnapshot(snapshot.Runtime);
+            CommitStagedShell(stagedShell, scenePath);
+            _reloadCount = snapshot.Reloads;
+            _sceneLoadFailures = snapshot.SceneLoadFailures;
+            _rollbackCount = snapshot.Rollbacks;
+        }
+        catch
+        {
+            Runtime.RestoreSnapshot(beforeRuntime);
+            if (stagedShell is not null &&
+                GodotObject.IsInstanceValid(stagedShell) &&
+                stagedShell != _activeShell)
+            {
+                DiscardShell(stagedShell);
+            }
+            throw;
+        }
     }
 
     public void ReloadCurrentShell(bool force)
     {
         string scenePath = GetScenePath(Runtime.Current.Kind);
         if (!force &&
-            _activeShell is not null &&
-            GodotObject.IsInstanceValid(_activeShell) &&
+            IsActiveShellValid() &&
             string.Equals(_activeScenePath, scenePath, StringComparison.Ordinal))
         {
             return;
         }
 
-        RemoveActiveShell();
-        PackedScene packed = GD.Load<PackedScene>(scenePath) ??
-            throw new InvalidOperationException(
-                $"World scene shell could not be loaded: {scenePath}");
-        WorldSceneShell shell = packed.Instantiate<WorldSceneShell>();
-        if (shell.Kind != Runtime.Current.Kind)
+        WorldSceneShell stagedShell = StageShell(
+            Runtime.Current,
+            Runtime.Generation,
+            out scenePath);
+        if (!TryAttachStagedShell(stagedShell, out string attachFailure))
         {
-            shell.Free();
+            _sceneLoadFailures++;
+            _rollbackCount++;
             throw new InvalidOperationException(
-                $"World scene shell kind mismatch for {scenePath}: " +
-                $"expected {Runtime.Current.Kind}, actual {shell.Kind}.");
+                "World scene shell reload aborted; previous shell retained: " +
+                attachFailure);
         }
 
-        shell.Name = $"Active{Runtime.Current.Kind}World";
-        shell.SetMeta("world_system_id", Runtime.Current.SystemId);
-        shell.SetMeta("world_planet_id", Runtime.Current.PlanetId);
-        shell.SetMeta("world_generation", Runtime.Generation);
-        AddChild(shell);
-        _activeShell = shell;
-        _activeScenePath = scenePath;
-        _reloadCount++;
+        CommitStagedShell(stagedShell, scenePath);
     }
 
     public WorldSceneCoordinatorDiagnostics CreateDiagnostics()
     {
         WorldSceneContext context = Runtime.Current;
         int hostChildren = GetChildCount();
-        bool validShell = _activeShell is not null &&
-            GodotObject.IsInstanceValid(_activeShell);
+        bool validShell = IsActiveShellValid();
         bool shellMatches = validShell &&
             _activeShell!.Kind == context.Kind &&
+            _activeShell.GetParent() == this &&
             string.Equals(
                 _activeShell.GetMeta("world_system_id").AsString(),
                 context.SystemId,
@@ -122,7 +265,8 @@ public partial class WorldSceneCoordinatorNode : Node3D
             string.Equals(
                 _activeShell.GetMeta("world_planet_id").AsString(),
                 context.PlanetId,
-                StringComparison.Ordinal);
+                StringComparison.Ordinal) &&
+            _activeShell.GetMeta("world_generation").AsInt32() == Runtime.Generation;
 
         return new WorldSceneCoordinatorDiagnostics(
             context.Kind,
@@ -136,6 +280,8 @@ public partial class WorldSceneCoordinatorNode : Node3D
             _reloadCount,
             Runtime.RejectedTransitions,
             Runtime.HyperspaceTransitions,
+            _sceneLoadFailures,
+            _rollbackCount,
             hostChildren == 1 && validShell,
             shellMatches);
     }
@@ -186,23 +332,100 @@ public partial class WorldSceneCoordinatorNode : Node3D
         return path;
     }
 
-    private void RemoveActiveShell()
+    private WorldSceneShell StageShell(
+        WorldSceneContext context,
+        int generation,
+        out string scenePath)
     {
-        if (_activeShell is null)
+        scenePath = GetScenePath(context.Kind);
+        PackedScene packed = GD.Load<PackedScene>(scenePath) ??
+            throw new InvalidOperationException(
+                $"World scene shell could not be loaded: {scenePath}");
+        WorldSceneShell shell = packed.Instantiate<WorldSceneShell>();
+        if (shell.Kind != context.Kind)
+        {
+            shell.Free();
+            throw new InvalidOperationException(
+                $"World scene shell kind mismatch for {scenePath}: " +
+                $"expected {context.Kind}, actual {shell.Kind}.");
+        }
+
+        shell.Name = $"Active{context.Kind}World";
+        shell.SetMeta("world_system_id", context.SystemId);
+        shell.SetMeta("world_planet_id", context.PlanetId);
+        shell.SetMeta("world_generation", generation);
+        return shell;
+    }
+
+    private bool TryAttachStagedShell(
+        WorldSceneShell shell,
+        out string failure)
+    {
+        try
+        {
+            AddChild(shell);
+        }
+        catch (Exception exception)
+        {
+            DiscardShell(shell);
+            failure = "add_child threw: " + exception.Message;
+            return false;
+        }
+
+        bool parentMatches = shell.GetParent() == this;
+        bool treeMatches = !IsInsideTree() || shell.IsInsideTree();
+        if (!parentMatches || !treeMatches)
+        {
+            DiscardShell(shell);
+            failure =
+                $"staged shell did not enter coordinator tree " +
+                $"(parent={(parentMatches ? 1 : 0)}, tree={(treeMatches ? 1 : 0)}).";
+            return false;
+        }
+
+        failure = string.Empty;
+        return true;
+    }
+
+    private void CommitStagedShell(
+        WorldSceneShell stagedShell,
+        string scenePath)
+    {
+        WorldSceneShell? previousShell = _activeShell;
+        _activeShell = stagedShell;
+        _activeScenePath = scenePath;
+        _reloadCount++;
+
+        if (previousShell is not null &&
+            previousShell != stagedShell &&
+            GodotObject.IsInstanceValid(previousShell))
+        {
+            if (previousShell.GetParent() == this)
+            {
+                RemoveChild(previousShell);
+            }
+            previousShell.QueueFree();
+        }
+    }
+
+    private bool IsActiveShellValid()
+    {
+        return _activeShell is not null &&
+            GodotObject.IsInstanceValid(_activeShell) &&
+            _activeShell.GetParent() == this;
+    }
+
+    private void DiscardShell(WorldSceneShell shell)
+    {
+        if (!GodotObject.IsInstanceValid(shell))
         {
             return;
         }
 
-        if (GodotObject.IsInstanceValid(_activeShell))
+        if (shell.GetParent() == this)
         {
-            if (_activeShell.GetParent() == this)
-            {
-                RemoveChild(_activeShell);
-            }
-            _activeShell.QueueFree();
+            RemoveChild(shell);
         }
-
-        _activeShell = null;
-        _activeScenePath = string.Empty;
+        shell.QueueFree();
     }
 }

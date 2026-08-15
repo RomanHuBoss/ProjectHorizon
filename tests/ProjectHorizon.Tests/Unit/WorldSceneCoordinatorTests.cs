@@ -86,4 +86,43 @@ public sealed class WorldSceneCoordinatorTests
         Assert.Throws<ArgumentException>(() =>
             WorldSceneContext.Create(WorldSceneKind.Surface, "system.alpha", ""));
     }
+
+    [Fact]
+    public void SnapshotRestore_IsExactAndDoesNotAdvanceCounters()
+    {
+        WorldSceneCoordinatorRuntime runtime = new(
+            WorldSceneContext.Create(
+                WorldSceneKind.Surface,
+                "system.alpha",
+                "planet.alpha.0"));
+        WorldSceneCoordinatorRuntimeSnapshot original =
+            runtime.CaptureSnapshot();
+
+        Assert.Equal(
+            WorldSceneTransitionResult.Applied,
+            runtime.TryTransition(
+                WorldSceneContext.Create(
+                    WorldSceneKind.Orbit,
+                    "system.alpha",
+                    "planet.alpha.0"),
+                out _));
+        Assert.Equal(
+            WorldSceneTransitionResult.Rejected,
+            runtime.TryTransition(
+                WorldSceneContext.Create(
+                    WorldSceneKind.HyperspaceTransit,
+                    "system.alpha",
+                    "planet.alpha.0"),
+                out _));
+
+        runtime.RestoreSnapshot(original);
+
+        Assert.Equal(original, runtime.CaptureSnapshot());
+        Assert.Equal(WorldSceneKind.Surface, runtime.Current.Kind);
+        Assert.Equal(1, runtime.Generation);
+        Assert.Equal(0, runtime.TransitionCount);
+        Assert.Equal(0, runtime.RejectedTransitions);
+        Assert.Equal(0, runtime.HyperspaceTransitions);
+    }
+
 }

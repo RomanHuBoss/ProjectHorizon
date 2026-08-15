@@ -368,16 +368,28 @@ public partial class SalvageRepairSlice
         }
 
         SynchronizeWorldSceneCoordinator();
-        WorldSceneCoordinatorAcceptanceReport report =
-            WorldSceneCoordinatorAcceptanceRunner.Run(
+        int surfaceActivationTransitionsBefore = _surfaceActivationTransitions;
+        int planetActivationPipelineMaskBefore = _planetActivationPipelineMask;
+        WorldSceneCoordinatorAcceptanceReport report;
+        try
+        {
+            report = WorldSceneCoordinatorAcceptanceRunner.Run(
                 _worldSceneCoordinatorNode,
-                WorldResidencyPolicyMatches());
+                () => ApplyWorldResidencyPolicy(force: false),
+                WorldResidencyPolicyMatches);
+        }
+        finally
+        {
+            _surfaceActivationTransitions = surfaceActivationTransitionsBefore;
+            _planetActivationPipelineMask = planetActivationPipelineMaskBefore;
+        }
+
         _worldSceneCoordinatorAcceptanceReport = report;
         _worldSceneCoordinatorAcceptanceHud = report.Passed
-            ? $"PASS oneScene={(report.SingleLiveScene ? 1 : 0)}, " +
-              $"transitions={(report.TransitionGraph ? 1 : 0)}, " +
-              $"hyper={(report.HyperspaceSystemChange ? 1 : 0)}, " +
-              $"residency={(report.ResidencyPolicy ? 1 : 0)}"
+            ? $"PASS live={(report.LiveTransitionPath ? 1 : 0)}, " +
+              $"oneScene={(report.SingleLiveScene ? 1 : 0)}, " +
+              $"steps={report.LiveSteps}, " +
+              $"restored={(report.StateRestored ? 1 : 0)}"
             : $"FAIL {report.Result}";
 
         WorldSceneCoordinatorDiagnostics diagnostics =
@@ -393,8 +405,17 @@ public partial class SalvageRepairSlice
             $"singleLiveScene={(report.SingleLiveScene ? 1 : 0)}; " +
             $"liveContextMatch={(report.LiveContextMatch ? 1 : 0)}; " +
             $"residencyPolicy={(report.ResidencyPolicy ? 1 : 0)}; " +
+            $"livePath={(report.LiveTransitionPath ? 1 : 0)}; " +
+            $"transactionalSwap={(report.TransactionalSwap ? 1 : 0)}; " +
+            $"stateRestored={(report.StateRestored ? 1 : 0)}; " +
+            $"steps={report.LiveSteps}; maxHostChildren={report.MaxHostChildren}; " +
+            $"testTransitions={report.TransitionCount}; testReloads={report.Reloads}; " +
+            $"testRejected={report.RejectedTransitions}; " +
+            $"testHyperspace={report.HyperspaceTransitions}; " +
             $"kind={diagnostics.Kind}; hostChildren={diagnostics.HostChildren}; " +
             $"generation={diagnostics.Generation}; reloads={diagnostics.Reloads}; " +
+            $"sceneLoadFailures={diagnostics.SceneLoadFailures}; " +
+            $"rollbacks={diagnostics.Rollbacks}; " +
             $"surfaceActive={(_surfaceRuntimeActive ? 1 : 0)}; " +
             $"orbitActive={(_orbitRuntimeActive ? 1 : 0)}; " +
             $"worldTransitions={_worldResidencyTransitions}; " +

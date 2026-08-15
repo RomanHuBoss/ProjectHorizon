@@ -11,6 +11,20 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.149] - 2026-08-15
+
+### Changed
+
+- Hardened `WorldSceneCoordinatorNode` into a staged scene transaction: the target PackedScene is loaded, instantiated and attached before application state changes, while the previous shell remains resident until the new shell is proven inside the coordinator tree. Failed swaps retain the prior context/shell and restore exact runtime counters.
+- Added exact volatile snapshots for the application/runtime and Godot coordinator state. The snapshots are acceptance/rollback infrastructure only and do not create a second persistence source of truth.
+- Upgraded the TASK-148 `F5` probe into a live seven-context traversal (`Surface → Orbit → StationInterior → HyperspaceTransit → StationInterior → Orbit → Surface`) that checks one-shell residency after every step and restores the exact pre-test context/counters in `finally`.
+- Expanded World Scene Coordinator diagnostics and contract coverage with transactional-swap, rollback, state-restoration and a fourth xUnit regression test.
+- Restored the exact Git LFS payloads for the v2.0 PDF/DOCX technical specification and the v1.0 PDF into their repository paths; no document was regenerated or rewritten.
+
+### Fixed
+
+- Removed the failure window where `WorldSceneCoordinatorRuntime` could advance to the destination context before the destination PackedScene had successfully loaded/entered the scene tree.
+
 ## [0.1.0-alpha.148.2] - 2026-08-15
 
 ### Fixed
