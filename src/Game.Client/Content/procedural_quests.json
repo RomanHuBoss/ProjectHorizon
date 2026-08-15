@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "worldSeed": 20260814,
+  "boardSize": 20,
+  "maximumActive": 5,
+  "objectiveTypes": [
+    {"objectiveType":"VisitLocation","weight":8,"baseRewardCredits":170,"reputationReward":3,"factions":["faction.meridian_exchange","faction.helix_academy"]},
+    {"objectiveType":"ScanObject","weight":10,"baseRewardCredits":190,"reputationReward":4,"factions":["faction.helix_academy"]},
+    {"objectiveType":"ScanSpecies","weight":10,"baseRewardCredits":210,"reputationReward":5,"factions":["faction.helix_academy"]},
+    {"objectiveType":"CollectResource","weight":12,"baseRewardCredits":180,"reputationReward":3,"factions":["faction.meridian_exchange","faction.helix_academy"]},
+    {"objectiveType":"CraftItem","weight":10,"baseRewardCredits":260,"reputationReward":5,"factions":["faction.meridian_exchange","faction.aegis_compact"]},
+    {"objectiveType":"DeliverItem","weight":9,"baseRewardCredits":240,"reputationReward":4,"factions":["faction.meridian_exchange","faction.aegis_compact"]},
+    {"objectiveType":"RepairObject","weight":7,"baseRewardCredits":280,"reputationReward":5,"factions":["faction.aegis_compact"]},
+    {"objectiveType":"DefeatTarget","weight":6,"baseRewardCredits":360,"reputationReward":7,"factions":["faction.aegis_compact"]},
+    {"objectiveType":"ProtectTarget","weight":5,"baseRewardCredits":390,"reputationReward":8,"factions":["faction.aegis_compact"]},
+    {"objectiveType":"BuildModule","weight":8,"baseRewardCredits":300,"reputationReward":5,"factions":["faction.meridian_exchange","faction.aegis_compact"]},
+    {"objectiveType":"TradeItem","weight":12,"baseRewardCredits":200,"reputationReward":4,"factions":["faction.meridian_exchange"]},
+    {"objectiveType":"FindSignal","weight":9,"baseRewardCredits":220,"reputationReward":5,"factions":["faction.helix_academy","faction.aegis_compact"]},
+    {"objectiveType":"ExplorePlanet","weight":7,"baseRewardCredits":320,"reputationReward":6,"factions":["faction.helix_academy"]},
+    {"objectiveType":"ExploreSystem","weight":6,"baseRewardCredits":420,"reputationReward":8,"factions":["faction.helix_academy","faction.meridian_exchange"]},
+    {"objectiveType":"ReturnToNpc","weight":4,"baseRewardCredits":130,"reputationReward":2,"factions":["faction.meridian_exchange","faction.helix_academy","faction.aegis_compact"]}
+  ]
+}

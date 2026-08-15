@@ -557,6 +557,11 @@ public partial class SalvageRepairSlice
         _voyageNavigationAssist = false;
         ApplyStageOneVoyageToScene();
         _lastDomainEvent = "StageOneLanding";
+        RecordProceduralQuestObjective(
+            ProceduralQuestObjectiveType.ExplorePlanet,
+            GalaxyNavigation.CurrentPlanetId,
+            1,
+            queueAutosave: false);
         QueueCurrentSnapshot(AutosaveTrigger.Landing);
         GD.Print(
             "TASK-112 player landing PASS: " +

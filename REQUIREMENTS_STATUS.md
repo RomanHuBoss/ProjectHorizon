@@ -1,14 +1,146 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-11
-> **Подготовленный снимок:** `ProjectHorizon-main-planetary-ecology-closure.zip`
+> **Последняя актуализация:** 2026-08-14
+> **Подготовленный снимок:** `ProjectHorizon-main-procedural-quests-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0A. Текущая синхронизация и mega-итерация 2026-08-11
+## 0A. Текущая синхронизация и mega-итерация 2026-08-14
+
+### Закрытие procedural ecology по прямому решению владельца продукта
+
+Пользователь 2026-08-14 прямо распорядился считать предыдущую ecology-итерацию
+отработанной и перейти к следующей mega-итерации без сложной ручной проверки.
+Поэтому статусы синхронизированы **как acceptance waiver by product owner**, а не
+как якобы выполненный локальный runtime-прогон:
+
+- `TASK-116` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-117` — `IN_PROGRESS` → `VERIFIED`;
+- procedural flora/fauna core, ecology catalogue, scan/harvest API и delta-only
+  persistence считаются закрытыми для обычной разработки; возврат допустим при
+  подтверждённой регрессии или изменении ТЗ;
+- пользовательская clean build/F5 ecology acceptance, визуальный smoke и
+  отдельное runtime-подтверждение исчезновения atmosphere warning **не
+  выполнялись и не заявляются как выполненные**.
+
+### TASK-118 — procedural repeatable quests / mission journal mega-iteration
+
+**Исходный снимок:** `ProjectHorizon-main-planetary-ecology-closure.zip` —
+редакция `TASK-116/117`, прямо принятая владельцем продукта по waiver.  
+**Подготовленный снимок:** `ProjectHorizon-main-procedural-quests-closure.zip`.  
+**Git SHA:** архив не содержит `.git`; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования PDF v2.0:** §19.1–19.4 «Задания», §22 persistence и
+Stage 2 baseline «20 заданий».
+
+**Реализовано:**
+
+- добавлен строгий `procedural_quests.json` schema `1` с балансом **всех 15**
+  objective types PDF: `VisitLocation`, `ScanObject`, `ScanSpecies`,
+  `CollectResource`, `CraftItem`, `DeliverItem`, `RepairObject`, `DefeatTarget`,
+  `ProtectTarget`, `BuildModule`, `TradeItem`, `FindSignal`, `ExplorePlanet`,
+  `ExploreSystem`, `ReturnToNpc`;
+- `ProceduralQuestGenerator` детерминированно строит ровно `20` repeatable
+  `QuestDefinition` из immutable world seed и capability pools; основная сюжетная
+  линия не заменяется процедурной, как прямо требует §19.4;
+- каждая mission definition содержит state graph в терминологии PDF:
+  `QuestInstance`, `QuestNode`, `QuestCondition`, `QuestAction`, `QuestReward`; текущий безопасный
+  граф линейный `Objective → optional Return → Claim`, с проверкой уникальности
+  узлов и отсутствия циклов;
+- feasibility до выдачи проверяет доступность capability/target, NPC-giver,
+  landing/inventory/equipment gates и state graph; board не выдаёт цели, которых
+  фактически нет в текущем vertical slice;
+- доменный движок поддерживает `DefeatTarget` и `ProtectTarget`, а из текущего
+  gameplay-board эти два типа намеренно исключаются, пока в мире нет реальных
+  hostile/protected targets; изолированная acceptance использует synthetic
+  capability targets только для доказательства поддержки движком всех 15 типов;
+- gameplay-board использует только реальные POI, ecology species, 42 resource
+  IDs, фактически runtime-enabled `StoreOutputs` craft outputs, attainable resource/craft items,
+  base modules, первый доступный planet каждой nearby system, existing systems
+  и существующего NPC; `RepairObject` сейчас выдаётся только для реально
+  подключённого `object.ship.starter`;
+- `Q` на поверхности вне других UI открывает persistent Mission Journal;
+  `Up/Down` выбирают mission, `Enter` выполняет contextual action
+  accept/deliver/return/claim, `Esc/Q` закрывают журнал; legacy `Q` в Station
+  Services и roll input корабля не перехватываются;
+- progress подключён к существующим API без параллельных подсистем:
+  resource collection, runtime/queue crafting, buy/sell, starter/system repair,
+  base placement, POI scan/resolve, ecology scan/harvest, planetary landing и
+  hyperspace system exploration;
+- `DeliverItem` атомарно расходует нужное количество из общего inventory,
+  return/claim разрешены у реального giver checkpoint, credits начисляются через
+  существующую Station Services economy, procedural faction reputation
+  детерминирована completed mission state;
+- persistence хранит только mission deltas (`status/progress`) плюс seed/revision
+  в optional `save_settings.procedural_quests`; 20 definitions повторно
+  генерируются из seed/content, SQLite schema остаётся `2`; поддержаны exact
+  round-trip, cold restore, legacy fallback, graceful exit и `F8` reset;
+- `F5` расширен изолированной `TASK-118` acceptance в
+  `save_1.procedural-quests-test.db`; gameplay-slot тест не изменяет.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Content/procedural_quests.json`;
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralQuestCatalog.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralQuestRuntime.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralQuestAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceProceduralQuests.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceEcology.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceVoyage.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceGalaxy.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StationServicesRuntime.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-116`: `IMPLEMENTED` → `VERIFIED` — прямой acceptance waiver пользователя;
+- `TASK-117`: `IN_PROGRESS` → `VERIFIED` — прямой acceptance waiver пользователя;
+- `TASK-118`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-119`: `NOT_STARTED` → `IN_PROGRESS` — локальная clean build + единый F5
+  automated acceptance; длинная ручная цепочка не требуется;
+- `TASK-006`: остаётся `BLOCKED` до наличия `.git`/SHA.
+
+**Минимальная runtime-приёмка TASK-119:**
+
+1. `tools\clean-build-windows10.cmd`: фактический `CoreCompile`, `0` errors;
+   warnings прислать полностью, даже если build успешен.
+2. Запустить `SalvageRepairSlice`. При восстановлении активного полёта нажать
+   `F8`, чтобы F5 hotkey был доступен. Startup должен содержать
+   `TASK-118 procedural quest catalog READY ... objectiveTypes=15; board=20;` и
+   `TASK-118 procedural quests READY ... board=20; maxActive=5; journal=Q`.
+3. Один раз нажать `F5` и дождаться одной строки `TASK-118 procedural quests
+   acceptance PASS` с `objectiveTypes=15; generated=20; deterministic=1;
+   allTypes=1; feasibility=1; infeasibleRejected=1; activeLimit=1; lifecycle=1;
+   return=1; rewards=1; gameplayBoard=1; coldRestore=1; legacyFallback=1;
+   roundTrip=1; logWritten=1; maxWriters=1; integrity=ok`. Это основной и
+   достаточный критерий данной итерации.
+4. Необязательный visual smoke: после `F8` нажать `Q`; Mission Journal должен
+   показать `Board=20` и прокручиваемый список предложений. Выбрать offered mission и нажать `Enter`; строка должна
+   перейти в accepted, Output — `TASK-118 player procedural quest accept PASS`.
+
+При `FAIL` нужны полный build log, строка `TASK-118 ... FAIL` и последние ~200
+строк Godot Output.
+
+**Граница закрытия:** после `TASK-119 → VERIFIED` repeatable procedural mission
+core считается закрытым. Hand-authored main story остаётся отдельной контентной
+задачей по §19.4; физические combat/protect targets подключаются к уже готовым
+objective APIs, а не требуют второй quest subsystem.
+
+**Ограничение среды подготовки:** .NET SDK/Godot в рабочем контейнере не
+обнаружены; фактическая compilation/runtime-проверка нового C# здесь не
+выполнялась и не заявляется.
+
+---
+
+## 0B. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 
@@ -196,7 +328,7 @@ C# lexical/bracket integrity и точная change-boundary относител�
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и station services Этапа 1 подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует целиком core-подсистему строительства баз: каталог из 50 модулей, размещение и соединение, лимиты, электрический граф, игровой builder, persistence, reset и изолированную приёмку. Её runtime-подтверждение остаётся за `TASK-107`. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API.
+**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. Galaxy/hyperspace и procedural ecology дополнительно закрыты прямыми acceptance-waiver решениями владельца продукта, что явно отделено от runtime-доказательств. Текущая mega-итерация `TASK-118` реализует повторяемые procedural missions по §19: все 15 objective types в домене, deterministic board из 20 заданий, feasibility/state graph, Mission Journal, интеграцию с существующими gameplay events и delta-only SQLite persistence. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance — `IN_PROGRESS`.
 
 ## 3. Результат текущей итерации от 2026-08-03
 

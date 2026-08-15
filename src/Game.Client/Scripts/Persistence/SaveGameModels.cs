@@ -226,6 +226,16 @@ public sealed record EcologySaveData(
     IReadOnlyList<string> DiscoveredFaunaIds,
     IReadOnlyList<string> RemovedFloraInstanceIds);
 
+public sealed record ProceduralQuestStateSaveData(
+    string QuestId,
+    ProceduralQuestStatus Status,
+    int Progress);
+
+public sealed record ProceduralQuestSaveData(
+    long WorldSeed,
+    int BoardRevision,
+    IReadOnlyList<ProceduralQuestStateSaveData> States);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -245,7 +255,8 @@ public sealed record SaveGameSnapshot(
     ShipSystemsSaveData? ShipSystems = null,
     StageOneVoyageSaveData? StageOneVoyage = null,
     GalaxyNavigationSaveData? GalaxyNavigation = null,
-    EcologySaveData? Ecology = null);
+    EcologySaveData? Ecology = null,
+    ProceduralQuestSaveData? ProceduralQuests = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

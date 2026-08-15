@@ -496,6 +496,11 @@ public partial class SalvageRepairSlice
         _status = message;
         if (changed)
         {
+            RecordProceduralQuestObjective(
+                ProceduralQuestObjectiveType.ScanSpecies,
+                species,
+                1,
+                queueAutosave: false);
             QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);
             GD.Print(
                 "TASK-116 player ecology scan PASS: " +
@@ -520,6 +525,11 @@ public partial class SalvageRepairSlice
         _status = message;
         if (changed)
         {
+            RecordProceduralQuestObjective(
+                ProceduralQuestObjectiveType.ScanSpecies,
+                definition.FaunaId,
+                1,
+                queueAutosave: false);
             QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);
             GD.Print(
                 "TASK-116 player ecology scan PASS: " +
@@ -550,6 +560,11 @@ public partial class SalvageRepairSlice
         }
 
         GrantSharedInventory(definition.HarvestDefinitionId, 1);
+        RecordProceduralQuestObjective(
+            ProceduralQuestObjectiveType.CollectResource,
+            definition.HarvestDefinitionId,
+            1,
+            queueAutosave: false);
         node.QueueFree();
         _promotedFloraNodes.Remove(node.InstanceId);
         QueueCurrentSnapshot(AutosaveTrigger.DiscoveryChanged);

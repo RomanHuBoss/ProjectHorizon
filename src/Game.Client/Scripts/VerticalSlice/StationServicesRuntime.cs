@@ -135,6 +135,8 @@ public sealed class StationServicesRuntime
 
     public string NpcId => _npc.NpcId;
 
+    public string FactionId => _npc.FactionId;
+
     public int PlayerCredits { get; private set; }
 
     public int MerchantCredits { get; private set; }
@@ -457,6 +459,34 @@ public sealed class StationServicesRuntime
     {
         Reputation = Math.Clamp(checked(Reputation + delta), -100, 100);
         return Reputation;
+    }
+
+    public string GrantExternalQuestReward(
+        string factionId,
+        int credits,
+        int reputationReward)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(factionId);
+        if (credits < 0 || reputationReward < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(credits),
+                "Quest rewards must not be negative.");
+        }
+        PlayerCredits = checked(PlayerCredits + credits);
+        bool localFaction = string.Equals(
+            factionId,
+            _npc.FactionId,
+            StringComparison.Ordinal);
+        if (localFaction)
+        {
+            Reputation = Math.Clamp(
+                checked(Reputation + reputationReward),
+                -100,
+                100);
+        }
+        return $"external quest reward={credits} credits; faction={factionId}; " +
+            $"localReputation={(localFaction ? Reputation : 0)}";
     }
 
     public StationServicesSaveData CreateSaveData()

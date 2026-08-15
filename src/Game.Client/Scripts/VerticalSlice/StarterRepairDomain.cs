@@ -773,7 +773,8 @@ public static class StarterRepairSnapshotFactory
         ShipSystemsSaveData? shipSystems = null,
         StageOneVoyageSaveData? stageOneVoyage = null,
         GalaxyNavigationSaveData? galaxyNavigation = null,
-        EcologySaveData? ecology = null)
+        EcologySaveData? ecology = null,
+        ProceduralQuestSaveData? proceduralQuests = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -890,7 +891,8 @@ public static class StarterRepairSnapshotFactory
             shipSystems,
             stageOneVoyage,
             galaxyNavigation,
-            ecology);
+            ecology,
+            proceduralQuests);
     }
 
     private static string ResolveCurrentPlanetId(

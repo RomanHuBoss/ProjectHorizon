@@ -614,6 +614,24 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        ProceduralQuestSaveData? expectedProceduralQuests = expected.ProceduralQuests;
+        ProceduralQuestSaveData? actualProceduralQuests = actual.ProceduralQuests;
+        if ((expectedProceduralQuests is null) != (actualProceduralQuests is null))
+        {
+            mismatch = "procedural_quests presence differs";
+            return false;
+        }
+
+        if (expectedProceduralQuests is not null && actualProceduralQuests is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizeProceduralQuests(expectedProceduralQuests)),
+                JsonSerializer.Serialize(CanonicalizeProceduralQuests(actualProceduralQuests)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "procedural_quests differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -1214,6 +1232,19 @@ public sealed partial class SaveDatabase : IDisposable
                     CanonicalizeEcology(snapshot.Ecology))));
         }
 
+        if (snapshot.ProceduralQuests is not null)
+        {
+            ValidateProceduralQuests(snapshot.ProceduralQuests);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'procedural_quests', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeProceduralQuests(snapshot.ProceduralQuests))));
+        }
+
         foreach (InventoryItemSaveData item in snapshot.Inventory)
         {
             if (item.Quality is < 0 or > 100 ||
@@ -1458,6 +1489,7 @@ public sealed partial class SaveDatabase : IDisposable
         StageOneVoyageSaveData? stageOneVoyage = null;
         GalaxyNavigationSaveData? galaxyNavigation = null;
         EcologySaveData? ecology = null;
+        ProceduralQuestSaveData? proceduralQuests = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1469,8 +1501,8 @@ public sealed partial class SaveDatabase : IDisposable
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
-                "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology') " +
-                "ORDER BY setting_key;";
+                "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
+                "'procedural_quests') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1767,6 +1799,31 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "procedural_quests",
+            out string? proceduralQuestsJson))
+        {
+            if (string.IsNullOrWhiteSpace(proceduralQuestsJson))
+            {
+                throw new InvalidDataException(
+                    "procedural_quests setting is empty.");
+            }
+
+            try
+            {
+                proceduralQuests = JsonSerializer.Deserialize<ProceduralQuestSaveData>(
+                    proceduralQuestsJson) ?? throw new InvalidDataException(
+                        "procedural_quests setting deserialized to null.");
+                ValidateProceduralQuests(proceduralQuests);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "procedural_quests setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1872,7 +1929,8 @@ public sealed partial class SaveDatabase : IDisposable
             shipSystems,
             stageOneVoyage,
             galaxyNavigation,
-            ecology);
+            ecology,
+            proceduralQuests);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -2216,6 +2274,44 @@ public sealed partial class SaveDatabase : IDisposable
         {
             throw new InvalidDataException(
                 "ecology contains invalid or duplicate discovery/delta IDs.");
+        }
+    }
+
+    private static ProceduralQuestSaveData CanonicalizeProceduralQuests(
+        ProceduralQuestSaveData quests)
+    {
+        ArgumentNullException.ThrowIfNull(quests);
+        return quests with
+        {
+            States = quests.States
+                .OrderBy(state => state.QuestId, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateProceduralQuests(ProceduralQuestSaveData quests)
+    {
+        ArgumentNullException.ThrowIfNull(quests);
+        if (quests.WorldSeed <= 0 ||
+            quests.BoardRevision != ProceduralQuestGenerator.BoardRevision ||
+            quests.States is null ||
+            quests.States.Count > ProceduralQuestCatalog.ExpectedBoardSize)
+        {
+            throw new InvalidDataException(
+                "procedural_quests contains invalid seed, revision or state count.");
+        }
+        HashSet<string> ids = new(StringComparer.Ordinal);
+        foreach (ProceduralQuestStateSaveData state in quests.States)
+        {
+            if (string.IsNullOrWhiteSpace(state.QuestId) ||
+                !state.QuestId.StartsWith("quest.proc.", StringComparison.Ordinal) ||
+                !ids.Add(state.QuestId) ||
+                !Enum.IsDefined(state.Status) ||
+                state.Progress < 0)
+            {
+                throw new InvalidDataException(
+                    "procedural_quests contains an invalid or duplicate quest state.");
+            }
         }
     }
 

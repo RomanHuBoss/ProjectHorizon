@@ -807,6 +807,23 @@ theme_override_font_sizes/font_size = 14
 text = "PLANETARY ECOLOGY CATALOGUE"
 autowrap_mode = 2
 
+[node name="MissionJournal" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 175.0
+offset_top = 28.0
+offset_right = 1205.0
+offset_bottom = 665.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/MissionJournal"]
+mouse_filter = 2
+custom_minimum_size = Vector2(990, 595)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "PROCEDURAL MISSION JOURNAL"
+autowrap_mode = 2
+
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
 mouse_filter = 2
 anchor_left = 1.0
