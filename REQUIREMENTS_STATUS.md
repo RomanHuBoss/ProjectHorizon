@@ -2,13 +2,24 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure-hotfix1.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
 ## 0. Текущая mega-итерация 2026-08-15 — World Scene Coordinator / §5 vertical-slice closure
+
+### TASK-148.1 — runtime hotfix: gameplay scene `CantOpen`
+
+**Внешнее runtime evidence от 2026-08-15 17:29 (+03:00):** пользовательский скриншот подтверждает, что главное меню запускается, но команда «Начать стандартную игру» не открывает gameplay и выводит `Переход к игровой сцене не удался: CantOpen`. Это означает, что `TASK-149` runtime acceptance фактически **FAILED на первом переходе** и остаётся `IN_PROGRESS`; `WORLD-ACC-102/103` не могут считаться пройденными.
+
+**Локализация дефекта:** diff принятого TASK-146 → TASK-148 показывает единственную новую hard resource dependency непосредственно в `SalvageRepairSlice.tscn`: `ext_resource` на `WorldSceneCoordinatorNode.cs`. Coordinator является orchestration object и не должен блокировать открытие authored gameplay scene. При overlay/fresh C# resource reindex новый script UID/class может быть недоступен ResourceLoader до обновления assembly/cache; тогда Godot не может открыть весь PackedScene и `ChangeSceneToFile` возвращает `CantOpen`.
+
+**Исправление:** `WorldSceneCoordinatorNode` удалён из serialized `.tscn` и создаётся программно под существующим `Gameplay` после успешной загрузки `SalvageRepairSlice`. Четыре world-context PackedScene shell остаются bounded runtime resources и загружаются coordinator'ом уже после входа в gameplay. В `validate-task148-world-scene-coordinator.py` добавлен regression invariant `gameplayLoadSafe=1`: main gameplay scene не имеет hard dependency на coordinator C# script/node, а runtime bootstrap должен присутствовать явно. VERSION поднят до `0.1.0-alpha.148.1`.
+
+**Статус:** `TASK-148` остаётся `IMPLEMENTED`; `TASK-149` остаётся `IN_PROGRESS` после подтверждённой неудачной runtime-попытки. Требуется повторный переход Menu → Gameplay, затем первоначальные clean build / quality / F5 / manual smoke criteria.
+
 
 ### Синхронизация принятой TASK-146/TASK-147
 
@@ -34,14 +45,14 @@
 - coordinator **не имеет отдельного persistence block**: new/load/reset выводят context из существующих `StageOneVoyage.Location` + `GalaxyNavigation.CurrentSystem/CurrentPlanetId`, SQLite schema остаётся прежней;
 - HUD получил локализованную строку World scene; F5 запускает `TASK-148 world scene coordinator acceptance`;
 - xUnit `WorldSceneCoordinatorTests` проверяет полный graph, illegal transition и ID normalization; `tools/validate-task148-world-scene-coordinator.py` интегрирован в local quality, CI и release gates;
-- документация архитектуры вынесена в `docs/WORLD_SCENE_COORDINATION.md`; VERSION = `0.1.0-alpha.148`.
+- документация архитектуры вынесена в `docs/WORLD_SCENE_COORDINATION.md`; VERSION = `0.1.0-alpha.148.1`.
 
 **Изменения относительно принятого TASK-146 hotfix1:** `added=16`, `changed=15`, `removed=0`.
 
 **Фактически выполненные статические проверки:**
 
 ```text
-TASK-140 VERSION PASS: version=0.1.0-alpha.148; changelog=1
+TASK-140 VERSION PASS: version=0.1.0-alpha.148.1; changelog=1
 TASK-140 JSON CONTRACT PASS: json=21; parsed=21; industrySchema=5/5; localizationParity=1
 TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1336; parity=1; sourceSinks=0
 TASK-134 AUDIO CONTRACT PASS
@@ -51,7 +62,7 @@ TASK-140 SECTION-37 CONTRACT PASS: debugExports=4/4; releaseExports=4/4
 TASK-142 SECTION-38 CONTRACT PASS
 TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS
 TASK-146 BASE CONSTRUCTION CLOSURE CONTRACT PASS
-TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; f5Acceptance=1; xunit=3/3
+TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; f5Acceptance=1; xunit=3/3
 XML PASS: 4/4; YAML PASS: 2/2; Python syntax PASS: 13/13; Bash syntax PASS
 C# lexical structural check PASS: 6/6 new TASK-148 files
 UID PASS: 139/139 unique; res:// references: broken=0; world scenes=4/4 with kinds 0/1/2/3

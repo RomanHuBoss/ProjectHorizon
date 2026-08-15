@@ -11,6 +11,13 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.148.1] - 2026-08-15
+
+### Fixed
+
+- Removed the TASK-148 coordinator C# script as a hard `ext_resource` of `SalvageRepairSlice.tscn`; the orchestration node is now created under `Gameplay` only after the gameplay scene itself has loaded. This prevents a fresh/overlaid Godot C# UID/resource cache from turning the whole gameplay scene into `CantOpen`.
+- Extended the TASK-148 contract gate with a gameplay-load-safety invariant so orchestration-only C# nodes cannot accidentally become scene-opening dependencies again.
+
 ## [0.1.0-alpha.148] - 2026-08-15
 
 ### Added

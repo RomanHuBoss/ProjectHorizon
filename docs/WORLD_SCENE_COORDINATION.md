@@ -14,7 +14,7 @@ Surface/Orbit/Station transitions must keep the same stable system and planet ID
 
 ## Scene residency
 
-`Gameplay/WorldSceneCoordinator` owns exactly one lightweight PackedScene shell:
+`WorldSceneCoordinatorNode` is created programmatically under `Gameplay` after the authored gameplay scene has loaded. It owns exactly one lightweight PackedScene shell:
 
 - `SurfaceWorldShell.tscn`
 - `OrbitWorldShell.tscn`
@@ -41,3 +41,8 @@ No `world_scene` SQLite setting or schema migration is introduced. On new game, 
 ## Acceptance
 
 `F5` runs TASK-148 and checks the legal graph, illegal-transition guard, hyperspace destination-system change, context validation, all four PackedScenes, exactly one live shell, live context metadata and residency state. `tools/validate-task148-world-scene-coordinator.py` and `WorldSceneCoordinatorTests` enforce the same architecture in CI.
+
+
+## Gameplay load safety
+
+The coordinator host is intentionally **not** serialized as a C# `ext_resource` in `SalvageRepairSlice.tscn`. It is orchestration state, not authored world content. Creating the node after the gameplay PackedScene has opened prevents C# UID/resource-cache refresh during overlay upgrades from making the entire gameplay scene return `CantOpen`. `tools/validate-task148-world-scene-coordinator.py` enforces this as `gameplayLoadSafe=1`.

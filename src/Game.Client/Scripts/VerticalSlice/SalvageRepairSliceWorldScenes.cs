@@ -23,12 +23,28 @@ public partial class SalvageRepairSlice
 
     private void BindWorldSceneCoordinatorSceneNodes()
     {
-        _worldSceneCoordinatorNode = GetNodeOrNull<WorldSceneCoordinatorNode>(
-            "Gameplay/WorldSceneCoordinator");
+        Node3D gameplay = GetNodeOrNull<Node3D>("Gameplay") ??
+            throw new InvalidOperationException(
+                "Vertical slice scene is missing Gameplay host.");
+
+        _worldSceneCoordinatorNode =
+            gameplay.GetNodeOrNull<WorldSceneCoordinatorNode>(
+                "WorldSceneCoordinator");
         if (_worldSceneCoordinatorNode is null)
         {
-            throw new InvalidOperationException(
-                "Vertical slice scene is missing Gameplay/WorldSceneCoordinator.");
+            // TASK-148.1: the coordinator is an orchestration object, not authored
+            // scene content. Creating it after SalvageRepairSlice has loaded keeps
+            // a newly added C# script from becoming a hard ext_resource dependency
+            // that can make the whole gameplay PackedScene return CantOpen while
+            // Godot is refreshing an overlaid project's C# resource/UID cache.
+            _worldSceneCoordinatorNode = new WorldSceneCoordinatorNode
+            {
+                Name = "WorldSceneCoordinator"
+            };
+            gameplay.AddChild(_worldSceneCoordinatorNode);
+            GD.Print(
+                "TASK-148.1 world scene coordinator bootstrap PASS: " +
+                "mode=runtime-node; gameplaySceneHardDependency=0.");
         }
     }
 

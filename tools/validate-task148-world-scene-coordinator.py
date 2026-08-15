@@ -46,8 +46,10 @@ for name in scene_paths:
     need((ROOT/'src/Game.Client/Scenes/World'/name).exists(), f'packed scene {name}', failures)
     need(name in node, f'coordinator scene path {name}', failures)
 need('hostChildren == 1 && validShell' in node, 'single live shell invariant', failures)
-need('Gameplay/WorldSceneCoordinator' in slice_world, 'scene coordinator binding', failures)
-need('name="WorldSceneCoordinator"' in scene and '12_world_scene_coordinator' in scene, 'main scene coordinator node', failures)
+need('GetNodeOrNull<Node3D>("Gameplay")' in slice_world, 'gameplay coordinator host binding', failures)
+need('new WorldSceneCoordinatorNode' in slice_world and 'gameplay.AddChild(_worldSceneCoordinatorNode);' in slice_world, 'runtime coordinator bootstrap', failures)
+need('WorldSceneCoordinatorNode.cs' not in scene and '12_world_scene_coordinator' not in scene, 'gameplay scene has no hard coordinator script dependency', failures)
+need('name="WorldSceneCoordinator"' not in scene, 'coordinator is not serialized into gameplay scene', failures)
 
 need('WorldSceneKind.Surface => true' in slice_world, 'surface residency', failures)
 need('bool orbitActive = kind == WorldSceneKind.Orbit;' in slice_world, 'orbit residency', failures)
@@ -74,9 +76,9 @@ all_save_text='\n'.join(text(p) for p in (
     'src/Game.Client/Scripts/Persistence/SaveDatabase.cs',
     'src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs'))
 need('world_scene' not in all_save_text.lower(), 'no duplicate world-scene persistence', failures)
-need(version == '0.1.0-alpha.148', 'VERSION alpha.148', failures)
+need(version == '0.1.0-alpha.148.1', 'VERSION alpha.148.1', failures)
 
 if failures:
     print('TASK-148 WORLD SCENE COORDINATOR CONTRACT FAIL: ' + '; '.join(failures))
     sys.exit(1)
-print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; f5Acceptance=1; xunit=3/3.')
+print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; f5Acceptance=1; xunit=3/3.')
