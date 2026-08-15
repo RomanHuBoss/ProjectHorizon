@@ -2,9 +2,120 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-npc-factions-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-ground-npc-navigation-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+
+### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и перейти дальше. Поэтому журнал синхронизирован до начала нового
+шага:
+
+- `TASK-122` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-123` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; локальный Godot runtime
+  предыдущей редакции в среде подготовки не приписывается задним числом.
+
+### TASK-124 — локальная наземная NavigationServer3D подсистема
+
+**Исходный снимок:** `ProjectHorizon-main-npc-factions-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-ground-npc-navigation-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §30.1 «Ground NPC navigation»; §29.2–29.3
+локальные коллизии/препятствия около активной области; §16 физические NPC.
+
+**Реализовано:**
+
+- добавлен отдельный `Gameplay/NpcNavigation` runtime на `NavigationServer3D` и
+  `NavigationRegion3D`; whole-planet navmesh не создаётся;
+- навигационная поверхность разбита на procedural tiles `12 × 12 m` с клеткой
+  `1 m`; active window имеет radius `2 tiles`, то есть максимум `5 × 5 = 25`
+  регионов одновременно и bounded memory/runtime footprint;
+- streaming-окно следует за игроком: при переходе центра в другой tile ненужные
+  регионы evict-ятся, недостающие создаются; после перестройки выдерживается
+  NavigationServer synchronization window перед path queries;
+- walkable geometry строится из bounds существующего `GroundBody`, а статические
+  `Box/Cylinder/Capsule/Sphere` collision shapes переводятся в local blocked cells
+  с clearance по radius NPC; визуальная геометрия не парсится для runtime bake;
+- для тех же статических объектов создаются `NavigationObstacle3D` avoidance
+  proxies; база и POI автоматически вызывают obstacle/nav refresh после rebuild;
+- семь динамических `NpcFactionAgentNode` переведены с direct local steering на
+  `NavigationAgent3D`: behavior target → `TargetPosition` →
+  `GetNextPathPosition()` в physics update → desired velocity →
+  `VelocityComputed` → `MoveAndSlide`;
+- включены 2D XZ avoidance, agent radius/height, neighbors/time horizons и общий
+  avoidance layer; телепорт/respawn сбрасывает internal avoidance velocity;
+- patrol/flee/hostile chase и существующий combat/dialogue слой сохранены поверх
+  pathfinding; если NPC находится вне active navigation window, он не запускает
+  старый прямолинейный fallback, а sleeps до возвращения локального nav region;
+- добавлен stuck detector: при отсутствии физического прогресса к далёкой цели
+  строится боковой recovery waypoint через реальный NavigationServer path query;
+- сохранён legacy direct-motion fallback только для изолированного запуска NPC без
+  подключённой navigation surface, а не для штатного vertical slice;
+- HUD получил строку `NPC navigation` с regions/cells/obstacles/active agents/path
+  requests/recoveries/server sync;
+- `F5` расширен `TASK-124` runtime acceptance: local region budget, cross-tile path,
+  obstacle clearance, forced stream shift + eviction + restore, server sync,
+  реальные `NavigationAgent3D` path requests, `velocity_computed` callbacks и
+  recovery-waypoint probe; gameplay save при этом не изменяется.
+
+**Добавленные/изменённые файлы:**
+
+- `src/Game.Client/Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcNavigationAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceNpcNavigation.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/NpcFactionAgentNode.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceNpcFactions.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-122`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-123`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-124`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-125`: `NOT_STARTED` → `IN_PROGRESS` — clean build + F5/runtime navigation
+  acceptance на стороне пользователя;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Проверки среды подготовки:**
+
+- выполнены статические проверки C# structure/references, scene NodePath/ext_resource,
+  UID uniqueness, JSON parse и baseline content counts;
+- проверены bounded tile constants и отсутствие whole-planet region creation;
+- проверена связка scene → navigation surface → NPC agent → F5 acceptance → HUD;
+- .NET SDK/MSBuild и Godot в среде подготовки отсутствуют, поэтому локальные
+  `dotnet build`, импорт проекта и фактический runtime не заявляются.
+
+**Минимальная runtime-приёмка TASK-125:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`; критерий — реальный `CoreCompile`,
+   `0 errors`.
+2. Запустить `SalvageRepairSlice`; в startup ожидаются строки `TASK-124 NPC
+   navigation surface READY` и `TASK-124 NPC NavigationAgent3D binding READY`.
+3. Один раз нажать `F5`. Ключевой критерий:
+
+```text
+TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; obstacles=>0; avoidanceObstacles=>0; tilesTouched=>=3; pathPoints=>=2; localBudget=1; crossTilePath=1; obstacleClearance=1; boundedStreaming=1; navigationAgents=7; pathRequests=>0; avoidanceSamples=>0; agentRuntime=1; avoidanceRuntime=1; recoveryProbe=1; evicted=>0; sync=1; result=local tiled NavigationServer3D runtime verified.
+```
+
+4. Manual smoke: наблюдать минимум двух NPC с разных сторон препятствий 20–30 s;
+   они должны обходить collision objects без прохода насквозь и без постоянного
+   `TASK-124 NPC navigation recovery` loop. Подойти к hostile Opponent: chase и
+   атака должны сохраниться. Отойти достаточно далеко и вернуться: строка HUD
+   `regions=N/25` остаётся bounded, NPC снова продолжают движение.
+5. При `FAIL` предоставить clean-build log, полную строку `TASK-124 ... FAIL`,
+   последние ~200 строк Godot Output и screenshot HUD со строкой `NPC navigation`.
+
+**Следующий рекомендуемый mega-шаг после TASK-125:** закрыть следующий крупный
+неверифицированный блок ТЗ, выбранный по актуальному gap-анализу после runtime
+приёмки навигации; flying NPC steering (§30.2) не смешивать с ground navigation.
 
 ---
 
@@ -109,9 +220,9 @@
 - `TASK-120`: `IMPLEMENTED` → `VERIFIED` — прямой acceptance waiver владельца
   продукта;
 - `TASK-121`: `IN_PROGRESS` → `VERIFIED` — тот же acceptance waiver;
-- `TASK-122`: `NOT_STARTED` → `IMPLEMENTED`;
-- `TASK-123`: `NOT_STARTED` → `IN_PROGRESS` — clean build + единый F5 + короткий
-  NPC smoke на стороне пользователя;
+- `TASK-122`: `NOT_STARTED` → `VERIFIED` (последующее acceptance waiver владельца продукта);
+- `TASK-123`: `NOT_STARTED` → `VERIFIED` — первоначально был runtime acceptance,
+  затем закрыт последующим acceptance waiver владельца продукта;
 - `TASK-006`: остаётся `BLOCKED`.
 
 **Проверки среды подготовки:**
@@ -121,9 +232,9 @@
 - проверены optional-setting read/write/delete paths `npc_factions`, обе snapshot
   factory интеграции, scene nodes `Gameplay/NpcPopulation` и `Hud/NpcInteraction`,
   реальные procedural combat/protection target IDs и отсутствие изменения schema;
-- .NET SDK, C# compiler и Godot в среде подготовки отсутствуют, поэтому clean
-  build и фактический Godot runtime **не заявляются**; `TASK-122` остаётся
-  `IMPLEMENTED`, а `TASK-123` — `IN_PROGRESS`.
+- .NET SDK, C# compiler и Godot в среде подготовки отсутствовали, поэтому clean
+  build и фактический Godot runtime этой исторической итерации **не заявлялись**;
+  позднее `TASK-122/123` закрыты явным acceptance waiver владельца продукта.
 
 **Минимальная runtime-приёмка TASK-123:**
 
@@ -133,7 +244,7 @@
 
 ```text
 TASK-122 NPC/faction catalog READY: schema=1; factions=3; archetypes=8; agents=8; dialogues=8; defeatTargets=1; protectTargets=2; ...
-TASK-122 physical NPC population READY: authored=1; dynamic=7; interaction=E; hostileCombat=multitool-hitscan; localSteering=enabled.
+TASK-122 physical NPC population READY: authored=1; dynamic=7; interaction=E; hostileCombat=multitool-hitscan; navigation=TASK-124.
 ```
 
 3. Если восстановился старый gameplay state — нажать `F8`; затем один раз `F5`.
@@ -153,11 +264,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
    и полную строку `TASK-122 NPC/factions acceptance PASS`. При `FAIL` — build log,
    `TASK-122 ... FAIL`, последние ~200 строк Godot Output и точный шаг smoke.
 
-**Следующий рекомендуемый mega-шаг после TASK-123:** `TASK-124` — наземная NPC
-навигация/encounter layer по §30.1: локальные tiled `NavigationRegion3D`,
-NavigationServer3D path requests, avoidance, obstacle recovery и bounded streaming
-без whole-planet navmesh. Это логически продолжает уже закрытый NPC/faction core и
-может быть выполнено отдельной крупной подсистемой.
+**Следующий шаг:** `TASK-124` реализован последующей mega-итерацией; см. раздел 0.
 
 ---
 
@@ -577,7 +684,7 @@ C# lexical/bracket integrity и точная change-boundary относител�
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. `TASK-118/119` и `TASK-120/121` закрыты явными acceptance-waiver решениями владельца продукта, отдельно от локальных runtime-доказательств. Текущая mega-итерация `TASK-122` закрывает базовый NPC/faction/dialogue core §16 и подключает реальные hostile/protected NPC к procedural quests. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance `TASK-123` — `IN_PROGRESS`; tiled NavigationServer3D layer §30.1 остаётся следующим отдельным блоком.
+**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. `TASK-118/119`, `TASK-120/121` и `TASK-122/123` закрыты явными acceptance-waiver решениями владельца продукта, отдельно от локальных runtime-доказательств. Текущая mega-итерация `TASK-124` реализует локальную tiled `NavigationServer3D/NavigationRegion3D` подсистему §30.1 с bounded streaming, obstacle-aware pathfinding, `NavigationAgent3D` avoidance и recovery; `TASK-125` остаётся runtime acceptance до clean build + F5 на пользовательской машине.
 
 ## 3. Результат текущей итерации от 2026-08-03
 

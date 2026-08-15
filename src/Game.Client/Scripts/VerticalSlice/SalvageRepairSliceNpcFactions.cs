@@ -105,10 +105,11 @@ public partial class SalvageRepairSlice
             node.CombatResolved += OnNpcCombatResolved;
             _npcPopulationRoot.AddChild(node);
         }
+        AttachNpcNavigationAgents();
         GD.Print(
             "TASK-122 physical NPC population READY: " +
             $"authored=1; dynamic={_npcPopulationRoot.GetChildCount()}; " +
-            "interaction=E; hostileCombat=multitool-hitscan; localSteering=enabled.");
+            "interaction=E; hostileCombat=multitool-hitscan; navigation=TASK-124.");
     }
 
     private bool HandleNpcFactionInput(Key physical, Key logical)
