@@ -218,6 +218,14 @@ public sealed record GalaxyNavigationSaveData(
     double TotalDistanceLightYears,
     IReadOnlyList<string> VisitedSystemIds);
 
+public sealed record EcologySaveData(
+    long WorldSeed,
+    string RegionKey,
+    int DiscoveryPoints,
+    IReadOnlyList<string> DiscoveredFloraIds,
+    IReadOnlyList<string> DiscoveredFaunaIds,
+    IReadOnlyList<string> RemovedFloraInstanceIds);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -236,7 +244,8 @@ public sealed record SaveGameSnapshot(
     PlanetaryExplorationSaveData? PlanetaryExploration = null,
     ShipSystemsSaveData? ShipSystems = null,
     StageOneVoyageSaveData? StageOneVoyage = null,
-    GalaxyNavigationSaveData? GalaxyNavigation = null);
+    GalaxyNavigationSaveData? GalaxyNavigation = null,
+    EcologySaveData? Ecology = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

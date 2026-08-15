@@ -146,6 +146,11 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 5.5)
 
 [node name="Gameplay" type="Node3D" parent="."]
 
+[node name="AtmospherePlanet" type="Node3D" parent="Gameplay"]
+position = Vector3(0, -120, 0)
+
+[node name="Ecology" type="Node3D" parent="Gameplay"]
+
 [node name="VoyageShip" parent="Gameplay" instance=ExtResource("7_voyage_ship")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2, -10)
 StartPilotEnabled = false
@@ -783,6 +788,23 @@ custom_minimum_size = Vector2(1000, 590)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "GALAXY MAP"
+autowrap_mode = 2
+
+[node name="EcologyCatalog" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 210.0
+offset_top = 32.0
+offset_right = 1175.0
+offset_bottom = 650.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/EcologyCatalog"]
+mouse_filter = 2
+custom_minimum_size = Vector2(925, 575)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "PLANETARY ECOLOGY CATALOGUE"
 autowrap_mode = 2
 
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]

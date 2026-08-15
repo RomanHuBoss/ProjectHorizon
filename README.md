@@ -900,3 +900,51 @@ repair ship → E board → T takeoff → fly/navigation assist to orbital dock
 ### Procedural galaxy, maps and hyperspace (`TASK-114`)
 
 После полного Stage 1 loop приобрести и установить `module.ship.hyperspace_core` либо `module.ship.compotium_drive_core`, состыковаться с orbital station и нажать `M`. Galaxy tab показывает nearby systems, sector coordinates, star type, прямую distance, количество waypoint jumps и `VISITED/NEW`; System tab показывает все planets текущей системы. `Up/Down` меняет selection, `Enter` строит route и выполняет следующий waypoint. Jump отклоняется на поверхности, в полёте, без commissioning, при `flightReady=0`, с повреждённым hyperdrive, без активного hyperspace module, при недостатке fuel или отсутствии range-aware route. После успешного jump ship остаётся piloted и docked у station checkpoint новой системы; station services доступны без нового economy runtime. Штатное завершение и cold restore обязаны сохранять exact system/sector/destination/jump/distance/visited state. `F8` возвращает `galaxy.g1/system.vertical_slice`, `visited=1`, `jumps=0`.
+
+## Procedural planetary ecology closure
+
+`TASK-116` adds the Stage 2-ready planetary ecology core required by PDF v2.0
+sections 11–12 and the Stage 2 content baseline. `Content/ecology.json` defines
+16 biomes, 60 flora modules and 20 fauna archetypes split into 12 terrestrial,
+4 flying and 4 aquatic species. All six required fauna body plans are covered.
+The runtime regenerates populations deterministically from `WorldSeed` and
+`RegionKey` instead of serializing every plant or animal.
+
+Repeated vegetation is rendered by `MultiMeshInstance3D` groups. Only nearby
+flora specimens are promoted to interactive `StaticBody3D` nodes for scan,
+harvest and damage interaction. Fauna is capped at 20 fully active local
+`CharacterBody3D` agents plus 80 statistical/simplified population entries.
+Nearby AI evaluates at 10 Hz, medium-range AI at 4 Hz and distant fauna remains
+statistical. The utility/steering runtime covers Idle, Wander, Graze, Drink,
+Sleep, Investigate, Flee, Threaten, Attack, ReturnToTerritory and FollowGroup.
+
+On foot:
+
+```text
+V          scan the nearest flora/fauna signal within 16 m
+O          open/close the ecology catalogue
+Tab        switch Flora/Fauna inside the catalogue
+Up/Down    browse discovered species
+E          harvest an interactable promoted flora specimen
+```
+
+Harvesting yields `resource.flora_pulp`. Discovery species IDs and removed flora
+instance IDs are persisted in the optional `save_settings.ecology` value. No
+procedural fauna instance pose/state is stored. SQLite schema remains version 2;
+legacy saves regenerate ecology from the catalog seed with empty discovery and
+harvest deltas.
+
+`F5` now runs `TASK-116` in the isolated
+`save_1.ecology-test.db` alongside the existing runtime/ship/voyage/galaxy
+acceptance. The ecology test checks the 16/60/20 baseline, 12/4/4 movement
+coverage, six body plans, all eleven behavior states, deterministic placement,
+MultiMesh-oriented flora population, 20/80 population limits, update tiers,
+utility behavior, discovery/harvest lifecycle, delta-only persistence, all 16
+biomes, cold restore, legacy fallback, exact SQLite round-trip, one-writer
+discipline and integrity.
+
+The integrated `VoyageShip` now resolves its default `../AtmospherePlanet`
+reference through `Gameplay/AtmospherePlanet`. This removes the previous
+`Arcade ship has no atmosphere reference` warning and activates the atmospheric
+flight coefficients already derived from ship `AtmosphericEfficiency` while the
+ship is near the planetary surface.

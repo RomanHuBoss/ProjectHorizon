@@ -596,6 +596,24 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        EcologySaveData? expectedEcology = expected.Ecology;
+        EcologySaveData? actualEcology = actual.Ecology;
+        if ((expectedEcology is null) != (actualEcology is null))
+        {
+            mismatch = "ecology presence differs";
+            return false;
+        }
+
+        if (expectedEcology is not null && actualEcology is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizeEcology(expectedEcology)),
+                JsonSerializer.Serialize(CanonicalizeEcology(actualEcology)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "ecology differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -1017,7 +1035,7 @@ public sealed partial class SaveDatabase : IDisposable
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
             "'base_construction', 'planetary_exploration', 'ship_systems', " +
-            "'stage_one_voyage', 'galaxy_navigation');",
+            "'stage_one_voyage', 'galaxy_navigation', 'ecology');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1181,6 +1199,19 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeGalaxyNavigation(snapshot.GalaxyNavigation))));
+        }
+
+        if (snapshot.Ecology is not null)
+        {
+            ValidateEcology(snapshot.Ecology);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'ecology', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizeEcology(snapshot.Ecology))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1426,6 +1457,7 @@ public sealed partial class SaveDatabase : IDisposable
         ShipSystemsSaveData? shipSystems = null;
         StageOneVoyageSaveData? stageOneVoyage = null;
         GalaxyNavigationSaveData? galaxyNavigation = null;
+        EcologySaveData? ecology = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1437,7 +1469,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'production_queue', 'production_queue_network', " +
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
-                "'ship_systems', 'stage_one_voyage', 'galaxy_navigation') " +
+                "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology') " +
                 "ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
@@ -1710,6 +1742,31 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "ecology",
+            out string? ecologyJson))
+        {
+            if (string.IsNullOrWhiteSpace(ecologyJson))
+            {
+                throw new InvalidDataException(
+                    "ecology setting is empty.");
+            }
+
+            try
+            {
+                ecology = JsonSerializer.Deserialize<EcologySaveData>(ecologyJson) ??
+                    throw new InvalidDataException(
+                        "ecology setting deserialized to null.");
+                ValidateEcology(ecology);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "ecology setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1814,7 +1871,8 @@ public sealed partial class SaveDatabase : IDisposable
             planetaryExploration,
             shipSystems,
             stageOneVoyage,
-            galaxyNavigation);
+            galaxyNavigation,
+            ecology);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -2099,6 +2157,65 @@ public sealed partial class SaveDatabase : IDisposable
         {
             throw new InvalidDataException(
                 "galaxy_navigation current system is not deterministic.");
+        }
+    }
+
+    private static EcologySaveData CanonicalizeEcology(EcologySaveData ecology)
+    {
+        ArgumentNullException.ThrowIfNull(ecology);
+        return ecology with
+        {
+            DiscoveredFloraIds = ecology.DiscoveredFloraIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray(),
+            DiscoveredFaunaIds = ecology.DiscoveredFaunaIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray(),
+            RemovedFloraInstanceIds = ecology.RemovedFloraInstanceIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidateEcology(EcologySaveData ecology)
+    {
+        ArgumentNullException.ThrowIfNull(ecology);
+        if (ecology.WorldSeed <= 0 ||
+            !GameContentCatalog.IsStableId(ecology.RegionKey) ||
+            !ecology.RegionKey.StartsWith("region.", StringComparison.Ordinal) ||
+            ecology.DiscoveryPoints < 0 ||
+            ecology.DiscoveredFloraIds is null ||
+            ecology.DiscoveredFaunaIds is null ||
+            ecology.RemovedFloraInstanceIds is null ||
+            ecology.DiscoveredFloraIds.Count > EcologyCatalog.ExpectedFloraCount ||
+            ecology.DiscoveredFaunaIds.Count > EcologyCatalog.ExpectedFaunaCount ||
+            ecology.RemovedFloraInstanceIds.Count > EcologyPlanner.GameplayFloraInstanceCount)
+        {
+            throw new InvalidDataException(
+                "ecology contains invalid identity, counters or collection sizes.");
+        }
+
+        static bool HasUniqueStableIds(
+            IReadOnlyList<string> ids,
+            string prefix)
+        {
+            return ids.All(id =>
+                    GameContentCatalog.IsStableId(id) &&
+                    id.StartsWith(prefix, StringComparison.Ordinal)) &&
+                ids.Distinct(StringComparer.Ordinal).Count() == ids.Count;
+        }
+
+        if (!HasUniqueStableIds(ecology.DiscoveredFloraIds, "flora.") ||
+            !HasUniqueStableIds(ecology.DiscoveredFaunaIds, "fauna.") ||
+            ecology.RemovedFloraInstanceIds.Any(id =>
+                string.IsNullOrWhiteSpace(id) ||
+                !id.StartsWith("ecology.flora.", StringComparison.Ordinal)) ||
+            ecology.RemovedFloraInstanceIds
+                .Distinct(StringComparer.Ordinal).Count() !=
+                ecology.RemovedFloraInstanceIds.Count)
+        {
+            throw new InvalidDataException(
+                "ecology contains invalid or duplicate discovery/delta IDs.");
         }
     }
 

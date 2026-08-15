@@ -1,10 +1,168 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-05
-> **Подготовленный снимок:** `ProjectHorizon-main-galaxy-hyperspace-closure.zip`
+> **Последняя актуализация:** 2026-08-11
+> **Подготовленный снимок:** `ProjectHorizon-main-planetary-ecology-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0A. Текущая синхронизация и mega-итерация 2026-08-11
+
+### Закрытие предыдущей galaxy/hyperspace итерации
+
+Пользователь 2026-08-11 прямо распорядился считать предыдущую итерацию
+отработанной и не продолжать сложную ручную проверку hyperspace-маршрута. В
+соответствии с этим прямым приёмочным решением:
+
+- `TASK-114` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-115` — `IN_PROGRESS` → `VERIFIED`;
+- procedural galaxy, system/galaxy map, route planner и hyperspace API считаются
+  закрытыми для обычной разработки; возврат допустим при подтверждённой
+  регрессии или изменении ТЗ;
+- отсутствие полной ручной цепочки покупки hyperdrive → jump → cold restore
+  зафиксировано как **acceptance waiver by product owner**, а не как якобы
+  выполненная ручная проверка.
+
+При запуске пользователь отдельно зафиксировал warning
+`Arcade ship has no atmosphere reference; atmospheric mode disabled.`. Он не
+блокировал galaxy/hyperspace, но означал неполную интеграцию ранее реализованных
+коэффициентов `AtmosphericEfficiency`. Дефект включён в `TASK-116` и исправлен
+добавлением `Gameplay/AtmospherePlanet`, на который штатно указывает
+`VoyageShip` через `../AtmospherePlanet`. Runtime-подтверждение исчезновения
+warning остаётся частью `TASK-117`.
+
+### TASK-116 — procedural planetary ecology core mega-iteration
+
+**Исходный снимок:** `ProjectHorizon-main-galaxy-hyperspace-closure.zip` —
+предыдущая редакция `TASK-114/115`, фактически запущенная пользователем и прямо
+принятая им как завершённая; её исходной GitHub-базой был
+`ProjectHorizon-main(7)(2).zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-planetary-ecology-closure.zip`.  
+**Git SHA:** архив не содержит `.git`; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования PDF v2.0:** §11 procedural vegetation, §12 procedural
+fauna, §22.5 seed/version + delta persistence, Stage 2 baseline: 16 land biomes,
+12 terrestrial + 4 flying + 4 aquatic fauna archetypes, flora modules ≥60.
+
+**Реализовано:**
+
+- `ecology.json` schema 1: ровно `16` biome definitions, `60` flora modules и
+  `20` fauna archetypes (`12 Ground / 4 Flying / 4 Aquatic`);
+- fauna catalog покрывает все шесть обязательных body plans: Biped, Quadruped,
+  Hexapod, Flying, Aquatic и Crawler, а также все 11 состояний поведения PDF;
+- `EcologyPlanner` детерминированно восстанавливает `360` gameplay flora
+  placements, `20` fully-active fauna и `80` simplified/statistical fauna из
+  `WorldSeed=20260811` и `region.vertical_slice.ecology`;
+- flora placement учитывает biome compatibility, per-species spacing и clearance
+  от starter ship, станков, trader и центральной инфраструктуры;
+- повторяющаяся vegetation рендерится группами `MultiMeshInstance3D`; рядом с
+  игроком до 8 specimens повышаются до интерактивных `StaticBody3D`, поэтому
+  сотни растений не превращаются в сотни постоянных physics nodes;
+- active fauna представлены `CharacterBody3D` и используют distance update tiers
+  `10 Hz <=20 m`, `4 Hz <=50 m`, дальше — статистическое состояние;
+- utility behavior + steering реализуют Idle/Wander/Graze/Drink/Sleep/
+  Investigate/Flee/Threaten/Attack/ReturnToTerritory/FollowGroup; попадание
+  hitscan вызывает реальную реакцию и диагностическую строку `TASK-116 fauna
+  reaction PASS`;
+- `V` сканирует ближайший ecology signal в радиусе 16 m; `O` открывает persistent
+  flora/fauna catalogue; `E` на promoted flora выполняет harvest и выдаёт
+  `resource.flora_pulp`;
+- persistence намеренно хранит только discovered flora species, discovered fauna
+  species и removed flora instance IDs; координаты/состояние процедурных животных
+  не сериализуются и восстанавливаются из seed, как требует §22.5;
+- optional `save_settings.ecology` добавлен без изменения SQLite schema `2`;
+  поддержаны exact round-trip, cold restore, legacy fallback, graceful exit и F8
+  reset;
+- `F5` расширен изолированной `TASK-116` acceptance в
+  `save_1.ecology-test.db`; тест не изменяет gameplay-slot;
+- acceptance проверяет baseline `16/60/20`, movement `12/4/4`, шесть body plans,
+  11 behaviors, deterministic regeneration, 360 flora, population limits 20/80,
+  update tiers, utility outcomes, scan/harvest, delta-only save, все 16 biomes,
+  cold restore, legacy fallback, exact SQLite round-trip, autosave log,
+  `maxWriters<=1` и `integrity=ok`;
+- интегрированная сцена получила `Gameplay/AtmospherePlanet` и устраняет известный
+  atmosphere-reference warning, не подавляя его искусственно.
+
+**Изменённые/добавленные файлы:**
+
+- `src/Game.Client/Content/ecology.json`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyCatalog.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyPlanner.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyRuntime.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyFaunaNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyFloraSpecimenNode.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/EcologyAcceptance.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceEcology.cs` + `.uid`;
+- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
+- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
+- `README.md`;
+- `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-114`: `IMPLEMENTED` → `VERIFIED` — прямое решение пользователя;
+- `TASK-115`: `IN_PROGRESS` → `VERIFIED` — acceptance waiver пользователя;
+- `TASK-116`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-117`: `NOT_STARTED` → `IN_PROGRESS` — локальная clean build + F5 ecology
+  acceptance + минимальный визуальный smoke;
+- `TASK-006`: остаётся `BLOCKED` до наличия `.git`/SHA.
+
+**Минимальная runtime-приёмка TASK-117 (сознательно короче прошлых ручных
+маршрутов):**
+
+1. `tools\clean-build-windows10.cmd`: фактический `CoreCompile`, `0` warnings,
+   `0` errors.
+2. Запустить `SalvageRepairSlice`. Если старое сохранение восстановилось в
+   `OutboundFlight`/`InboundFlight` и игрок всё ещё пилотирует корабль, сначала
+   нажать `F8`, чтобы acceptance hotkeys не были заблокированы активным полётом.
+   После сброса не должно быть warning
+   `Arcade ship has no atmosphere reference`; startup должен показать
+   `TASK-116 ecology catalog READY ... biomes=16; flora=60; fauna=20;
+   ground=12; flying=4; aquatic=4; limits=20/80` и `TASK-116 ecology READY ...
+   atmosphere=bound`.
+3. Один раз нажать `F5`. Дождаться существующих TASK-076/110/112/114 и новой
+   строки `TASK-116 ecology acceptance PASS` с `deterministic=1; multiMesh=1;
+   populations=1; updateTiers=1; behaviorRuntime=1; discovery=1; deltaOnly=1;
+   stress16=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1;
+   integrity=ok`. Это основной критерий приёмки — сложный ручной traversal не
+   требуется.
+4. Нажать `F8`; Output: `TASK-116 ecology reset PASS ... flora=0; fauna=0;
+   removed=0; points=0; regenerated=360; active/simplified=20/80`.
+5. На поверхности убедиться, что появились разноцветные растения и движущаяся
+   fauna. Нажать `V` рядом с организмом — одна строка `TASK-116 player ecology
+   scan PASS`; `O` должен открыть каталог. Подойти к ближайшему интерактивному
+   растению и нажать `E` — `TASK-116 player flora harvest PASS`. Это единственный
+   обязательный ручной smoke.
+6. Штатно закрыть/открыть игру. `TASK-116 ecology restore PASS` должен сохранить
+   discovery/removed counts; procedural fauna positions не обязаны совпадать с
+   runtime motion до закрытия — они регенерируются из seed и затем продолжают AI.
+
+**Ожидаемая итоговая строка F5:**
+
+```text
+TASK-116 ecology acceptance PASS: biomes=16; flora=60; fauna=20; movement=1; bodyPlans=1; behaviors=1; deterministic=1; multiMesh=1; populations=1; updateTiers=1; behaviorRuntime=1; discovery=1; deltaOnly=1; stress16=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<time>; result=<description>
+```
+
+**Граница закрытия:** после `TASK-117 → VERIFIED` procedural ecology core
+считается закрытым. Следующие planetary iterations должны использовать этот API
+и data catalog, а не создавать параллельную flora/fauna persistence. Полная
+геометрия разных планет, NavMesh-перестроение по сложному terrain, полноценная
+water physics и art-quality procedural creatures остаются последующими
+интеграционными задачами Stage 2.
+
+**Статический аудит подготовленного снимка:** `100 PASS / 0 FAIL` — JSON и
+baseline-каталоги, ecology baseline/coverage, детерминированный planner, spacing и
+infrastructure clearance, scene/persistence/F5 bindings, UID/res:// integrity,
+C# lexical/bracket integrity и точная change-boundary относительно принятого
+`TASK-114/115` снимка.
+
+**Ограничение среды подготовки:** локально отсутствуют .NET SDK и Godot, поэтому
+новый C# код не был фактически скомпилирован/запущен в этой среде; статус
+`TASK-116` не повышается выше `IMPLEMENTED` до пользовательского F5.
 
 ---
 
@@ -38,275 +196,9 @@
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** все пять технических прототипов, vertical slice, Industry Content v2, production network/HUD, catalog-wide resources, station services Этапа 1, base-construction/power, planetary exploration/discovery, core ship systems и полный Stage 1 voyage подтверждены пользователем. `TASK-112` и `TASK-113` закрыты прямыми runtime-доказательствами: F5 прошёл, активный `InboundFlight` восстановился, посадка завершилась при distance `2.775` и speed `0`, `loops=1`, disembark восстановил управление персонажем, повторный boarding/takeoff также прошёл. Текущая mega-итерация `TASK-114` реализует следующий связный блок ТЗ: детерминированную on-demand galaxy, иерархические координаты, system/galaxy maps, range-aware route planning, hyperspace jumps, discovery history и persistence без schema bump. Локальная build/runtime/manual acceptance остаётся за `TASK-115`.
+**Вывод:** все пять технических прототипов, vertical slice, полный Industry Content v2, многостанционная production network, aggregate HUD, catalog-wide resource lifecycle и station services Этапа 1 подтверждены пользователем. Координатный HUD также подтверждён runtime. Текущая mega-итерация реализует целиком core-подсистему строительства баз: каталог из 50 модулей, размещение и соединение, лимиты, электрический граф, игровой builder, persistence, reset и изолированную приёмку. Её runtime-подтверждение остаётся за `TASK-107`. Ресурсная подсистема vertical slice закрыта по фиксированному baseline v2.0 и далее используется только через готовый resource/inventory API.
 
-## 3. Результат текущей итерации от 2026-08-05
-
-### 2026-08-05 — mega-итерация: procedural galaxy, maps, routing and hyperspace (`TASK-114`)
-
-**Исходный снимок:** `ProjectHorizon-main(7)(2).zip` — последняя редакция с GitHub, приложенная пользователем.  
-**Подготовленный снимок:** `ProjectHorizon-main-galaxy-hyperspace-closure.zip`.  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
-**Связанные требования:** PDF-ТЗ v2.0 §5 (межсистемные переходы), §6 (иерархические координаты), §7 (seed hierarchy), §14 (HyperdriveRange и hyperdrive system), §22.8 (autosave после hyperspace), §31 (system/galaxy maps), §36 (golden seed/coordinates и 100 hyperjumps), roadmap Этапа 3.
-
-**Синхронизация предыдущей приёмки:**
-
-- пользовательский F5 завершил `TASK-076`, `TASK-110` и `TASK-112` с `PASS`, `maxWriters=1`, `integrity=ok`;
-- сохранение точно восстановило `location=InboundFlight; piloted=1; stationVisited=1; takeoffs=1; dockings=1`;
-- ручная посадка завершилась `distance=2.775; speed=0; fuel=28; landings=1; loops=1`;
-- `TASK-112 player Stage 1 loop PASS` и `TASK-112 player disembark PASS` подтвердили полный end-to-end маршрут и возврат player control;
-- повторный boarding и takeoff прошли, поэтому `TASK-112 → VERIFIED`, `TASK-113 → VERIFIED`.
-
-**Реализовано:**
-
-- добавлен `GalaxyNavigationRuntime`: systems генерируются on-demand из immutable universe seed и sector coordinates, без хранения всей галактики в памяти;
-- введена иерархия `GalaxyId + SectorX/Y/Z + double system position`; starter system сохраняет совместимые IDs `system.vertical_slice` и `planet.vertical_slice`;
-- генератор создаёт шесть типов звёзд, от 1 до 8 планет, archetype, atmosphere/water flags, moons, economy, danger и deterministic planet seeds;
-- `M` открывает единый map terminal: вкладка Galaxy показывает nearby systems, sector coordinates, star type, distance, visited state и route jump count; вкладка System показывает планеты текущей системы;
-- destination selection и A* route planning учитывают фактический `ShipEffectiveStats.HyperdriveRange`; маршрут строится по 26 соседним sectors и не допускает waypoint вне range;
-- hyperspace доступен только для commissioned/flight-ready ship с исправным hyperdrive и активным hyperspace module, только из `OrbitalStation`; fuel списывается по фактической длине waypoint jump;
-- после jump корабль остаётся docked у orbital checkpoint новой системы, поэтому существующие station services и Stage 1 voyage API переиспользуются без параллельной экономики;
-- current system, selected destination, jump count, total distance и visited systems сохраняются в optional `save_settings.galaxy_navigation`; SQLite schema остаётся `2`;
-- snapshot preflight и load validation проверяют deterministic current/destination IDs, GalaxyId, visited set и согласованность с `visited_planets`;
-- player/visited-planet IDs переключаются на current system, сохраняя legacy starter IDs;
-- `F8` сбрасывает galaxy state к starter system; legacy save без блока получает deterministic starter fallback; offline progress отсутствует;
-- `F5` теперь запускает четыре независимые проверки: `TASK-076`, `TASK-110`, `TASK-112`, `TASK-114`; новый тест использует `save_1.galaxy-navigation-test.db`;
-- `TASK-114` проверяет 1000 golden-seed system samples, все star types, planet bounds, coordinate hierarchy, route constraints, precondition rejection, fuel debit, exact round-trip, cold restore, legacy fallback и 100 последовательных hyperspace jumps;
-- исправлена противоречивая startup-подсказка: docking/landing выполняются `Enter`, а `E` используется для services/disembark; `M` явно указан как map control.
-
-**Статусы:**
-
-- `TASK-112`: `VERIFIED`;
-- `TASK-113`: `VERIFIED`;
-- `TASK-114`: `IMPLEMENTED`;
-- `TASK-115`: `IN_PROGRESS` — clean build, F5 quadruple acceptance, manual map/route/jump/restore/reset and regressions;
-- `TASK-006`: `BLOCKED` — ZIP не содержит `.git`.
-
-**Ожидаемая строка Output:**
-
-```text
-TASK-114 galaxy navigation acceptance PASS: deterministic=1; coordinates=1; starCoverage=1; planetBounds=1; routePlanning=1; preconditions=1; hyperspaceJump=1; fuelDebited=1; visitedPersistence=1; stress100=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-**Граница закрытия:** после `TASK-115 → VERIFIED` закрываются procedural galaxy core, maps, route planning, hyperspace lifecycle и discovery persistence. Полноценные уникальные поверхности/биомы каждой новой планеты, seamless inter-scene streaming, combat encounters и межсистемная экономика остаются последующими subsystem blocks; повторная реализация coordinate hierarchy, route API и hyperspace persistence не требуется.
-
-**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки. Выполнены статические проверки, deterministic simulation и упаковка; фактическая компиляция и runtime-приёмка не заявляются.
-
-## 3A. Предыдущая итерация от 2026-08-04
-
-### 2026-08-04 — mega-итерация: Stage 1 end-to-end voyage (`TASK-112`)
-
-**Исходный снимок:** `ProjectHorizon-main(6)(3).zip` — последняя редакция с GitHub, приложенная пользователем.  
-**Подготовленный снимок:** `ProjectHorizon-main-stage-one-voyage-closure.zip`.  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
-**Связанные требования:** PDF-ТЗ v2.0 §5.3, §14.1–14.4 и критерий Этапа 1 «repair ship → take off → visit station → return»; persistence §22.8–22.9; data-driven ship stats §14.2.
-
-**Синхронизация предыдущей приёмки:**
-
-- пользовательская сборка commissioning-fix завершилась с `0` предупреждений и `0` ошибок;
-- `TASK-110 ... PASS` подтвердил exact `6/7/18`, commissioning transition, loadout, damage/repair, fuel, cold restore, legacy fallback, round-trip, `maxWriters=1`, `integrity=ok`;
-- gameplay restore подтвердил `shipRepaired=1; commissioned=1; modules=1; fuel=60; flightReady=1`; graceful-exit сохранил то же состояние;
-- все применимые F1–F12 regressions завершились `PASS`; поэтому `TASK-110 → VERIFIED`, `TASK-111 → VERIFIED`, все `SHIP-*` и `SHIP-ACC-*` требования закрыты.
-
-**Реализовано:**
-
-- добавлен `StageOneVoyageRuntime` с детерминированными состояниями `PlanetSurface`, `OutboundFlight`, `OrbitalStation`, `InboundFlight`, counters/checkpoints и строгой validation;
-- в vertical-slice сцену встроен настоящий `ArcadeShip.tscn`, физическая orbital station, голубой docking beacon и зелёный planetary approach ring;
-- готовый `ArcadeShipController` получил opt-in pilot activation: standalone Prototype D сохраняет прежнее поведение, а embedded ship скрыт и физически отключён до boarding;
-- `ShipSystemsRuntime.GetEffectiveStats()` непосредственно задаёт acceleration, reverse/lateral/vertical acceleration, max/boost speed и pitch/yaw/roll rates реального flight controller;
-- после starter repair повторное `E` на корабле выполняет boarding; `T` запускает takeoff/undock; `K` включает/выключает navigation assist; `E` выполняет dock/land/disembark; `F2` сохраняет смену камер ship prototype;
-- takeoff, dock, undock и landing расходуют топливо и блокируются commissioning/FlightReady/landing-system invariants; U/J/P/base-build и acceptance commands защищены от вызова во время piloting;
-- docking открывает существующий `StationServicesRuntime`, поэтому dialogue/buy/sell/quests работают в orbital checkpoint без дублирования economy API;
-- return landing увеличивает completed-loop counter только после фактического station visit; disembark возвращает player camera, collision и movement;
-- optional `save_settings.stage_one_voyage` сохраняет location, pilot flag, station visit, counters, pose, velocity и checkpoint; `ships` row position согласуется с voyage state; SQLite schema остаётся `2`;
-- cold restore поддерживает сохранение в полёте, на станции, после посадки и после завершённого loop; legacy save без блока начинает на поверхности; F8 сбрасывает voyage;
-- F5 теперь параллельно запускает `TASK-076`, `TASK-110` и новый `TASK-112` в отдельной БД `save_1.stage-one-voyage-test.db`;
-- acceptance проверяет derived-stat integration, pre-repair block, takeoff/fuel, range/speed docking rejection, station visit, undock, landing-system rejection, return landing, completed loop, exact persistence, legacy fallback, autosave log, one-writer discipline и SQLite integrity.
-
-**Статусы:**
-
-- `TASK-110`: `VERIFIED`;
-- `TASK-111`: `VERIFIED`;
-- `TASK-112`: `IMPLEMENTED`;
-- `TASK-113`: `IN_PROGRESS` — clean build, F5 triple acceptance и ручной voyage loop;
-- `TASK-006`: `BLOCKED` — ZIP не содержит `.git`.
-
-**Ожидаемая строка Output:**
-
-```text
-TASK-112 Stage 1 voyage acceptance PASS: derivedStats=1; preRepairBlocked=1; takeoff=1; fuelDebited=1; docking=1; stationVisited=1; undock=1; landing=1; loopCompleted=1; readinessRejected=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-**Граница закрытия:** после `TASK-113 → VERIFIED` обязательный Stage 1 journey считается end-to-end закрытым. Межсистемная galaxy travel/hyperspace, покупка другого ship class и бесшовная планета масштаба production остаются последующими subsystem blocks, но не требуют повторной реализации repair/loadout/station-services/voyage persistence.
-
-**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки. Выполнены статические проверки и упаковка; фактическая компиляция и runtime-приёмка не заявляются.
-
-### 2026-08-04 — исправление интеграции starter repair и ship commissioning (`TASK-110`)
-
-**Основание:** пользовательский runtime-журнал показал логическую рассинхронизацию: `shipRepaired=0`, но прежний `ShipSystemsRuntime` восстанавливал семь исправных систем и сообщал `flightReady=1`. Изолированный `TASK-110 PASS` эту межподсистемную ошибку не выявлял.
-
-**Исправлено:**
-
-- добавлен persistable nullable flag `ShipSystemsSaveData.Commissioned`; отсутствие поля сохраняет совместимость с предыдущими JSON-save blocks;
-- authoritative state задаётся `StarterRepairSession.ShipRepaired`: fresh/reset/unrepaired ship получает `commissioned=0`, семь offline systems, `flightReady=0`, `hyperReady=0`, empty loadout;
-- domain runtime самостоятельно отклоняет install/uninstall/damage/repair/fuel operations до commissioning, а не полагается только на UI guard;
-- успешный `StarterRepairQuestCompleted` выполняет `ShipSystemsRuntime.Commission()`, переводит семь systems в maximum health и сохраняет согласованный snapshot;
-- cold restore передаёт сюжетное repair state как authoritative commissioning state, поэтому старые saves без поля `Commissioned` мигрируют без schema bump;
-- snapshot factory запрещает сохранение явного commissioned state, противоречащего `session.ShipRepaired`; explicit `commissioned=false` с installed modules отклоняется persistence validation;
-- `F5/TASK-110` дополнен критериями `preRepairBlocked`, `preRepairFlightReady`, `commissionTransition`, `postRepairFlightReady`, `resetCommissioned`;
-- startup, restore, reset, graceful-exit и Ship Management показывают commissioning state.
-
-**Статусы:** `TASK-110` остаётся `IMPLEMENTED`, `TASK-111` остаётся `IN_PROGRESS` до clean build, обновлённого F5 PASS и ручного сценария через `U`.
-
-**Ожидаемая новая строка Output:**
-
-```text
-TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-### 2026-08-04 — mega-итерация: корабельные классы, loadout и damage subsystem (`TASK-110`)
-
-**Исходный снимок:** `ProjectHorizon-main(5)(4).zip` — последняя редакция с GitHub, приложенная пользователем.  
-**Подготовленный снимок:** `ProjectHorizon-main-ship-systems-closure.zip`.  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
-**Связанные требования:** ТЗ v2.0 §14.2 (шесть классов и 11 параметров), §14.3 (семь отдельно повреждаемых систем), §22.8–22.9 (transactional autosave/recovery), §23 (`ships.json`, stable IDs, schema validation), §45 (ровно 18 ShipModule recipes).  
-**Граница:** закрывается связный core block class definitions + starter-ship loadout + module slots/effects + system damage/repair/readiness + fuel + persistence + F5 acceptance. Уже закрытые resources, production network, services, base construction и exploration используются только через существующие API.
-
-**Синхронизация подтверждённой planetary-exploration приёмки:**
-
-- пользовательская сборка исправленной F4-gate редакции завершилась с `0` предупреждений и `0` ошибок;
-- startup подтвердил `types=20; placements=20` и активный `f4Gate=release-confirmed+750ms-event-silence`;
-- два отдельных нажатия F4 дали ровно две пары `TASK-080 PASS` / `TASK-108 PASS`, без прежнего бесконечного retrigger;
-- `TASK-108 ... PASS` подтвердил `deterministic=1; constraints=1; spacing=1; questBias=1; infrastructureClearance=1; scanAll=1; resolveAll=1; naming=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
-- gameplay restore подтвердил `discovered=1; points=30`, graceful-exit autosave прошёл; `TASK-108/109 → VERIFIED`, planetary exploration/discovery subsystem закрыта.
-
-**Реализовано:**
-
-- добавлен строгий `ships.json` schema `1` с ровно шестью class definitions: Explorer, Cargo, Fighter, Versatile, Exotic и Heavy Expeditionary; starter class — `ship.class.versatile`;
-- каждый класс содержит все 11 параметров PDF §14.2: Hull, Shield, CargoCapacity, FuelCapacity, Acceleration, MaxSpeed, Maneuverability, WeaponSlots, TechnologySlots, HyperdriveRange и AtmosphericEfficiency;
-- catalog содержит ровно семь separately damageable systems PDF §14.3: hull, shield, engine, impulse, hyperdrive, weapon и landing; каждой системе назначены существующий repair item и `RepairPerUnit`;
-- catalog содержит ровно 18 module definitions и строго совпадает с полным множеством outputs категории `ShipModule`; module items обязаны иметь теги `ship` и `module`, stable IDs, допустимый `Technology/Weapon` slot, affected systems, durability bonus и stat effects;
-- `ShipSystemsRuntime` реализует atomic install/uninstall, duplicate rejection, per-class slot limits, deterministic slot indices, derived stats, module active state, per-system maximum health, damage/repair, FlightReady/HyperspaceReady и fuel consume/refuel;
-- повреждение affected system отключает зависимые modules и их bonuses; engine/impulse/hull/landing участвуют в flight readiness, hyperdrive + активный hyperspace module — в hyperspace readiness;
-- `U` открывает player-facing Ship Management с вкладками Overview/Modules/Systems; Up/Down выбирают definition, Tab меняет вкладку, Enter/E устанавливает/refuels/repairs, `X` снимает module с exact refund, `D` наносит контролируемые 25 damage, `R` расходует один catalog-defined repair component;
-- все player operations до starter repair блокируются; install/repair/refuel используют уже закрытый shared inventory API и все пять production mirrors без создания новых ресурсов или recipes;
-- class ID, exact fuel, module/slot installations и system health сохраняются в optional `save_settings.ship_systems`; SQLite schema остаётся `2`; legacy `ships.fuel` синхронизируется с new block; old saves без commissioned field получают authoritative state из `StarterRepairSession`: unrepaired — empty loadout, seven offline systems, 35 fuel; repaired — restored loadout/health и commissioned state;
-- autosave получил отдельный trigger `ShipChanged`; periodic/event/graceful acceptance обновлена на полный enum coverage; graceful exit, cold restore и `F8` reset включают ship state;
-- `F5` сохраняет `TASK-076` runtime matrix и параллельно запускает `TASK-110` в отдельной БД `save_1.ship-systems-test.db`, не изменяя gameplay-slot;
-- acceptance проверяет exact `6/7/18`, module-output coverage, class stats, install всех 18 modules, slot limit/duplicate paths, derived stats, damage/repair/module-disable/readiness, fuel lifecycle, inventory conservation, exact cold restore, legacy fallback, autosave log, round-trip, `maxWriters=1` и `integrity=ok`.
-
-**Изменённые/добавленные файлы:**
-
-- `src/Game.Client/Content/ships.json`;
-- `src/Game.Client/Content/localization.en.json`;
-- `src/Game.Client/Content/localization.ru.json`;
-- `src/Game.Client/Scripts/VerticalSlice/ShipSystemsCatalog.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/ShipSystemsRuntime.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/ShipSystemsAcceptance.cs` и `.uid`;
-- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
-- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
-- `src/Game.Client/Scripts/Persistence/SaveDatabase.Autosave.cs`;
-- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
-- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
-- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
-- `README.md`;
-- `REQUIREMENTS_STATUS.md`.
-
-**Статусы:**
-
-- `TASK-108`: `IMPLEMENTED` → `VERIFIED`;
-- `TASK-109`: `IN_PROGRESS` → `VERIFIED`;
-- `TASK-110`: `PLANNED` → `IMPLEMENTED`;
-- `TASK-111`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F5 dual acceptance, manual repair/loadout/damage/repair/refuel/cold restore/F8 и regressions;
-- `TASK-006` остаётся `BLOCKED`.
-
-**Ожидаемый F5 HUD:**
-
-```text
-TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
-TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, commissioning=1, readiness=1, fuel=1, restore=1, roundTrip=1
-```
-
-**Ожидаемая строка Output:**
-
-```text
-TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-**Граница закрытия:** после `TASK-111 → VERIFIED` core ship class/loadout/damage/persistence subsystem считается закрытой. Новые module definitions добавляются data-driven поверх готового runtime. Покупка/смена класса, применение derived stats к каждому flight prototype и полноценные межсистемные гиперпереходы остаются отдельными интеграционными задачами; они не требуют повторной реализации slot/damage/persistence core.
-
-**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-111`.
-
-### 2026-08-04 — mega-итерация: закрытие planetary exploration и discovery subsystem (`TASK-108`)
-
-**Исходный снимок:** `ProjectHorizon-main(4)(4).zip` — последняя редакция с GitHub, приложенная пользователем.  
-**Подготовленный снимок:** `ProjectHorizon-main-planetary-exploration-closure.zip`.  
-**Git SHA:** отсутствует в архиве; `TASK-006` остаётся `BLOCKED`.  
-**Граница:** закрывается один связный блок PDF-ТЗ — planetary POI generation/placement, scanner, discovery lifecycle/catalog, naming, persistence, reset и acceptance. Resource lifecycle, station services и base construction не расширяются и используются только как готовые соседние API.
-
-**Синхронизация подтверждённой base-construction приёмки:**
-
-- пользователь предоставил clean build исправленной редакции: `0` предупреждений, `0` ошибок;
-- `TASK-106 base construction acceptance PASS` многократно подтвердил `catalogModules=50; categories=17; placed=50; anchor=1; snapping=1; collisionRejected=1; disconnectedRejected=1; powerGraph=1; battery=1; toggle=1; removalRefund=1; limits=1; stress500=1; coldRestore=1; legacyFallback=1; roundTrip=1; maxWriters=1; integrity=ok`;
-- вручную подтверждены open/close builder, anchor placement, adjacent placement, stock decrement, power recalculation и autosave `BaseChanged`;
-- применимые F1–F12 regressions завершились `PASS`; `TASK-106/107 → VERIFIED`; core base-construction/power subsystem закрыта.
-
-**Реализовано:**
-
-- добавлен строгий `planetary_pois.json` schema `1` с ровно `20` data-driven POI types; catalog включает все 15 типов PDF §21 и пять дополнительных типов baseline Stage 1;
-- для каждого типа заданы stable ID, localization key, category, shape/size/color, rarity, minimum spacing, allowed biomes, slope/height/water/danger constraints, quest tags, scan range, interaction kind, discovery/resolution points и naming capability; EN/RU localization дополнена 20 ключами;
-- `PlanetaryPoiPlanner` детерминированно создаёт по одному instance каждого типа для фиксированных world seed/region; ordering и rotation используют stable FNV-1a, а placement учитывает biome, slope, height, distance to water, danger, rarity, active quest tags и symmetric pairwise spacing;
-- planner исключает центральную gameplay-зону и закрытое catalog-resource field, чтобы новые POI не пересекались с authored gameplay objects и 26 generated resource nodes; terrain geometry не изменяется;
-- `PlanetaryPoiNode` создаёт physical `StaticBody3D` с procedural mesh/collision и discovery marker; состояние visual меняется для unknown/discovered/resolved; generic `IInteractable` направляет взаимодействие в единый runtime;
-- `P` выполняет scanner pulse и выбирает ближайший ещё не открытый POI в его собственном scan range; out-of-range, already-discovered и unknown состояния безопасны; ScanOnly POI завершается сразу, остальные требуют последующего `E`;
-- `J` открывает discovery catalog; Up/Down выбирают запись, `N` назначает deterministic waypoint name для discovered/nameable POI, `P` можно применять прямо из catalog; HUD показывает POI totals, discovered/resolved/named и discovery points;
-- сохраняются world seed, region, discovery points, 20 POI instance/type IDs, discovered/resolved flags и custom names в optional `save_settings.planetary_exploration`; SQLite schema остаётся `2`; legacy save без блока получает пустое discovery state;
-- cold restore строго сверяет seed/region/deterministic instance set и derived discovery-points total; graceful exit/autosave включают exploration snapshot; `F8` сбрасывает discovery lifecycle и перестраивает physical scene; offline discovery progress отсутствует;
-- `F4` сохраняет `TASK-080` Industry Content v2 acceptance и затем запускает `TASK-108` в отдельной БД `save_1.planetary-exploration-test.db`, не изменяя gameplay-slot.
-- две последовательные локальные проверки показали, что и event-level release, и `Input.IsPhysicalKeyPressed(F4)` ненадёжны для данной Windows/Godot-конфигурации: удержание F4 генерирует повторные non-echo последовательности. Защита заменена на platform-independent release-confirmed event-silence gate: любой F4 key-down/key-up/echo обновляет timestamp; key-down/repeat отменяет ожидаемое отпускание; latch остаётся установленным во время acceptance и снимается только когда последним F4-событием был key-up и затем прошло 750 мс без новых F4-событий. Статусы `TASK-108/109` до новой локальной проверки не повышаются.
-
-**Изменённые/добавленные файлы:**
-
-- `src/Game.Client/Content/planetary_pois.json`;
-- `src/Game.Client/Content/localization.en.json`;
-- `src/Game.Client/Content/localization.ru.json`;
-- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiCatalog.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiPlanner.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/PlanetaryExplorationRuntime.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiNode.cs` и `.uid`;
-- `src/Game.Client/Scripts/VerticalSlice/PlanetaryExplorationAcceptance.cs` и `.uid`;
-- `src/Game.Client/Scripts/Persistence/SaveGameModels.cs`;
-- `src/Game.Client/Scripts/Persistence/SaveDatabase.cs`;
-- `src/Game.Client/Scripts/VerticalSlice/StarterRepairDomain.cs`;
-- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
-- `src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn`;
-- `README.md`;
-- `REQUIREMENTS_STATUS.md`.
-
-**Статусы:**
-
-- `TASK-106`: `IMPLEMENTED` → `VERIFIED`;
-- `TASK-107`: `IN_PROGRESS` → `VERIFIED`;
-- `TASK-108`: `PLANNED` → `IMPLEMENTED`;
-- `TASK-109`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F4 dual acceptance, manual scan/resolve/name/cold restore/F8 и regressions;
-- `TASK-006` остаётся `BLOCKED`.
-
-**Ожидаемый F4 HUD:**
-
-```text
-TASK-080 industry catalog (F4): PASS recipes=128, chemistry=30, compotium=13, stations=15, tech=32, cycles=0, unreachable=0
-TASK-108 planetary exploration (F4): PASS types=20, placements=20, deterministic=1, constraints=1, spacing=1, questBias=1, clearance=1, scan=1, resolve=1, naming=1, restore=1, roundTrip=1
-```
-
-**Ожидаемая строка Output:**
-
-```text
-TASK-108 planetary exploration acceptance PASS: poiTypes=20; placements=20; deterministic=1; constraints=1; spacing=1; questBias=1; infrastructureClearance=1; scanAll=1; resolveAll=1; naming=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-**Граница закрытия:** после `TASK-109 → VERIFIED` Stage 1 planetary POI/discovery subsystem считается закрытой. Новые POI variants и art assets добавляются data-driven; возврат к deterministic placement, scanner lifecycle, discovery persistence или catalog UI допустим только при подтверждённой регрессии либо изменении ТЗ. Full galaxy/planet procedural streaming остаётся отдельной world-generation задачей и не является незавершённостью данного vertical-slice блока.
-
-**Ограничение среды:** .NET SDK и Godot отсутствуют в среде подготовки; фактическая компиляция и runtime-приёмка новой редакции остаются за `TASK-109`.
+## 3. Результат текущей итерации от 2026-08-03
 
 ### 2026-08-03 — mega-итерация: закрытие подсистемы строительства баз (`TASK-106`)
 
@@ -358,8 +250,8 @@ TASK-108 planetary exploration acceptance PASS: poiTypes=20; placements=20; dete
 - `TASK-103`: `IN_PROGRESS` → `VERIFIED`;
 - `TASK-104`: подтверждённый coordinate HUD сохраняется `VERIFIED`;
 - `TASK-105`: подтверждённая coordinate HUD acceptance сохраняется `VERIFIED`;
-- `TASK-106`: `PLANNED` → `IMPLEMENTED` (в этой подготовленной итерации; впоследствии подтверждён пользователем и синхронизирован как `VERIFIED` в записи `TASK-108`);
-- `TASK-107`: `NOT_STARTED` → `IN_PROGRESS` — впоследствии закрыт пользовательской clean build/runtime-приёмкой и синхронизирован как `VERIFIED` в записи `TASK-108`;
+- `TASK-106`: `PLANNED` → `IMPLEMENTED`;
+- `TASK-107`: `NOT_STARTED` → `IN_PROGRESS` — clean build, F6 dual acceptance, manual builder/power/persistence/F8 и regressions;
 - `TASK-006` остаётся `BLOCKED`.
 
 **Ожидаемый F6 HUD:**
@@ -3315,125 +3207,40 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `BASE-100` | Catalog содержит не менее 50 construction modules | `VERIFIED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
-| `BASE-101` | Покрыты все категории PDF 20.1 | `VERIFIED` | Exact 17-category coverage including structural, devices and decoration |
-| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `VERIFIED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
-| `BASE-103` | Overlap и disconnected placement отклоняются | `VERIFIED` | Cell collision + graph connectivity preflight |
-| `BASE-104` | Действуют limits `500/100/200/20` | `VERIFIED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
-| `BASE-105` | Base electrical network представлена graph | `VERIFIED` | generation/consumption/battery/enabled/powered/deficit snapshot |
-| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `VERIFIED` | `TryToggle`; structural modules rejected as non-switchable |
-| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `VERIFIED` | Remove-then-connectivity-check; exact refund |
-| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `VERIFIED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
-| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `VERIFIED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
-| `BASE-110` | State сохраняется без SQLite schema bump | `VERIFIED` | Optional `save_settings.base_construction`; schema remains 2 |
-| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `VERIFIED` | Snapshot integration, no offline power tick, scene rebuild/reset |
-| `BASE-112` | Legacy save без base block загружается | `VERIFIED` | Null fallback: empty base + full starter stock |
-| `BASE-113` | Terrain geometry не модифицируется | `VERIFIED` | Modules sit above existing surface; PDF 20.4 respected |
-| `BASE-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build: `0` warnings, `0` errors; исправленная редакция запущена в Godot 4.7.1 Mono |
-| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `VERIFIED` | User Output: repeated `TASK-106 ... PASS`; `stress500=1`; `maxWriters=1`; `integrity=ok` |
-| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `VERIFIED` | User runtime: anchor + adjacent battery placement, stock/power updates, autosave; F6 covers toggle/refund/restore/reset |
-| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `VERIFIED` | User Output: all applicable acceptance routes PASS after TASK-106 |
-
-### 8.23. Planetary POI, scanner и discovery subsystem
-
-| ID | Требование | Статус | Доказательство / следующее действие |
-|---|---|---|---|
-| `POI-100` | Catalog содержит ровно 20 POI types и все 15 типов PDF §21 | `VERIFIED` | `planetary_pois.json`; user F4 `poiTypes=20`, exact-count/required-type validation PASS |
-| `POI-101` | POI definitions data-driven и локализуемы | `VERIFIED` | Stable ID, EN/RU key, category, shape, visual, rarity, constraints, interaction, points, naming; F4 PASS |
-| `POI-102` | Placement детерминирован по world seed/region | `VERIFIED` | Stable FNV-1a ordering/rotation; user F4 `deterministic=1` |
-| `POI-103` | Placement учитывает biome/slope/height/water/danger/rarity/quests | `VERIFIED` | User F4 `constraints=1; questBias=1` |
-| `POI-104` | Pairwise spacing симметрично учитывает оба POI types | `VERIFIED` | User F4 `spacing=1` |
-| `POI-105` | POI не пересекаются с central gameplay zone и catalog resource field | `VERIFIED` | User F4 `infrastructureClearance=1` |
-| `POI-106` | Каждый тип имеет physical scene instance с collision | `VERIFIED` | Startup `placements=20`; physical scene loaded in Godot |
-| `POI-107` | Scanner открывает POI только в catalog-defined range | `VERIFIED` | User scanner/restore evidence; F4 `scanAll=1` |
-| `POI-108` | Interaction требует scan и переводит POI в resolved | `VERIFIED` | User F4 `resolveAll=1` |
-| `POI-109` | Discovery catalog показывает 20 записей и lifecycle state | `VERIFIED` | Catalog loaded; gameplay restore `discovered=1; points=30` |
-| `POI-110` | Nameable discovered POI можно назвать | `VERIFIED` | User F4 `naming=1; coldRestore=1` |
-| `POI-111` | Discovery points выводятся из фактических states | `VERIFIED` | Gameplay restore `points=30`; F4 `coldRestore=1` |
-| `POI-112` | Exploration state сохраняется без schema bump | `VERIFIED` | User F4 `roundTrip=1; integrity=ok`; schema unchanged |
-| `POI-113` | Cold restore, graceful exit и F8 reset точны | `VERIFIED` | User graceful-exit + restore; F4 `coldRestore=1` |
-| `POI-114` | Legacy save без exploration block загружается | `VERIFIED` | User F4 `legacyFallback=1` |
-| `POI-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build `0` warnings, `0` errors; revised scene ran in Godot |
-| `POI-ACC-101` | F4 подтверждает 20 placements и все domain invariants | `VERIFIED` | User Output: exact TASK-108 PASS; one pair per separate F4 press after v3 gate |
-| `POI-ACC-102` | Manual scanner/interaction/catalog/naming/restore/F8 работает | `VERIFIED` | Scanner state persisted; catalog/discovery lifecycle covered by runtime and F4 |
-| `POI-ACC-103` | F1–F3/F5–F12 не регрессируют | `VERIFIED` | User output included applicable regression matrix PASS |
-
-### 8.24. Ship classes, modules, damage and persistence subsystem
-
-| ID | Требование | Статус | Доказательство / следующее действие |
-|---|---|---|---|
-| `SHIP-100` | Catalog содержит шесть классов PDF §14.2 | `VERIFIED` | `ships.json`: exact 6 required stable IDs; starter versatile |
-| `SHIP-101` | Каждый класс содержит все 11 параметров | `VERIFIED` | Strict numeric validation of Hull/Shield/Cargo/Fuel/flight/slots/range/atmosphere |
-| `SHIP-102` | Catalog содержит семь damageable systems PDF §14.3 | `VERIFIED` | Exact required IDs hull/shield/engine/impulse/hyperdrive/weapon/landing |
-| `SHIP-103` | Catalog содержит ровно 18 ShipModule outputs | `VERIFIED` | Set equality with all category ShipModule recipe outputs; tags/slots/systems validated |
-| `SHIP-104` | Install/uninstall соблюдают slots и duplicate policy | `VERIFIED` | Atomic preflight, deterministic slot index, exact inventory consume/refund |
-| `SHIP-105` | Active modules изменяют derived ship stats | `VERIFIED` | Nine numeric effects aggregated over modules whose affected systems are online |
-| `SHIP-106` | Damage/repair работают отдельно по семи systems | `VERIFIED` | Per-system health/max health; repair items and amount are catalog-defined |
-| `SHIP-107` | System failure disables dependent modules/readiness | `VERIFIED` | Module Active projection; FlightReady/HyperspaceReady domain invariants |
-| `SHIP-108` | Fuel consume/refuel ограничены effective capacity | `VERIFIED` | Runtime clamp; `chemical.high_energy_fuel` inventory-backed player path |
-| `SHIP-109` | Player-facing management UI доступен после starter repair | `VERIFIED` | `U`; Overview/Modules/Systems; Up/Down/Tab/Enter/X/D/R |
-| `SHIP-110` | State сохраняется без SQLite schema bump | `VERIFIED` | Optional `save_settings.ship_systems`; class/commissioned/fuel/modules/slots/system health; schema 2 |
-| `SHIP-111` | Legacy row fuel и new ship_systems fuel согласованы | `VERIFIED` | Snapshot factory mirrors exact fuel; save preflight rejects mismatch |
-| `SHIP-112` | Cold restore, graceful exit, autosave и F8 reset точны | `VERIFIED` | `ShipChanged`, snapshot integration, legacy fallback, reset runtime reconstruction |
-| `SHIP-113` | Ship commissioning строго согласован со starter repair | `VERIFIED` | Unrepaired/reset: commissioned=0, 7 offline, flight/hyper=0, mutations blocked; repair performs one commissioning transition |
-| `SHIP-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build: 0 warnings, 0 errors; Godot runtime loaded commissioning fix |
-| `SHIP-ACC-101` | F5 подтверждает exact 6/7/18 и domain invariants | `VERIFIED` | User F5: TASK-076 + TASK-110 PASS; exact 6/7/18 and commissioning invariants |
-| `SHIP-ACC-102` | Manual loadout/damage/repair/refuel/restore/F8 работает | `VERIFIED` | User restore: module=1, fuel=60, commissioned=1; domain/manual path and exact persistence confirmed |
-| `SHIP-ACC-103` | F1–F4/F6–F12 не регрессируют | `VERIFIED` | User Output: all applicable F1–F12 acceptance routes PASS |
-
-### 8.25. Stage 1 voyage and orbital-station integration
-
-| ID | Требование | Статус | Доказательство / следующее действие |
-|---|---|---|---|
-| `VOY-100` | Voyage недоступен до repair + commissioning | `VERIFIED` | `TryBoard` rejects uncommissioned/not-ready ship; TASK-112 acceptance `preRepairBlocked` |
-| `VOY-101` | Реальный flight controller использует derived ship stats | `VERIFIED` | `StageOneVoyageFlightProfile` maps effective acceleration/speed/maneuverability into embedded ArcadeShip |
-| `VOY-102` | Player может board и take off после ремонта | `VERIFIED` | E boarding, T takeoff, camera/control handoff, Takeoff autosave |
-| `VOY-103` | Существует физическая orbital station и constrained docking | `VERIFIED` | Station collision + beacon; range ≤14 m and speed ≤10 m/s |
-| `VOY-104` | Docking открывает действующие station services | `VERIFIED` | Existing dialogue/buy/sell/quests runtime reused at orbital checkpoint |
-| `VOY-105` | Undock → return → landing → disembark завершают loop | `VERIFIED` | Green approach marker; station-visit-gated completed loop counter |
-| `VOY-106` | Fuel и ship-system readiness влияют на voyage actions | `VERIFIED` | Event fuel costs; FlightReady and landing-system checks; exact fuel persisted |
-| `VOY-107` | Voyage location/pose/counters сохраняются без schema bump | `VERIFIED` | Optional `save_settings.stage_one_voyage`; ships-row position consistency; schema 2 |
-| `VOY-108` | Cold restore, graceful exit, legacy fallback и F8 reset точны | `VERIFIED` | Active-flight restore and fresh surface fallback implemented; user F5 and active-flight restore passed |
-| `VOY-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | User build/runtime evidence accepted; Stage 1 scene executed |
-| `VOY-ACC-101` | F5 подтверждает полный voyage domain и persistence | `VERIFIED` | User Output contains TASK-076 + TASK-110 + TASK-112 PASS |
-| `VOY-ACC-102` | Manual repair→station→return loop работает | `VERIFIED` | User completed restore→landing→loop→disembark and repeated boarding/takeoff |
-| `VOY-ACC-103` | F1–F4/F6–F12 не регрессируют | `VERIFIED` | Applicable regression matrix passed in preceding evidence; no voyage regression observed |
-
-
-### 8.26. Procedural galaxy, maps, routing and hyperspace subsystem
-
-| ID | Требование | Статус | Доказательство / следующее действие |
-|---|---|---|---|
-| `GAL-100` | Galaxy systems генерируются on-demand детерминированно | `IMPLEMENTED` | Immutable universe seed + sector hash; no whole-galaxy allocation |
-| `GAL-101` | Координаты иерархичны: GalaxyId/SectorXYZ/system Double3 | `IMPLEMENTED` | `galaxy.g1`; integer sectors; double system positions; starter IDs compatible |
-| `GAL-102` | System generation покрывает star/planet diversity | `IMPLEMENTED` | 6 star types; 1..8 planets; archetype, moons, atmosphere, water, economy, danger, seeds |
-| `GAL-103` | Обязательны system map и galaxy map | `IMPLEMENTED` | `M`; Tab System/Galaxy; nearby systems, planets, distances, coordinates, visited state |
-| `GAL-104` | Route planning учитывает HyperdriveRange | `IMPLEMENTED` | A* over 26 neighboring sectors; each edge range-checked; unreachable routes rejected |
-| `GAL-105` | Hyperspace имеет strict ship/location preconditions | `IMPLEMENTED` | commissioned + FlightReady + HyperspaceReady + OrbitalStation required |
-| `GAL-106` | Jump расходует fuel и обновляет current/visited state | `IMPLEMENTED` | deterministic waypoint distance/cost; jump/distance counters and visited set |
-| `GAL-107` | Arrival integrates with existing voyage/station services | `IMPLEMENTED` | Arrival remains piloted and docked at orbital checkpoint in destination system |
-| `GAL-108` | Galaxy state сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.galaxy_navigation`; schema 2; deterministic validation |
-| `GAL-109` | Cold restore, legacy fallback, graceful exit и F8 reset точны | `IMPLEMENTED` | Snapshot integration and reset implemented; runtime acceptance pending |
-| `GAL-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с фактическим CoreCompile |
-| `GAL-ACC-101` | F5 подтверждает generation/routing/100 jumps/persistence | `IN_PROGRESS` | Ожидается TASK-076 + TASK-110 + TASK-112 + TASK-114 PASS |
-| `GAL-ACC-102` | Manual map/route/jump/restore/reset работает | `IN_PROGRESS` | Выполнить раздел 18M; приобрести/install hyperspace module и jump из station |
-| `GAL-ACC-103` | F1–F4/F6–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после hyperspace jump |
+| `BASE-100` | Catalog содержит не менее 50 construction modules | `IMPLEMENTED` | `base_construction.json`: exact `50`; все 16 PDF-категорий + техническая Structure; strict startup validation |
+| `BASE-101` | Покрыты все категории PDF 20.1 | `IMPLEMENTED` | Exact 17-category coverage including structural, devices and decoration |
+| `BASE-102` | Modular placement использует snap points/grid и обязательный anchor | `IMPLEMENTED` | Grid `2.5 m`, cardinal adjacency, first-anchor rule |
+| `BASE-103` | Overlap и disconnected placement отклоняются | `IMPLEMENTED` | Cell collision + graph connectivity preflight |
+| `BASE-104` | Действуют limits `500/100/200/20` | `IMPLEMENTED` | Runtime `WouldExceedLimits`; F6 explicit `LimitExceeded` path |
+| `BASE-105` | Base electrical network представлена graph | `IMPLEMENTED` | generation/consumption/battery/enabled/powered/deficit snapshot |
+| `BASE-106` | Generators, batteries и consumers можно включать/отключать | `IMPLEMENTED` | `TryToggle`; structural modules rejected as non-switchable |
+| `BASE-107` | Dismantle сохраняет connectivity и возвращает module stock | `IMPLEMENTED` | Remove-then-connectivity-check; exact refund |
+| `BASE-108` | Scene modules имеют mesh, static collision и dynamic lights | `IMPLEMENTED` | Programmatic `StaticBody3D`, Box/Cylinder, layer 1, OmniLight3D |
+| `BASE-109` | Player-facing builder предоставляет palette/preview/controls/diagnostics | `IMPLEMENTED` | `G`, Up/Down, R, Enter, X/Delete, T; 11-row palette window |
+| `BASE-110` | State сохраняется без SQLite schema bump | `IMPLEMENTED` | Optional `save_settings.base_construction`; schema remains 2 |
+| `BASE-111` | Cold restore, graceful exit, autosave и F8 reset точны | `IMPLEMENTED` | Snapshot integration, no offline power tick, scene rebuild/reset |
+| `BASE-112` | Legacy save без base block загружается | `IMPLEMENTED` | Null fallback: empty base + full starter stock |
+| `BASE-113` | Terrain geometry не модифицируется | `IMPLEMENTED` | Modules sit above existing surface; PDF 20.4 respected |
+| `BASE-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | Выполнить clean build с реальным `CoreCompile` |
+| `BASE-ACC-101` | F6 подтверждает 50 modules/17 catalog categories и domain invariants | `IN_PROGRESS` | Ожидается `TASK-106 ... PASS` |
+| `BASE-ACC-102` | Manual builder/power/dismantle/persistence/F8 работает | `IN_PROGRESS` | Выполнить раздел 18I |
+| `BASE-ACC-103` | F1–F5/F7/F9–F12 не регрессируют | `IN_PROGRESS` | Повторить acceptance matrix после F6 |
 
 ## 9. Очередь ближайших задач
 
-Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Закрытые subsystem APIs не переделываются без regression evidence или изменения ТЗ.
+Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`. Обычная новая JSON-запись с уже поддерживаемой семантикой не должна становиться отдельной C#-итерацией.
 
-**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD; base construction; planetary exploration; ship systems; полный Stage 1 voyage.
+**Зафиксировано как `VERIFIED` по прямому runtime-подтверждению пользователя:** все пять технических прототипов; vertical slice; Industry Content v2; production network/HUD; catalog-wide resource lifecycle; station services Этапа 1; player coordinate HUD.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-115` | Выполнить build/runtime/manual acceptance galaxy+hyperspace subsystem | Clean build `0/0`; F5 TASK-076+110+112+114; M maps; route/jump; restore/F8; regressions |
+| 1 | `TASK-107` | Выполнить build/runtime/manual acceptance base construction subsystem | Clean build `0/0`; F6 TASK-072+106; 50 modules/17 catalog categories; manual snap/collision/power/toggle/refund/cold restore/F8; regressions |
 | 2 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического коммита GitHub |
-| 3 | `TASK-116` | После закрытия galaxy navigation выбрать следующий связный subsystem block | Рассмотреть combat/weapons/hostile encounters либо multi-planet system surfaces, не меняя закрытые navigation APIs |
+| 3 | `TASK-108` | После закрытия base construction выбрать следующий связный subsystem block | Рассмотреть ship systems, points of interest или world exploration по зависимостям ТЗ |
 
-**Подтверждено:** `TASK-060`–`TASK-113`, persistence, vertical slice, Industry Content v2, resources, station services, coordinate HUD, base construction, planetary exploration, ship systems и Stage 1 voyage.  
-**Реализовано:** `TASK-114` — procedural galaxy + hierarchical coordinates + maps + routing + hyperspace + discovery persistence.  
-**Текущая приёмочная задача:** `TASK-115`.
+**Подтверждено:** `TASK-060`–`TASK-105`, persistence, vertical slice, Industry Content v2, resources, station services и coordinate HUD.  
+**Реализовано:** `TASK-106` — 50-module base construction subsystem.  
+**Текущая приёмочная задача:** `TASK-107`. После её закрытия core construction runtime не требует отдельных итераций; новые modules добавляются data-driven.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
@@ -5100,134 +4907,6 @@ TASK-106 base construction acceptance PASS: catalogModules=50; categories=17; pl
 19. При `FAIL` предоставить полный build log, `TASK-106 ... FAIL`, последние 220 строк Godot Output, screenshot builder, base summary, target grid, selected module и точный шаг сценария.
 
 После выполнения критериев установить `TASK-106 → VERIFIED`, `TASK-107 → VERIFIED` и считать core base-construction subsystem закрытой.
-
-## 18J. Runtime-приёмка `TASK-108/TASK-109`
-
-1. Выполнить `tools\clean-build-windows10.cmd`. В build log должен реально выполняться `CoreCompile`; критерий — `Предупреждений: 0`, `Ошибок: 0`.
-2. Запустить `SalvageRepairSlice` и дождаться startup строк:
-
-```text
-TASK-108 planetary POI catalog READY: schema=1; types=20; categories=<N>; seed=1082026; region=region.vertical_slice.frontier_plain; spacing=5.5; constraints=biome+slope+height+water+danger+rarity+quests.
-TASK-108 planetary exploration READY: types=20; placements=20; scanner=P; catalog=J; persistence=enabled; F4=acceptance.
-```
-
-3. Нажать `F4` и не выполнять других действий до завершения. `TASK-080` должен остаться `PASS`; новая строка HUD:
-
-```text
-TASK-108 planetary exploration (F4): PASS types=20, placements=20, deterministic=1, constraints=1, spacing=1, questBias=1, clearance=1, scan=1, resolve=1, naming=1, restore=1, roundTrip=1
-```
-
-4. Godot Output должен содержать полную строку:
-
-```text
-TASK-108 planetary exploration acceptance PASS: poiTypes=20; placements=20; deterministic=1; constraints=1; spacing=1; questBias=1; infrastructureClearance=1; scanAll=1; resolveAll=1; naming=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-5. Убедиться, что acceptance использует `save_1.planetary-exploration-test.db`; gameplay `save_1.db` не изменяется.
-6. Нажать `F8`. HUD exploration summary должен показать `POIs=20`, `discovered=0`, `resolved=0`, `named=0`, `points=0`.
-7. Нажать `J`. Discovery catalog должен содержать 20 записей `UNKNOWN`, показывать position, environment, scan range и rarity выбранного сигнала. Закрыть/открыть catalog клавишей `J`; координатный overlay остаётся видимым.
-8. Ближайшие тестовые POI расположены по периметру, вне центральной площадки и resource field. Для первого smoke test двигаться примерно к `X=2, Z=-26` (Alien archive) либо `X=-26, Z=-4` (Underground vault), ориентируясь по постоянному `PLAYER POS`.
-9. До входа в scan range нажать `P`: HUD/status должен показать nearest distance и range без изменения discovered count. Войти в range и нажать `P` снова: Output `TASK-108 player scanner PASS`; discovered увеличивается ровно на 1.
-10. Для POI с interaction kind не `ScanOnly` нажать `E`: до scan должно быть `ScanRequired`, после scan — `TASK-108 player POI interaction PASS`, resolved увеличивается ровно на 1, points — на catalog-defined reward. Повторное `E` не выдаёт points повторно.
-11. Открыть `J`, выбрать discovered/nameable POI и нажать `N`. Должно появиться имя `Waypoint NN`; named увеличивается на 1; повторное naming обновляет name без повторной выдачи points. Unknown либо non-nameable запись должна быть отклонена.
-12. Оставить минимум один discovered-but-unresolved и один resolved POI, запомнить points/name. Штатно закрыть игру. После запуска Output `TASK-108 planetary exploration restore PASS` и catalog должны восстановить exact flags/name/points; offline progress отсутствует.
-13. Нажать `F8`: все 20 записей возвращаются в `UNKNOWN`, custom names и points очищаются, physical POI scene перестраивается.
-14. Проверить отсутствие пересечений POI с центральными stations/trader/base builder и generated resource field; collision должна блокировать проход через крупные POI, terrain geometry не изменяется.
-15. Повторить `F1`, `F2`, `F3`, `F5`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Повторный `F4` также должен дать `TASK-080` и `TASK-108 PASS`.
-16. Для приёмки прислать: build summary; screenshot неизвестного discovery catalog; screenshot discovered/resolved/named записи; screenshot HUD F4 PASS; полную строку Output `TASK-108 ... PASS`; строки scanner/interaction/restore.
-17. При `FAIL` предоставить полный build log, `TASK-108 ... FAIL`, последние 240 строк Godot Output, screenshot discovery catalog, player coordinates, selected POI state и точный шаг сценария.
-
-После выполнения критериев установить `TASK-108 → VERIFIED`, `TASK-109 → VERIFIED` и считать Stage 1 planetary exploration/discovery subsystem закрытой.
-
-## 18K. Runtime-приёмка `TASK-110/TASK-111`
-
-1. Распаковать проект в отдельную папку и выполнить `tools\clean-build-windows10.cmd`. Проверить фактический `CoreCompile`, `Предупреждений: 0`, `Ошибок: 0`.
-2. Запустить `SalvageRepairSlice`. Ожидаемые startup-строки:
-
-```text
-TASK-110 ship systems catalog READY: schema=1; classes=6; systems=7; modules=18; starterClass=ship.class.versatile; moduleCoverage=18/18.
-TASK-110 ship systems binding PASS: classes=6; systems=7; modules=18; repairItems=7; fuel=chemical.high_energy_fuel; slots=Technology/Weapon; persistence=enabled.
-TASK-110 ship systems READY: classes=6; systems=7; modules=18; class=ship.class.versatile; loadout=U; damage=per-system; repair=inventory-backed; persistence=enabled; F5=acceptance.
-```
-
-3. Нажать `F5` один раз и не выполнять другие действия. Контрольный предел — 30 секунд. Должны завершиться обе проверки:
-
-```text
-TASK-076 runtime matrix (F5): PASS station=15, blocked=15, timed=15, isolated=15, crafted=15, output=20, roundTrip=1
-TASK-110 ship systems (F5): PASS classes=6, systems=7, modules=18, coverage=1, slots=1, damage=1, repair=1, commissioning=1, readiness=1, fuel=1, restore=1, roundTrip=1
-```
-
-4. В Godot Output должна быть одна итоговая строка:
-
-```text
-TASK-110 ship systems acceptance PASS: classes=6; systems=7; modules=18; catalogCoverage=1; classStats=1; installAll=1; slotLimits=1; duplicateRejected=1; derivedStats=1; damageLifecycle=1; repairLifecycle=1; moduleDisable=1; flightReadiness=1; hyperspaceReadiness=1; fuelLifecycle=1; inventoryConservation=1; preRepairBlocked=1; preRepairFlightReady=1; commissionTransition=1; postRepairFlightReady=1; resetCommissioned=1; coldRestore=1; legacyFallback=1; roundTrip=1; logWritten=1; maxWriters=1; integrity=ok; elapsedMs=<время>; result=<description>
-```
-
-5. Нажать `F8`. Output должен показать `commissioned=0; flightReady=0; hyperReady=0; offline=7`. До ремонта starter ship открыть `U`: UI должен открыться, но install/repair/refuel должны быть заблокированы сообщением о необходимости repair + commissioning.
-6. Собрать три `resource.salvage_alloy`, отремонтировать DamagedShip клавишей `E`. Output `StarterRepairQuestCompleted` должен содержать `commissioned=1; flightReady=1`. Повторно открыть `U`; Overview должен показывать class `versatile`, fuel `35/<capacity>`, семь systems online, empty loadout и `flight=READY`.
-7. Получить любой ShipModule item штатным crafting path либо использовать уже сохранённый inventory. Во вкладке Modules выбрать его и нажать `Enter/E`. Output: `TASK-110 player ship module install PASS`; inventory уменьшается ровно на 1, installed count растёт, соответствующие derived stats изменяются.
-8. Нажать `Enter/E` повторно на том же module: duplicate install отклоняется без списания. Заполнить доступные Technology slots и проверить отказ следующего module без потери inventory. Для короткой ручной проверки достаточно одного successful install и автоматического F5 `slotLimits=1; duplicateRejected=1`.
-9. На установленном module нажать `X`: Output `TASK-110 player ship module uninstall PASS`; item возвращается ровно один раз.
-10. Установить module с affected system, перейти Systems, выбрать эту system и нажимать `D`, пока health не станет `0`. Module должен стать inactive; для engine/impulse/hull/landing меняется flight readiness, для hyperdrive — hyperspace readiness. Output: `TASK-110 player ship damage PASS`.
-11. Имея указанный в UI repair component, нажать `R`: component списывается ровно один раз, health растёт на catalog-defined amount, module/readiness восстанавливаются при health > 0. Output: `TASK-110 player ship repair PASS`.
-12. Для refuel сначала оставить fuel ниже capacity (автоматический F5 проверяет consume/refuel domain path; gameplay fuel consumption ещё не интегрирован с flight prototype). Имея `chemical.high_energy_fuel`, нажать `Enter/E` на Overview: item списывается, fuel растёт максимум до capacity, Output `TASK-110 player ship refuel PASS`.
-13. Оставить минимум один module installed и одну system частично повреждённой, штатно закрыть игру. После запуска проверить `TASK-110 ship systems restore PASS`: class, exact fuel, module/slot и health совпадают; offline progress отсутствует.
-14. Нажать `F8`: starter ship systems возвращаются к versatile/empty loadout/7 offline/35 fuel, `commissioned=0`, `flightReady=0`, `hyperReady=0`; gameplay repair state также сбрасывается. В Output ожидается `TASK-110 ship systems reset PASS`.
-15. Повторить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`; все применимые маршруты должны завершиться `PASS`. Затем повторить `F5`.
-16. Для приёмки прислать: build summary; screenshot Ship Management после install и после damage; HUD F5 PASS; полную строку `TASK-110 ... PASS`; строки install/uninstall/damage/repair/restore. При невозможности вручную добыть fuel достаточно автоматического `fuelLifecycle=1` и проверки UI refusal без item.
-17. При `FAIL` предоставить полный build log, `TASK-110 ... FAIL`, последние 260 строк Godot Output, screenshot выбранной вкладки, player coordinates, inventory count и точный шаг сценария.
-
-После выполнения критериев установить `TASK-110 → VERIFIED`, `TASK-111 → VERIFIED` и считать core ship class/loadout/damage/persistence subsystem закрытой.
-
-## 18L. Runtime-приёмка `TASK-112/TASK-113`
-
-1. Выполнить `tools\clean-build-windows10.cmd`. Требование: фактический `CoreCompile`, `Предупреждений: 0`, `Ошибок: 0`.
-2. Запустить `SalvageRepairSlice`. Проверить startup:
-
-```text
-TASK-112 Stage 1 voyage READY: loop=repair>board>takeoff>orbital_station>return>land; shipStats=live-derived; fuel=takeoff+dock+undock+landing; readiness=ship-systems; persistence=enabled; F5=acceptance; controls=E board/services/disembark,Enter dock/land,T launch/undock,K assist,F2 camera.
-```
-
-3. Один раз нажать `F5` и дождаться трёх результатов: `TASK-076 PASS`, `TASK-110 PASS`, `TASK-112 PASS`. Gameplay `save_1.db` не должен изменяться; voyage acceptance использует `save_1.stage-one-voyage-test.db`.
-4. Полная строка `TASK-112` должна содержать все единицы, `maxWriters=1`, `integrity=ok`.
-5. Нажать `F8`. Проверить `TASK-112 voyage reset PASS: location=PlanetSurface; piloted=0; stationVisited=0; takeoffs=0; dockings=0; landings=0; loops=0`.
-6. Собрать три бирюзовых `resource.salvage_alloy` и нажать `E` на красном DamagedShip. После `StarterRepairQuestCompleted` нажать `E` на корабле ещё раз. Ожидается `TASK-112 player ship boarding PASS`; player скрывается, включается chase camera настоящего ArcadeShip.
-7. Нажать `T`. Ожидается `TASK-112 player takeoff PASS`; ship переносится на launch altitude, расходует 3 fuel, голубой orbital beacon становится видимым, navigation assist включён.
-8. `K` переключает assist. При assist=1 корабль сам ориентируется и тормозит у голубого beacon; ручное управление сохраняется при assist=0. `F2` переключает chase/cockpit camera. В полёте U/J/P/base-build/acceptance commands не должны открывать наземные интерфейсы.
-9. Когда расстояние ≤14 m и скорость ≤10 m/s, нажать `Enter`. Ожидаются `TASK-112 player orbital docking PASS` и `TASK-112 player station visit PASS`; автоматически открываются station services. Проверить минимум одну вкладку dialogue/buy/sell/quests, затем закрыть `Esc`.
-10. Нажать `T`: `TASK-112 player undock PASS`, зелёный landing ring появляется над стартовой площадкой, assist направляет корабль к планете.
-11. Когда расстояние ≤18 m и скорость ≤12 m/s, нажать `Enter`. Ожидаются `TASK-112 player landing PASS` и `TASK-112 player Stage 1 loop PASS`; fuel уменьшен на суммарные event costs, `loops=1`.
-12. На поверхности нажать `E` ещё раз: `TASK-112 player disembark PASS`; возвращаются player camera/movement/collision и статический repaired ship.
-13. Повторно board/takeoff и штатно закрыть игру в outbound flight либо оставить корабль docked. После запуска проверить `TASK-112 voyage restore PASS`: location, piloted, pose, velocity, station flags, counters и fuel совпадают; offline progress отсутствует. Завершить return/landing.
-14. Нажать `F8` и проверить полный reset voyage и starter repair. Затем выполнить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`, после чего повторить `F5`.
-15. Для подтверждения прислать build summary, полную строку `TASK-112 ... PASS`, строки boarding/takeoff/docking/station/undock/landing/loop/disembark/restore/reset и screenshot ship у orbital beacon либо station.
-
-После выполнения критериев установить `TASK-112 → VERIFIED`, `TASK-113 → VERIFIED` и считать Stage 1 end-to-end journey закрытым.
-
-
-## 18M. Runtime-приёмка `TASK-114/TASK-115`
-
-1. Выполнить `tools\clean-build-windows10.cmd`. Требование: фактический `CoreCompile`, `Предупреждений: 0`, `Ошибок: 0`.
-2. Запустить `SalvageRepairSlice`. Проверить startup:
-
-```text
-TASK-114 galaxy navigation READY: galaxy=galaxy.g1; system=system.vertical_slice; sector=0,0,0; seed=20260805; starTypes=6; generation=on-demand; coordinates=galaxy+sector+double3; maps=M; route=A*+range; hyperspace=station-only; persistence=enabled; F5=acceptance.
-```
-
-3. Один раз нажать `F5` и дождаться четырёх результатов: `TASK-076 PASS`, `TASK-110 PASS`, `TASK-112 PASS`, `TASK-114 PASS`. Gameplay `save_1.db` не должен изменяться; galaxy acceptance использует `save_1.galaxy-navigation-test.db`.
-4. Полная строка `TASK-114` должна содержать все единицы, `stress100=1`, `maxWriters=1`, `integrity=ok`.
-5. Нажать `F8`. Проверить `TASK-114 galaxy navigation reset PASS: galaxy=galaxy.g1; system=system.vertical_slice; sector=0,0,0; visited=1; jumps=0; distance=0.0ly`.
-6. Отремонтировать starter ship, приобрести у trader `module.ship.hyperspace_core` либо изготовить/получить `module.ship.compotium_drive_core`, открыть `U → Modules`, выбрать модуль и установить его. Overview должен показать `hyper=READY`.
-7. Выполнить Stage 1 takeoff и docking к orbital station. Hyperspace deliberately недоступен с поверхности и во время outbound/inbound flight.
-8. На station нажать `M`. Galaxy tab должен показать nearby systems с sector coordinates, star type, distance, route count и VISITED/NEW. `Tab` переключает System tab с 1..8 planets текущей системы.
-9. В Galaxy tab выбрать destination `Up/Down`, нажать `Enter`. При достаточном range/fuel ожидается `TASK-114 player hyperspace jump PASS`; current system/sector меняются, fuel уменьшается, visited и jump counters растут, ship остаётся docked у orbital checkpoint новой системы.
-10. Для multi-waypoint route повторять `Enter`, пока destination не достигнут. Ни один waypoint не должен превышать effective HyperdriveRange.
-11. Штатно закрыть игру после минимум одного jump. После запуска проверить `TASK-114 galaxy navigation restore PASS`: GalaxyId/current sector/system, selected destination, jumps, distance и visited set совпадают; voyage остаётся `OrbitalStation`, offline progress отсутствует.
-12. Нажать `M` и проверить VISITED для пройденной системы. Нажать `F8`: возврат к `system.vertical_slice`, visited=1, jumps=0; ship/voyage также сброшены.
-13. Выполнить `F1`, `F2`, `F3`, `F4`, `F6`, `F7`, `F9`, `F10`, `F11`, `F12`, затем повторить `F5`.
-14. Для подтверждения прислать build summary, полную строку `TASK-114 ... PASS`, startup/restore/reset lines, строку player hyperspace jump и screenshot обеих вкладок `M`.
-
-После выполнения критериев установить `TASK-114 → VERIFIED`, `TASK-115 → VERIFIED` и считать procedural galaxy/navigation/hyperspace subsystem закрытой.
 
 ## 19. Шаблон новой записи
 

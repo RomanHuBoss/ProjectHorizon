@@ -401,6 +401,7 @@ public partial class SalvageRepairSlice : Node3D
 
         BindStageOneVoyageSceneNodes();
         BindGalaxyNavigationSceneNodes();
+        BindEcologySceneNodes();
 
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
@@ -411,6 +412,7 @@ public partial class SalvageRepairSlice : Node3D
             LoadPlanetaryPoiCatalog();
         ShipSystemsCatalog shipSystemsCatalog =
             LoadShipSystemsCatalog(catalog);
+        _ecologyCatalog = LoadEcologyCatalog(catalog);
         IReadOnlyList<PlanetaryPoiPlacement> planetaryPoiPlacements =
             PlanetaryPoiPlanner.Plan(planetaryPoiCatalog);
         SaveDatabase.RegisterKnownInventoryDefinitions(catalog.Items.Keys);
@@ -479,6 +481,7 @@ public partial class SalvageRepairSlice : Node3D
             stationRecipes);
         InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
+        InitializeEcologyRuntime(saveData: null);
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -562,8 +565,8 @@ public partial class SalvageRepairSlice : Node3D
             "the playable runtime matrix, F6 for base construction plus legacy " +
             "regression, F9/F10/F11/F12 for regressions, F7 for complete " +
             "resource acceptance or F8 to reset. Press G for base build mode, " +
-            "P for scanner pulse, J for the discovery catalog and U for ship " +
-            "management. After starter repair press E on the ship to board; " +
+            "P for POI scanner pulse, J for the discovery catalog, V for ecology " +
+            "scan, O for the ecology catalogue and U for ship management. After starter repair press E on the ship to board; " +
             "T launches or undocks, K toggles navigation assist, Enter docks " +
             "or lands, and E opens services or disembarks. Press M for the " +
             "system/galaxy map.");
@@ -650,6 +653,15 @@ public partial class SalvageRepairSlice : Node3D
             "maps=M; route=A*+range; hyperspace=station-only; " +
             "persistence=enabled; F5=acceptance.");
         GD.Print(
+            "TASK-116 ecology READY: " +
+            $"biomes={EcologyCatalog.Biomes.Count}; " +
+            $"flora={EcologyCatalog.Flora.Count}; " +
+            $"fauna={EcologyCatalog.Fauna.Count}; " +
+            $"instanced={EcologyPlan.Flora.Count}; " +
+            $"active/simplified={EcologyPlan.ActiveFauna.Count}/{EcologyPlan.SimplifiedFauna.Count}; " +
+            "scanner=V; catalog=O; ai=utility+steering; persistence=seed+deltas; F5=acceptance; " +
+            $"atmosphere={(_voyageShip?.HasAtmosphereReference == true ? "bound" : "missing")}.");
+        GD.Print(
             "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -692,6 +704,7 @@ public partial class SalvageRepairSlice : Node3D
         PollShipSystemsAcceptanceTask();
         PollStageOneVoyageAcceptanceTask();
         PollGalaxyNavigationAcceptanceTask();
+        PollEcologyAcceptanceTask();
         PollCatalogMatrixAcceptanceTask();
         PollTechnologySelectorAcceptanceTask();
         PollStationServicesAcceptanceTask();
@@ -703,6 +716,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdateGameplayProductionQueue(delta);
         UpdateTimedCraft(delta);
         UpdateStageOneVoyage(delta);
+        UpdateEcology(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
@@ -770,6 +784,11 @@ public partial class SalvageRepairSlice : Node3D
 
         if (keyEvent.Echo)
         {
+            return;
+        }
+        if (HandleEcologyInput(physical, logical))
+        {
+            GetViewport().SetInputAsHandled();
             return;
         }
         if (_shipManagementOpen)
@@ -4796,6 +4815,7 @@ public partial class SalvageRepairSlice : Node3D
             _shipSystemsAcceptanceTask is null &&
             _stageOneVoyageAcceptanceTask is null &&
             _galaxyNavigationAcceptanceTask is null &&
+            _ecologyAcceptanceTask is null &&
             _chemicalProcessAcceptanceTask is null &&
             _productionQueueAcceptanceTask is null &&
             _itemQualityDismantleAcceptanceTask is null &&
@@ -4808,6 +4828,7 @@ public partial class SalvageRepairSlice : Node3D
             !_discoveryCatalogOpen &&
             !_shipManagementOpen &&
             !_galaxyMapOpen &&
+            !_ecologyCatalogOpen &&
             !(_stageOneVoyageRuntime?.Piloted ?? false) &&
             (_gameplayProductionNetwork?.TotalJobs ?? 0) == 0 &&
             !_craftTimer.IsRunning &&
@@ -5244,8 +5265,9 @@ public partial class SalvageRepairSlice : Node3D
             _lifetimeCancellation.Token);
         BeginStageOneVoyageAcceptance(directory);
         BeginGalaxyNavigationAcceptance(directory);
+        BeginEcologyAcceptance(directory);
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116 runtime, ship systems, voyage, galaxy navigation and ecology acceptance running";
     }
 
     private void BeginReset()
@@ -5286,7 +5308,8 @@ public partial class SalvageRepairSlice : Node3D
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
             stageOneVoyage: StageOneVoyage.CreateSaveData(),
-            galaxyNavigation: GalaxyNavigation.CreateSaveData());
+            galaxyNavigation: GalaxyNavigation.CreateSaveData(),
+            ecology: Ecology.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -5321,6 +5344,7 @@ public partial class SalvageRepairSlice : Node3D
         CloseDiscoveryCatalog();
         CloseShipManagement();
         CloseGalaxyMap();
+        CloseEcologyCatalog();
         if (_initializeTask is not null ||
             _loadTask is not null ||
             _resetTask is not null ||
@@ -5338,6 +5362,7 @@ public partial class SalvageRepairSlice : Node3D
             _shipSystemsAcceptanceTask is not null ||
             _stageOneVoyageAcceptanceTask is not null ||
             _galaxyNavigationAcceptanceTask is not null ||
+            _ecologyAcceptanceTask is not null ||
             _chemicalProcessAcceptanceTask is not null ||
             _productionQueueAcceptanceTask is not null ||
             _itemQualityDismantleAcceptanceTask is not null ||
@@ -5368,7 +5393,8 @@ public partial class SalvageRepairSlice : Node3D
             planetaryExploration: PlanetaryExploration.CreateSaveData(),
             shipSystems: ShipSystems.CreateSaveData(),
             stageOneVoyage: StageOneVoyage.CreateSaveData(),
-            galaxyNavigation: GalaxyNavigation.CreateSaveData());
+            galaxyNavigation: GalaxyNavigation.CreateSaveData(),
+            ecology: Ecology.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = $"graceful-exit flush rev={snapshot.Revision}";
         GD.Print(
@@ -5401,7 +5427,10 @@ public partial class SalvageRepairSlice : Node3D
             $"voyageLoops={StageOneVoyage.CompletedLoops}; " +
             $"galaxySystem={GalaxyNavigation.CurrentSystem.SystemId}; " +
             $"galaxyVisited={GalaxyNavigation.VisitedSystemIds.Count}; " +
-            $"hyperJumps={GalaxyNavigation.JumpCount}.");
+            $"hyperJumps={GalaxyNavigation.JumpCount}; " +
+            $"ecologyFlora={Ecology.DiscoveredFloraCount}; " +
+            $"ecologyFauna={Ecology.DiscoveredFaunaCount}; " +
+            $"ecologyRemoved={Ecology.RemovedFloraCount}.");
         _gracefulExitTask = FlushGracefulExitAsync(snapshot);
     }
 
@@ -5472,6 +5501,7 @@ public partial class SalvageRepairSlice : Node3D
                 commissioned: Session.ShipRepaired);
             InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
+            InitializeEcologyRuntime(snapshot?.Ecology);
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null &&
                 !StageOneVoyage.Piloted)
@@ -5488,6 +5518,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseDiscoveryCatalog();
             CloseShipManagement();
             CloseGalaxyMap();
+            CloseEcologyCatalog();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -5565,6 +5596,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"jumps={GalaxyNavigation.JumpCount}; " +
                 $"distance={GalaxyNavigation.TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly; " +
                 $"legacyFallback={(snapshot?.GalaxyNavigation is null ? 1 : 0)}.");
+            GD.Print(
+                "TASK-116 ecology restore PASS: " +
+                $"flora={Ecology.DiscoveredFloraCount}; " +
+                $"fauna={Ecology.DiscoveredFaunaCount}; " +
+                $"removed={Ecology.RemovedFloraCount}; " +
+                $"points={Ecology.DiscoveryPoints}; " +
+                $"active/simplified={EcologyPlan.ActiveFauna.Count}/{EcologyPlan.SimplifiedFauna.Count}; " +
+                $"legacyFallback={(snapshot?.Ecology is null ? 1 : 0)}.");
             IReadOnlyList<ProductionQueueSaveData> restoredQueues =
                 snapshot?.ProductionQueueNetwork?.Stations ??
                 (snapshot?.ProductionQueue is null
@@ -5632,6 +5671,7 @@ public partial class SalvageRepairSlice : Node3D
             _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
             InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
+            InitializeEcologyRuntime(saveData: null);
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
@@ -5640,6 +5680,7 @@ public partial class SalvageRepairSlice : Node3D
             CloseDiscoveryCatalog();
             CloseShipManagement();
             CloseGalaxyMap();
+            CloseEcologyCatalog();
             RebuildBaseConstructionScene();
             ApplyPlanetaryPoiStateToScene();
             _craftTimer.Reset();
@@ -5689,6 +5730,14 @@ public partial class SalvageRepairSlice : Node3D
                 $"visited={GalaxyNavigation.VisitedSystemIds.Count}; " +
                 $"jumps={GalaxyNavigation.JumpCount}; " +
                 $"distance={GalaxyNavigation.TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly.");
+            GD.Print(
+                "TASK-116 ecology reset PASS: " +
+                $"flora={Ecology.DiscoveredFloraCount}; " +
+                $"fauna={Ecology.DiscoveredFaunaCount}; " +
+                $"removed={Ecology.RemovedFloraCount}; " +
+                $"points={Ecology.DiscoveryPoints}; " +
+                $"regenerated={EcologyPlan.Flora.Count}; " +
+                $"active/simplified={EcologyPlan.ActiveFauna.Count}/{EcologyPlan.SimplifiedFauna.Count}.");
         }
         catch (Exception exception)
         {
@@ -6259,10 +6308,12 @@ public partial class SalvageRepairSlice : Node3D
             _shipSystemsAcceptanceTask is not null ||
             _stageOneVoyageAcceptanceTask is not null ||
             _galaxyNavigationAcceptanceTask is not null ||
+            _ecologyAcceptanceTask is not null ||
             _catalogMatrixAcceptanceReport is null ||
             _shipSystemsAcceptanceReport is null ||
             _stageOneVoyageAcceptanceReport is null ||
-            _galaxyNavigationAcceptanceReport is null)
+            _galaxyNavigationAcceptanceReport is null ||
+            _ecologyAcceptanceReport is null)
         {
             return;
         }
@@ -6270,13 +6321,14 @@ public partial class SalvageRepairSlice : Node3D
         bool passed = _catalogMatrixAcceptanceReport.Passed &&
             _shipSystemsAcceptanceReport.Passed &&
             _stageOneVoyageAcceptanceReport.Passed &&
-            _galaxyNavigationAcceptanceReport.Passed;
+            _galaxyNavigationAcceptanceReport.Passed &&
+            _ecologyAcceptanceReport.Passed;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114 runtime, ship systems, voyage and galaxy navigation acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116 runtime, ship systems, voyage, galaxy navigation and ecology acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116 runtime, ship systems, voyage, galaxy navigation and ecology acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7098,6 +7150,7 @@ public partial class SalvageRepairSlice : Node3D
             $"hyper={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
+        string ecologyLine = BuildEcologyHudLine();
 
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
@@ -7115,6 +7168,7 @@ public partial class SalvageRepairSlice : Node3D
                 shipSystemsLine + "\n" +
                 voyageLine + "\n" +
                 galaxyLine + "\n" +
+                ecologyLine + "\n" +
                 $"{technologyLine}\n" +
                 $"Interaction: {interaction}\n" +
                 $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
@@ -7133,11 +7187,12 @@ public partial class SalvageRepairSlice : Node3D
                 $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
                 $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
                 $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
+                $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
                 $"Status: {_status}\n" +
-                "E - interact/select • U - ship management • M - system/galaxy map • P - scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
+                "E - interact/select • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
                 "services: B buy, S sell, Q quests • F1 - production queue • " +
                 "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy • " +
+                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology • " +
                 "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
             return;
         }
@@ -7157,6 +7212,7 @@ public partial class SalvageRepairSlice : Node3D
             shipSystemsLine + "\n" +
             voyageLine + "\n" +
             galaxyLine + "\n" +
+            ecologyLine + "\n" +
             pendingPreview + "\n" +
             $"Craft process: {craftProcess}\n" +
             $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
@@ -7184,6 +7240,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
             $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
             $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
+            $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
             $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
             $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
             $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
@@ -7191,13 +7248,13 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
             $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
             $"Status: {_status}\n" +
-            "WASD/Space - move • E - interact/select • U - ship management • M - system/galaxy map • P - scanner • J - discoveries • G - base build • H - HUD • " +
+            "WASD/Space - move • E - interact/select • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scanner • J - discoveries • G - base build • H - HUD • " +
             "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
             "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
             "F1 - production queue acceptance • " +
             "F2 - chemical runtime acceptance • " +
             "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation • F6 - base construction + legacy regression • " +
+            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology • F6 - base construction + legacy regression • " +
             "F9/F10/F11/F12 - regressions • F7 - all resources • " +
             "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
     }
