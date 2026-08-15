@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-horizon-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  GODOT_VERSION: '4.7.1'
+  GODOT_CHANNEL: stable
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.302'
+
+      - name: Install JSON schema validator
+        run: python3 -m pip install --disable-pip-version-check 'jsonschema>=4.20,<5'
+
+      - name: Read application version
+        shell: bash
+        run: |
+          echo "PH_VERSION=$(tr -d '\r\n' < VERSION)" >> "$GITHUB_ENV"
+          python3 tools/ci/verify-version.py
+
+      - name: Restore dependencies
+        run: dotnet restore tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+
+      - name: Build C# - warnings are errors
+        run: >-
+          dotnet build tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Debug --no-restore
+          -p:ContinuousIntegrationBuild=true
+          -p:Version="$PH_VERSION"
+          -warnaserror
+
+      - name: Validate JSON and repository contracts
+        run: |
+          python3 tools/validate-json-content.py
+          python3 tools/validate-localization-contract.py
+          python3 tools/validate-audio-contract.py
+          python3 tools/validate-developer-diagnostics-contract.py
+          python3 tools/validate-section36-testing-contract.py
+          python3 tools/validate-section37-build-contract.py
+
+      - name: Unit tests and coverage
+        run: >-
+          dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Debug --no-build --no-restore
+          --collect:"XPlat Code Coverage"
+          --settings tests/coverlet.runsettings
+          --results-directory artifacts/test-results
+          --logger "trx;LogFileName=section36.trx"
+
+      - name: Enforce coverage thresholds
+        run: python3 tools/verify-section36-coverage.py --results-dir artifacts/test-results
+
+      - name: Verify save migrations and recovery explicitly
+        run: >-
+          dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Debug --no-build --no-restore
+          --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests"
+          --logger "console;verbosity=normal"
+
+      - name: Upload test evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-test-evidence
+          path: artifacts/test-results
+          if-no-files-found: warn
+          retention-days: 14
+
+  debug-exports:
+    name: debug-exports
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.302'
+
+      - name: Install official Godot .NET editor and export templates
+        run: ./tools/ci/bootstrap-godot.sh
+
+      - name: Headless Windows and Linux Debug exports
+        run: ./tools/ci/export-project.sh debug
+
+      - name: Upload Windows Debug
+        uses: actions/upload-artifact@v7
+        with:
+          name: ProjectHorizon-windows-x64-debug
+          path: artifacts/exports/windows-debug
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Linux Debug
+        uses: actions/upload-artifact@v7
+        with:
+          name: ProjectHorizon-linux-x86_64-debug
+          path: artifacts/exports/linux-debug
+          if-no-files-found: error
+          retention-days: 7

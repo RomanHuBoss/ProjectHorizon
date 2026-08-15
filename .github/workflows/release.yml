@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  DOTNET_NOLOGO: '1'
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  GODOT_VERSION: '4.7.1'
+  GODOT_CHANNEL: stable
+
+jobs:
+  release:
+    name: build-and-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '10.0.302'
+
+      - name: Install JSON schema validator
+        run: python3 -m pip install --disable-pip-version-check 'jsonschema>=4.20,<5'
+
+      - name: Verify tag, version and changelog
+        id: version
+        shell: bash
+        run: |
+          VERSION_VALUE="$(tr -d '\r\n' < VERSION)"
+          echo "PH_VERSION=$VERSION_VALUE" >> "$GITHUB_ENV"
+          echo "version=$VERSION_VALUE" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            python3 tools/ci/verify-version.py --tag "$GITHUB_REF_NAME"
+          else
+            python3 tools/ci/verify-version.py
+          fi
+
+      - name: Restore dependencies
+        run: dotnet restore tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+
+      - name: Release build - warnings are errors and symbols enabled
+        run: >-
+          dotnet build tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Release --no-restore
+          -p:ContinuousIntegrationBuild=true
+          -p:DebugType=portable
+          -p:DebugSymbols=true
+          -p:Version="$PH_VERSION"
+          -warnaserror
+
+      - name: Validate JSON and repository contracts
+        run: |
+          python3 tools/validate-json-content.py
+          python3 tools/validate-localization-contract.py
+          python3 tools/validate-audio-contract.py
+          python3 tools/validate-developer-diagnostics-contract.py
+          python3 tools/validate-section36-testing-contract.py
+          python3 tools/validate-section37-build-contract.py
+
+      - name: Unit tests and coverage
+        run: >-
+          dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Release --no-build --no-restore
+          --collect:"XPlat Code Coverage"
+          --settings tests/coverlet.runsettings
+          --results-directory artifacts/test-results
+          --logger "trx;LogFileName=section36-release.trx"
+
+      - name: Enforce coverage thresholds
+        run: python3 tools/verify-section36-coverage.py --results-dir artifacts/test-results
+
+      - name: Verify save migrations and recovery explicitly
+        run: >-
+          dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
+          -c Release --no-build --no-restore
+          --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests"
+
+      - name: Install official Godot .NET editor and export templates
+        run: ./tools/ci/bootstrap-godot.sh
+
+      - name: Headless Windows and Linux Release exports
+        run: ./tools/ci/export-project.sh release
+
+      - name: Package release, symbols and checksums
+        run: >-
+          python3 tools/ci/package-release.py
+          --version "$PH_VERSION"
+          --commit "$GITHUB_SHA"
+          --exports artifacts/exports
+          --output artifacts/release
+
+      - name: Verify packaged checksums
+        working-directory: artifacts/release
+        run: sha256sum --check SHA256SUMS.txt
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: ProjectHorizon-${{ steps.version.outputs.version }}-release
+          path: artifacts/release
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "v$PH_VERSION"
+          artifacts/release/ProjectHorizon-*-windows-x64.zip
+          artifacts/release/ProjectHorizon-*-linux-x86_64.tar.gz
+          artifacts/release/ProjectHorizon-*-symbols.zip
+          artifacts/release/release-manifest.json
+          artifacts/release/SHA256SUMS.txt
+          artifacts/release/VERSION
+          artifacts/release/CHANGELOG.md
+          --verify-tag
+          --title "Project Horizon $PH_VERSION"
+          --notes-file artifacts/release/RELEASE_NOTES.md

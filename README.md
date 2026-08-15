@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice, навигационная глава PDF v2.0 §30, star-system runtime §15, UI/application shell + localization §31, sound architecture §32 и Developer/Diagnostics §34–§35 закрыты принятой владельцем продукта приёмкой. Текущая mega-итерация TASK-138 реализует §36 Testing: отдельный xUnit/coverlet verification project, versioned golden seeds, save/recovery и load/stress scenarios, количественные coverage-gates и F5 smoke интеграции.
+Stage 1 vertical slice, навигационная глава PDF v2.0 §30, star-system runtime §15, UI/application shell + localization §31, sound architecture §32, Developer/Diagnostics §34–§35 и Verification Suite §36 закрыты принятой владельцем продукта приёмкой. Текущая mega-итерация TASK-140 реализует §37 Build/CI/Release Engineering: pull-request quality gate, Windows/Linux headless exports, warnings-as-errors, version/changelog contract и воспроизводимую release-упаковку с symbols/manifest/SHA-256.
 
-### Подсистемы through TASK-137 — `VERIFIED`; §36 Verification & Automated Testing Suite — `IMPLEMENTED`
+### Подсистемы through TASK-139 — `VERIFIED`; §37 Build/CI/Release Engineering — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -402,6 +402,48 @@ tools\run-section36-tests.cmd --full-soak
 выполняет ускоренные virtual-time 2h/8h сценарии, 100 последовательных voyage docking/landing loops с persistence round-trip и 100 реальных hyperspace jumps через существующий navigation acceptance runner; F5 дополнительно повторяет 100 voyage loops,
 500-module base, 10,000-entry inventory, 1000 visited systems и repeated recovery, не
 создавая гигабайтный файл при каждом запуске.
+
+### §37 Build / CI / Release engineering (TASK-140)
+
+Репозиторий содержит два GitHub Actions pipeline:
+
+```text
+.github/workflows/ci.yml
+.github/workflows/release.yml
+```
+
+Pull request / integration CI выполняет restore, C# build с `ContinuousIntegrationBuild=true`
+и warnings-as-errors, xUnit + coverage thresholds, JSON/Industry Schema validation,
+изолированные persistence migration/recovery tests, затем headless Godot 4.7.1 .NET exports
+для Windows x64 Debug и Linux x86_64 Debug. Локальный quality-equivalent запускается:
+
+```bat
+tools\run-section37-quality.cmd
+```
+
+или:
+
+```bash
+./tools/run-section37-quality.sh
+```
+
+Release workflow можно сначала запустить вручную (`workflow_dispatch`) как dry-run: он
+повторяет quality gates, создаёт Windows/Linux Release exports, отдельный portable-PDB
+symbols archive, `release-manifest.json`, `RELEASE_NOTES.md` и `SHA256SUMS.txt`, но ничего
+не публикует. Push тега строго `v<VERSION>` запускает тот же pipeline и после успешной
+упаковки публикует GitHub Release. Текущая application version хранится в `VERSION`,
+а release notes — в `CHANGELOG.md`; tag/version mismatch является hard failure.
+
+Статический §37 gate:
+
+```text
+python tools/validate-section37-build-contract.py
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+```
+
+Подробная branch/release policy: `docs/BUILD_AND_RELEASE.md`. Настройки branch protection
+(`quality` и `debug-exports` как required checks) находятся на стороне GitHub и поэтому
+не могут быть доказаны одним архивом без `.git`; это runtime/repository gate TASK-141.
 
 Статические contract gates:
 

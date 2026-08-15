@@ -2,13 +2,131 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-section36-verification-suite.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-section37-ci-release-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Verification & Automated Testing Suite / §36 closure
+## 0. Текущая mega-итерация 2026-08-15 — Build / CI / Release Engineering / §37 closure
+
+### Закрытие §36 по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-140 журнал синхронизирован:
+
+- `TASK-138` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-139` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; отсутствовавшие в среде
+  подготовки `.NET`/Godot test execution и runtime не приписываются задним числом.
+
+### TASK-140 — reproducible PR quality gate, cross-platform exports and release packaging
+
+**Исходный снимок:** `ProjectHorizon-main-section36-verification-suite.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-section37-ci-release-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §37.1–37.3 «Version control / branches / CI» и
+требование §38 о трактовке compiler warnings в CI как errors.
+
+**Реализовано:**
+
+- добавлены `.github/workflows/ci.yml` и `.github/workflows/release.yml`; PR/integration
+  pipeline выполняет нормативную последовательность restore → C# build → tests/coverage →
+  JSON validation → persistence migration/recovery verification → Windows Debug export →
+  Linux Debug export;
+- CI build получает `ContinuousIntegrationBuild=true`, `-warnaserror`, а общий
+  `Directory.Build.props` дополнительно включает `TreatWarningsAsErrors`, deterministic
+  build и portable debug symbols для CI;
+- `tools/validate-json-content.py` разбирает все JSON проекта, проверяет пять нормативных
+  Industry Content JSON через `Project_Horizon_Industry_Content_Schema_v2.0.json` и
+  контролирует parity локализационных каталогов;
+- debug/release exports выполняет штатный Godot CLI в `--headless` по новым
+  `export_presets.cfg` для `Windows Desktop x86_64` и `Linux x86_64`; bootstrap фиксирует
+  Godot 4.7.1 .NET editor и mono export templates;
+- release workflow можно запускать вручную как dry-run без публикации: он выполняет
+  Release build/tests/coverage/validation, Windows/Linux Release exports и создаёт готовый
+  release evidence; push matching tag `v<VERSION>` проходит тот же pipeline и только после
+  успешных gate публикует GitHub Release;
+- добавлены `VERSION=0.1.0-alpha.140`, `CHANGELOG.md` и `tools/ci/verify-version.py`;
+  несовпадение release tag / VERSION / changelog является hard failure;
+- `tools/ci/package-release.py` создаёт Windows ZIP, Linux tar.gz, отдельный symbols ZIP
+  (portable PDB обязателен), `release-manifest.json`, `RELEASE_NOTES.md`, version/changelog
+  и `SHA256SUMS.txt`; отсутствие symbols или одного из export trees завершает pipeline FAIL;
+- локальные `tools/run-section37-quality.cmd` / `.sh` повторяют quality часть CI без
+  гигабайтной загрузки export templates;
+- добавлен статический `tools/validate-section37-build-contract.py`, фиксирующий branch
+  convention `main/develop/feature/*/fix/*/release/*`, все нормативные CI/release stages,
+  LFS/ignore policy, warnings-as-errors, JSON Schema и headless exports;
+- расширена Git LFS policy для PDF/DOCX/7z наряду с уже отслеживаемыми 3D/audio/video/texture
+  бинарниками; `.gitignore` сохраняет запрет `.godot/bin/obj/.vs`, локальных DB и logs;
+- branch protection намеренно не выдаётся за файл репозитория: required checks
+  `quality` и `debug-exports` должны быть включены в GitHub для `main`, `develop` и
+  `release/*`; отсутствие `.git` в переданном архиве по-прежнему оставляет TASK-006 BLOCKED.
+
+**Статусы:**
+
+- `TASK-138`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-139`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-140`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-141`: `NOT_STARTED` → `IN_PROGRESS` — реальный GitHub CI + release dry-run + branch protection;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Статическая приёмка TASK-140:**
+
+```text
+TASK-140 VERSION PASS: version=0.1.0-alpha.140; tag=<not-required>; changelog=1.
+TASK-140 JSON CONTRACT PASS: json=21; parsed=21; industrySchema=5/5; localizationParity=1.
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+```
+
+**Статический pre-release audit:**
+
+```text
+files eligible for release: 352
+vs accepted TASK-138 archive: +15 / ~3 / -0
+C# source: 143 files, byte-identical to TASK-138
+JSON: 21/21 PASS
+UID: 134/134 unique
+res:// references: 65; broken=0
+YAML workflows: 2/2 PASS
+XML project/build files: 3/3 PASS
+forbidden build/runtime artifacts: 0
+TASK-132 localization gate: PASS
+TASK-134 audio gate: PASS
+TASK-136 diagnostics gate: PASS
+TASK-138 section-36 gate: PASS
+TASK-140 section-37 gate: PASS
+```
+
+Синтетическая проверка Godot bootstrap подтвердила поиск mono editor binary и установку
+двух export templates из заранее подготовленных тестовых архивов без сетевой зависимости.
+Синтетическая проверка release packager (временные export/PDB файлы после проверки
+удалены) фактически создала Windows/Linux/symbols packages, manifest, notes и семь SHA-256
+entries; `sha256sum --check` вернул PASS.
+
+**Ограничение среды:** в среде подготовки отсутствуют `dotnet` и Godot, а архив не содержит
+`.git`, поэтому фактические GitHub Actions jobs, Godot exports и branch-protection settings
+не выдаются за выполненные. До TASK-141 §37 имеет статус `IMPLEMENTED`.
+
+**Минимальная приёмка TASK-141:**
+
+1. Поместить снимок в рабочий Git-репозиторий и открыть PR; jobs `quality` и
+   `debug-exports` должны завершиться green. В quality log требуются restore/build без
+   warnings, xUnit + coverage PASS, JSON contract PASS, migration/recovery PASS и
+   TASK-140 section-37 contract PASS.
+2. Скачать два CI artifact: Windows x64 Debug и Linux x86_64 Debug; Windows build открыть
+   до Main Menu. Сам факт Linux export подтверждается успешным headless export job.
+3. В GitHub branch protection сделать `quality` и `debug-exports` required checks для
+   `main`, `develop` и release branches; запретить merge при красном required check.
+4. Actions → `Release` → `Run workflow` на текущей ветке: manual dry-run должен создать
+   release artifact с Windows/Linux Release, symbols ZIP, manifest, VERSION/CHANGELOG/notes
+   и `SHA256SUMS.txt`, при этом GitHub Release не публикуется.
+5. Когда будет нужен реальный выпуск, tag обязан быть `v0.1.0-alpha.140`; matching tag
+   запускает тот же workflow и разрешает публикацию только после всех gate.
+
+**Граница закрытия:** после green PR CI, manual release dry-run и включённых required
+checks `TASK-141 → VERIFIED`; тогда §37 можно считать закрытым для текущего проекта.
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Verification & Automated Testing Suite / §36 closure
 
 ### Закрытие Developer & Diagnostics по решению владельца продукта
 
@@ -118,7 +236,7 @@ TASK-138 verification suite acceptance PASS: generatorVersion=1; goldenSystems=4
 Фактические coverage percentages должны быть внесены в журнал после запуска; статический
 наличественный контракт не заменяет выполнение `dotnet test`.
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — Developer & Diagnostics Suite / §34 + §35 closure
+## 0B. Предыдущая mega-итерация 2026-08-15 — Developer & Diagnostics Suite / §34 + §35 closure
 
 ### Закрытие sound-итерации по решению владельца продукта
 
@@ -294,7 +412,7 @@ stress/coverage automation должна опираться на TASK-136 diagnos
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
+## 0C. Предыдущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
 
 ### Закрытие localization-итерации по решению владельца продукта
 
@@ -433,7 +551,7 @@ TASK-134 audio architecture acceptance PASS: buses=8/8; cues=19/19; pool2d=8; po
 
 ---
 
-## 0C. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
+## 0D. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
 
 ### Закрытие UI/application-shell итерации по решению владельца продукта
 
@@ -529,7 +647,7 @@ Music/SFX/Voice buses, но полноценный игровой sound runtime 
 
 ---
 
-## 0D. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+## 0E. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
 
 ### Закрытие star-system итерации по решению владельца продукта
 
@@ -656,7 +774,7 @@ accessibility baseline, переиспользуя ранее созданные
 
 ---
 
-## 0E. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0F. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -786,7 +904,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0F. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0G. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -913,7 +1031,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0G. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0H. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -1024,7 +1142,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0H. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0I. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -1173,7 +1291,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0I. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0J. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -1269,7 +1387,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0J. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0K. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -1401,7 +1519,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0K. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0L. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 
@@ -3873,9 +3991,9 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `TOOL-003` | 1.3 | Не использовать GDScript в производственном коде | `IMPLEMENTED` | В архиве нет `.gd` | Подтвердить CI-проверкой |
 | `TOOL-004` | 37.1 | Использовать Git | `IMPLEMENTED` | Архив получен из репозитория; `.gitignore`, `.gitattributes` присутствуют | Записать merge commit SHA из `main` |
 | `TOOL-005` | 37.1 | Git LFS для крупных бинарных файлов | `IMPLEMENTED` | LFS-шаблоны настроены для `.blend`, `.glb`, `.fbx`, аудио, видео и исходников текстур | Проверить `git lfs track` |
-| `TOOL-006` | 37.1 | Не хранить кеш, сборки, IDE-настройки, локальные БД и логи | `IMPLEMENTED` | Запрещённые каталоги отсутствуют в архиве | Позже добавить CI-проверку |
-| `TOOL-007` | 37.2 | `main`, `develop`, `feature/*`, `fix/*`, `release/*` | `IN_PROGRESS` | Имя снимка соответствует feature-итерации; удалённая структура веток архивом не доказывается | Проверить ветки на GitHub |
-| `TOOL-008` | 37.2 | `main` всегда собирается | `IN_PROGRESS` | Архив не содержит `.git`, CI и журнал сборки текущей итерации отсутствуют | Выполнить локальную сборку; затем создать CI |
+| `TOOL-006` | 37.1 | Не хранить кеш, сборки, IDE-настройки, локальные БД и логи | `IMPLEMENTED` | `.gitignore` + TASK-140 repository contract; релизный архив проходит forbidden-artifact audit | Подтвердить green CI на GitHub |
+| `TOOL-007` | 37.2 | `main`, `develop`, `feature/*`, `fix/*`, `release/*` | `IN_PROGRESS` | TASK-140 формализовал branch policy в `docs/BUILD_AND_RELEASE.md`; архив без `.git` не доказывает существование remote branches | TASK-141: проверить/создать ветки и protection на GitHub |
+| `TOOL-008` | 37.2 | `main` всегда собирается | `IN_PROGRESS` | `.github/workflows/ci.yml` запускает quality + Windows/Linux Debug exports для main/develop/release; required check ещё должен быть включён на GitHub | TASK-141: green CI + required checks |
 
 ---
 
@@ -3891,7 +4009,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `CFG-002` | 1.2 | Основной графический API — Vulkan | `IMPLEMENTED` | В `project.godot` явно задано `rendering_device/driver.windows="vulkan"` | Подтвердить фактический драйвер выводом `RenderingServer` при запуске |
 | `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `NOT_STARTED` | Экспортные профили отсутствуют | Вернуться при настройке экспорта |
 | `CFG-004` | 38 | Nullable включён | `IMPLEMENTED` | `<Nullable>enable</Nullable>` присутствует | Пересобрать без предупреждений |
-| `CFG-005` | 38 | Предупреждения контролируются | `IN_PROGRESS` | Политики CI нет | После текущего smoke test добавить warnings-as-errors в CI |
+| `CFG-005` | 38 | Предупреждения контролируются | `IMPLEMENTED` | TASK-140: `-warnaserror` + `ContinuousIntegrationBuild=true` + `Directory.Build.props/TreatWarningsAsErrors` | TASK-141: подтвердить build с 0 warnings в GitHub CI |
 | `CFG-006` | 38 | Нет циклических зависимостей | `IMPLEMENTED` | C#-проект пока один | Проверять при добавлении проектов |
 | `CFG-007` | 38 | Генерация мира не выполняется в `_Process` | `IMPLEMENTED` | `_PhysicsProcess` только обнаруживает переход; worker-задачи считают данные, timer дозированно применяет готовые mesh/collision в main thread | Подтвердить профилированием |
 | `CFG-008` | 37.1 | Хранить import-настройки, исключая `.godot/` | `IMPLEMENTED` | `icon.svg.import` хранится, `.godot/` исключена | Не игнорировать глобально `*.import` |
