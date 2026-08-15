@@ -101,7 +101,7 @@ all_save_text='\n'.join(text(p) for p in (
     'src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs'))
 need('world_scene' not in all_save_text.lower(), 'no duplicate world-scene persistence', failures)
 try:
-    alpha_revision = int(version.rsplit('alpha.', 1)[1])
+    alpha_revision = int(version.rsplit('alpha.', 1)[1].split('.', 1)[0])
 except (IndexError, ValueError):
     alpha_revision = -1
 need(version.startswith('0.1.0-alpha.') and alpha_revision >= 149,

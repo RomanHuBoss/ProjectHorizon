@@ -10,6 +10,26 @@
 
 ## 0. Текущая mega-итерация 2026-08-15 — TASK-150 Multi-Planet Environment subsystem
 
+## 0.1. Hotfix 2026-08-15 — TASK-150.1 build + graceful-exit closure
+
+**Подготовленный снимок:** `ProjectHorizon-main-task150.1-build-graceful-exit-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.150.1`.  
+**Статус:** TASK-150 остаётся `IMPLEMENTED`; TASK-151 остаётся `IN_PROGRESS` до повторной реальной сборки и runtime-приёмки.
+
+**Фактическое внешнее доказательство:** пользовательский Windows/Godot build от 15.08.2026 19:35 дошёл до `Game.Client/CoreCompile`, завершился `0 warnings / 1 error` и выявил единственный blocker `CS0104` в `DeveloperWorkbenchController.cs(232,17)`: неоднозначный `FileAccess` между `Godot.FileAccess` и `System.IO.FileAccess`. Runtime-лог также выявил same-frame graceful-exit race: после успешного flush/scene transition `_Process()` повторно запускал `TryBeginGracefulExit`, когда `Player` уже вышел из SceneTree, а lifetime `CancellationTokenSource` был disposed.
+
+**Исправление:**
+- Planet Preview использует явный `Godot.FileAccess.GetFileAsString`;
+- введён `_exitTransitionCommitted` как одноразовый commit guard;
+- `PollGracefulExitTask()` возвращает признак committed transition, после которого текущий `_Process()` немедленно завершается;
+- `TryBeginGracefulExit()` запрещён после commit/выхода узла из дерева и не читает позицию `Player`, пока тот не находится в SceneTree;
+- позиция игрока читается один раз в локальный `Vector3` до формирования snapshot;
+- `_ExitTree()` фиксирует committed teardown до Cancel/Dispose lifetime CTS;
+- TASK-150 static gate дополнен защитой от неоднозначного `FileAccess` и same-frame graceful-exit re-entry.
+
+**Приёмка hotfix:** clean build должен дать `0 warnings / 0 errors`; затем Return to Main Menu и закрытие окна игры после gameplay не должны выдавать `!is_inside_tree()` из `Player.GlobalPosition` и `ObjectDisposedException: CancellationTokenSource has been disposed`.
+
+
 ### Синхронизация принятой TASK-149 / technical acceptance tail
 
 Владелец продукта после передачи `ProjectHorizon-main-task149-runtime-regression-hotfix.zip` прямо указал: **«будем считать, что всё работает»** и потребовал перейти к следующей итерации. По правилам `DEVELOPMENT_ITERATION_PROTOCOL.md` это фиксируется как explicit **product-owner acceptance waiver** для оставшегося acceptance-tail предыдущего технического блока. Уже полученные фактические показатели не заменяются выдуманными: реальный TASK-148 F5 остаётся доказан строкой `livePath=1; transactionalSwap=1; stateRestored=1; steps=7; maxHostChildren=1; sceneLoadFailures=0; rollbacks=0`; отсутствующие exact clean-build/manual/Compatibility метрики задним числом не реконструируются.

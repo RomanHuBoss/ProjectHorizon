@@ -185,6 +185,7 @@ public partial class SalvageRepairSlice : Node3D
     private int _observedAutosaveFailures;
     private double _autosaveElapsedSeconds;
     private bool _closeRequested;
+    private bool _exitTransitionCommitted;
     private bool _previousAutoAcceptQuit = true;
     private string _status = "";
     private string _acceptanceHud = "READY";
@@ -744,6 +745,8 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _ExitTree()
     {
+        _exitTransitionCommitted = true;
+        _closeRequested = false;
         DisposeArchitectureRuntime();
         DisposeLocalizationRuntime();
         GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
@@ -798,9 +801,16 @@ public partial class SalvageRepairSlice : Node3D
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
-        PollGracefulExitTask();
+        if (PollGracefulExitTask())
+        {
+            return;
+        }
         UpdatePeriodicAutosave(delta);
         TryBeginGracefulExit();
+        if (_exitTransitionCommitted || !IsInsideTree())
+        {
+            return;
+        }
         UpdatePlanetMapPanel();
         UpdateHud();
     }
@@ -5512,13 +5522,14 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _revision++;
+        Vector3 playerPosition = _player.GlobalPosition;
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
             Session,
-            _player.GlobalPosition.X,
-            _player.GlobalPosition.Y,
-            _player.GlobalPosition.Z,
+            playerPosition.X,
+            playerPosition.Y,
+            playerPosition.Z,
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
@@ -5557,7 +5568,10 @@ public partial class SalvageRepairSlice : Node3D
 
     private void TryBeginGracefulExit()
     {
-        if (!_closeRequested || _gracefulExitTask is not null)
+        if (!_closeRequested ||
+            _gracefulExitTask is not null ||
+            _exitTransitionCommitted ||
+            !IsInsideTree())
         {
             return;
         }
@@ -5600,6 +5614,7 @@ public partial class SalvageRepairSlice : Node3D
             _multiStationIndustryAcceptanceTask is not null ||
             (_autosave?.IsBusy ?? false) ||
             _player is null ||
+            !_player.IsInsideTree() ||
             _autosave is null)
         {
             _state = SalvageRepairSliceState.Exiting;
@@ -5608,13 +5623,14 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _revision++;
+        Vector3 playerPosition = _player.GlobalPosition;
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
             Session,
-            _player.GlobalPosition.X,
-            _player.GlobalPosition.Y,
-            _player.GlobalPosition.Z,
+            playerPosition.X,
+            playerPosition.Y,
+            playerPosition.Z,
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
@@ -7192,11 +7208,11 @@ public partial class SalvageRepairSlice : Node3D
             $"crafted={CountCraftedStationRecipes()}/{ObjectiveRecipes.Count}; pending=0");
     }
 
-    private void PollGracefulExitTask()
+    private bool PollGracefulExitTask()
     {
         if (_gracefulExitTask is null || !_gracefulExitTask.IsCompleted)
         {
-            return;
+            return false;
         }
 
         Task<GracefulExitResult> task = _gracefulExitTask;
@@ -7211,6 +7227,8 @@ public partial class SalvageRepairSlice : Node3D
             if (_returnToMainMenuAfterGracefulExit)
             {
                 _returnToMainMenuAfterGracefulExit = false;
+                _closeRequested = false;
+                _exitTransitionCommitted = true;
                 GetTree().Paused = false;
                 Error transition = GetTree().ChangeSceneToFile(MainMenuScenePath);
                 if (transition != Error.Ok)
@@ -7224,14 +7242,19 @@ public partial class SalvageRepairSlice : Node3D
             }
             else
             {
+                _closeRequested = false;
+                _exitTransitionCommitted = true;
                 GetTree().Quit();
             }
+            return true;
         }
         catch (Exception exception)
         {
+            _exitTransitionCommitted = false;
             _closeRequested = false;
             _returnToMainMenuAfterGracefulExit = false;
             Fail("graceful exit", exception);
+            return false;
         }
     }
 

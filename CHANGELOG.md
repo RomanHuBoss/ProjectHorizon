@@ -11,6 +11,15 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.150.1] - 2026-08-15
+
+### Fixed
+
+- Fixed the external Windows/Godot compile blocker `CS0104` in `DeveloperWorkbenchController.cs` by explicitly using `Godot.FileAccess` for the Planet Preview environment catalog.
+- Made graceful exit/main-menu transition idempotent: a completed flush now commits the scene/quit transition once, stops the current `_Process()` frame, refuses new exit work after `_ExitTree`, and snapshots `Player.GlobalPosition` only while the player is inside the active SceneTree.
+- Extended the TASK-150 contract gate with compile-ambiguity and graceful-exit re-entry guards.
+- Fixed the TASK-148 validator version parser so patch revisions such as `alpha.150.1` are correctly accepted as newer than `alpha.149`.
+
 ## [0.1.0-alpha.150] - 2026-08-15
 
 ### Added

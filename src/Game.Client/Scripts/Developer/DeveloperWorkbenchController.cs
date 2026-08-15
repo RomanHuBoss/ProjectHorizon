@@ -229,7 +229,7 @@ public partial class DeveloperWorkbenchController : Control
         double density = DeterministicResourceDensity(planet.Seed);
         PlanetEnvironmentCatalog environmentCatalog =
             PlanetEnvironmentCatalog.LoadFromJson(
-                FileAccess.GetFileAsString(
+                Godot.FileAccess.GetFileAsString(
                     "res://Content/planet_environments.json"));
         PlanetEnvironmentProfile environment =
             new PlanetEnvironmentRuntime(environmentCatalog).BuildProfile(

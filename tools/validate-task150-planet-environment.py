@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -102,6 +103,16 @@ need("planet_atmosphere_shell.gdshader" in preview and
 need("PlanetEnvironmentProfile environment" in workbench and
      "Water={environment.WaterCoverage:P0}" in workbench,
      "developer Planet Preview does not report environment profile", failures)
+
+need("Godot.FileAccess.GetFileAsString" in workbench and
+     re.search(r"(?<!Godot\.)FileAccess\.GetFileAsString", workbench) is None,
+     "Planet Preview contains ambiguous FileAccess reference", failures)
+need("_exitTransitionCommitted" in slice_main and
+     "if (PollGracefulExitTask())" in slice_main and
+     "!_player.IsInsideTree()" in slice_main and
+     "Vector3 playerPosition = _player.GlobalPosition;" in slice_main and
+     "_exitTransitionCommitted = true;" in slice_main,
+     "graceful-exit scene transition is not guarded against same-frame re-entry", failures)
 need("GalaxyNavigation.CurrentPlanetId" in planet_map and
      "GalaxyNavigation.CurrentPlanet.HasAtmosphere" in audio and
      "GalaxyNavigation.CurrentPlanet.Archetype" in survival,
@@ -130,5 +141,5 @@ print(
     "TASK-150 PLANET ENVIRONMENT CONTRACT PASS: "
     "starterPlanets=4/4; archetypes=9/9; radius=20-80km; biomes=max8; "
     "water=1; atmosphere=1; clouds=0-2; climateFactors=1; persistence=1; "
-    "systemMap=1; planetPreview=1; currentPlanetConsumers=1; persistenceBoundary=1; starDirection=1; shaders=3/3; f5=1; xunit=4/4."
+    "systemMap=1; planetPreview=1; currentPlanetConsumers=1; persistenceBoundary=1; starDirection=1; buildHotfix=1; gracefulExitGuard=1; shaders=3/3; f5=1; xunit=4/4."
 )
