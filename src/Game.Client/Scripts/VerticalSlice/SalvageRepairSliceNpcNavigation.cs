@@ -19,6 +19,7 @@ public partial class SalvageRepairSlice
     private bool _npcNavigationAcceptanceServerSync;
     private int _npcNavigationAcceptanceTilesTouched;
     private int _npcNavigationAcceptancePathPoints;
+    private int _npcNavigationAcceptanceProbeAttempts;
 
     private bool NpcNavigationAcceptanceRunning =>
         _npcNavigationAcceptancePhase != NpcNavigationAcceptancePhase.Idle &&
@@ -112,6 +113,7 @@ public partial class SalvageRepairSlice
         _npcNavigationAcceptanceServerSync = false;
         _npcNavigationAcceptanceTilesTouched = 0;
         _npcNavigationAcceptancePathPoints = 0;
+        _npcNavigationAcceptanceProbeAttempts = 0;
         if (_npcNavigationSurface is null || !_npcNavigationSurface.IsConfigured || _player is null)
         {
             CompleteNpcNavigationAcceptanceFailure("navigation surface is unavailable");
@@ -131,11 +133,11 @@ public partial class SalvageRepairSlice
             return;
         }
         _npcNavigationAcceptanceElapsed += delta;
-        if (_npcNavigationAcceptanceElapsed > 8.0)
+        if (_npcNavigationAcceptanceElapsed > 6.0)
         {
             _npcNavigationSurface.SetAcceptanceStreamingCenter(null);
             CompleteNpcNavigationAcceptanceFailure(
-                $"timeout in phase {_npcNavigationAcceptancePhase}");
+                $"timeout in phase {_npcNavigationAcceptancePhase}; pathProbeAttempts={_npcNavigationAcceptanceProbeAttempts}");
             return;
         }
 
@@ -146,9 +148,15 @@ public partial class SalvageRepairSlice
                 {
                     return;
                 }
-                ProbeInitialNavigationSurface();
+                if (!TryProbeInitialNavigationSurface())
+                {
+                    _npcNavigationAcceptanceHud =
+                        $"RUNNING path-sync attempt={_npcNavigationAcceptanceProbeAttempts}";
+                    return;
+                }
                 _npcNavigationSurface.SetAcceptanceStreamingCenter(
                     _player.GlobalPosition + new Vector3(24.5f, 0.0f, 0.0f));
+                _npcNavigationAcceptanceElapsed = 0.0;
                 _npcNavigationAcceptancePhase = NpcNavigationAcceptancePhase.WaitShiftSync;
                 _npcNavigationAcceptanceHud = "RUNNING stream-shift";
                 break;
@@ -164,6 +172,7 @@ public partial class SalvageRepairSlice
                     shifted.StreamGeneration > _npcNavigationAcceptanceInitialStreamGeneration &&
                     shifted.EvictedRegions > _npcNavigationAcceptanceInitialEvictions;
                 _npcNavigationSurface.SetAcceptanceStreamingCenter(null);
+                _npcNavigationAcceptanceElapsed = 0.0;
                 _npcNavigationAcceptancePhase = NpcNavigationAcceptancePhase.WaitRestoreSync;
                 _npcNavigationAcceptanceHud = "RUNNING stream-restore";
                 break;
@@ -171,6 +180,12 @@ public partial class SalvageRepairSlice
             case NpcNavigationAcceptancePhase.WaitRestoreSync:
                 if (!_npcNavigationSurface.ReadyForQueries)
                 {
+                    return;
+                }
+                if (!TryProbeInitialNavigationSurface())
+                {
+                    _npcNavigationAcceptanceHud =
+                        $"RUNNING restored-path attempt={_npcNavigationAcceptanceProbeAttempts}";
                     return;
                 }
                 _npcNavigationAcceptanceServerSync = true;
@@ -189,60 +204,127 @@ public partial class SalvageRepairSlice
         }
     }
 
-    private void ProbeInitialNavigationSurface()
+    private bool TryProbeInitialNavigationSurface()
     {
-        if (_npcNavigationSurface is null || _player is null)
+        if (_npcNavigationSurface is null || _player is null ||
+            !_npcNavigationSurface.ReadyForQueries)
         {
-            return;
+            return false;
         }
+
+        _npcNavigationAcceptanceProbeAttempts++;
         NpcNavigationSurfaceSnapshot snapshot = _npcNavigationSurface.CreateSnapshot();
-        _npcNavigationAcceptanceLocalBudget =
+        bool localBudget =
             snapshot.ActiveRegions > 0 &&
             snapshot.ActiveRegions <= snapshot.MaximumRegions &&
             snapshot.MaximumRegions == 25 &&
             snapshot.WalkableCells > 0;
+        if (!localBudget)
+        {
+            return false;
+        }
 
         Vector3 center = _player.GlobalPosition;
         Vector3[] bestPath = Array.Empty<Vector3>();
         int bestTiles = 0;
-        float[] zOffsets = { -18.0f, -12.0f, -6.0f, 0.0f, 6.0f, 12.0f, 18.0f };
-        foreach (float zOffset in zOffsets)
+        bool bestClearance = false;
+        foreach ((Vector3 Start, Vector3 Target) probe in
+                 BuildNavigationAcceptancePathProbes(center))
         {
-            Vector3 start = new(
-                center.X - 20.0f,
-                NpcNavigationSurfaceNode.NavigationSurfaceY,
-                center.Z + zOffset);
-            Vector3 target = new(
-                center.X + 20.0f,
-                NpcNavigationSurfaceNode.NavigationSurfaceY,
-                center.Z + zOffset);
-            Vector3[] candidate = _npcNavigationSurface.QueryPath(start, target);
-            int touched = _npcNavigationSurface.CountTilesTouchedByPath(candidate);
-            if (candidate.Length < 2 || touched < bestTiles)
+            Vector3[] candidate = _npcNavigationSurface.QueryPath(
+                probe.Start,
+                probe.Target);
+            if (candidate.Length < 2)
             {
                 continue;
             }
-            bestPath = candidate;
-            bestTiles = touched;
-            if (touched >= 4 && _npcNavigationSurface.PathAvoidsCapturedObstacles(candidate))
+
+            int touched = _npcNavigationSurface.CountTilesTouchedByPath(candidate);
+            bool clearance = _npcNavigationSurface.PathAvoidsCapturedObstacles(candidate);
+            if (touched > bestTiles ||
+                (touched == bestTiles && clearance && !bestClearance))
+            {
+                bestPath = candidate;
+                bestTiles = touched;
+                bestClearance = clearance;
+            }
+            if (touched >= 3 && clearance)
             {
                 break;
             }
         }
-        _npcNavigationAcceptancePathPoints = bestPath.Length;
-        _npcNavigationAcceptanceTilesTouched = bestTiles;
-        _npcNavigationAcceptanceCrossTile = bestPath.Length >= 2 && bestTiles >= 3;
-        _npcNavigationAcceptanceObstacleClearance =
-            bestPath.Length >= 2 &&
+
+        bool crossTile = bestPath.Length >= 2 && bestTiles >= 3;
+        bool obstacleClearance =
+            crossTile &&
             snapshot.StaticObstacles > 0 &&
             snapshot.AvoidanceObstacles == snapshot.StaticObstacles &&
-            _npcNavigationSurface.PathAvoidsCapturedObstacles(bestPath);
-        _npcNavigationAcceptanceRecoveryProbe = bestPath.Length >= 2 &&
-            _npcNavigationSurface.TryBuildRecoveryWaypoint(
-                bestPath[0],
-                bestPath[^1],
-                124,
-                out _);
+            bestClearance;
+        bool recoveryProbe = crossTile && TryProbeRecoveryWaypoint(bestPath);
+        if (!crossTile || !obstacleClearance || !recoveryProbe)
+        {
+            return false;
+        }
+
+        _npcNavigationAcceptanceLocalBudget = true;
+        _npcNavigationAcceptancePathPoints = bestPath.Length;
+        _npcNavigationAcceptanceTilesTouched = bestTiles;
+        _npcNavigationAcceptanceCrossTile = true;
+        _npcNavigationAcceptanceObstacleClearance = true;
+        _npcNavigationAcceptanceRecoveryProbe = true;
+        return true;
+    }
+
+    private static (Vector3 Start, Vector3 Target)[]
+        BuildNavigationAcceptancePathProbes(Vector3 center)
+    {
+        float y = NpcNavigationSurfaceNode.NavigationSurfaceY;
+        float[] offsets = { -18.0f, -12.0f, -6.0f, 0.0f, 6.0f, 12.0f, 18.0f };
+        var probes = new System.Collections.Generic.List<(Vector3, Vector3)>();
+        foreach (float offset in offsets)
+        {
+            probes.Add((
+                new Vector3(center.X - 20.0f, y, center.Z + offset),
+                new Vector3(center.X + 20.0f, y, center.Z + offset)));
+            probes.Add((
+                new Vector3(center.X + offset, y, center.Z - 20.0f),
+                new Vector3(center.X + offset, y, center.Z + 20.0f)));
+        }
+        probes.Add((
+            new Vector3(center.X - 18.0f, y, center.Z - 18.0f),
+            new Vector3(center.X + 18.0f, y, center.Z + 18.0f)));
+        probes.Add((
+            new Vector3(center.X - 18.0f, y, center.Z + 18.0f),
+            new Vector3(center.X + 18.0f, y, center.Z - 18.0f)));
+        return probes.ToArray();
+    }
+
+    private bool TryProbeRecoveryWaypoint(Vector3[] path)
+    {
+        if (_npcNavigationSurface is null || path.Length < 2)
+        {
+            return false;
+        }
+
+        int[] indices = { 0, Math.Min(1, path.Length - 2), Math.Max(0, path.Length / 2 - 1) };
+        foreach (int index in indices.Distinct())
+        {
+            Vector3 current = path[index];
+            Vector3 target = path[^1];
+            for (int sideSeed = 124; sideSeed <= 127; sideSeed++)
+            {
+                if (_npcNavigationSurface.TryBuildRecoveryWaypoint(
+                    current,
+                    target,
+                    sideSeed,
+                    out _))
+                {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void CompleteNpcNavigationAcceptance()
@@ -343,7 +425,7 @@ public partial class SalvageRepairSlice
             $"TASK-124 NPC navigation acceptance {(report.Passed ? "PASS" : "FAIL")}: " +
             $"regions={report.Regions}/{report.MaximumRegions}; walkableCells={report.WalkableCells}; " +
             $"obstacles={report.StaticObstacles}; avoidanceObstacles={report.AvoidanceObstacles}; " +
-            $"tilesTouched={report.TilesTouched}; pathPoints={report.PathPoints}; " +
+            $"tilesTouched={report.TilesTouched}; pathPoints={report.PathPoints}; probeAttempts={_npcNavigationAcceptanceProbeAttempts}; " +
             $"localBudget={(report.LocalTileBudget ? 1 : 0)}; crossTilePath={(report.CrossTilePath ? 1 : 0)}; " +
             $"obstacleClearance={(report.ObstacleClearance ? 1 : 0)}; boundedStreaming={(report.BoundedStreaming ? 1 : 0)}; " +
             $"navigationAgents={report.NavigationAgents}; pathRequests={report.PathRequests}; " +

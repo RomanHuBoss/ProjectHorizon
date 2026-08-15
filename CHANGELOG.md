@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.154.1] - 2026-08-15
+
+### Fixed
+- Updated the reviewed TASK-138 golden starter-system fixture from the obsolete one-planet output to the current four-planet Stage 2 starter system and bumped `ProjectHorizonGenerator.Version` to `2`, matching the deterministic world-generation change already introduced by TASK-150.
+- Removed the hard-coded generator-version `1` assumption from the section-36 static gate; the golden manifest must now match the central generator version.
+- Hardened TASK-124 F5 navigation acceptance against NavigationServer3D synchronization races: path probing retries within bounded per-phase timeouts, samples horizontal/vertical/diagonal routes, revalidates after stream restore, and retains the original cross-tile, obstacle-clearance and recovery invariants.
+- Added `validate-task1541-runtime-acceptance-hotfix.py` and strengthened the TASK-149.4 regression gate with explicit navigation-path readiness coverage.
+
 ## [0.1.0-alpha.154] - 2026-08-15
 
 ### Added

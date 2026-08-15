@@ -15,6 +15,7 @@ def need(condition: bool, message: str, failures: list[str]) -> None:
 failures: list[str] = []
 frequency = text("src/Game.Domain/Architecture/SystemFrequencyPolicy.cs")
 nav = text("src/Game.Client/Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs")
+nav_acceptance = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceNpcNavigation.cs")
 application = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceApplicationShell.cs")
 aerial = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAerialNavigation.cs")
 ship = text("src/Game.Client/Scripts/VerticalSlice/NpcShipNavigationNode.cs")
@@ -38,6 +39,14 @@ need("HasNavigationMapSynchronized()" in nav and
      "navigation synchronization state is not tracked", failures)
 need("ReadyForQueries =>" in nav and "HasNavigationMapSynchronized();" in nav,
      "navigation queries are not gated by actual map synchronization", failures)
+need("TryProbeInitialNavigationSurface" in nav_acceptance and
+     "RUNNING path-sync attempt=" in nav_acceptance and
+     "RUNNING restored-path attempt=" in nav_acceptance,
+     "navigation acceptance does not retry until the synchronized map yields a valid path", failures)
+need("BuildNavigationAcceptancePathProbes" in nav_acceptance and
+     "bestTiles >= 3" in nav_acceptance and
+     "PathAvoidsCapturedObstacles" in nav_acceptance,
+     "navigation acceptance cross-tile/clearance probe is not robustly sampled", failures)
 
 need("PathsReferToSameFile" in application and "Path.GetFullPath" in application,
      "TASK-130 profile path normalization missing", failures)
@@ -68,6 +77,6 @@ if failures:
 
 print(
     "TASK-149.4 RUNTIME REGRESSION CLOSURE PASS: "
-    "frequencyGate=1; navIterationGuard=1; profilePathNormalization=1; "
+    "frequencyGate=1; navIterationGuard=1; navPathReadiness=1; profilePathNormalization=1; "
     "orbitResidentShipProbe=1; residencyAwareAerialAcceptance=1; xunitFrequencyBounds=1."
 )

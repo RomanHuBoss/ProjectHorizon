@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "generatorVersion": 1,
+  "generatorVersion": 2,
   "systemCases": [
     {
       "universeSeed": 20260805,
@@ -12,19 +12,46 @@
       "starType": "OrangeDwarf",
       "economyType": "industrial",
       "dangerLevel": 2,
-      "planetCount": 1,
+      "planetCount": 4,
       "planets": [
         {
           "planetId": "planet.vertical_slice",
-          "archetype": "radioactive",
+          "archetype": "temperate",
           "orbitIndex": 1,
           "moonCount": 2,
           "hasAtmosphere": true,
-          "hasWater": false,
+          "hasWater": true,
           "seed": 2098602563083061118
+        },
+        {
+          "planetId": "planet.vertical_slice.02",
+          "archetype": "desert",
+          "orbitIndex": 2,
+          "moonCount": 1,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 4395441907776456285
+        },
+        {
+          "planetId": "planet.vertical_slice.03",
+          "archetype": "frozen",
+          "orbitIndex": 3,
+          "moonCount": 4,
+          "hasAtmosphere": true,
+          "hasWater": true,
+          "seed": 4221165558522861703
+        },
+        {
+          "planetId": "planet.vertical_slice.04",
+          "archetype": "volcanic",
+          "orbitIndex": 4,
+          "moonCount": 1,
+          "hasAtmosphere": true,
+          "hasWater": false,
+          "seed": 9110157915945515618
         }
       ],
-      "checksum": "122c191b338922e38a24dadd60f4ec14d82eb82f05228c85ac31b3ab739c010b"
+      "checksum": "de556c0b329522a2fb698e67106542f6befc0e8ecc2238a8fac42f2ea8616d66"
     },
     {
       "universeSeed": 20260805,

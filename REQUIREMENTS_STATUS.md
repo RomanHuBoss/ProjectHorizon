@@ -2,13 +2,63 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — TASK-154 Planet-Scoped Surface Content
+## 0. Текущая hotfix-итерация 2026-08-15 — TASK-154.1 F5 Runtime Acceptance Regression Closure
+
+**Исходный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.154.1`.  
+**Статус:** hotfix `IMPLEMENTED`; требуется повторный Windows/Godot F5. TASK-153 и TASK-155 остаются `IN_PROGRESS`, но их F5-пункты теперь подтверждены внешним runtime evidence.
+
+### Внешнее runtime evidence пользователя
+
+Godot 4.7.1 .NET / Forward Mobile / Vulkan реально запустил F5 matrix. Подтверждены `PASS` для TASK-128, TASK-150, TASK-152, TASK-154, TASK-148, TASK-130, TASK-132, TASK-134, TASK-136, TASK-142, TASK-144, TASK-110/112/114/116/118/120/122/126 и crafting matrix. Для текущих Stage 2 задач зафиксированы точные строки:
+
+`TASK-152 interplanetary travel acceptance PASS: starterPlanets=4/4; targetSelection=1; targetPersistence=1; fuelDebited=1; guidance=1; worldHandoff=1; arrival=1; transferPersistence=1; sameSystem=1; ...`
+
+`TASK-154 multi-planet surface content acceptance PASS: starterPlanets=4/4; biomeProfiles=4/4; regions=4/4; ecologyClimateAware=1; aquaticPolicy=1; poiClimateAware=1; poiDeterministic=1; perPlanetPersistence=1; legacyStarter=1; ...`
+
+Одновременно выявлены два F5 regression defects:
+
+1. `TASK-138 verification suite acceptance FAIL`: runtime generator уже штатно выдаёт четыре starter planets и checksum `de556c0b329522a2fb698e67106542f6befc0e8ecc2238a8fac42f2ea8616d66`, а reviewed golden fixture всё ещё содержал старую одно-планетную систему и checksum `122c191b...`. Это stale golden contract после TASK-150, а не nondeterministic worldgen.
+2. `TASK-124 NPC navigation acceptance FAIL`: `regions=25/25`, `walkableCells=2458`, `navigationAgents=7`, `pathRequests=80`, `avoidanceSamples=1634`, однако initial acceptance path probe зафиксировал `tilesTouched=0/pathPoints=0`; после завершения FAIL в том же runtime появились реальные `TASK-124 NPC navigation recovery` события. Это подтверждает race между F5 surface/world rebuild и первым NavigationServer path query, а не отсутствие NavigationAgent runtime.
+
+### Исправлено
+
+- `ProjectHorizonGenerator.Version` повышен `1 → 2`, поскольку deterministic starter-system output уже был намеренно изменён TASK-150; generator version теперь соответствует фактической четырёхпланетной генерации.
+- `golden-seeds.v1.json` обновлён только в reviewed starter-system case: 4 planets `temperate/desert/frozen/volcanic`, сохранены фактические stable seeds/moon counts/IDs, checksum установлен в фактически наблюдавшийся `de556c0...`; остальные три fixed system cases и POI fixture не изменены.
+- `validate-section36-testing-contract.py` больше не hard-code `generatorVersion=1`: он извлекает central `ProjectHorizonGenerator.Version` и требует точного совпадения golden manifest.
+- TASK-124 one-shot path probe заменён bounded readiness barrier. Acceptance ждёт не только `MapGetIterationId`, но и фактически ненулевой query path; пробует горизонтальные, вертикальные и диагональные cross-tile маршруты, не снижая критерии `tiles>=3`, obstacle clearance и recovery.
+- После forced streaming shift/restore path/recovery probe выполняется повторно; phase timeout сбрасывается на переходах и ограничен 6 секундами на фазу, чтобы тест не зависал бесконечно. Output дополнен `probeAttempts`.
+- Добавлен `tools/validate-task1541-runtime-acceptance-hotfix.py`; TASK-149.4 gate усилен `navPathReadiness=1`; оба section-37 quality runner запускают новый gate.
+
+### Статусы по предоставленному evidence
+
+- `TRAVEL-ACC-102`: `IN_PROGRESS → VERIFIED` — фактический F5 TASK-152 PASS.
+- `SURFACE-ACC-102`: `IN_PROGRESS → VERIFIED` — фактический F5 TASK-154 PASS.
+- `TASK-153`: остаётся `IN_PROGRESS` — нет присланного clean-build/section-37 и manual target→cruise→landing→cold-restore evidence.
+- `TASK-155`: остаётся `IN_PROGRESS` — нет manual multi-planet variation + independent cold-restore evidence.
+- TASK-124 navigation implementation не откатывается: runtime diagnostics/последующие recovery подтверждают живую подсистему; исправляется ложный negative acceptance race.
+- TASK-138 golden verification contract требует повторного F5 после hotfix; до него новая редакция не объявляется runtime-verified.
+
+### Фактические проверки в среде подготовки
+
+`TASK-154.1 RUNTIME ACCEPTANCE HOTFIX CONTRACT PASS: generatorVersion=2; goldenStarter=4/4; goldenChecksum=1; navQueryRetry=1; navRestoredPath=1; navCrossTileInvariant=1; boundedPhases=1.`
+
+`TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; goldenVersion=2; goldenSystems=4; goldenPoi=20; coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1.`
+
+`TASK-149.4 RUNTIME REGRESSION CLOSURE PASS: frequencyGate=1; navIterationGuard=1; navPathReadiness=1; profilePathNormalization=1; orbitResidentShipProbe=1; residencyAwareAerialAcceptance=1; xunitFrequencyBounds=1.`
+
+В исходном архиве нормативные PDF по-прежнему представлены Git LFS pointer-файлами; render подтвердил отсутствие PDF payload. Поэтому новые трактовки ТЗ не вводятся — hotfix относится к уже зафиксированным §30.1/TASK-124 и §36/TASK-138 требованиям.
+
+---
+
+## 0. Предыдущая mega-итерация 2026-08-15 — TASK-154 Planet-Scoped Surface Content
 
 **Исходный снимок:** `ProjectHorizon-main(20260815-192529).zip` — последняя приложенная пользователем редакция с GitHub.  
 **Подготовленный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`.  
@@ -5374,7 +5424,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `TRAVEL-109` | F5/static/xUnit проверяют целую подсистему | `IMPLEMENTED` | TASK-152 acceptance; validator; xUnit 3/3 |
 | `TRAVEL-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-153 Windows/Godot .NET acceptance |
 | `TRAVEL-ACC-101` | Section-37 + xUnit green | `IN_PROGRESS` | static gates available; actual dotnet unavailable in preparation environment |
-| `TRAVEL-ACC-102` | F5 TASK-152 PASS | `IN_PROGRESS` | выполнить runtime acceptance |
+| `TRAVEL-ACC-102` | F5 TASK-152 PASS | `VERIFIED` | внешний Godot 4.7.1 F5: all target/persistence/fuel/guidance/handoff/arrival invariants = 1 |
 | `TRAVEL-ACC-103` | Manual target→cruise→arrival→landing→cold restore | `IN_PROGRESS` | выполнить gameplay smoke |
 
 ### 8.26. Planet-Scoped Surface Content / Stage 2 real post-travel variation
@@ -5394,7 +5444,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `SURFACE-110` | Static/F5/xUnit acceptance проверяет подсистему целиком | `IMPLEMENTED` | TASK-154 validator; F5 acceptance; xUnit 3/3 source coverage |
 | `SURFACE-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-155 Windows/Godot .NET acceptance |
 | `SURFACE-ACC-101` | Section-37 + xUnit execution green | `IN_PROGRESS` | static gates PASS; actual dotnet unavailable in preparation environment |
-| `SURFACE-ACC-102` | F5 TASK-154 PASS | `IN_PROGRESS` | выполнить runtime acceptance |
+| `SURFACE-ACC-102` | F5 TASK-154 PASS | `VERIFIED` | внешний Godot 4.7.1 F5: 4/4 profiles/regions + ecology/aquatic/POI/persistence/legacy = 1 |
 | `SURFACE-ACC-103` | Manual 4-planet variation + independent cold restore | `IN_PROGRESS` | выполнить gameplay smoke по критериям §0 |
 
 ## 9. Очередь ближайших задач
@@ -5403,12 +5453,12 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | Clean build `0/0`; quality/xUnit; F5 TASK-152 PASS; manual target→cruise→landing→cold restore |
-| 2 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 TASK-154 PASS; manual variation on starter 4 planets; independent discovery/ecology cold restore |
+| 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются clean build `0/0`, quality/xUnit и manual target→cruise→landing→cold restore |
+| 2 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются quality/build evidence, manual variation on starter 4 planets и independent discovery/ecology cold restore |
 | 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
 **Принято владельцем продукта:** TASK-149 technical foundation и TASK-150/TASK-151 Multi-Planet Environment acceptance.  
-**Текущая кодовая реализация:** TASK-154 Planet-Scoped Surface Content (`IMPLEMENTED`).  
+**Текущая кодовая реализация:** TASK-154.1 F5 Runtime Acceptance Regression Closure (`IMPLEMENTED`) поверх TASK-154 Planet-Scoped Surface Content.  
 **Формально первая незакрытая приёмочная задача:** TASK-153; TASK-155 следует сразу после неё.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

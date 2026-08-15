@@ -27,6 +27,7 @@ python3 tools/validate-task149-runtime-regression-closure.py
 python3 tools/validate-task150-planet-environment.py
 python3 tools/validate-task152-interplanetary-travel.py
 python3 tools/validate-task154-multi-planet-surface-content.py
+python3 tools/validate-task1541-runtime-acceptance-hotfix.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

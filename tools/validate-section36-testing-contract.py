@@ -72,18 +72,21 @@ for marker in load_markers:
     need(marker in stress, f"load/stress scenario missing: {marker}")
 need("FullSoakFact" in stress and "PROJECT_HORIZON_FULL_SOAK" in read("tests/ProjectHorizon.Tests/Support/FullSoakFactAttribute.cs"), "full-soak gate missing")
 
+version_match = re.search(r"public const int Version = (\d+);", generator)
+need(version_match is not None, "central generator version missing")
+central_version = int(version_match.group(1)) if version_match else -1
 manifest_path = ROOT / "src/Game.Client/Testing/golden-seeds.v1.json"
 need(manifest_path.exists(), "golden manifest missing")
 if manifest_path.exists():
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    need(manifest.get("generatorVersion") == 1, "golden generator version must match initial central version")
+    need(manifest.get("generatorVersion") == central_version,
+         "golden generator version must match central generator version")
     need(len(manifest.get("systemCases", [])) >= 3, "golden systems must use >=3 fixed seeds/cases")
     poi = manifest.get("poiFixture", {})
     need(poi.get("expectedCount") == 20, "golden POI fixture must cover 20 objects")
     need(len(poi.get("placements", [])) == 20, "golden POI positions/control heights missing")
     for checksum in [*(case.get("checksum", "") for case in manifest.get("systemCases", [])), poi.get("checksum", "")]:
         need(bool(re.fullmatch(r"[a-f0-9]{64}", checksum)), "golden checksum is not SHA-256")
-need("public const int Version = 1" in generator, "central generator version missing")
 need("ProjectHorizonGenerator.Version" in golden_contract, "golden contract is not version-bound")
 need("ProjectHorizonGenerator.Version" in read("src/Game.Client/Scripts/VerticalSlice/GalaxyNavigationRuntime.cs"), "worldgen generator version not centralized")
 
@@ -109,7 +112,7 @@ need("TASK-138" in read("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlic
 status = "PASS" if not failures else "FAIL"
 print(
     f"TASK-138 SECTION-36 CONTRACT {status}: unitGroups=10/10; saveScenarios=8/8; "
-    f"loadScenarios=8/8+abnormal; goldenVersion=1; goldenSystems=4; goldenPoi=20; "
+    f"loadScenarios=8/8+abnormal; goldenVersion={central_version}; goldenSystems=4; goldenPoi=20; "
     f"coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1."
 )
 for failure in failures:
