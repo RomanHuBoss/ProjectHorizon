@@ -5480,6 +5480,7 @@ public partial class SalvageRepairSlice : Node3D
         RunDeveloperDiagnosticsAcceptance();
         RunTestingArchitectureAcceptance();
         RunArchitectureAcceptance();
+        RunPlatformArchitectureAcceptance();
         _status =
             "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }

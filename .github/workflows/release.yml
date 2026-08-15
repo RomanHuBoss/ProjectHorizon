@@ -70,6 +70,7 @@ jobs:
           python3 tools/validate-section36-testing-contract.py
           python3 tools/validate-section37-build-contract.py
           python3 tools/validate-section38-architecture-contract.py
+          python3 tools/validate-platform-architecture-contract.py
 
       - name: Unit tests and coverage
         run: >-
@@ -92,7 +93,7 @@ jobs:
       - name: Install official Godot .NET editor and export templates
         run: ./tools/ci/bootstrap-godot.sh
 
-      - name: Headless Windows and Linux Release exports
+      - name: Headless primary and Compatibility Release exports
         run: ./tools/ci/export-project.sh release
 
       - name: Package release, symbols and checksums
@@ -123,6 +124,8 @@ jobs:
           gh release create "v$PH_VERSION"
           artifacts/release/ProjectHorizon-*-windows-x64.zip
           artifacts/release/ProjectHorizon-*-linux-x86_64.tar.gz
+          artifacts/release/ProjectHorizon-*-windows-x64-compatibility.zip
+          artifacts/release/ProjectHorizon-*-linux-x86_64-compatibility.tar.gz
           artifacts/release/ProjectHorizon-*-symbols.zip
           artifacts/release/release-manifest.json
           artifacts/release/SHA256SUMS.txt

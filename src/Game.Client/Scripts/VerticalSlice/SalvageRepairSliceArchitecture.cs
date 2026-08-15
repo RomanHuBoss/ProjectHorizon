@@ -263,4 +263,38 @@ public partial class SalvageRepairSlice
             GD.PushError($"TASK-142 architecture acceptance FAIL: {exception}");
         }
     }
+    private void RunPlatformArchitectureAcceptance()
+    {
+        try
+        {
+            string domainAssembly = typeof(IDomainEvent).Assembly.GetName().Name ?? string.Empty;
+            string applicationAssembly = typeof(DomainEventBus).Assembly.GetName().Name ?? string.Empty;
+            string clientAssembly = GetType().Assembly.GetName().Name ?? string.Empty;
+            bool layers =
+                string.Equals(domainAssembly, "Game.Domain", StringComparison.Ordinal) &&
+                string.Equals(applicationAssembly, "Game.Application", StringComparison.Ordinal) &&
+                string.Equals(clientAssembly, "Game.Client", StringComparison.Ordinal) &&
+                !string.Equals(domainAssembly, applicationAssembly, StringComparison.Ordinal) &&
+                !string.Equals(applicationAssembly, clientAssembly, StringComparison.Ordinal);
+            RendererProfileSnapshot renderer = RendererProfileDiagnostics.Capture();
+            bool passed = layers && renderer.IsValidForProfile;
+            string result =
+                $"TASK-144 platform architecture acceptance {(passed ? "PASS" : "FAIL")}: " +
+                $"domainAssembly={domainAssembly}; applicationAssembly={applicationAssembly}; " +
+                $"clientAssembly={clientAssembly}; layers={(layers ? 3 : 0)}/3; " +
+                $"renderer={renderer.RenderingMethod}; driver={renderer.RenderingDriver}; " +
+                $"compatibilityFeature={(renderer.CompatibilityExportFeature ? 1 : 0)}; " +
+                $"rendererProfile={(renderer.IsValidForProfile ? 1 : 0)}.";
+            GD.Print(result);
+            if (!passed)
+            {
+                GD.PushError(result);
+            }
+        }
+        catch (Exception exception)
+        {
+            GD.PushError($"TASK-144 platform architecture acceptance FAIL: {exception}");
+        }
+    }
+
 }

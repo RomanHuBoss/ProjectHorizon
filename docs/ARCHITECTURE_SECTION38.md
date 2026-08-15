@@ -47,6 +47,25 @@ The Godot project explicitly pins `physics/common/physics_ticks_per_second=60`. 
 - Save requests are queued through `SaveAutosaveCoordinator` and publish `SaveRequested`; no scene-local direct SQL is permitted.
 - Save/content/generator formats remain explicitly versioned.
 
+## Compiled layer boundaries (TASK-144)
+
+The architecture rule is now represented by three separate .NET assemblies rather than folders
+inside one Godot project:
+
+```text
+Game.Domain <- Game.Application <- Game.Client
+```
+
+- `Game.Domain` contains domain-event contracts, scheduling policy and deterministic generator
+  contracts and has no ProjectReference, Godot or SQLite dependency.
+- `Game.Application` contains application orchestration such as `DomainEventBus` and references
+  only `Game.Domain`.
+- `Game.Client` is the Godot composition/presentation host and references both lower layers.
+
+`Section38ArchitectureTests.LayeredAssembliesHaveOneWayDependencies` verifies the loaded assembly
+graph, while `validate-platform-architecture-contract.py` verifies the project graph and prevents
+Godot/SQLite dependencies from leaking into Domain/Application.
+
 ## Domain / Godot separation
 
 - Domain/runtime/catalog/model classes must not use `Godot.Node` as their data model.
@@ -77,8 +96,8 @@ Section-38 xUnit tests live in:
 tests/ProjectHorizon.Tests/Architecture/Section38ArchitectureTests.cs
 ```
 
-`tools/run-section37-quality.*` and both GitHub Actions workflows execute the section-38 contract in addition to the previous quality gates.
+`tools/run-section37-quality.*` and both GitHub Actions workflows execute the section-38 contract plus `tools/validate-platform-architecture-contract.py` in addition to the previous quality gates.
 
 ## Runtime acceptance
 
-One gameplay `F5` run includes `TASK-142`. It validates all eleven typed events on an isolated bus, the live subscription set, 10 Hz / 2 Hz fixed-rate gates over a 60 Hz physics sample, and ecology frequency mapping. It does not modify the gameplay save slot merely to prove the event bus contract.
+One gameplay `F5` run includes `TASK-142` and `TASK-144`. TASK-142 validates all eleven typed events on an isolated bus, the live subscription set, 10 Hz / 2 Hz fixed-rate gates over a 60 Hz physics sample, and ecology frequency mapping. TASK-144 verifies that domain/application/client types are loaded from `Game.Domain`, `Game.Application` and `Game.Client` respectively and that the observed renderer profile is internally consistent. A separate Compatibility export/run must report `feature=compatibility`, `method=gl_compatibility` and an `opengl3...` driver before the fallback requirement can be marked VERIFIED. The probes do not modify the gameplay save slot merely to prove these contracts.

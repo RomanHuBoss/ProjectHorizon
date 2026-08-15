@@ -2,6 +2,10 @@
 # Visual Studio 2012
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Client", "Game.Client.csproj", "{6E7E1343-2184-425F-B6B9-88D649620088}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Domain", "..\Game.Domain\Game.Domain.csproj", "{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Game.Application", "..\Game.Application\Game.Application.csproj", "{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 	Debug|Any CPU = Debug|Any CPU
@@ -9,6 +13,18 @@ Global
 	ExportRelease|Any CPU = ExportRelease|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.ExportDebug|Any CPU.ActiveCfg = Debug|Any CPU
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.ExportDebug|Any CPU.Build.0 = Debug|Any CPU
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.ExportRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{51A4BB67-07BC-41EF-AD76-E9E51A1DB52A}.ExportRelease|Any CPU.Build.0 = Release|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.ExportDebug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.ExportDebug|Any CPU.Build.0 = Debug|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.ExportRelease|Any CPU.ActiveCfg = Release|Any CPU
+		{1F132F79-5A3B-4A3B-B0A5-A5F1B50BE7A2}.ExportRelease|Any CPU.Build.0 = Release|Any CPU
 		{6E7E1343-2184-425F-B6B9-88D649620088}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6E7E1343-2184-425F-B6B9-88D649620088}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6E7E1343-2184-425F-B6B9-88D649620088}.ExportDebug|Any CPU.ActiveCfg = ExportDebug|Any CPU

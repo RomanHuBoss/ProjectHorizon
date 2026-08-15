@@ -34,6 +34,13 @@ public partial class MainMenuController : Control
             GameLogLevel.Information,
             GameLogCategory.BOOT,
             "main menu ready");
+        RendererProfileSnapshot renderer = RendererProfileDiagnostics.Capture();
+        string rendererEvidence = RendererProfileDiagnostics.BuildEvidence(renderer);
+        GD.Print(rendererEvidence);
+        StructuredGameLogger.Log(
+            renderer.IsValidForProfile ? GameLogLevel.Information : GameLogLevel.Error,
+            GameLogCategory.BOOT,
+            rendererEvidence);
         AudioDirector audio = AudioDirector.EnsureInstalled(GetTree());
         audio.SetEnvironment(GameAudioEnvironment.Vacuum, force: true);
         audio.SetMusicState(GameMusicState.Menu);

@@ -49,7 +49,7 @@ def collect_symbols(target: Path) -> list[Path]:
         rel = path.relative_to(ROOT)
         if any(part in {"artifacts", "TestResults"} for part in rel.parts):
             continue
-        if "Game.Client" not in path.name and "Game.Client" not in str(rel):
+        if not any(name in path.name or name in str(rel) for name in ("Game.Client", "Game.Domain", "Game.Application")):
             continue
         candidates.append(path)
     if not candidates:
@@ -83,10 +83,17 @@ def main() -> int:
     exports = Path(args.exports).resolve()
     windows = exports / "windows-release"
     linux = exports / "linux-release"
-    if not windows.is_dir() or not any(windows.rglob("*")):
-        raise SystemExit(f"ERROR: Windows Release export missing: {windows}")
-    if not linux.is_dir() or not any(linux.rglob("*")):
-        raise SystemExit(f"ERROR: Linux Release export missing: {linux}")
+    windows_compat = exports / "windows-compatibility-release"
+    linux_compat = exports / "linux-compatibility-release"
+    required_exports = {
+        "Windows Release": windows,
+        "Linux Release": linux,
+        "Windows Compatibility Release": windows_compat,
+        "Linux Compatibility Release": linux_compat,
+    }
+    for label, tree in required_exports.items():
+        if not tree.is_dir() or not any(tree.rglob("*")):
+            raise SystemExit(f"ERROR: {label} export missing: {tree}")
 
     output = Path(args.output).resolve()
     if output.exists():
@@ -95,9 +102,13 @@ def main() -> int:
 
     win_archive = output / f"ProjectHorizon-{args.version}-windows-x64.zip"
     linux_archive = output / f"ProjectHorizon-{args.version}-linux-x86_64.tar.gz"
+    win_compat_archive = output / f"ProjectHorizon-{args.version}-windows-x64-compatibility.zip"
+    linux_compat_archive = output / f"ProjectHorizon-{args.version}-linux-x86_64-compatibility.tar.gz"
     symbols_archive = output / f"ProjectHorizon-{args.version}-symbols.zip"
     zip_tree(windows, win_archive)
     tar_tree(linux, linux_archive)
+    zip_tree(windows_compat, win_compat_archive)
+    tar_tree(linux_compat, linux_compat_archive)
 
     symbols = collect_symbols(output)
     staging = output / "symbols-staging"
@@ -117,22 +128,31 @@ def main() -> int:
         "godotVersion": "4.7.1",
         "dotnetGlobalJson": json.loads((ROOT / "global.json").read_text(encoding="utf-8"))["sdk"]["version"],
         "generatedUtc": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "platforms": ["windows-x64", "linux-x86_64"],
+        "platforms": [
+            "windows-x64-mobile-vulkan",
+            "linux-x86_64-mobile-vulkan",
+            "windows-x64-compatibility-opengl3",
+            "linux-x86_64-compatibility-opengl3",
+        ],
         "symbolFileCount": len(symbols),
         "artifacts": [],
     }
-    for path in (win_archive, linux_archive, symbols_archive):
+    for path in (win_archive, linux_archive, win_compat_archive, linux_compat_archive, symbols_archive):
         manifest["artifacts"].append({"file": path.name, "bytes": path.stat().st_size, "sha256": sha256(path)})
     manifest_path = output / "release-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
-    checksum_targets = [win_archive, linux_archive, symbols_archive, manifest_path, output / "VERSION", output / "CHANGELOG.md", output / "RELEASE_NOTES.md"]
+    checksum_targets = [
+        win_archive, linux_archive, win_compat_archive, linux_compat_archive, symbols_archive,
+        manifest_path, output / "VERSION", output / "CHANGELOG.md", output / "RELEASE_NOTES.md"
+    ]
     checksums = "".join(f"{sha256(path)}  {path.name}\n" for path in sorted(checksum_targets, key=lambda p: p.name))
     (output / "SHA256SUMS.txt").write_text(checksums, encoding="utf-8")
 
     print(
-        f"TASK-140 RELEASE PACKAGE PASS: version={args.version}; windows=1; linux=1; "
-        f"symbols={len(symbols)}; checksums={len(checksum_targets)}; manifest=1; changelog=1."
+        f"TASK-144 RELEASE PACKAGE PASS: version={args.version}; primaryWindows=1; primaryLinux=1; "
+        f"compatibilityWindows=1; compatibilityLinux=1; symbols={len(symbols)}; "
+        f"checksums={len(checksum_targets)}; manifest=1; changelog=1."
     )
     return 0
 

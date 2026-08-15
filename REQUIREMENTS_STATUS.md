@@ -2,13 +2,85 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-section38-architecture-hardening.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task144-platform-architecture-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — Architecture & Code-Quality Hardening / §38 closure
+## 0. Текущая mega-итерация 2026-08-15 — Layered Architecture + Compatibility Renderer / platform foundation closure
+
+### TASK-144 — compiled layer boundaries and executable Compatibility/OpenGL fallback
+
+**Исходный снимок:** `ProjectHorizon-main(9)(2).zip` — последняя редакция GitHub, приложенная пользователем.  
+**Подготовленный снимок:** `ProjectHorizon-main-task144-platform-architecture-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §1.2 (основной Mobile/Vulkan и резервный Compatibility/OpenGL 3.3 профиль), §4.1 (многослойная архитектура), §37 (CI/export/release) и §38 (направление зависимостей и Godot-independent domain logic).
+
+**Ограничение исходного снимка по нормативному PDF:** `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf` и соответствующий DOCX в GitHub ZIP являются Git LFS pointer-файлами, а не payload документов. Для PDF указан LFS OID `sha256:1facda8ebc41f1fd161f4b3ce9d2c3847b61a3aae0f9283e45bf9999f50f3dd8`, размер payload `1774256`. Поэтому в этой итерации нормативная карта берётся из ранее извлечённых и уже зафиксированных в `REQUIREMENTS_STATUS.md` требований §1.2/§4.1/§37/§38; новые требования ТЗ не выдумываются и сам pointer не изменяется.
+
+**Решение по масштабу:** вместо следующей одиночной игровой функции закрывается единый platform/architecture block — два оставшихся технических хвоста `ARCH-001` и `CFG-003`, а также их CI/release enforcement. `TASK-143` не объявляется `VERIFIED`: clean build/xUnit/Godot F5 предыдущего §38 по-прежнему требуют реального runtime на машине с Godot/.NET.
+
+**Реализовано:**
+
+- создана реальная compiled boundary `Game.Domain` (`net8.0`): typed domain events, `SystemFrequencyPolicy`/`SystemFrequencyGate` и `ProjectHorizonGenerator.Version` физически вынесены из Godot project tree; проект не содержит Godot, SQLite и project references;
+- создана compiled boundary `Game.Application` (`net8.0`) с `DomainEventBus`; единственная project dependency — `Game.Domain`;
+- `Game.Client` остаётся Godot composition/presentation host и явно ссылается на `Game.Domain` и `Game.Application`; solution содержит все три production assemblies; reverse/cyclic project references отсутствуют;
+- section-38 validator адаптирован к новым физическим слоям и теперь проверяет публичные interfaces/async contracts во всех production assemblies, а также граф `Domain <- Application <- Client`;
+- xUnit architecture suite проверяет фактические assembly names и отсутствие обратных ссылок/Godot/SQLite в Domain/Application;
+- основной runtime профиль явно фиксирует `mobile` + Vulkan для Windows/Linux и разрешает штатный RenderingDevice fallback to OpenGL 3; для Compatibility profile заданы `gl_compatibility` + native `opengl3` (OpenGL 3.3 desktop);
+- добавлены отдельные export presets `Windows Desktop Compatibility` и `Linux Compatibility` с custom feature `compatibility`; всего desktop presets теперь `4/4`;
+- headless CI/export pipeline создаёт четыре Debug и четыре Release export tree: primary Windows/Linux + Compatibility Windows/Linux;
+- release packager создаёт отдельные Compatibility archives, включает их в manifest/SHA-256 и собирает portable PDB также для `Game.Domain` и `Game.Application`;
+- Main Menu печатает фактически выбранные `RenderingServer.GetCurrentRenderingMethod()` и `GetCurrentRenderingDriverName()`; dedicated Compatibility export считается корректным только при `gl_compatibility` + `opengl3*`;
+- общий F5 acceptance после TASK-142 дополнительно печатает `TASK-144 platform architecture acceptance`: он проверяет, что event contracts, event bus и Godot runtime действительно загружены из `Game.Domain`, `Game.Application`, `Game.Client`, и валидирует текущий renderer profile;
+- добавлен статический `tools/validate-platform-architecture-contract.py`; он включён в local quality scripts, PR CI и release workflow;
+- version повышена до `0.1.0-alpha.144`; README, architecture/build docs, changelog и журнал синхронизированы.
+
+**Изменённые файлы относительно `ProjectHorizon-main(9)(2).zip`:** `added=8`, `changed=23`, `removed=7`. Новые production projects: `src/Game.Domain/*`, `src/Game.Application/*`; новый runtime diagnostic: `RendererProfileDiagnostics.cs`; изменены composition project/solution, `project.godot`, `export_presets.cfg`, Main Menu/F5 acceptance, CI/release scripts/workflows, section-36/37/38 validators, xUnit architecture tests, README/docs/version/changelog. Семь удалений — прежние копии перенесённых architecture/domain файлов и их Godot `.uid`; их логика не удалена, а физически перенесена в новые assemblies.
+
+**Дополнительные фактически выполненные проверки:**
+
+- `VERSION/CHANGELOG`: PASS, `0.1.0-alpha.144`;
+- Python syntax изменённых validators/packager: PASS; shell `bash -n`: PASS; XML project/build files: `5/5` PASS; GitHub workflow YAML: `2/2` PASS;
+- changed/new C# lexical-regression audit: `9/9` PASS; существующие Pygments limitations в старом большом `SalvageRepairSlice.cs` не увеличились (`56 → 56` lexer error tokens), новые TASK-144 C# files дают `0` error tokens;
+- `.uid`: `135/135` уникальны; `res://`: `66`, `broken=0` (две ссылки `.import` на исключаемый `.godot/imported` корректно не считаются source references); scene/resource structural audit: `11` files PASS; единственный F5 binding сохранён, нового hotkey conflict нет;
+- synthetic export harness (не настоящий Godot): `debug 4/4`, `release 4/4`; synthetic release packaging: four platforms, `5` distributable archives, `3` assembly PDB inputs, `9/9` SHA-256 entries PASS; созданные synthetic `artifacts/bin` после теста удалены. Эта проверка доказывает wiring scripts/package logic, но **не** заменяет Godot import/export или C# build.
+
+**Статусы:**
+
+- `TASK-142` остаётся `IMPLEMENTED`;
+- `TASK-143` остаётся `IN_PROGRESS` — требуется реальный clean build/xUnit/F5 §38;
+- `TASK-144`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-145`: `NOT_STARTED` → `IN_PROGRESS` — clean build + primary/Compatibility runtime/export acceptance;
+- `ARCH-001`: `IN_PROGRESS` → `IMPLEMENTED`;
+- `CFG-003`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-006` остаётся `BLOCKED`, поскольку поставочный ZIP не содержит `.git` metadata.
+
+**Статическая приёмка TASK-144:**
+
+```text
+TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
+TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS: layers=3/3; domainGodotFree=1; applicationGodotFree=1; projectCycles=0; primaryRenderer=mobile/vulkan; compatibilityRenderer=gl_compatibility/opengl3; desktopPresets=4/4; debugExports=4/4; releaseExports=4/4; runtimeRendererEvidence=1.
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=4/4; releaseExports=4/4; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+```
+
+Одновременно проходят TASK-132 localization, TASK-134 audio, TASK-136 developer diagnostics, TASK-138 testing contract и JSON/schema gates. В среде подготовки отсутствуют `dotnet` и Godot, поэтому фактические C# compile, xUnit execution, Godot import/export и runtime здесь не заявляются.
+
+**Минимальная приёмка TASK-145:**
+
+1. Выполнить `tools\clean-build-windows10.cmd`: требуется реальный `CoreCompile`, `0 errors`, `0 warnings` для client и новых project references.
+2. Выполнить `tools\run-section37-quality.cmd`: должны пройти xUnit/coverage и contract gates до `TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS`.
+3. Обычный запуск проекта/primary Windows export: в Output должна появиться строка `TASK-144 renderer profile PASS`; на Vulkan-capable Windows ожидаются `feature=primary; method=mobile; driver=vulkan`. Штатный engine fallback на `gl_compatibility/opengl3*` также является допустимым fallback, но его надо прислать как отдельный факт.
+4. В gameplay нажать `F5`: требуется `TASK-144 platform architecture acceptance PASS` с `domainAssembly=Game.Domain; applicationAssembly=Game.Application; clientAssembly=Game.Client; layers=3/3; rendererProfile=1`.
+5. Запустить CI artifact/export `ProjectHorizon-windows-x64-compatibility-debug` либо локально экспортировать preset `Windows Desktop Compatibility`: стартовая строка обязана показать `feature=compatibility; method=gl_compatibility; driver=opengl3...; compatibility=1`; затем F5 также должен вернуть TASK-144 `PASS`.
+6. Для Linux достаточно green headless export обоих presets; при наличии Linux runtime повторить renderer evidence для primary и Compatibility.
+7. После F5 выполнить короткую регрессию Main Menu → New/Continue → gameplay, pause/settings, один resource interaction и graceful exit; существующие save/autosave и UI flows не должны регрессировать.
+
+**Граница закрытия:** после clean build/quality, primary F5 и отдельного Compatibility runtime/export smoke `TASK-145 → VERIFIED`, `ARCH-001 → VERIFIED`, `CFG-003 → VERIFIED`. После этого platform/architecture foundation считается закрытым; следующие итерации снова можно выбирать по gameplay/content roadmap, не возвращаясь к проектным границам или renderer profiles без подтверждённой регрессии либо изменения ТЗ.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — Architecture & Code-Quality Hardening / §38 closure
 
 ### Закрытие §37 по решению владельца продукта
 
@@ -4126,16 +4198,16 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Раздел ТЗ | Требование | Статус | Доказательство / замечание | Следующее действие |
 |---|---:|---|---|---|---|
-| `ARCH-001` | 4.1 | Многослойная архитектура | `IN_PROGRESS` | Пока создан только `Game.Client` | Создавать библиотеки по мере появления логики, не заранее |
+| `ARCH-001` | 4.1 | Многослойная архитектура | `IMPLEMENTED` | TASK-144: compiled `Game.Domain <- Game.Application <- Game.Client`; xUnit + static no-reverse-dependency gates | TASK-145 clean build/F5 |
 | `ARCH-002` | 4.1 | Доменная логика не зависит от `Godot.Node` | `IMPLEMENTED` | TASK-142 gate: runtime/catalog/domain classes и typed event contracts не используют `Godot.Node` как модель; event bus Godot-independent | TASK-143 runtime/quality gate |
 | `ARCH-003` | 4.2 | Godot-клиент в `src/Game.Client` | `IMPLEMENTED` | Структура соответствует ТЗ | Подтвердить сборкой из чистого клона |
 | `ARCH-006` | 4.3 | Клиент содержит сцены, камеры, управление и адаптеры взаимодействия | `IMPLEMENTED` | `DebugWorld`, `TerrainChunkPrototype`, `CubeSpherePrototype`, `PlanetaryPlayer`, управление, взаимодействие и бой | Довести Прототип A до приёмки |
 | `CFG-001` | 1.2 | Основной renderer — Mobile | `IMPLEMENTED` | `renderer/rendering_method="mobile"` | Подтвердить запуском |
 | `CFG-002` | 1.2 | Основной графический API — Vulkan | `IMPLEMENTED` | В `project.godot` явно задано `rendering_device/driver.windows="vulkan"` | Подтвердить фактический драйвер выводом `RenderingServer` при запуске |
-| `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `NOT_STARTED` | Экспортные профили отсутствуют | Вернуться при настройке экспорта |
+| `CFG-003` | 1.2 | Compatibility/OpenGL 3.3 — резервный профиль | `IMPLEMENTED` | TASK-144: Windows/Linux Compatibility presets, custom feature override, OpenGL 3 driver, CI/release artifacts | TASK-145 Compatibility runtime/export smoke |
 | `CFG-004` | 38 | Nullable включён | `IMPLEMENTED` | `<Nullable>enable</Nullable>` присутствует | Пересобрать без предупреждений |
 | `CFG-005` | 38 | Предупреждения контролируются | `VERIFIED` | TASK-140 warnings-as-errors implementation; TASK-141 принят владельцем продукта | Сохранять 0-warning CI policy |
-| `CFG-006` | 38 | Нет циклических зависимостей | `IMPLEMENTED` | C#-проект пока один | Проверять при добавлении проектов |
+| `CFG-006` | 38 | Нет циклических зависимостей | `IMPLEMENTED` | TASK-144: три production projects, one-way `Domain <- Application <- Client`; static graph gate `projectCycles=0` + xUnit assembly gate | TASK-145 clean build |
 | `CFG-007` | 38 | Генерация мира не выполняется в `_Process` | `IMPLEMENTED` | `_PhysicsProcess` только обнаруживает переход; worker-задачи считают данные, timer дозированно применяет готовые mesh/collision в main thread | Подтвердить профилированием |
 | `CFG-008` | 37.1 | Хранить import-настройки, исключая `.godot/` | `IMPLEMENTED` | `icon.svg.import` хранится, `.godot/` исключена | Не игнорировать глобально `*.import` |
 | `CFG-009` | 38.1 | Частоты systems 60/60/10/2 Hz, background economy 0.2–1 Hz | `IMPLEMENTED` | `SystemFrequencyPolicy`; explicit Godot 60 Hz; NPC/fauna throttling; TASK-142 gate | TASK-143 runtime smoke |

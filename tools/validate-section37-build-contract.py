@@ -48,7 +48,10 @@ need("TreatWarningsAsErrors" in props, "Directory.Build.props lacks CI warnings-
 
 need('name="Windows Desktop"' in exports and 'platform="Windows Desktop"' in exports, "Windows export preset missing")
 need('name="Linux"' in exports and 'platform="Linux"' in exports, "Linux export preset missing")
-need('binary_format/architecture="x86_64"' in exports, "x86_64 export architecture missing")
+need('name="Windows Desktop Compatibility"' in exports, "Windows Compatibility export preset missing")
+need('name="Linux Compatibility"' in exports, "Linux Compatibility export preset missing")
+need(exports.count('binary_format/architecture="x86_64"') == 4, "all four desktop export presets must be x86_64")
+need(exports.count('custom_features="compatibility"') == 2, "Compatibility feature tag missing from fallback presets")
 need("--headless" in export_script and "--export-debug" not in export_script, "export script must use generic headless debug/release mode")
 need('mode="--export-$CONFIG"' in export_script, "export script does not select debug/release CLI mode")
 need("godotengine/godot-builds/releases/download" in bootstrap, "Godot bootstrap is not pinned to official build releases")
@@ -61,7 +64,11 @@ for marker in [
     "package-release.py", "SHA256SUMS.txt", "gh release create",
 ]:
     need(marker in release, f"release stage missing: {marker}")
-for artifact in ["windows-x64.zip", "linux-x86_64.tar.gz", "symbols.zip", "release-manifest.json", "SHA256SUMS.txt"]:
+for artifact in [
+    "windows-x64.zip", "linux-x86_64.tar.gz",
+    "windows-x64-compatibility.zip", "linux-x86_64-compatibility.tar.gz",
+    "symbols.zip", "release-manifest.json", "SHA256SUMS.txt"
+]:
     need(artifact in package or artifact in release, f"release artifact contract missing: {artifact}")
 need("*.pdb" in package and "no Project Horizon portable PDB symbols" in package, "symbols archive does not enforce PDB presence")
 need("sha256" in package.lower(), "release checksums are not generated")
@@ -87,7 +94,7 @@ for action in ["actions/checkout@v7", "actions/setup-dotnet@v6", "actions/upload
 status = "PASS" if not failures else "FAIL"
 print(
     f"TASK-140 SECTION-37 CONTRACT {status}: branches=5/5; prPipeline=8/8; "
-    f"debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; "
+    f"debugExports=4/4; releaseExports=4/4; symbols=1; checksums=1; version=1; changelog=1; "
     f"jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1."
 )
 for failure in failures:

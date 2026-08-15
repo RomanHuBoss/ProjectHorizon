@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice, навигационная глава PDF v2.0 §30, star-system runtime §15, UI/application shell + localization §31, sound architecture §32, Developer/Diagnostics §34–§35 и Verification Suite §36 закрыты принятой владельцем продукта приёмкой. Текущая mega-итерация TASK-140 реализует §37 Build/CI/Release Engineering: pull-request quality gate, Windows/Linux headless exports, warnings-as-errors, version/changelog contract и воспроизводимую release-упаковку с symbols/manifest/SHA-256.
+Stage 1 vertical slice и ранее принятые подсистемы сохранены; §37 Build/CI/Release Engineering принят, а §38 Architecture & Code-Quality Hardening реализован и ожидает реальный clean-build/F5 smoke (`TASK-143`). Текущая mega-итерация `TASK-144` закрывает оставшийся platform/architecture foundation: физические .NET-границы `Game.Domain ← Game.Application ← Game.Client` и исполняемый Compatibility/OpenGL fallback для Windows/Linux, включая CI/release profiles и runtime evidence.
 
-### Подсистемы through TASK-139 — `VERIFIED`; §37 Build/CI/Release Engineering — `IMPLEMENTED`
+### TASK-144 platform/architecture foundation — `IMPLEMENTED`; runtime acceptance TASK-143/TASK-145 — `IN_PROGRESS`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -416,7 +416,7 @@ tools\run-section36-tests.cmd --full-soak
 Pull request / integration CI выполняет restore, C# build с `ContinuousIntegrationBuild=true`
 и warnings-as-errors, xUnit + coverage thresholds, JSON/Industry Schema validation,
 изолированные persistence migration/recovery tests, затем headless Godot 4.7.1 .NET exports
-для Windows x64 Debug и Linux x86_64 Debug. Локальный quality-equivalent запускается:
+четырёх desktop-профилей: primary Windows/Linux и Compatibility/OpenGL Windows/Linux. Локальный quality-equivalent запускается:
 
 ```bat
 tools\run-section37-quality.cmd
@@ -429,8 +429,8 @@ tools\run-section37-quality.cmd
 ```
 
 Release workflow можно сначала запустить вручную (`workflow_dispatch`) как dry-run: он
-повторяет quality gates, создаёт Windows/Linux Release exports, отдельный portable-PDB
-symbols archive, `release-manifest.json`, `RELEASE_NOTES.md` и `SHA256SUMS.txt`, но ничего
+повторяет quality gates, создаёт primary + Compatibility Windows/Linux Release exports, отдельный
+portable-PDB symbols archive, `release-manifest.json`, `RELEASE_NOTES.md` и `SHA256SUMS.txt`, но ничего
 не публикует. Push тега строго `v<VERSION>` запускает тот же pipeline и после успешной
 упаковки публикует GitHub Release. Текущая application version хранится в `VERSION`,
 а release notes — в `CHANGELOG.md`; tag/version mismatch является hard failure.
@@ -439,13 +439,41 @@ symbols archive, `release-manifest.json`, `RELEASE_NOTES.md` и `SHA256SUMS.txt`
 
 ```text
 python tools/validate-section37-build-contract.py
-TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=4/4; releaseExports=4/4; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
 ```
 
 Подробная branch/release policy: `docs/BUILD_AND_RELEASE.md`. Настройки branch protection
 (`quality` и `debug-exports` как required checks) находятся на стороне GitHub. TASK-140/141
 приняты владельцем продукта как `VERIFIED`; текущий архив по-прежнему не содержит `.git`,
 поэтому repository metadata не приписывается локальной проверке.
+
+### Platform/architecture foundation (TASK-144)
+
+Кодовая база теперь имеет физические границы сборок:
+
+```text
+src/Game.Domain/       # domain contracts/policies; без Godot/SQLite
+src/Game.Application/  # application orchestration; зависит только от Game.Domain
+src/Game.Client/       # Godot host/presentation/adapters; компонует оба слоя
+```
+
+Допустимое направление зависимостей: `Game.Domain ← Game.Application ← Game.Client`.
+Обратные project references, Godot/SQLite references в Domain/Application и схлопывание
+слоёв обратно в один client project блокируются `tools/validate-platform-architecture-contract.py`
+и xUnit architecture tests.
+
+Для desktop shipping определены четыре export preset: `Windows Desktop`, `Linux`,
+`Windows Desktop Compatibility`, `Linux Compatibility`. Primary профиль использует Mobile/Vulkan;
+Compatibility presets добавляют feature `compatibility`, которое переключает project setting на
+`gl_compatibility`/`opengl3`. При старте `RendererProfileDiagnostics` печатает фактические renderer
+и driver, а TASK-144 F5 probe одновременно подтверждает три разные runtime assemblies. CI/release
+создают и primary, и Compatibility artifacts; fallback больше не является только декларацией README.
+
+Статический gate:
+
+```text
+TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS: layers=3/3; domainGodotFree=1; applicationGodotFree=1; projectCycles=0; primaryRenderer=mobile/vulkan; compatibilityRenderer=gl_compatibility/opengl3; desktopPresets=4/4; debugExports=4/4; releaseExports=4/4; runtimeRendererEvidence=1.
+```
 
 ### §38 Architecture & code-quality hardening (TASK-142)
 
@@ -495,7 +523,7 @@ python tools/validate-section36-testing-contract.py
 TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; goldenVersion=1; goldenSystems=4; goldenPoi=20; coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1.
 
 python tools/validate-section37-build-contract.py
-TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=2/2; releaseExports=2/2; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
+TASK-140 SECTION-37 CONTRACT PASS: branches=5/5; prPipeline=8/8; debugExports=4/4; releaseExports=4/4; symbols=1; checksums=1; version=1; changelog=1; jsonSchema=1; migrations=1; warningsAsErrors=1; headlessGodot=1.
 
 python tools/validate-section38-architecture-contract.py
 TASK-142 SECTION-38 CONTRACT PASS: nullable=1; warningsAsErrors=1; publicInterfaces=5; asyncCancellation=1; typedEvents=11/11; eventBus=1; frequencies=60/60/10/2; backgroundEconomy=0.2-1Hz; telemetryBatched=1; sqlBoundary=1; exceptions=1; stableLayers=1; nodeDomainSeparation=1; noWorldgenInProcess=1; projectCycles=0; serializationVersioned=1; uiDomainSeparation=1.
@@ -763,7 +791,7 @@ src/Game.Client/project.godot
 ```
 
 2. Дождаться импорта ресурсов и выполнить сборку C#.
-3. Нажать `F5`: стартует `ShipFlightPrototype.tscn` с компактным HUD.
+3. Нажать `F5`: стартует `MainMenu`; выбрать New Game/Continue для входа в gameplay. В запущенном gameplay клавиша `F5` выполняет встроенные acceptance probes текущего vertical slice.
 4. Проверить ручной free-flight:
    - W/S — тяга;
    - A/D и Space/C — боковые/вертикальные импульсные двигатели;

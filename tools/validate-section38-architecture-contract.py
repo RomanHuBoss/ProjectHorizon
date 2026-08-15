@@ -4,6 +4,9 @@ import pathlib, re, sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SRC = ROOT / 'src' / 'Game.Client' / 'Scripts'
+DOMAIN = ROOT / 'src' / 'Game.Domain'
+APPLICATION = ROOT / 'src' / 'Game.Application'
+PRODUCTION_CS_ROOTS = (SRC, DOMAIN, APPLICATION)
 errors: list[str] = []
 
 
@@ -22,7 +25,8 @@ require('TreatWarningsAsErrors' in props and 'ContinuousIntegrationBuild' in pro
 
 # Public interfaces must have XML documentation immediately before declaration.
 interfaces = []
-for path in SRC.rglob('*.cs'):
+for source_root in PRODUCTION_CS_ROOTS:
+  for path in source_root.rglob('*.cs'):
     lines = path.read_text(encoding='utf-8').splitlines()
     for idx, line in enumerate(lines):
         if re.search(r'\bpublic\s+interface\s+\w+', line):
@@ -33,14 +37,15 @@ require(len(interfaces) >= 5, f'expected >=5 public interfaces after architectur
 
 # Every production Task/ValueTask operation must expose CancellationToken explicitly.
 async_api = re.compile(r'(?:public|private|protected|internal)\s+(?:static\s+)?(?:async\s+)?(?:Task(?:<[^;{]+?>)?|ValueTask(?:<[^;{]+?>)?)\s+\w+\s*\((.*?)\)', re.S)
-for path in SRC.rglob('*.cs'):
-    source=path.read_text(encoding='utf-8')
-    for match in async_api.finditer(source):
-        require('CancellationToken' in match.group(1), f'async operation lacks CancellationToken: {path.relative_to(ROOT)}')
+for source_root in PRODUCTION_CS_ROOTS:
+    for path in source_root.rglob('*.cs'):
+        source=path.read_text(encoding='utf-8')
+        for match in async_api.finditer(source):
+            require('CancellationToken' in match.group(1), f'async operation lacks CancellationToken: {path.relative_to(ROOT)}')
 
 # Required typed domain events and a non-Godot event bus.
-events_source=text(SRC/'Infrastructure/Architecture/DomainEvents.cs')
-bus_source=text(SRC/'Infrastructure/Architecture/DomainEventBus.cs')
+events_source=text(DOMAIN/'Architecture/DomainEvents.cs')
+bus_source=text(APPLICATION/'Architecture/DomainEventBus.cs')
 required_events=['ItemAdded','ItemRemoved','ResourceMined','PlanetEntered','PlanetExited','SystemDiscovered','QuestAccepted','QuestCompleted','ShipDamaged','BaseModulePlaced','SaveRequested']
 for name in required_events:
     require(re.search(rf'public\s+sealed\s+record\s+{name}\b', events_source) is not None, f'missing typed event {name}')
@@ -72,7 +77,7 @@ project_config=text(ROOT/'src/Game.Client/project.godot')
 require('common/physics_ticks_per_second=60' in project_config, 'Godot physics tick rate is not explicitly pinned to 60 Hz')
 player_controller=text(SRC/'Player/PlayerController.cs')
 require('public override void _PhysicsProcess(double delta)' in player_controller, 'player controller is not integrated on the physics tick')
-freq=text(SRC/'Infrastructure/Architecture/SystemFrequencyPolicy.cs')
+freq=text(DOMAIN/'Architecture/SystemFrequencyPolicy.cs')
 for token in ['PhysicsHz = 60.0','PlayerControllerHz = 60.0','NearbyAiHz = 10.0','DistantAiHz = 2.0','BackgroundEconomyMinimumHz = 0.2','BackgroundEconomyMaximumHz = 1.0']:
     require(token in freq, f'frequency policy missing {token}')
 require('SystemFrequencyPolicy.NearbyAiHz' in text(SRC/'VerticalSlice/NpcFactionAgentNode.cs'), 'ground NPC decisions not gated at nearby AI frequency')
@@ -129,9 +134,15 @@ for path in SRC.rglob('*.cs'):
         require('CubeSphereMeshBuilder.Build(' not in body and 'GenerateSystem(' not in body and 'PlanetaryPoiPlanner.Plan(' not in body,
                 f'world generation performed directly in _Process: {path.relative_to(ROOT)}')
 
-# Project dependency direction remains one-way tests -> game.
+# Project dependency direction is explicit and acyclic: Domain <- Application <- Client; tests -> Client.
+domain_project=text(DOMAIN/'Game.Domain.csproj')
+application_project=text(APPLICATION/'Game.Application.csproj')
 game_project=csproj
-require('<ProjectReference' not in game_project, 'Game.Client unexpectedly references another project')
+require('<ProjectReference' not in domain_project, 'Game.Domain must not reference another project')
+require('Godot' not in domain_project and 'Microsoft.Data.Sqlite' not in domain_project, 'Game.Domain project has forbidden infrastructure dependency')
+require('../Game.Domain/Game.Domain.csproj' in application_project, 'Game.Application must reference Game.Domain')
+require('Game.Client' not in application_project and 'Godot' not in application_project and 'Microsoft.Data.Sqlite' not in application_project, 'Game.Application has forbidden client/infrastructure dependency')
+require('../Game.Domain/Game.Domain.csproj' in game_project and '../Game.Application/Game.Application.csproj' in game_project, 'Game.Client must compose Domain and Application projects')
 test_project=text(ROOT/'tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj')
 require('Game.Client.csproj' in test_project, 'test project does not reference production project')
 
@@ -147,7 +158,7 @@ for path in SRC.rglob('*.cs'):
 # Serializable/persistent structures remain versioned by explicit contracts.
 save_source=text(SRC/'Persistence/SaveDatabase.cs')
 require('CurrentSchemaVersion' in save_source and 'CurrentContentVersion' in save_source, 'save structures lack explicit schema/content versions')
-require((SRC/'Infrastructure/ProjectHorizonGenerator.cs').exists(), 'generator version contract missing')
+require((DOMAIN/'ProjectHorizonGenerator.cs').exists(), 'generator version contract missing')
 
 # UI/application shell must not directly mutate inventory/crafting domain state.
 for path in (SRC/'Application').glob('*.cs'):

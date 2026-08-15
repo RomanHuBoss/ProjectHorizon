@@ -26,6 +26,7 @@ dotnet build "%PROJECT%" -c Debug --no-restore -p:ContinuousIntegrationBuild=tru
 %PY% "%ROOT%\tools\validate-section36-testing-contract.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-section37-build-contract.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-section38-architecture-contract.py" || exit /b 1
+%PY% "%ROOT%\tools\validate-platform-architecture-contract.py" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --collect:"XPlat Code Coverage" --settings "%ROOT%\tests\coverlet.runsettings" --results-directory "%RESULTS%" --logger "trx;LogFileName=section36.trx" || exit /b 1
 %PY% "%ROOT%\tools\verify-section36-coverage.py" --results-dir "%RESULTS%" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests" || exit /b 1

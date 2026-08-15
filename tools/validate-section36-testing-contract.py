@@ -25,7 +25,7 @@ golden_tests = read("tests/ProjectHorizon.Tests/Golden/GoldenSeedTests.cs")
 stress = read("tests/ProjectHorizon.Tests/Stress/StressScenarioTests.cs")
 golden_contract = read("src/Game.Client/Scripts/Testing/GoldenSeedContract.cs")
 testing_bridge = read("src/Game.Client/Scripts/Testing/SalvageRepairSliceTesting.cs")
-generator = read("src/Game.Client/Scripts/Infrastructure/ProjectHorizonGenerator.cs")
+generator = read("src/Game.Domain/ProjectHorizonGenerator.cs")
 runner = read("tools/run-section36-tests.cmd")
 coverage_script = read("tools/verify-section36-coverage.py")
 

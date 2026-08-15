@@ -62,4 +62,22 @@ public sealed class Section38ArchitectureTests
             EcologyRuntime.GetUpdateFrequencyHz(35.0), 6);
         Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(80.0), 6);
     }
+    [Fact]
+    public void LayeredAssembliesHaveOneWayDependencies()
+    {
+        var domainAssembly = typeof(IDomainEvent).Assembly;
+        var applicationAssembly = typeof(DomainEventBus).Assembly;
+        var clientAssembly = typeof(EcologyRuntime).Assembly;
+
+        Assert.Equal("Game.Domain", domainAssembly.GetName().Name);
+        Assert.Equal("Game.Application", applicationAssembly.GetName().Name);
+        Assert.Equal("Game.Client", clientAssembly.GetName().Name);
+        Assert.DoesNotContain(domainAssembly.GetReferencedAssemblies(), reference =>
+            reference.Name is "Game.Application" or "Game.Client" or "GodotSharp" or "Microsoft.Data.Sqlite");
+        Assert.Contains(applicationAssembly.GetReferencedAssemblies(), reference =>
+            reference.Name == "Game.Domain");
+        Assert.DoesNotContain(applicationAssembly.GetReferencedAssemblies(), reference =>
+            reference.Name is "Game.Client" or "GodotSharp" or "Microsoft.Data.Sqlite");
+    }
+
 }

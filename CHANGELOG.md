@@ -11,6 +11,26 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.144] - 2026-08-15
+
+### Added
+
+- Compiled `Game.Domain` and `Game.Application` assemblies with one-way project references,
+  leaving `Game.Client` as the Godot composition/presentation host.
+- Dedicated Windows/Linux Compatibility export presets that select Godot's
+  `gl_compatibility` renderer and OpenGL 3 driver path.
+- Runtime renderer-profile evidence plus a TASK-144 platform/architecture acceptance probe.
+- Executable TASK-144 platform/architecture contract validator and xUnit assembly-boundary gate.
+
+### Changed
+
+- Domain events, scheduling policy and deterministic generator contracts were moved out of
+  `Game.Client`; the event-bus implementation now lives in the application layer.
+- CI and release packaging now produce four desktop profiles: primary Windows/Linux and
+  Compatibility Windows/Linux, with portable symbols collected across all three assemblies.
+- Build/release documentation and architecture evidence were synchronized with the compiled
+  layer graph and executable renderer fallback.
+
 ## [0.1.0-alpha.142] - 2026-08-15
 
 ### Added

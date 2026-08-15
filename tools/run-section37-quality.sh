@@ -19,6 +19,7 @@ python3 tools/validate-developer-diagnostics-contract.py
 python3 tools/validate-section36-testing-contract.py
 python3 tools/validate-section37-build-contract.py
 python3 tools/validate-section38-architecture-contract.py
+python3 tools/validate-platform-architecture-contract.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"
