@@ -2,13 +2,25 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure-hotfix1.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task148-world-scene-coordinator-closure-hotfix2.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
 ## 0. Текущая mega-итерация 2026-08-15 — World Scene Coordinator / §5 vertical-slice closure
+
+### TASK-148.2 — runtime hotfix: Godot text-scene parse + AudioDirector startup lifecycle
+
+**Внешнее runtime evidence от 2026-08-15 17:37 (+03:00):** обычная incremental Windows-сборка `Game.Client.csproj` завершилась успешно с `0 warnings / 0 errors`; при этом `CoreCompile` у `Game.Domain`, `Game.Application` и `Game.Client` был пропущен как up-to-date, поэтому это полезное build evidence, но не заменяет требуемый clean build TASK-149. Godot 4.7.1 запустился на primary renderer и вывел `TASK-144 renderer profile PASS: feature=primary; method=mobile; driver=vulkan`. При переходе Menu → Gameplay ResourceLoader дал точную причину `CantOpen`: `SalvageRepairSlice.tscn:151 - Parse Error: Unknown tag 'sub_resource' in file.` До этого в Main Menu также зафиксированы `Parent node is busy setting up children, add_child() failed` из `AudioDirector.EnsureInstalled` и два `Playback can only happen when a node is inside the scene tree`.
+
+**Локализация дефектов:** три `PlayerWater*` `sub_resource` действительно находились после первых `[node]` секций в authored `.tscn`; Godot text scene format требует resource declarations до node sections. Независимо от этого `AudioDirector.EnsureInstalled()` синхронно выполнял `SceneTree.Root.AddChild()` из `MainMenuController._Ready`, когда root ещё находился в child-setup critical section; затем `InitializeRuntime()` пытался проигрывать loop-плееры, хотя director не вошёл в tree. Повторяющиеся сообщения редактора про `/root/godot/modules/mono/.../NativeCalls.cs` являются следствием попытки debugger/source mapping открыть внутренние исходники Godot из stack trace и не рассматриваются как отдельный project resource path.
+
+**Исправление:** `PlayerWaterMaterial`, `PlayerWaterMesh`, `PlayerWaterShape` перенесены в resource declaration block перед первым `[node]`. Добавлен repository-wide `validate-godot-text-resource-structure.py`, который для всех shipping `.tscn` запрещает `ext_resource/sub_resource` после начала node tree, проверяет уникальность resource IDs и отсутствие unresolved `ExtResource/SubResource`; gate включён в local quality, CI и release. `AudioDirector` теперь устанавливается через deferred root `add_child`; pending instance предотвращает дубли до следующего idle step; environment/music requests, полученные до `_Ready`, сохраняются и применяются после входа director в tree; 2D/3D playback имеет pre-ready/in-tree guard. TASK-134 audio validator расширен `deferredInstall=1; preReadyPlaybackGuard=1`. VERSION = `0.1.0-alpha.148.2`.
+
+**Статическая приёмка после hotfix:** `GODOT TEXT RESOURCE STRUCTURE PASS: scenes=15; refs=277; resourceOrder=1; uniqueIds=1; resolvedRefs=1`; `TASK-134 AUDIO CONTRACT PASS ... deferredInstall=1; preReadyPlaybackGuard=1`; `TASK-148 ... PASS ... gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1`. Реальный повторный Godot runtime после исправления в среде подготовки недоступен, поэтому `TASK-149` остаётся `IN_PROGRESS`.
+
+**Повторная минимальная проверка пользователя:** Build должен остаться `0 warnings / 0 errors`; затем «Новая игра → Начать стандартную игру» должна открыть gameplay без `Parse Error`, `CantOpen`, `Parent node is busy...` и `Playback can only happen...`. После этого можно переходить к полному F5/world-transition acceptance TASK-149.
 
 ### TASK-148.1 — runtime hotfix: gameplay scene `CantOpen`
 
@@ -45,14 +57,14 @@
 - coordinator **не имеет отдельного persistence block**: new/load/reset выводят context из существующих `StageOneVoyage.Location` + `GalaxyNavigation.CurrentSystem/CurrentPlanetId`, SQLite schema остаётся прежней;
 - HUD получил локализованную строку World scene; F5 запускает `TASK-148 world scene coordinator acceptance`;
 - xUnit `WorldSceneCoordinatorTests` проверяет полный graph, illegal transition и ID normalization; `tools/validate-task148-world-scene-coordinator.py` интегрирован в local quality, CI и release gates;
-- документация архитектуры вынесена в `docs/WORLD_SCENE_COORDINATION.md`; VERSION = `0.1.0-alpha.148.1`.
+- документация архитектуры вынесена в `docs/WORLD_SCENE_COORDINATION.md`; VERSION = `0.1.0-alpha.148.2`.
 
 **Изменения относительно принятого TASK-146 hotfix1:** `added=16`, `changed=15`, `removed=0`.
 
 **Фактически выполненные статические проверки:**
 
 ```text
-TASK-140 VERSION PASS: version=0.1.0-alpha.148.1; changelog=1
+TASK-140 VERSION PASS: version=0.1.0-alpha.148.2; changelog=1
 TASK-140 JSON CONTRACT PASS: json=21; parsed=21; industrySchema=5/5; localizationParity=1
 TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1336; parity=1; sourceSinks=0
 TASK-134 AUDIO CONTRACT PASS
@@ -62,7 +74,7 @@ TASK-140 SECTION-37 CONTRACT PASS: debugExports=4/4; releaseExports=4/4
 TASK-142 SECTION-38 CONTRACT PASS
 TASK-144 PLATFORM/ARCHITECTURE CONTRACT PASS
 TASK-146 BASE CONSTRUCTION CLOSURE CONTRACT PASS
-TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; f5Acceptance=1; xunit=3/3
+TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1; f5Acceptance=1; xunit=3/3
 XML PASS: 4/4; YAML PASS: 2/2; Python syntax PASS: 13/13; Bash syntax PASS
 C# lexical structural check PASS: 6/6 new TASK-148 files
 UID PASS: 139/139 unique; res:// references: broken=0; world scenes=4/4 with kinds 0/1/2/3

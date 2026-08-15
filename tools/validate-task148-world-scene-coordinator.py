@@ -21,6 +21,7 @@ star=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceStarSystem.cs
 scene=text('src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn')
 accept=text('src/Game.Client/Scripts/VerticalSlice/WorldSceneCoordinatorAcceptance.cs')
 tests=text('tests/ProjectHorizon.Tests/Unit/WorldSceneCoordinatorTests.cs')
+audio=text('src/Game.Client/Scripts/Application/AudioDirector.cs')
 version=text('VERSION').strip()
 
 for token in ('Surface = 0','Orbit = 1','StationInterior = 2','HyperspaceTransit = 3'):
@@ -51,6 +52,17 @@ need('new WorldSceneCoordinatorNode' in slice_world and 'gameplay.AddChild(_worl
 need('WorldSceneCoordinatorNode.cs' not in scene and '12_world_scene_coordinator' not in scene, 'gameplay scene has no hard coordinator script dependency', failures)
 need('name="WorldSceneCoordinator"' not in scene, 'coordinator is not serialized into gameplay scene', failures)
 
+# Runtime startup hotfixes: authored text resources must be declared before nodes,
+# and root-persistent audio must install outside the SceneTree child-setup critical section.
+scene_lines=scene.splitlines()
+first_node=next((i for i,line in enumerate(scene_lines) if line.startswith('[node ')), None)
+late_resource = first_node is not None and any(
+    line.startswith('[sub_resource ') or line.startswith('[ext_resource ')
+    for line in scene_lines[first_node + 1:])
+need(first_node is not None and not late_resource, 'gameplay text-scene resource declaration order', failures)
+need('root.CallDeferred(Node.MethodName.AddChild, director)' in audio and 'root.AddChild(director);' not in audio, 'deferred AudioDirector root installation', failures)
+need('if (!_ready || !IsInsideTree())' in audio, 'pre-ready audio playback guard', failures)
+
 need('WorldSceneKind.Surface => true' in slice_world, 'surface residency', failures)
 need('bool orbitActive = kind == WorldSceneKind.Orbit;' in slice_world, 'orbit residency', failures)
 need('WorldSceneKind.StationInterior => false' in slice_world, 'station suspends surface', failures)
@@ -76,9 +88,9 @@ all_save_text='\n'.join(text(p) for p in (
     'src/Game.Client/Scripts/Persistence/SaveDatabase.cs',
     'src/Game.Client/Scripts/Persistence/SaveDatabase.Migration.cs'))
 need('world_scene' not in all_save_text.lower(), 'no duplicate world-scene persistence', failures)
-need(version == '0.1.0-alpha.148.1', 'VERSION alpha.148.1', failures)
+need(version == '0.1.0-alpha.148.2', 'VERSION alpha.148.2', failures)
 
 if failures:
     print('TASK-148 WORLD SCENE COORDINATOR CONTRACT FAIL: ' + '; '.join(failures))
     sys.exit(1)
-print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; f5Acceptance=1; xunit=3/3.')
+print('TASK-148 WORLD SCENE COORDINATOR CONTRACT PASS: contexts=4/4; packedScenes=4/4; oneResident=1; transitionGraph=1; illegalGuard=1; surfaceResidency=1; orbitResidency=1; stationResidency=1; hyperspaceResidency=1; destinationReload=1; persistenceDerived=1; gameplayLoadSafe=1; runtimeBootstrap=1; sceneSyntaxSafe=1; audioLifecycleSafe=1; f5Acceptance=1; xunit=3/3.')

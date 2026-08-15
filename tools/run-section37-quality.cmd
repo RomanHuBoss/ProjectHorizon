@@ -20,6 +20,7 @@ if not errorlevel 1 (
 dotnet restore "%PROJECT%" || exit /b 1
 dotnet build "%PROJECT%" -c Debug --no-restore -p:ContinuousIntegrationBuild=true -p:Version=%PH_VERSION% -warnaserror || exit /b 1
 %PY% "%ROOT%\tools\validate-json-content.py" || exit /b 1
+%PY% "%ROOT%\tools\validate-godot-text-resource-structure.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-localization-contract.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-audio-contract.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-developer-diagnostics-contract.py" || exit /b 1

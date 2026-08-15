@@ -13,6 +13,7 @@ dotnet restore tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj
 dotnet build tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-restore \
   -p:ContinuousIntegrationBuild=true -p:Version="$VERSION_VALUE" -warnaserror
 python3 tools/validate-json-content.py
+python3 tools/validate-godot-text-resource-structure.py
 python3 tools/validate-localization-contract.py
 python3 tools/validate-audio-contract.py
 python3 tools/validate-developer-diagnostics-contract.py

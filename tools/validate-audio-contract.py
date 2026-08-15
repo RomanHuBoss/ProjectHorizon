@@ -132,6 +132,18 @@ def main() -> int:
     if not all(marker in director for marker in environment_markers):
         fail("environment/vacuum contract incomplete", failures)
 
+    lifecycle_markers = [
+        "_pendingInstallation",
+        "root.CallDeferred(Node.MethodName.AddChild, director)",
+        "if (!_ready || !IsInsideTree())",
+        "ApplyEnvironmentState(requestedEnvironment, force: true, countTransition: false)",
+        "ApplyMusicState(requestedMusicState, force: true, countTransition: false)",
+    ]
+    if not all(marker in director for marker in lifecycle_markers):
+        fail("deferred audio installation/pre-ready playback guard incomplete", failures)
+    if "root.AddChild(director);" in director:
+        fail("AudioDirector still performs synchronous root AddChild during scene setup", failures)
+
     music_markers = [
         "MusicCrossfadeSeconds", "BeginMusicCrossfade", "UpdateMusicCrossfade",
         "MusicMenu", "MusicSurface", "MusicSpace", "MusicInterior", "MusicCombat",
@@ -189,6 +201,7 @@ def main() -> int:
         f"pool2d={p2}; pool3d={p3}; maxTransient={p2 + p3}; maxConcurrent={p2 + p3 + 5}; "
         f"environments={len(env)}; musicStates={len(music)}; "
         "positional=1; attenuation=1; pooling=1; vacuumRule=1; "
+        "deferredInstall=1; preReadyPlaybackGuard=1; "
         f"gameplayHooks={len(PLAYER_HOOKS)}; settingsRouting=1; localization=1; "
         f"sourceAudioAssets={len(raw_audio)}."
     )

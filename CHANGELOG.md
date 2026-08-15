@@ -11,6 +11,14 @@ save schema and procedural-generator versions are versioned independently.
 
 - Future changes intended for the next tagged release are recorded here.
 
+## [0.1.0-alpha.148.2] - 2026-08-15
+
+### Fixed
+
+- Moved the `PlayerWaterMaterial`/mesh/shape `sub_resource` declarations ahead of the first `[node]` in `SalvageRepairSlice.tscn`; Godot 4.7.1 had rejected the gameplay scene with `Parse Error: Unknown tag 'sub_resource'` and `ChangeSceneToFile(...)=CantOpen`.
+- Changed `AudioDirector` root installation to deferred `add_child`, preserving requested environment/music until `_Ready` and guarding playback before the director is inside the scene tree. This removes the startup `Parent node is busy setting up children` and `Playback can only happen when a node is inside the scene tree` failure path.
+- Added a repository-wide Godot text-scene structural gate (resource order, duplicate IDs and unresolved `ExtResource`/`SubResource` references) to local quality, CI and release pipelines, and strengthened the audio lifecycle contract.
+
 ## [0.1.0-alpha.148.1] - 2026-08-15
 
 ### Fixed

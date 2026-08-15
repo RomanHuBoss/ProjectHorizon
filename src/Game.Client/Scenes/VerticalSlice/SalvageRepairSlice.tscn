@@ -126,6 +126,18 @@ content_margin_top = 12.0
 content_margin_right = 14.0
 content_margin_bottom = 12.0
 
+[sub_resource type="StandardMaterial3D" id="PlayerWaterMaterial"]
+albedo_color = Color(0.05, 0.38, 0.62, 0.55)
+transparency = 1
+roughness = 0.22
+
+[sub_resource type="BoxMesh" id="PlayerWaterMesh"]
+material = SubResource("PlayerWaterMaterial")
+size = Vector3(8, 0.35, 6)
+
+[sub_resource type="BoxShape3D" id="PlayerWaterShape"]
+size = Vector3(8, 2.4, 6)
+
 [node name="SalvageRepairSlice" type="Node3D"]
 script = ExtResource("1_controller")
 
@@ -147,18 +159,6 @@ shape = SubResource("GroundShape")
 
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 5.5)
-
-[sub_resource type="StandardMaterial3D" id="PlayerWaterMaterial"]
-albedo_color = Color(0.05, 0.38, 0.62, 0.55)
-transparency = 1
-roughness = 0.22
-
-[sub_resource type="BoxMesh" id="PlayerWaterMesh"]
-material = SubResource("PlayerWaterMaterial")
-size = Vector3(8, 0.35, 6)
-
-[sub_resource type="BoxShape3D" id="PlayerWaterShape"]
-size = Vector3(8, 2.4, 6)
 
 [node name="Gameplay" type="Node3D" parent="."]
 

@@ -91,6 +91,8 @@ public partial class AudioDirector : Node
         public ulong StartedTicks { get; set; }
     }
 
+    private static AudioDirector? _pendingInstallation;
+
     private readonly List<TwoDVoice> _twoDVoices = new();
     private readonly List<ThreeDVoice> _threeDVoices = new();
     private readonly HashSet<ulong> _hookedButtonIds = new();
@@ -131,8 +133,16 @@ public partial class AudioDirector : Node
         AudioDirector? existing = root.GetNodeOrNull<AudioDirector>(NodeName);
         if (existing is not null)
         {
-            existing.InitializeRuntime();
+            if (existing.IsNodeReady())
+            {
+                existing.InitializeRuntime();
+            }
             return existing;
+        }
+
+        if (_pendingInstallation is not null && GodotObject.IsInstanceValid(_pendingInstallation))
+        {
+            return _pendingInstallation;
         }
 
         AudioDirector director = new()
@@ -140,8 +150,13 @@ public partial class AudioDirector : Node
             Name = NodeName,
             ProcessMode = ProcessModeEnum.Always
         };
-        root.AddChild(director);
-        director.InitializeRuntime();
+        _pendingInstallation = director;
+
+        // Main-menu _Ready runs while SceneTree.Root can still be blocked adding the
+        // current scene. Installing on the next idle step avoids Node::add_child()
+        // failing with data.blocked > 0. Runtime initialization is performed by
+        // AudioDirector._Ready after the director has actually entered the tree.
+        root.CallDeferred(Node.MethodName.AddChild, director);
         return director;
     }
 
@@ -163,6 +178,10 @@ public partial class AudioDirector : Node
 
     public override void _Ready()
     {
+        if (ReferenceEquals(_pendingInstallation, this))
+        {
+            _pendingInstallation = null;
+        }
         InitializeRuntime();
     }
 
@@ -173,14 +192,19 @@ public partial class AudioDirector : Node
             return;
         }
 
+        GameAudioEnvironment requestedEnvironment = _environment;
+        GameMusicState requestedMusicState = _musicState;
+
         ProcessMode = ProcessModeEnum.Always;
         EnsureBusLayout();
         ProceduralAudioBank.EnsureBuilt();
         BuildDedicatedPlayers();
         BuildPools();
         EnsureEnvironmentFilters();
-        SetEnvironment(GameAudioEnvironment.Atmosphere, force: true);
         _ready = true;
+
+        ApplyEnvironmentState(requestedEnvironment, force: true, countTransition: false);
+        ApplyMusicState(requestedMusicState, force: true, countTransition: false);
         GD.Print(
             "TASK-134 audio architecture READY: " +
             $"buses={RequiredBuses.Length}; pool2d={TwoDPoolSize}; pool3d={ThreeDPoolSize}; " +
@@ -229,6 +253,11 @@ public partial class AudioDirector : Node
         float pitchScale = 1.0f,
         string bus = "SFX")
     {
+        if (!_ready || !IsInsideTree())
+        {
+            return false;
+        }
+
         if (_environment == GameAudioEnvironment.Vacuum && externalInVacuum)
         {
             _vacuumSuppressed++;
@@ -268,16 +297,35 @@ public partial class AudioDirector : Node
 
     public void SetEnvironment(GameAudioEnvironment environment, bool force = false)
     {
+        if (!_ready)
+        {
+            // Preserve the caller's requested environment until deferred installation
+            // reaches _Ready. No AudioStreamPlayer is touched before it is in-tree.
+            _environment = environment;
+            return;
+        }
+
+        ApplyEnvironmentState(environment, force, countTransition: true);
+    }
+
+    private void ApplyEnvironmentState(
+        GameAudioEnvironment environment,
+        bool force,
+        bool countTransition)
+    {
         if (!force && _environment == environment)
         {
             return;
         }
 
         _environment = environment;
-        _environmentTransitions++;
+        if (countTransition)
+        {
+            _environmentTransitions++;
+        }
         ApplyEnvironmentFilterProfile(environment);
 
-        if (_ambient is null || _weather is null)
+        if (_ambient is null || _weather is null || !IsInsideTree())
         {
             return;
         }
@@ -305,13 +353,28 @@ public partial class AudioDirector : Node
 
     public void SetMusicState(GameMusicState state)
     {
-        if (!_ready || state == _musicState)
+        if (!_ready)
+        {
+            // Queue the desired state while the director is awaiting deferred add.
+            _musicState = state;
+            return;
+        }
+
+        ApplyMusicState(state, force: false, countTransition: true);
+    }
+
+    private void ApplyMusicState(GameMusicState state, bool force, bool countTransition)
+    {
+        if (!force && state == _musicState)
         {
             return;
         }
 
         _musicState = state;
-        _musicTransitions++;
+        if (countTransition)
+        {
+            _musicTransitions++;
+        }
         if (state == GameMusicState.None)
         {
             _musicA?.Stop();
@@ -319,6 +382,11 @@ public partial class AudioDirector : Node
             _musicCurrent = null;
             _musicNext = null;
             _musicCrossfadeActive = false;
+            return;
+        }
+
+        if (!IsInsideTree())
+        {
             return;
         }
 
@@ -610,6 +678,11 @@ public partial class AudioDirector : Node
         float volumeDb,
         float pitchScale)
     {
+        if (!_ready || !IsInsideTree())
+        {
+            return;
+        }
+
         if (!ProceduralAudioBank.Contains(cueId))
         {
             _poolRejects++;
