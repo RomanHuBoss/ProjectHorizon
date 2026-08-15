@@ -114,7 +114,7 @@ public partial class SalvageRepairSlice
             if (Matches(physical, logical, Key.Q) ||
                 Matches(physical, logical, Key.Escape))
             {
-                CloseMissionJournal("mission journal closed");
+                CloseMissionJournal(L("ui.quest.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -167,7 +167,7 @@ public partial class SalvageRepairSlice
             Math.Max(0, ProceduralQuests.Views.Count - 1));
         _missionJournalPanel!.Visible = true;
         UpdateMissionJournalPanel();
-        _status = "procedural mission journal opened";
+        _status = L("ui.quest.journal_opened");
     }
 
     private void CloseMissionJournal(string status = "")
@@ -254,8 +254,7 @@ public partial class SalvageRepairSlice
                 }
                 else
                 {
-                    _missionJournalFeedback =
-                        "objective is active; complete it in the world";
+                    _missionJournalFeedback = L("ui.quest.objective_active");
                 }
                 break;
 
@@ -268,7 +267,7 @@ public partial class SalvageRepairSlice
                 break;
 
             case ProceduralQuestStatus.Completed:
-                _missionJournalFeedback = "mission already completed";
+                _missionJournalFeedback = L("ui.quest.already_completed");
                 break;
         }
         UpdateMissionJournalPanel();
@@ -296,8 +295,7 @@ public partial class SalvageRepairSlice
     {
         if (!IsAtProceduralQuestGiver(selected.Definition))
         {
-            _missionJournalFeedback =
-                $"return to {selected.Definition.GiverNpcId} to continue";
+            _missionJournalFeedback = LF("ui.quest.return_to", ("npc", selected.Definition.GiverNpcId));
             return;
         }
         int changed = ProceduralQuests.RecordReturnToNpc(
@@ -305,10 +303,10 @@ public partial class SalvageRepairSlice
             out IReadOnlyList<string> changedIds);
         if (changed <= 0)
         {
-            _missionJournalFeedback = "mission return produced no state change";
+            _missionJournalFeedback = L("ui.quest.return_no_change");
             return;
         }
-        _missionJournalFeedback = "returned to mission giver; reward ready";
+        _missionJournalFeedback = L("ui.quest.return_ready");
         _lastDomainEvent =
             $"ProceduralQuestReturned({string.Join(",", changedIds)})";
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
@@ -322,8 +320,7 @@ public partial class SalvageRepairSlice
     {
         if (!IsAtProceduralQuestGiver(selected.Definition))
         {
-            _missionJournalFeedback =
-                $"deliver at {selected.Definition.GiverNpcId}";
+            _missionJournalFeedback = LF("ui.quest.deliver_at", ("npc", selected.Definition.GiverNpcId));
             return;
         }
         int remaining = Math.Max(
@@ -350,8 +347,7 @@ public partial class SalvageRepairSlice
         ProceduralQuests.RecordReturnToNpc(
             selected.Definition.GiverNpcId,
             out _);
-        _missionJournalFeedback =
-            $"delivered {remaining} x {selected.Definition.TargetDefinitionId}; reward ready";
+        _missionJournalFeedback = LF("ui.quest.delivered", ("quantity", remaining), ("item", selected.Definition.TargetDefinitionId));
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
         GD.Print(
             "TASK-118 player procedural delivery PASS: " +
@@ -363,8 +359,7 @@ public partial class SalvageRepairSlice
     {
         if (!IsAtProceduralQuestGiver(selected.Definition))
         {
-            _missionJournalFeedback =
-                $"claim reward at {selected.Definition.GiverNpcId}";
+            _missionJournalFeedback = LF("ui.quest.claim_at", ("npc", selected.Definition.GiverNpcId));
             return;
         }
         if (!ProceduralQuests.TryClaim(
@@ -386,8 +381,7 @@ public partial class SalvageRepairSlice
         {
             NpcFactions.ApplyReputationDelta(factionId, reputation);
         }
-        _missionJournalFeedback =
-            $"{result}; +{credits} cr; +{reputation} rep";
+        _missionJournalFeedback = LF("ui.quest.reward", ("result", result), ("credits", credits), ("reputation", reputation));
         _lastDomainEvent =
             $"ProceduralQuestCompleted({selected.Definition.QuestId})";
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
@@ -458,20 +452,14 @@ public partial class SalvageRepairSlice
 
     private void UpdateMissionJournalPanel()
     {
-        if (!_missionJournalOpen || _missionJournalLabel is null)
-        {
-            return;
-        }
+        if (!_missionJournalOpen || _missionJournalLabel is null) return;
         IReadOnlyList<ProceduralQuestView> views = ProceduralQuests.Views;
         if (views.Count == 0)
         {
-            _missionJournalLabel.Text = "MISSION JOURNAL\nNo missions available.";
+            _missionJournalLabel.Text = L("ui.quest.no_missions");
             return;
         }
-        _missionJournalSelection = Math.Clamp(
-            _missionJournalSelection,
-            0,
-            views.Count - 1);
+        _missionJournalSelection = Math.Clamp(_missionJournalSelection, 0, views.Count - 1);
         int start = Math.Max(0, _missionJournalSelection - 6);
         int end = Math.Min(views.Count, start + 13);
         start = Math.Max(0, end - 13);
@@ -480,59 +468,44 @@ public partial class SalvageRepairSlice
         {
             ProceduralQuestView view = views[index];
             string marker = index == _missionJournalSelection ? ">" : " ";
-            string status = view.Status switch
-            {
-                ProceduralQuestStatus.Offered => "OFFER",
-                ProceduralQuestStatus.Accepted => "ACTIVE",
-                ProceduralQuestStatus.ReturnRequired => "RETURN",
-                ProceduralQuestStatus.ReadyToClaim => "CLAIM",
-                ProceduralQuestStatus.Completed => "DONE",
-                _ => view.Status.ToString().ToUpperInvariant()
-            };
-            lines.Add(
-                $"{marker} {index + 1:00} [{status,-6}] " +
-                $"{view.Definition.ObjectiveType,-14} " +
-                $"{GetShortContentId(view.Definition.TargetDefinitionId),-22} " +
-                $"{view.Progress}/{view.Definition.RequiredQuantity} " +
-                $"{view.Definition.RewardCredits}cr");
+            string status = L($"ui.quest.state.{view.Status.ToString().ToLowerInvariant()}");
+            lines.Add($"{marker} " + LF("ui.quest.row",
+                ("number", (index + 1).ToString("00", CultureInfo.InvariantCulture)), ("status", status),
+                ("objective", view.Definition.ObjectiveType), ("target", GetShortContentId(view.Definition.TargetDefinitionId)),
+                ("progress", view.Progress), ("required", view.Definition.RequiredQuantity), ("credits", view.Definition.RewardCredits)));
         }
         ProceduralQuestView selected = views[_missionJournalSelection];
-        string factionRep = string.Join(
-            " • ",
-            StationServiceCatalog.Factions.Keys
-                .OrderBy(value => value, StringComparer.Ordinal)
-                .Select(faction =>
-                    $"{GetShortContentId(faction)}=" +
-                    ProceduralQuests.GetFactionReputation(faction)));
-        _missionJournalLabel.Text =
-            "PROCEDURAL MISSION JOURNAL — PDF §19 / Stage 2 board\n" +
-            $"Board={views.Count} • active={ProceduralQuests.AcceptedCount}/" +
-            $"{ProceduralQuestCatalog.MaximumActive} • ready={ProceduralQuests.ReadyCount} • " +
-            $"completed={ProceduralQuests.CompletedCount}\n" +
-            $"Faction reputation: {factionRep}\n\n" +
-            string.Join("\n", lines) +
-            "\n\nSelected:\n" +
-            $"{selected.Definition.QuestId}\n" +
-            $"faction={selected.Definition.FactionId} • giver={selected.Definition.GiverNpcId}\n" +
-            $"target={selected.Definition.TargetDefinitionId} • " +
-            $"reward={selected.Definition.RewardCredits} credits + " +
-            $"{selected.Definition.ReputationReward} reputation\n" +
-            "Controls: Up/Down select • Enter accept/return/deliver/claim • Q/Esc close\n" +
-            $"Status: {_missionJournalFeedback}";
+        string factionRep = string.Join(" • ", StationServiceCatalog.Factions.Keys.OrderBy(value => value, StringComparer.Ordinal)
+            .Select(faction => $"{GetShortContentId(faction)}={ProceduralQuests.GetFactionReputation(faction)}"));
+        _missionJournalLabel.Text = string.Join("\n", new[]
+        {
+            L("ui.quest.header"),
+            LF("ui.quest.board_summary", ("board", views.Count), ("active", ProceduralQuests.AcceptedCount), ("maxActive", ProceduralQuestCatalog.MaximumActive), ("ready", ProceduralQuests.ReadyCount), ("completed", ProceduralQuests.CompletedCount)),
+            LF("ui.quest.faction_reputation", ("reputation", factionRep)),
+            "",
+            string.Join("\n", lines),
+            "",
+            L("ui.quest.selected"),
+            selected.Definition.QuestId,
+            LF("ui.quest.selected_detail", ("faction", selected.Definition.FactionId), ("giver", selected.Definition.GiverNpcId), ("target", selected.Definition.TargetDefinitionId), ("credits", selected.Definition.RewardCredits), ("reputation", selected.Definition.ReputationReward)),
+            L("ui.quest.controls"),
+            LF("ui.quest.status", ("status", _missionJournalFeedback))
+        });
     }
 
     private string BuildProceduralQuestHudLine()
     {
         if (_proceduralQuestRuntime is null)
         {
-            return "Missions: unavailable";
+            return L("ui.hud.missions.unavailable");
         }
-        return
-            $"Missions: board={ProceduralQuests.Board.Count} • " +
-            $"active={ProceduralQuests.AcceptedCount}/" +
-            $"{ProceduralQuestCatalog.MaximumActive} • " +
-            $"ready={ProceduralQuests.ReadyCount} • " +
-            $"completed={ProceduralQuests.CompletedCount} • Q journal";
+        return LF(
+            "ui.hud.missions.summary",
+            ("board", ProceduralQuests.Board.Count),
+            ("active", ProceduralQuests.AcceptedCount),
+            ("maxActive", ProceduralQuestCatalog.MaximumActive),
+            ("ready", ProceduralQuests.ReadyCount),
+            ("completed", ProceduralQuests.CompletedCount));
     }
 
     private void BeginProceduralQuestAcceptance(string directory)

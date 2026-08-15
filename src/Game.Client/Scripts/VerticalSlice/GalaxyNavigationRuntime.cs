@@ -392,31 +392,31 @@ public sealed class GalaxyNavigationRuntime
         ArgumentNullException.ThrowIfNull(shipSystems);
         if (SelectedDestination is null)
         {
-            result = "no hyperspace destination is selected";
+            result = GameLocalizationService.Text("ui.galaxy.no_selected");
             return GalaxyTravelActionResult.NoDestination;
         }
 
         if (!shipSystems.Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.galaxy.ship_not_commissioned");
             return GalaxyTravelActionResult.NotCommissioned;
         }
 
         if (!shipSystems.FlightReady)
         {
-            result = "starter ship is not flight-ready";
+            result = GameLocalizationService.Text("ui.galaxy.ship_not_ready");
             return GalaxyTravelActionResult.FlightNotReady;
         }
 
         if (!shipSystems.HyperspaceReady)
         {
-            result = "an active hyperspace module and hyperdrive system are required";
+            result = GameLocalizationService.Text("ui.galaxy.hyperdrive_required");
             return GalaxyTravelActionResult.HyperspaceNotReady;
         }
 
         if (voyageLocation != StageOneVoyageLocation.OrbitalStation)
         {
-            result = "hyperspace jump is only available while docked at an orbital station";
+            result = GameLocalizationService.Text("ui.galaxy.orbital_only");
             return GalaxyTravelActionResult.InvalidLocation;
         }
 
@@ -425,7 +425,7 @@ public sealed class GalaxyNavigationRuntime
             CurrentSystem.SystemId,
             StringComparison.Ordinal))
         {
-            result = "destination is the current system";
+            result = GameLocalizationService.Text("ui.galaxy.current_destination");
             return GalaxyTravelActionResult.SameSystem;
         }
 
@@ -435,7 +435,7 @@ public sealed class GalaxyNavigationRuntime
             stats.HyperdriveRange);
         if (!route.Reachable || route.Systems.Count < 2)
         {
-            result = $"no route within hyperdrive range {stats.HyperdriveRange:0.#} ly";
+            result = GameLocalizationService.Format("ui.galaxy.no_route", ("range", stats.HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)));
             return GalaxyTravelActionResult.RouteUnavailable;
         }
 
@@ -443,7 +443,7 @@ public sealed class GalaxyNavigationRuntime
         double distance = Distance(CurrentSystem, next);
         if (distance > stats.HyperdriveRange + 0.0001)
         {
-            result = $"next waypoint is outside range: {distance:0.#}/{stats.HyperdriveRange:0.#} ly";
+            result = GameLocalizationService.Format("ui.galaxy.waypoint_out_range", ("distance", distance.ToString("0.#", CultureInfo.InvariantCulture)), ("range", stats.HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)));
             return GalaxyTravelActionResult.OutsideRange;
         }
 
@@ -462,9 +462,12 @@ public sealed class GalaxyNavigationRuntime
             CurrentSystem.SystemId,
             SelectedDestination.SystemId,
             StringComparison.Ordinal);
-        result = $"jump {JumpCount}: {CurrentSystem.DisplayName}; " +
-            $"distance={distance:0.0}ly; fuelCost={fuelCost:0.#}; " +
-            $"destinationReached={(destinationReached ? 1 : 0)}";
+        result = GameLocalizationService.Format(
+            "ui.galaxy.jump_result",
+            ("jump", JumpCount),
+            ("system", CurrentSystem.DisplayName),
+            ("fuel", shipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("visited", _visitedSystemIds.Count));
         return GalaxyTravelActionResult.Applied;
     }
 

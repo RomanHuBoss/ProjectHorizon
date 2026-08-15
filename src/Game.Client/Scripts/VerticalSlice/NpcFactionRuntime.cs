@@ -18,8 +18,7 @@ public sealed record NpcDialogueOutcome(
     int ReputationAfter,
     int AppliedReputationDelta,
     bool FirstMeaningfulInteraction,
-    string ConsequenceEn,
-    string ConsequenceRu);
+    string ConsequenceKey);
 
 public sealed record NpcFactionCombatOutcome(
     string NpcId,
@@ -164,8 +163,7 @@ public sealed class NpcFactionRuntime
                 before,
                 0,
                 false,
-                $"Requires reputation {option.MinimumReputation}.",
-                $"Требуется репутация {option.MinimumReputation}.");
+                "ui.game.require_reputation");
         }
 
         bool meaningful = !string.Equals(option.Action, "Close", StringComparison.Ordinal);
@@ -187,8 +185,7 @@ public sealed class NpcFactionRuntime
             after,
             appliedDelta,
             firstMeaningful,
-            option.ConsequenceEn,
-            option.ConsequenceRu);
+            option.ConsequenceKey);
     }
 
     public NpcFactionCombatOutcome ApplyDamage(

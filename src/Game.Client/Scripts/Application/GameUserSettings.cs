@@ -9,6 +9,7 @@ public sealed class GameUserSettings
     public const float DefaultOnFootSensitivity = 0.0025f;
     public const float DefaultShipSensitivity = 0.0035f;
 
+    public string LanguageCode { get; set; } = GameLocalizationService.AutomaticLanguage;
     public float OnFootMouseSensitivity { get; set; } = DefaultOnFootSensitivity;
     public float ShipMouseSensitivity { get; set; } = DefaultShipSensitivity;
     public bool InvertOnFootX { get; set; }
@@ -43,6 +44,7 @@ public sealed class GameUserSettings
     {
         GameUserSettings clone = new()
         {
+            LanguageCode = LanguageCode,
             OnFootMouseSensitivity = OnFootMouseSensitivity,
             ShipMouseSensitivity = ShipMouseSensitivity,
             InvertOnFootX = InvertOnFootX,
@@ -132,6 +134,11 @@ public static class GameUserSettingsService
             return settings;
         }
 
+        settings.LanguageCode = ReadString(
+            config,
+            SectionGeneral,
+            "language",
+            GameLocalizationService.AutomaticLanguage);
         settings.OnFootMouseSensitivity = ReadFloat(
             config,
             SectionControls,
@@ -170,6 +177,7 @@ public static class GameUserSettingsService
         ArgumentNullException.ThrowIfNull(settings);
         Normalize(settings);
         ConfigFile config = new();
+        config.SetValue(SectionGeneral, "language", settings.LanguageCode);
         config.SetValue(SectionControls, "on_foot_mouse_sensitivity", settings.OnFootMouseSensitivity);
         config.SetValue(SectionControls, "ship_mouse_sensitivity", settings.ShipMouseSensitivity);
         config.SetValue(SectionControls, "invert_on_foot_x", settings.InvertOnFootX);
@@ -208,6 +216,7 @@ public static class GameUserSettingsService
     {
         ArgumentNullException.ThrowIfNull(settings);
         Normalize(settings);
+        GameLocalizationService.ApplyConfiguredLanguage(settings.LanguageCode);
         ApplyInputMap(settings);
         ApplyAudio(settings);
         if (Engine.GetMainLoop() is SceneTree tree)
@@ -243,7 +252,7 @@ public static class GameUserSettingsService
         GameUserSettings source = settings ?? Current;
         return source.KeyboardBindings.TryGetValue(action, out long code)
             ? ((Key)code).ToString()
-            : "Unbound";
+            : GameLocalizationService.Text("ui.common.unbound");
     }
 
     private static void ApplyInputMap(GameUserSettings settings)
@@ -384,6 +393,10 @@ public static class GameUserSettingsService
 
     private static void Normalize(GameUserSettings settings)
     {
+        if (!GameLocalizationService.IsSupportedConfiguration(settings.LanguageCode))
+        {
+            settings.LanguageCode = GameLocalizationService.AutomaticLanguage;
+        }
         settings.OnFootMouseSensitivity = Mathf.Clamp(settings.OnFootMouseSensitivity, 0.0005f, 0.01f);
         settings.ShipMouseSensitivity = Mathf.Clamp(settings.ShipMouseSensitivity, 0.0005f, 0.015f);
         settings.FieldOfViewDegrees = Mathf.Clamp(settings.FieldOfViewDegrees, 60.0f, 110.0f);
@@ -400,6 +413,8 @@ public static class GameUserSettingsService
         }
     }
 
+    private static string ReadString(ConfigFile config, string section, string key, string fallback) =>
+        config.GetValue(section, key, fallback).AsString();
     private static float ReadFloat(ConfigFile config, string section, string key, float fallback) =>
         (float)config.GetValue(section, key, fallback).AsDouble();
     private static bool ReadBool(ConfigFile config, string section, string key, bool fallback) =>

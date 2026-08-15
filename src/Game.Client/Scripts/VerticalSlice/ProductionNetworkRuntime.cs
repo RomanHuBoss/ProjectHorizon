@@ -184,8 +184,11 @@ public sealed class ProductionNetworkRuntime
             queue => queue.GetQuantity(definitionId) < quantity);
         if (missing is not null)
         {
-            result = $"station {missing.StationId} mirror is missing " +
-                $"{quantity - missing.GetQuantity(definitionId)} x {definitionId}";
+            result = GameLocalizationService.Format(
+                "ui.industry.network_missing",
+                ("station", missing.StationId),
+                ("quantity", quantity - missing.GetQuantity(definitionId)),
+                ("item", definitionId));
             return false;
         }
 
@@ -201,8 +204,9 @@ public sealed class ProductionNetworkRuntime
             }
         }
 
-        result = $"consumed {quantity} x {definitionId} from " +
-            $"{targets.Length} station mirror(s)";
+        result = GameLocalizationService.Format(
+            "ui.industry.network_consumed",
+            ("quantity", quantity), ("item", definitionId), ("stations", targets.Length));
         return true;
     }
 

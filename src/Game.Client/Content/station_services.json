@@ -13,43 +13,79 @@
       "factionId": "faction.meridian_exchange",
       "localizationKey": "faction.meridian_exchange",
       "economyType": "Trading",
-      "preferredTags": ["trade", "resource", "component"],
-      "questTypes": ["TradeItem", "CollectResource", "CraftItem"],
+      "preferredTags": [
+        "trade",
+        "resource",
+        "component"
+      ],
+      "questTypes": [
+        "TradeItem",
+        "CollectResource",
+        "CraftItem"
+      ],
       "visualStyle": "cyan_corporate",
-      "namePool": ["Ilia Voss", "Mara Quill", "Soren Vale"],
       "relations": {
         "faction.meridian_exchange": 100,
         "faction.helix_academy": 25,
         "faction.aegis_compact": 10
-      }
+      },
+      "namePoolKeys": [
+        "npc_name.ilia_voss",
+        "npc_name.mara_quill",
+        "npc_name.soren_vale"
+      ]
     },
     {
       "factionId": "faction.helix_academy",
       "localizationKey": "faction.helix_academy",
       "economyType": "Scientific",
-      "preferredTags": ["science", "chemical", "technology"],
-      "questTypes": ["CollectResource", "CraftItem", "ScanObject"],
+      "preferredTags": [
+        "science",
+        "chemical",
+        "technology"
+      ],
+      "questTypes": [
+        "CollectResource",
+        "CraftItem",
+        "ScanObject"
+      ],
       "visualStyle": "white_violet_research",
-      "namePool": ["Dr. Eren Sol", "Talia Nox", "Yun Ardent"],
       "relations": {
         "faction.meridian_exchange": 25,
         "faction.helix_academy": 100,
         "faction.aegis_compact": 5
-      }
+      },
+      "namePoolKeys": [
+        "npc_name.eren_sol",
+        "npc_name.talia_nox",
+        "npc_name.yun_ardent"
+      ]
     },
     {
       "factionId": "faction.aegis_compact",
       "localizationKey": "faction.aegis_compact",
       "economyType": "Military",
-      "preferredTags": ["ship", "tool", "defense"],
-      "questTypes": ["ProtectTarget", "RepairObject", "DeliverItem"],
+      "preferredTags": [
+        "ship",
+        "tool",
+        "defense"
+      ],
+      "questTypes": [
+        "ProtectTarget",
+        "RepairObject",
+        "DeliverItem"
+      ],
       "visualStyle": "graphite_red_military",
-      "namePool": ["Commander Rook", "Vera Kane", "Dax Orlov"],
       "relations": {
         "faction.meridian_exchange": 10,
         "faction.helix_academy": 5,
         "faction.aegis_compact": 100
-      }
+      },
+      "namePoolKeys": [
+        "npc_name.commander_rook",
+        "npc_name.vera_kane",
+        "npc_name.dax_orlov"
+      ]
     }
   ],
   "markets": [
@@ -73,13 +109,10 @@
     {
       "dialogueId": "dialogue.trader.ilia_voss",
       "localizationKey": "dialogue.trader.ilia_voss",
-      "greeting": "Frontier Exchange online. Trade, contracts and local market data are available.",
-      "farewell": "Safe travels. The market will remember every transaction.",
       "options": [
         {
           "optionId": "dialogue_option.trader.open_trade",
           "localizationKey": "dialogue_option.trader.open_trade",
-          "text": "Show me the market.",
           "action": "OpenTrade",
           "minimumReputation": -100,
           "reputationDelta": 0
@@ -87,7 +120,6 @@
         {
           "optionId": "dialogue_option.trader.open_quests",
           "localizationKey": "dialogue_option.trader.open_quests",
-          "text": "Do you have work available?",
           "action": "OpenQuests",
           "minimumReputation": -100,
           "reputationDelta": 0
@@ -95,12 +127,13 @@
         {
           "optionId": "dialogue_option.trader.close",
           "localizationKey": "dialogue_option.trader.close",
-          "text": "That is all for now.",
           "action": "Close",
           "minimumReputation": -100,
           "reputationDelta": 0
         }
-      ]
+      ],
+      "greetingKey": "dialogue.trader.ilia_voss.greeting",
+      "farewellKey": "dialogue.trader.ilia_voss.farewell"
     }
   ],
   "npcs": [

@@ -133,7 +133,7 @@ public sealed class IndustryProcessRuntime
             "StoreOutputs",
             StringComparison.Ordinal))
         {
-            result = $"recipe {recipe.RecipeId} is not an inventory process";
+            result = GameLocalizationService.Format("ui.industry.not_inventory", ("recipe", recipe.RecipeId));
             return IndustryProcessResult.RecipeUnavailable;
         }
 
@@ -142,15 +142,13 @@ public sealed class IndustryProcessRuntime
             station.StationId,
             StringComparison.Ordinal))
         {
-            result = $"recipe {recipe.RecipeId} requires station " +
-                recipe.RequiredStation;
+            result = GameLocalizationService.Format("ui.industry.station_required", ("recipe", recipe.RecipeId), ("station", recipe.RequiredStation));
             return IndustryProcessResult.WrongStation;
         }
 
         if (station.Tier < recipe.StationTier)
         {
-            result = $"station tier {station.Tier} is below required tier " +
-                recipe.StationTier;
+            result = GameLocalizationService.Format("ui.industry.tier_low", ("tier", station.Tier), ("required", recipe.StationTier));
             return IndustryProcessResult.StationTierTooLow;
         }
 
@@ -158,21 +156,19 @@ public sealed class IndustryProcessRuntime
             recipe.Category,
             StringComparer.Ordinal))
         {
-            result = $"station {station.StationId} does not support category " +
-                recipe.Category;
+            result = GameLocalizationService.Format("ui.industry.category", ("station", station.StationId), ("category", recipe.Category));
             return IndustryProcessResult.UnsupportedCategory;
         }
 
         if (!_isTechnologyUnlocked(recipe.RequiredTechnology))
         {
-            result = $"recipe {recipe.RecipeId} requires technology " +
-                recipe.RequiredTechnology;
+            result = GameLocalizationService.Format("ui.industry.technology", ("recipe", recipe.RecipeId), ("technology", recipe.RequiredTechnology));
             return IndustryProcessResult.TechnologyLocked;
         }
 
         if (requestedBatches <= 0)
         {
-            result = "requested batch count must be positive";
+            result = GameLocalizationService.Text("ui.industry.batch_positive");
             return IndustryProcessResult.InvalidBatchCount;
         }
 
@@ -182,9 +178,10 @@ public sealed class IndustryProcessRuntime
             requiredEnergy > station.EnergyCapacity + 0.000001 ||
             requiredEnergy > EnergyRemaining + 0.000001)
         {
-            result = $"energy required={requiredEnergy.ToString("0.###", CultureInfo.InvariantCulture)}, " +
-                $"stationCapacity={station.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)}, " +
-                $"available={EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}";
+            result = GameLocalizationService.Format(
+                "ui.industry.energy",
+                ("required", requiredEnergy.ToString("0.###", CultureInfo.InvariantCulture)),
+                ("available", EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)));
             return IndustryProcessResult.InsufficientEnergy;
         }
 
@@ -203,10 +200,11 @@ public sealed class IndustryProcessRuntime
             !requiredEnvironment.RequiresVacuum || environment.IsVacuum;
         if (!temperatureValid || !pressureValid || !vacuumValid)
         {
-            result = $"environment rejected: temperature=" +
-                $"{environment.TemperatureKelvin.ToString("0.###", CultureInfo.InvariantCulture)}K, " +
-                $"pressure={environment.PressureKPa.ToString("0.###", CultureInfo.InvariantCulture)}kPa, " +
-                $"vacuum={(environment.IsVacuum ? 1 : 0)}";
+            result = GameLocalizationService.Format(
+                "ui.industry.environment",
+                ("temperature", environment.TemperatureKelvin.ToString("0.###", CultureInfo.InvariantCulture) + "K"),
+                ("pressure", environment.PressureKPa.ToString("0.###", CultureInfo.InvariantCulture) + "kPa"),
+                ("vacuum", environment.IsVacuum ? 1 : 0));
             return IndustryProcessResult.EnvironmentRejected;
         }
 
@@ -222,10 +220,9 @@ public sealed class IndustryProcessRuntime
             .ToArray();
         if (missingInputs.Count > 0)
         {
-            result = "missing inputs: " + string.Join(
-                ", ",
-                missingInputs.Select(input =>
-                    $"{input.Quantity} x {input.DefinitionId}"));
+            result = GameLocalizationService.Format(
+                "ui.industry.missing_inputs",
+                ("items", string.Join(", ", missingInputs.Select(input => $"{input.Quantity} × {input.DefinitionId}"))));
             return IndustryProcessResult.InsufficientInputs;
         }
 
@@ -239,15 +236,14 @@ public sealed class IndustryProcessRuntime
                 .ToArray();
         if (missingCatalysts.Count > 0)
         {
-            result = "missing catalysts: " + string.Join(
-                ", ",
-                missingCatalysts.Select(catalyst =>
-                    $"{catalyst.Quantity} x {catalyst.DefinitionId}"));
+            result = GameLocalizationService.Format(
+                "ui.industry.missing_catalysts",
+                ("items", string.Join(", ", missingCatalysts.Select(catalyst => $"{catalyst.Quantity} × {catalyst.DefinitionId}"))));
             return IndustryProcessResult.MissingCatalysts;
         }
 
-        result = $"recipe {recipe.RecipeId} is ready for " +
-            $"{requestedBatches} batch(es)";
+        result = GameLocalizationService.Format(
+            "ui.industry.ready", ("recipe", recipe.RecipeId), ("batches", requestedBatches));
         return IndustryProcessResult.Ready;
     }
 

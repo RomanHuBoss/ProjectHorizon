@@ -153,17 +153,17 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     {
         if (!_catalog.SuitModules.ContainsKey(moduleId))
         {
-            result = $"unknown suit module {moduleId}";
+            result = GameLocalizationService.Format("ui.survival.unknown_suit_module", ("module", moduleId));
             return PlayerEquipmentMutationResult.UnknownDefinition;
         }
         if (_installedSuitModules.Contains(moduleId))
         {
-            result = $"{moduleId} is already installed";
+            result = GameLocalizationService.Format("ui.survival.already_installed", ("module", moduleId));
             return PlayerEquipmentMutationResult.AlreadyInstalled;
         }
         if (_installedSuitModules.Count >= _catalog.SuitSlotLimit)
         {
-            result = $"suit slot limit {_catalog.SuitSlotLimit} reached";
+            result = GameLocalizationService.Format("ui.survival.suit_slot_limit", ("limit", _catalog.SuitSlotLimit));
             return PlayerEquipmentMutationResult.SlotLimit;
         }
 
@@ -174,7 +174,7 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
         LifeSupport += Math.Max(0.0, after.MaximumLifeSupport - before.MaximumLifeSupport);
         Oxygen += Math.Max(0.0, after.MaximumOxygen - before.MaximumOxygen);
         ClampVitals();
-        result = $"installed {moduleId}";
+        result = GameLocalizationService.Format("ui.survival.installed", ("module", moduleId));
         return PlayerEquipmentMutationResult.Applied;
     }
 
@@ -184,11 +184,11 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     {
         if (!_installedSuitModules.Remove(moduleId))
         {
-            result = $"{moduleId} is not installed";
+            result = GameLocalizationService.Format("ui.survival.not_installed", ("module", moduleId));
             return PlayerEquipmentMutationResult.NotInstalled;
         }
         ClampVitals();
-        result = $"uninstalled {moduleId}";
+        result = GameLocalizationService.Format("ui.survival.uninstalled", ("module", moduleId));
         return PlayerEquipmentMutationResult.Applied;
     }
 
@@ -198,21 +198,21 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     {
         if (!_catalog.MultitoolModules.ContainsKey(moduleId))
         {
-            result = $"unknown multitool module {moduleId}";
+            result = GameLocalizationService.Format("ui.survival.unknown_multitool_module", ("module", moduleId));
             return PlayerEquipmentMutationResult.UnknownDefinition;
         }
         if (_installedMultitoolModules.Contains(moduleId))
         {
-            result = $"{moduleId} is already installed";
+            result = GameLocalizationService.Format("ui.survival.already_installed", ("module", moduleId));
             return PlayerEquipmentMutationResult.AlreadyInstalled;
         }
         if (_installedMultitoolModules.Count >= _catalog.MultitoolSlotLimit)
         {
-            result = $"multitool slot limit {_catalog.MultitoolSlotLimit} reached";
+            result = GameLocalizationService.Format("ui.survival.multitool_slot_limit", ("limit", _catalog.MultitoolSlotLimit));
             return PlayerEquipmentMutationResult.SlotLimit;
         }
         _installedMultitoolModules.Add(moduleId);
-        result = $"installed {moduleId}";
+        result = GameLocalizationService.Format("ui.survival.installed", ("module", moduleId));
         return PlayerEquipmentMutationResult.Applied;
     }
 
@@ -222,10 +222,10 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     {
         if (!_installedMultitoolModules.Remove(moduleId))
         {
-            result = $"{moduleId} is not installed";
+            result = GameLocalizationService.Format("ui.survival.not_installed", ("module", moduleId));
             return PlayerEquipmentMutationResult.NotInstalled;
         }
-        result = $"uninstalled {moduleId}";
+        result = GameLocalizationService.Format("ui.survival.uninstalled", ("module", moduleId));
         return PlayerEquipmentMutationResult.Applied;
     }
 
@@ -237,7 +237,7 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
             definitionId,
             out PlayerConsumableDefinition? consumable))
         {
-            result = $"unknown survival consumable {definitionId}";
+            result = GameLocalizationService.Format("ui.survival.unknown_consumable", ("item", definitionId));
             return PlayerEquipmentMutationResult.UnknownDefinition;
         }
 
@@ -263,11 +263,11 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
             JetpackEnergy + MultitoolEnergy;
         if (after <= before + 0.0001)
         {
-            result = $"{definitionId} has no effect at current levels";
+            result = GameLocalizationService.Format("ui.survival.no_effect", ("item", definitionId));
             return PlayerEquipmentMutationResult.NoEffect;
         }
 
-        result = $"used {definitionId}";
+        result = GameLocalizationService.Format("ui.survival.used", ("item", definitionId));
         return PlayerEquipmentMutationResult.Applied;
     }
 

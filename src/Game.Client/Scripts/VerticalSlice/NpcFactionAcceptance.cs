@@ -82,15 +82,13 @@ public static class NpcFactionAcceptanceRunner
                 Enum.GetValues<NpcArchetype>().All(type =>
                     catalog.Dialogues.Values.Count(dialogue => dialogue.Archetype == type) == 1) &&
                 catalog.Dialogues.Values.All(dialogue =>
-                    !string.IsNullOrWhiteSpace(dialogue.GreetingEn) &&
-                    !string.IsNullOrWhiteSpace(dialogue.GreetingRu) &&
+                    GameLocalizationService.ContainsKey(dialogue.GreetingKey) &&
+                    GameLocalizationService.ContainsKey(dialogue.FarewellKey) &&
                     dialogue.Options.Count > 0 &&
                     dialogue.Options.All(option =>
                         !string.IsNullOrWhiteSpace(option.Condition) &&
-                        !string.IsNullOrWhiteSpace(option.TextEn) &&
-                        !string.IsNullOrWhiteSpace(option.TextRu) &&
-                        !string.IsNullOrWhiteSpace(option.ConsequenceEn) &&
-                        !string.IsNullOrWhiteSpace(option.ConsequenceRu))) &&
+                        GameLocalizationService.ContainsKey(option.TextKey) &&
+                        GameLocalizationService.ContainsKey(option.ConsequenceKey))) &&
                 catalog.Dialogues.Values.Single(dialogue =>
                     dialogue.Archetype == NpcArchetype.Trader).Options.Any(option =>
                     string.Equals(option.Action, "OpenTrade", StringComparison.Ordinal)) &&

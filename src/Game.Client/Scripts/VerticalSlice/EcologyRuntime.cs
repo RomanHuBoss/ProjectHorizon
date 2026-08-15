@@ -146,11 +146,15 @@ public sealed class EcologyRuntime
         definition = _catalog.GetFlora(placement.FloraId);
         if (!_discoveredFloraIds.Add(definition.FloraId))
         {
-            message = $"{definition.DisplayNameEn} already catalogued";
+            message = GameLocalizationService.Format(
+                "ui.game.ecology.already_catalogued",
+                ("name", GameLocalizationService.Text(definition.LocalizationKey)));
             return false;
         }
 
-        message = $"catalogued flora {definition.DisplayNameEn}";
+        message = GameLocalizationService.Format(
+            "ui.game.ecology.catalogued_flora",
+            ("name", GameLocalizationService.Text(definition.LocalizationKey)));
         return true;
     }
 
@@ -170,11 +174,15 @@ public sealed class EcologyRuntime
         definition = _catalog.GetFauna(spawn.FaunaId);
         if (!_discoveredFaunaIds.Add(definition.FaunaId))
         {
-            message = $"{definition.DisplayNameEn} already catalogued";
+            message = GameLocalizationService.Format(
+                "ui.game.ecology.already_catalogued",
+                ("name", GameLocalizationService.Text(definition.LocalizationKey)));
             return false;
         }
 
-        message = $"catalogued fauna {definition.DisplayNameEn}";
+        message = GameLocalizationService.Format(
+            "ui.game.ecology.catalogued_fauna",
+            ("name", GameLocalizationService.Text(definition.LocalizationKey)));
         return true;
     }
 
@@ -194,12 +202,16 @@ public sealed class EcologyRuntime
         _discoveredFloraIds.Add(definition.FloraId);
         if (!_removedFloraInstanceIds.Add(instanceId))
         {
-            message = $"{definition.DisplayNameEn} specimen already harvested";
+            message = GameLocalizationService.Format(
+                "ui.game.ecology.already_harvested",
+                ("name", GameLocalizationService.Text(definition.LocalizationKey)));
             return false;
         }
 
-        message =
-            $"harvested {definition.DisplayNameEn}; yield={definition.HarvestDefinitionId}";
+        message = GameLocalizationService.Format(
+            "ui.game.ecology.harvested",
+            ("name", GameLocalizationService.Text(definition.LocalizationKey)),
+            ("yield", definition.HarvestDefinitionId));
         return true;
     }
 

@@ -230,7 +230,7 @@ public sealed class StarterRepairSession
 
         if (_collectedResources.ContainsKey(resourceNodeId))
         {
-            result = $"resource node {resourceNodeId} was already collected";
+            result = GameLocalizationService.Format("ui.repair.node_collected", ("node", resourceNodeId));
             return false;
         }
 
@@ -241,12 +241,10 @@ public sealed class StarterRepairSession
                 definitionId,
                 quantity,
                 quantity));
-        result = string.Equals(
-            definitionId,
-            SalvageDefinitionId,
-            StringComparison.Ordinal)
-            ? $"salvage {SalvageQuantity}/{RequiredSalvage}"
-            : $"collected {quantity} x {definitionId}";
+        result = GameLocalizationService.Format(
+            "ui.repair.inventory_consumed",
+            ("quantity", quantity),
+            ("item", definitionId));
         return true;
     }
 
@@ -254,7 +252,7 @@ public sealed class StarterRepairSession
     {
         if (ShipRepaired)
         {
-            result = "ship already repaired";
+            result = GameLocalizationService.Text("ui.repair.ship_already");
             return StarterRepairResult.AlreadyRepaired;
         }
 
@@ -262,10 +260,7 @@ public sealed class StarterRepairSession
             GetMissingRecipeInputs(_repairRecipe);
         if (missing.Count > 0)
         {
-            result = "missing " + string.Join(
-                ", ",
-                missing.Select(input =>
-                    $"{input.Quantity} x {input.DefinitionId}"));
+            result = GameLocalizationService.Format("ui.repair.missing", ("items", string.Join(", ", missing.Select(input => $"{input.Quantity} × {input.DefinitionId}"))));
             return StarterRepairResult.InsufficientSalvage;
         }
 
@@ -277,9 +272,10 @@ public sealed class StarterRepairSession
         _lastCraftedOutputs = CopyOutputs(_repairRecipe.Outputs);
         AddCraftedOutputs(_lastCraftedOutputs);
         ShipRepaired = true;
-        result =
-            $"recipe {_repairRecipe.RecipeId} crafted and applied; " +
-            $"ship health={RepairedHealth.ToString("0.0", CultureInfo.InvariantCulture)}";
+        result = GameLocalizationService.Format(
+            "ui.repair.recipe_crafted",
+            ("recipe", _repairRecipe.RecipeId),
+            ("outputs", RepairedHealth.ToString("0.0", CultureInfo.InvariantCulture)));
         return StarterRepairResult.Repaired;
     }
 
@@ -293,13 +289,13 @@ public sealed class StarterRepairSession
             out CraftingRecipeDefinition? recipe) ||
             recipe is null)
         {
-            result = $"station recipe {recipeId} is unavailable";
+            result = GameLocalizationService.Format("ui.repair.recipe_unavailable", ("recipe", recipeId));
             return StationCraftResult.RecipeUnavailable;
         }
 
         if (!ShipRepaired)
         {
-            result = "repair the starter ship before crafting ship components";
+            result = GameLocalizationService.Text("ui.repair.ship_first");
             return StationCraftResult.ShipNotRepaired;
         }
 
@@ -308,22 +304,20 @@ public sealed class StarterRepairSession
             recipe.RequiredStation,
             StringComparison.Ordinal))
         {
-            result = $"recipe {recipe.RecipeId} requires station " +
-                recipe.RequiredStation;
+            result = GameLocalizationService.Format("ui.repair.recipe_station", ("recipe", recipe.RecipeId), ("station", recipe.RequiredStation));
             return StationCraftResult.WrongStation;
         }
 
         if (!_isTechnologyUnlocked(recipe.RequiredTechnology))
         {
-            result = $"recipe {recipe.RecipeId} requires technology " +
-                recipe.RequiredTechnology;
+            result = GameLocalizationService.Format("ui.repair.recipe_technology", ("recipe", recipe.RecipeId), ("technology", recipe.RequiredTechnology));
             return StationCraftResult.TechnologyLocked;
         }
 
         if (!IndustryRecipePolicy.IsRepeatable(recipe) &&
             HasRecipeOutputs(recipe))
         {
-            result = $"recipe {recipe.RecipeId} already crafted";
+            result = GameLocalizationService.Format("ui.repair.recipe_already", ("recipe", recipe.RecipeId));
             return StationCraftResult.AlreadyCrafted;
         }
 
@@ -331,14 +325,11 @@ public sealed class StarterRepairSession
             GetMissingRecipeInputs(recipe);
         if (missing.Count > 0)
         {
-            result = "missing " + string.Join(
-                ", ",
-                missing.Select(input =>
-                    $"{input.Quantity} x {input.DefinitionId}"));
+            result = GameLocalizationService.Format("ui.repair.missing", ("items", string.Join(", ", missing.Select(input => $"{input.Quantity} × {input.DefinitionId}"))));
             return StationCraftResult.InsufficientInputs;
         }
 
-        result = $"recipe {recipe.RecipeId} is ready at {stationId}";
+        result = GameLocalizationService.Format("ui.repair.recipe_ready", ("recipe", recipe.RecipeId), ("station", stationId));
         return StationCraftResult.Ready;
     }
 
@@ -369,8 +360,10 @@ public sealed class StarterRepairSession
                 _nextItemPropertySequence++,
                 ItemPropertyRuntime.CreateNominalEnvironment(recipe));
         AddCraftedOutputs(_lastCraftedOutputs, properties);
-        result = $"recipe {recipe.RecipeId} crafted; " +
-            $"stored in {recipe.Application.TargetId}";
+        result = GameLocalizationService.Format(
+            "ui.repair.recipe_crafted",
+            ("recipe", recipe.RecipeId),
+            ("outputs", recipe.Application.TargetId));
         return StationCraftResult.Crafted;
     }
 
@@ -381,7 +374,7 @@ public sealed class StarterRepairSession
         CraftingRecipeDefinition? recipe = _secondaryRecipe;
         if (recipe is null)
         {
-            result = "secondary recipe is unavailable";
+            result = GameLocalizationService.Text("ui.repair.secondary_unavailable");
             return StationCraftResult.RecipeUnavailable;
         }
 
@@ -395,7 +388,7 @@ public sealed class StarterRepairSession
         CraftingRecipeDefinition? recipe = _secondaryRecipe;
         if (recipe is null)
         {
-            result = "secondary recipe is unavailable";
+            result = GameLocalizationService.Text("ui.repair.secondary_unavailable");
             return StationCraftResult.RecipeUnavailable;
         }
 
@@ -433,12 +426,12 @@ public sealed class StarterRepairSession
         int available = GetAvailableQuantity(definitionId);
         if (available < quantity)
         {
-            result = $"missing {quantity - available} x {definitionId}";
+            result = GameLocalizationService.Format("ui.repair.inventory_missing", ("quantity", quantity - available), ("item", definitionId));
             return false;
         }
 
         Consume(definitionId, quantity);
-        result = $"consumed {quantity} x {definitionId}";
+        result = GameLocalizationService.Format("ui.repair.inventory_consumed", ("quantity", quantity), ("item", definitionId));
         return true;
     }
 

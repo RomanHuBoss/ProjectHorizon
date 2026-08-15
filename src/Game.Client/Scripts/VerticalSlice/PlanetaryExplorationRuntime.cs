@@ -118,13 +118,13 @@ public sealed class PlanetaryExplorationRuntime
             instanceId,
             out PlanetaryPoiRuntimeState? current))
         {
-            message = $"unknown POI {instanceId}";
+            message = GameLocalizationService.Format("ui.poi.unknown_instance", ("instance", instanceId));
             return PlanetaryPoiScanResult.UnknownPoi;
         }
 
         if (current.Discovered)
         {
-            message = $"{DisplayName(current)} already discovered";
+            message = GameLocalizationService.Format("ui.poi.already_discovered", ("name", DisplayName(current)));
             return PlanetaryPoiScanResult.AlreadyDiscovered;
         }
 
@@ -144,9 +144,9 @@ public sealed class PlanetaryExplorationRuntime
             DiscoveryPoints += current.Definition.ResolutionPoints;
         }
 
-        message = scanOnly
-            ? $"discovered and resolved {DisplayName(updated)}"
-            : $"discovered {DisplayName(updated)}";
+        message = GameLocalizationService.Format(
+            scanOnly ? "ui.poi.discovered_resolved" : "ui.poi.discovered",
+            ("name", DisplayName(updated)));
         return PlanetaryPoiScanResult.Discovered;
     }
 
@@ -158,27 +158,29 @@ public sealed class PlanetaryExplorationRuntime
             instanceId,
             out PlanetaryPoiRuntimeState? current))
         {
-            message = $"unknown POI {instanceId}";
+            message = GameLocalizationService.Format("ui.poi.unknown_instance", ("instance", instanceId));
             return PlanetaryPoiInteractionResult.UnknownPoi;
         }
 
         if (!current.Discovered)
         {
-            message = $"scan {DisplayName(current)} before interaction";
+            message = GameLocalizationService.Format("ui.poi.scan_first", ("name", DisplayName(current)));
             return PlanetaryPoiInteractionResult.ScanRequired;
         }
 
         if (current.Resolved)
         {
-            message = $"{DisplayName(current)} already resolved";
+            message = GameLocalizationService.Format("ui.poi.already_resolved", ("name", DisplayName(current)));
             return PlanetaryPoiInteractionResult.AlreadyResolved;
         }
 
         PlanetaryPoiRuntimeState updated = current with { Resolved = true };
         _states[instanceId] = updated;
         DiscoveryPoints += current.Definition.ResolutionPoints;
-        message = $"resolved {DisplayName(updated)} via " +
-            current.Definition.InteractionKind;
+        message = GameLocalizationService.Format(
+            "ui.poi.resolved",
+            ("name", DisplayName(updated)),
+            ("interaction", current.Definition.InteractionKind));
         return PlanetaryPoiInteractionResult.Resolved;
     }
 
@@ -191,31 +193,31 @@ public sealed class PlanetaryExplorationRuntime
             instanceId,
             out PlanetaryPoiRuntimeState? current))
         {
-            message = $"unknown POI {instanceId}";
+            message = GameLocalizationService.Format("ui.poi.unknown_instance", ("instance", instanceId));
             return false;
         }
 
         string normalized = customName.Trim();
         if (!current.Discovered)
         {
-            message = "scan the POI before naming it";
+            message = GameLocalizationService.Text("ui.poi.scan_before_naming");
             return false;
         }
 
         if (!current.Definition.CanBeNamed)
         {
-            message = $"{current.Definition.PoiTypeId} cannot be named";
+            message = GameLocalizationService.Format("ui.poi.cannot_name", ("name", DisplayName(current)));
             return false;
         }
 
         if (normalized.Length is < 3 or > 40)
         {
-            message = "POI name must contain 3..40 characters";
+            message = GameLocalizationService.Text("ui.poi.name_length");
             return false;
         }
 
         _states[instanceId] = current with { CustomName = normalized };
-        message = $"named {instanceId} as {normalized}";
+        message = GameLocalizationService.Format("ui.poi.named", ("instance", instanceId), ("name", normalized));
         return true;
     }
 
@@ -236,7 +238,7 @@ public sealed class PlanetaryExplorationRuntime
     public string DisplayName(PlanetaryPoiRuntimeState state)
     {
         return string.IsNullOrWhiteSpace(state.CustomName)
-            ? state.Definition.PoiTypeId
+            ? GameLocalizationService.Text(state.Definition.LocalizationKey)
             : state.CustomName;
     }
 

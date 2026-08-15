@@ -238,12 +238,12 @@ public sealed class ProductionQueueRuntime
         int available = GetQuantity(definitionId);
         if (available < quantity)
         {
-            result = $"missing {quantity - available} x {definitionId}";
+            result = GameLocalizationService.Format("ui.repair.inventory_missing", ("quantity", quantity - available), ("item", definitionId));
             return false;
         }
 
         Consume(definitionId, quantity);
-        result = $"consumed {quantity} x {definitionId}";
+        result = GameLocalizationService.Format("ui.repair.inventory_consumed", ("quantity", quantity), ("item", definitionId));
         return true;
     }
 

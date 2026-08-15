@@ -10,6 +10,7 @@ public partial class GamePauseOverlay : CanvasLayer
     private Label? _description;
     private Button? _resume;
     private bool _deathMode;
+    private string _deathReasonKey = "ui.death.default";
 
     public bool IsOpen => _backdrop?.Visible ?? false;
     public bool IsDeathMode => _deathMode && IsOpen;
@@ -27,7 +28,14 @@ public partial class GamePauseOverlay : CanvasLayer
             throw new System.InvalidOperationException(
                 "GamePauseOverlay must be a direct child of SalvageRepairSlice.");
         }
+        GameLocalizationService.LocaleChanged += OnLocaleChanged;
         BuildUi();
+        GameLocalizationService.LocalizeControlTree(this);
+    }
+
+    public override void _ExitTree()
+    {
+        GameLocalizationService.LocaleChanged -= OnLocaleChanged;
     }
 
     public override void _Input(InputEvent inputEvent)
@@ -62,8 +70,9 @@ public partial class GamePauseOverlay : CanvasLayer
             return;
         }
         _deathMode = false;
-        _title.Text = "[PAUSED] PROJECT HORIZON";
-        _description.Text = "Simulation paused • gameplay time and physics are stopped";
+        _deathReasonKey = "ui.death.default";
+        _title.Text = GameLocalizationService.Text("ui.pause.title");
+        _description.Text = GameLocalizationService.Text("ui.pause.description");
         _resume.Visible = true;
         _menu.Visible = true;
         _settings.Visible = false;
@@ -74,7 +83,7 @@ public partial class GamePauseOverlay : CanvasLayer
         GD.Print("TASK-130 pause PASS: treePaused=1; overlayProcess=Always; mouse=visible.");
     }
 
-    public void ShowDeath(string reason)
+    public void ShowDeath(string reasonKey)
     {
         if (_backdrop is null || _menu is null || _settings is null ||
             _title is null || _description is null || _resume is null)
@@ -82,10 +91,9 @@ public partial class GamePauseOverlay : CanvasLayer
             return;
         }
         _deathMode = true;
-        _title.Text = "[CRITICAL] PLAYER INCAPACITATED";
-        _description.Text = string.IsNullOrWhiteSpace(reason)
-            ? "Life-support failure. Return to the main menu to recover or start a new profile."
-            : reason;
+        _deathReasonKey = string.IsNullOrWhiteSpace(reasonKey) ? "ui.death.default" : reasonKey;
+        _title.Text = GameLocalizationService.Text("ui.death.title");
+        _description.Text = GameLocalizationService.Text(_deathReasonKey);
         _resume.Visible = false;
         _settings.Visible = false;
         _menu.Visible = true;
@@ -151,16 +159,16 @@ public partial class GamePauseOverlay : CanvasLayer
         _menu.AddChild(_description);
         _menu.AddChild(new HSeparator());
 
-        _resume = PauseButton("RESUME");
+        _resume = PauseButton("ui.pause.resume");
         _resume.Pressed += ResumeGame;
         _menu.AddChild(_resume);
-        Button settingsButton = PauseButton("SETTINGS");
+        Button settingsButton = PauseButton("ui.pause.settings");
         settingsButton.Pressed += OpenSettings;
         _menu.AddChild(settingsButton);
-        Button main = PauseButton("SAVE & MAIN MENU");
+        Button main = PauseButton("ui.pause.save_main");
         main.Pressed += ReturnToMainMenu;
         _menu.AddChild(main);
-        Button quit = PauseButton("SAVE & QUIT");
+        Button quit = PauseButton("ui.pause.save_quit");
         quit.Pressed += QuitGame;
         _menu.AddChild(quit);
 
@@ -179,6 +187,14 @@ public partial class GamePauseOverlay : CanvasLayer
         _settings.CloseRequested += CloseSettings;
         _settings.Applied += _ => _host?.ApplyApplicationSettings();
         _backdrop.AddChild(_settings);
+    }
+
+    private void OnLocaleChanged(string _)
+    {
+        GameLocalizationService.LocalizeControlTree(this);
+        if (_title is null || _description is null) return;
+        _title.Text = GameLocalizationService.Text(_deathMode ? "ui.death.title" : "ui.pause.title");
+        _description.Text = GameLocalizationService.Text(_deathMode ? _deathReasonKey : "ui.pause.description");
     }
 
     private static Button PauseButton(string text) => new()

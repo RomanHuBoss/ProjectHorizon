@@ -24,7 +24,7 @@ public partial class SalvageRepairSlice
     private bool _playerEquipmentOpen;
     private PlayerEquipmentTab _playerEquipmentTab;
     private int _playerEquipmentSelection;
-    private string _playerEquipmentFeedback = "I equipment • Shift sprint • Ctrl crouch • Space jetpack";
+    private string _playerEquipmentFeedback = "";
     private PlayerEnvironmentTickReport? _lastPlayerEnvironmentTick;
     private Task<PlayerSurvivalAcceptanceReport>? _playerSurvivalAcceptanceTask;
     private PlayerSurvivalAcceptanceReport? _playerSurvivalAcceptanceReport;
@@ -138,9 +138,8 @@ public partial class SalvageRepairSlice
             safeInterior);
         if (!PlayerSurvival.IsAlive && activeOnFoot)
         {
-            _status = "player incapacitated: return to main menu or start a new profile";
-            ShowApplicationDeathScreen(
-                "Life-support failure • health depleted • gameplay simulation paused");
+            _status = L("ui.survival.incapacitated");
+            ShowApplicationDeathScreen("ui.death.life_support");
         }
         if (_playerEquipmentOpen)
         {
@@ -253,7 +252,7 @@ public partial class SalvageRepairSlice
         _playerEquipmentOpen = true;
         _playerEquipmentTab = PlayerEquipmentTab.Overview;
         _playerEquipmentSelection = 0;
-        _playerEquipmentFeedback = "equipment opened";
+        _playerEquipmentFeedback = L("ui.survival.equipment_opened");
         UpdatePlayerEquipmentPanel();
     }
 
@@ -309,7 +308,7 @@ public partial class SalvageRepairSlice
         string id = entries[Math.Clamp(_playerEquipmentSelection, 0, entries.Count - 1)];
         if (_playerEquipmentTab == PlayerEquipmentTab.Inventory)
         {
-            _playerEquipmentFeedback = $"inventory item selected: {id}";
+            _playerEquipmentFeedback = LF("ui.survival.inventory_selected", ("item", id));
             UpdatePlayerEquipmentPanel();
             return;
         }
@@ -331,11 +330,11 @@ public partial class SalvageRepairSlice
         if (result != PlayerEquipmentMutationResult.Applied)
         {
             GrantSharedInventory(id, 1);
-            _playerEquipmentFeedback = $"install blocked: {result}";
+            _playerEquipmentFeedback = LF("ui.survival.install_blocked", ("result", result));
         }
         else
         {
-            _playerEquipmentFeedback = $"installed {id}";
+            _playerEquipmentFeedback = LF("ui.survival.installed_feedback", ("item", id));
             QueueCurrentSnapshot(AutosaveTrigger.PlayerChanged);
             GD.Print(
                 "TASK-120 player equipment install PASS: " +
@@ -366,14 +365,14 @@ public partial class SalvageRepairSlice
         {
             GrantSharedInventory(id, 1);
             QueueCurrentSnapshot(AutosaveTrigger.PlayerChanged);
-            _playerEquipmentFeedback = $"uninstalled {id}; refund=1";
+            _playerEquipmentFeedback = LF("ui.survival.uninstalled_feedback", ("item", id));
             GD.Print(
                 "TASK-120 player equipment uninstall PASS: " +
                 $"definition={id}; refund=1.");
         }
         else
         {
-            _playerEquipmentFeedback = $"uninstall blocked: {result}";
+            _playerEquipmentFeedback = LF("ui.survival.uninstall_blocked", ("result", result));
         }
         UpdatePlayerEquipmentPanel();
     }
@@ -408,36 +407,42 @@ public partial class SalvageRepairSlice
 
     private void UpdatePlayerEquipmentPanel()
     {
-        if (_playerEquipmentPanel is null || _playerEquipmentLabel is null ||
-            _playerSurvivalRuntime is null)
+        if (_playerEquipmentPanel is null || _playerEquipmentLabel is null || _playerSurvivalRuntime is null)
         {
             return;
         }
         _playerEquipmentPanel.Visible = _playerEquipmentOpen;
-        if (!_playerEquipmentOpen)
-        {
-            return;
-        }
+        if (!_playerEquipmentOpen) return;
+
         PlayerSurvivalEffectiveStats stats = PlayerSurvival.GetEffectiveStats();
-        string environment = _lastPlayerEnvironmentTick?.Archetype ??
-            ResolveCurrentEnvironmentArchetype();
+        string environment = _lastPlayerEnvironmentTick?.Archetype ?? ResolveCurrentEnvironmentArchetype();
+        string tabName = L($"ui.survival.tab.{_playerEquipmentTab.ToString().ToLowerInvariant()}");
         List<string> lines = new()
         {
-            "INVENTORY / EXOSUIT & MULTITOOL — TASK-120/TASK-130",
-            $"Tab={_playerEquipmentTab} | I/Esc close | Tab switch | Enter inspect/install/use | X uninstall",
-            $"Environment={environment} | swimming={(PlayerSurvival.Swimming ? 1 : 0)} | alive={(PlayerSurvival.IsAlive ? 1 : 0)}",
-            $"Health {PlayerSurvival.Health:0.#}/{stats.MaximumHealth:0.#} | Shield {PlayerSurvival.Shield:0.#}/{stats.MaximumShield:0.#} | Stamina {PlayerSurvival.Stamina:0.#}/{stats.MaximumStamina:0.#}",
-            $"LifeSupport {PlayerSurvival.LifeSupport:0.#}/{stats.MaximumLifeSupport:0.#} | Hazard {PlayerSurvival.HazardProtection:0.#}/{stats.MaximumHazardProtection:0.#} | Oxygen {PlayerSurvival.Oxygen:0.#}/{stats.MaximumOxygen:0.#}",
-            $"Jetpack {PlayerSurvival.JetpackEnergy:0.#}/{stats.MaximumJetpackEnergy:0.#} | Multitool {PlayerSurvival.MultitoolEnergy:0.#}/{stats.MaximumMultitoolEnergy:0.#} | mode={PlayerSurvival.ActiveMultitoolFunction}",
-            $"Protection T/R/X={stats.TemperatureProtection:0.#}/{stats.RadiationProtection:0.#}/{stats.ToxicProtection:0.#}",
-            $"Suit slots {PlayerSurvival.InstalledSuitModules.Count}/{PlayerSurvivalCatalog.SuitSlotLimit} | Multitool slots {PlayerSurvival.InstalledMultitoolModules.Count}/{PlayerSurvivalCatalog.MultitoolSlotLimit}",
+            L("ui.survival.header"),
+            LF("ui.survival.tab_line", ("tab", tabName)),
+            LF("ui.survival.environment", ("environment", environment), ("swimming", PlayerSurvival.Swimming ? 1 : 0), ("alive", PlayerSurvival.IsAlive ? 1 : 0)),
+            LF("ui.survival.vitals",
+                ("health", PlayerSurvival.Health.ToString("0.#", CultureInfo.InvariantCulture)), ("maxHealth", stats.MaximumHealth.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("shield", PlayerSurvival.Shield.ToString("0.#", CultureInfo.InvariantCulture)), ("maxShield", stats.MaximumShield.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("stamina", PlayerSurvival.Stamina.ToString("0.#", CultureInfo.InvariantCulture)), ("maxStamina", stats.MaximumStamina.ToString("0.#", CultureInfo.InvariantCulture))),
+            LF("ui.survival.support",
+                ("life", PlayerSurvival.LifeSupport.ToString("0.#", CultureInfo.InvariantCulture)), ("maxLife", stats.MaximumLifeSupport.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("hazard", PlayerSurvival.HazardProtection.ToString("0.#", CultureInfo.InvariantCulture)), ("maxHazard", stats.MaximumHazardProtection.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("oxygen", PlayerSurvival.Oxygen.ToString("0.#", CultureInfo.InvariantCulture)), ("maxOxygen", stats.MaximumOxygen.ToString("0.#", CultureInfo.InvariantCulture))),
+            LF("ui.survival.energy",
+                ("jetpack", PlayerSurvival.JetpackEnergy.ToString("0.#", CultureInfo.InvariantCulture)), ("maxJetpack", stats.MaximumJetpackEnergy.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("multitool", PlayerSurvival.MultitoolEnergy.ToString("0.#", CultureInfo.InvariantCulture)), ("maxMultitool", stats.MaximumMultitoolEnergy.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("mode", PlayerSurvival.ActiveMultitoolFunction)),
+            LF("ui.survival.protection", ("temperature", stats.TemperatureProtection.ToString("0.#", CultureInfo.InvariantCulture)), ("radiation", stats.RadiationProtection.ToString("0.#", CultureInfo.InvariantCulture)), ("toxic", stats.ToxicProtection.ToString("0.#", CultureInfo.InvariantCulture))),
+            LF("ui.survival.slots", ("suit", PlayerSurvival.InstalledSuitModules.Count), ("suitMax", PlayerSurvivalCatalog.SuitSlotLimit), ("tool", PlayerSurvival.InstalledMultitoolModules.Count), ("toolMax", PlayerSurvivalCatalog.MultitoolSlotLimit)),
             string.Empty
         };
         IReadOnlyList<string> entries = PlayerEquipmentEntries;
         if (_playerEquipmentTab == PlayerEquipmentTab.Overview)
         {
-            lines.Add("Shift sprint | Ctrl crouch | hold Space airborne jetpack | water: Space up/Ctrl down");
-            lines.Add("Z cycles multitool mode; scanner/mining/weapon/analyzer/repair consume shared multitool energy.");
+            lines.Add(L("ui.survival.controls"));
+            lines.Add(L("ui.survival.multitool_controls"));
         }
         else
         {
@@ -450,16 +455,16 @@ public partial class SalvageRepairSlice
                 {
                     PlayerEquipmentTab.Inventory => ContentCatalog.Items.TryGetValue(id, out GameItemDefinition? item)
                         ? item.Category.ToUpperInvariant()
-                        : "ITEM",
-                    PlayerEquipmentTab.Suit => PlayerSurvival.InstalledSuitModules.Contains(id, StringComparer.Ordinal) ? "INSTALLED" : "AVAILABLE",
-                    PlayerEquipmentTab.Multitool => PlayerSurvival.InstalledMultitoolModules.Contains(id, StringComparer.Ordinal) ? "INSTALLED" : "AVAILABLE",
-                    _ => "CONSUMABLE"
+                        : L("ui.survival.state.item"),
+                    PlayerEquipmentTab.Suit => L(PlayerSurvival.InstalledSuitModules.Contains(id, StringComparer.Ordinal) ? "ui.survival.state.installed" : "ui.survival.state.available"),
+                    PlayerEquipmentTab.Multitool => L(PlayerSurvival.InstalledMultitoolModules.Contains(id, StringComparer.Ordinal) ? "ui.survival.state.installed" : "ui.survival.state.available"),
+                    _ => L("ui.survival.state.consumable")
                 };
-                lines.Add($"{marker} {id} | {state} | inv={inventory}");
+                lines.Add($"{marker} " + LF("ui.survival.entry", ("item", id), ("state", state), ("inventory", inventory)));
             }
         }
         lines.Add(string.Empty);
-        lines.Add($"Result: {_playerEquipmentFeedback}");
+        lines.Add(LF("ui.common.result", ("result", _playerEquipmentFeedback)));
         _playerEquipmentLabel.Text = string.Join("\n", lines);
     }
 

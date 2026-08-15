@@ -142,31 +142,31 @@ public sealed class StageOneVoyageRuntime
         ArgumentNullException.ThrowIfNull(shipSystems);
         if (!shipSystems.Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.voyage.ship_not_commissioned");
             return StageOneVoyageActionResult.NotCommissioned;
         }
 
         if (!shipSystems.FlightReady)
         {
-            result = "starter ship is not flight-ready";
+            result = GameLocalizationService.Text("ui.voyage.ship_not_ready");
             return StageOneVoyageActionResult.FlightNotReady;
         }
 
         if (Location != StageOneVoyageLocation.PlanetSurface)
         {
-            result = $"cannot board while voyage location is {Location}";
+            result = GameLocalizationService.Format("ui.voyage.cannot_board", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
         if (Piloted)
         {
-            result = "starter ship is already piloted";
+            result = GameLocalizationService.Text("ui.voyage.already_piloted");
             return StageOneVoyageActionResult.AlreadyPiloted;
         }
 
         Piloted = true;
         LastCheckpoint = "planet.boarded";
-        result = "starter ship boarded; press T to take off";
+        result = GameLocalizationService.Text("ui.voyage.boarded");
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -185,13 +185,13 @@ public sealed class StageOneVoyageRuntime
 
         if (Location != StageOneVoyageLocation.PlanetSurface)
         {
-            result = $"takeoff requires PlanetSurface, current={Location}";
+            result = GameLocalizationService.Format("ui.voyage.takeoff_requires", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
         if (shipSystems.GetSystemHealth("ship.system.landing") <= 0.0)
         {
-            result = "landing system is offline";
+            result = GameLocalizationService.Text("ui.voyage.landing_offline");
             return StageOneVoyageActionResult.LandingSystemOffline;
         }
 
@@ -215,7 +215,7 @@ public sealed class StageOneVoyageRuntime
             0.0,
             0.0);
         LastCheckpoint = "flight.outbound";
-        result = $"takeoff complete; fuel={shipSystems.Fuel:0.#}";
+        result = GameLocalizationService.Format("ui.voyage.takeoff_complete", ("fuel", shipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)));
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -236,21 +236,21 @@ public sealed class StageOneVoyageRuntime
 
         if (Location != StageOneVoyageLocation.OutboundFlight)
         {
-            result = $"docking requires OutboundFlight, current={Location}";
+            result = GameLocalizationService.Format("ui.voyage.docking_requires", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
         if (!IsFiniteNonNegative(distanceMeters) ||
             distanceMeters > DockingRangeMeters)
         {
-            result = $"station is outside docking range: {distanceMeters:0.0}m";
+            result = GameLocalizationService.Format("ui.voyage.station_out_range", ("distance", distanceMeters.ToString("0.0", CultureInfo.InvariantCulture)));
             return StageOneVoyageActionResult.OutsideApproach;
         }
 
         if (!IsFiniteNonNegative(speedMetersPerSecond) ||
             speedMetersPerSecond > MaximumDockingSpeed)
         {
-            result = $"approach speed is too high: {speedMetersPerSecond:0.0}m/s";
+            result = GameLocalizationService.Format("ui.voyage.speed_high", ("speed", speedMetersPerSecond.ToString("0.0", CultureInfo.InvariantCulture)));
             return StageOneVoyageActionResult.TooFast;
         }
 
@@ -275,7 +275,7 @@ public sealed class StageOneVoyageRuntime
             0.0,
             0.0);
         LastCheckpoint = "station.docked";
-        result = $"docked at orbital station; fuel={shipSystems.Fuel:0.#}";
+        result = GameLocalizationService.Format("ui.voyage.docked", ("fuel", shipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)));
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -318,7 +318,7 @@ public sealed class StageOneVoyageRuntime
 
         if (Location != StageOneVoyageLocation.OrbitalStation)
         {
-            result = $"undock requires OrbitalStation, current={Location}";
+            result = GameLocalizationService.Format("ui.voyage.undock_requires", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
@@ -340,7 +340,7 @@ public sealed class StageOneVoyageRuntime
             0.0,
             0.0);
         LastCheckpoint = "flight.inbound";
-        result = $"undocked; return to planetary landing pad; fuel={shipSystems.Fuel:0.#}";
+        result = GameLocalizationService.Format("ui.voyage.undocked", ("fuel", shipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)));
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -361,27 +361,27 @@ public sealed class StageOneVoyageRuntime
 
         if (Location != StageOneVoyageLocation.InboundFlight)
         {
-            result = $"landing requires InboundFlight, current={Location}";
+            result = GameLocalizationService.Format("ui.voyage.landing_requires", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
         if (shipSystems.GetSystemHealth("ship.system.landing") <= 0.0)
         {
-            result = "landing system is offline";
+            result = GameLocalizationService.Text("ui.voyage.landing_offline");
             return StageOneVoyageActionResult.LandingSystemOffline;
         }
 
         if (!IsFiniteNonNegative(distanceMeters) ||
             distanceMeters > LandingRangeMeters)
         {
-            result = $"landing pad is outside approach range: {distanceMeters:0.0}m";
+            result = GameLocalizationService.Format("ui.voyage.pad_out_range", ("distance", distanceMeters.ToString("0.0", CultureInfo.InvariantCulture)));
             return StageOneVoyageActionResult.OutsideApproach;
         }
 
         if (!IsFiniteNonNegative(speedMetersPerSecond) ||
             speedMetersPerSecond > MaximumLandingSpeed)
         {
-            result = $"landing speed is too high: {speedMetersPerSecond:0.0}m/s";
+            result = GameLocalizationService.Format("ui.voyage.landing_speed_high", ("speed", speedMetersPerSecond.ToString("0.0", CultureInfo.InvariantCulture)));
             return StageOneVoyageActionResult.TooFast;
         }
 
@@ -410,7 +410,7 @@ public sealed class StageOneVoyageRuntime
             0.0,
             0.0);
         LastCheckpoint = "planet.landed";
-        result = $"landing complete; loops={CompletedLoops}; fuel={shipSystems.Fuel:0.#}";
+        result = GameLocalizationService.Format("ui.voyage.landing_complete", ("loops", CompletedLoops), ("fuel", shipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)));
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -418,19 +418,19 @@ public sealed class StageOneVoyageRuntime
     {
         if (!Piloted)
         {
-            result = "starter ship is not piloted";
+            result = GameLocalizationService.Text("ui.voyage.not_piloted");
             return StageOneVoyageActionResult.NotPiloted;
         }
 
         if (Location != StageOneVoyageLocation.PlanetSurface)
         {
-            result = $"disembark requires PlanetSurface, current={Location}";
+            result = GameLocalizationService.Format("ui.voyage.disembark_requires", ("location", Location));
             return StageOneVoyageActionResult.InvalidLocation;
         }
 
         Piloted = false;
         LastCheckpoint = "planet.surface";
-        result = "disembarked on planetary surface";
+        result = GameLocalizationService.Text("ui.voyage.disembarked");
         return StageOneVoyageActionResult.Applied;
     }
 
@@ -513,23 +513,23 @@ public sealed class StageOneVoyageRuntime
     {
         if (!Piloted)
         {
-            result = "starter ship is not piloted";
+            result = GameLocalizationService.Text("ui.voyage.not_piloted");
             return StageOneVoyageActionResult.NotPiloted;
         }
 
         if (!shipSystems.Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.voyage.ship_not_commissioned");
             return StageOneVoyageActionResult.NotCommissioned;
         }
 
         if (!shipSystems.FlightReady)
         {
-            result = "starter ship is not flight-ready";
+            result = GameLocalizationService.Text("ui.voyage.ship_not_ready");
             return StageOneVoyageActionResult.FlightNotReady;
         }
 
-        result = "ready";
+        result = GameLocalizationService.Text("ui.voyage.ready");
         return StageOneVoyageActionResult.Applied;
     }
 

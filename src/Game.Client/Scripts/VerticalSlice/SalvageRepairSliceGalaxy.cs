@@ -15,7 +15,7 @@ public partial class SalvageRepairSlice
     private int _galaxyMapSelection;
     private IReadOnlyList<GalaxySystemDefinition> _galaxyMapSystems =
         Array.Empty<GalaxySystemDefinition>();
-    private string _galaxyMapFeedback = "select a destination";
+    private string _galaxyMapFeedback = "";
     private Task<GalaxyNavigationAcceptanceReport>?
         _galaxyNavigationAcceptanceTask;
     private GalaxyNavigationAcceptanceReport?
@@ -45,9 +45,7 @@ public partial class SalvageRepairSlice
         _galaxyMapOpen = false;
         _galaxyMapSystemTab = false;
         _galaxyMapSelection = 0;
-        _galaxyMapFeedback = saveData is null
-            ? "legacy/fresh save: starter system selected"
-            : "galaxy navigation restored";
+        _galaxyMapFeedback = L(saveData is null ? "ui.galaxy.fresh" : "ui.galaxy.restored");
         RefreshGalaxyMapSystems();
         if (_galaxyMapPanel is not null)
         {
@@ -62,7 +60,7 @@ public partial class SalvageRepairSlice
             if (Matches(physical, logical, Key.Escape) ||
                 Matches(physical, logical, Key.M))
             {
-                CloseGalaxyMap("galaxy map closed");
+                CloseGalaxyMap(L("ui.galaxy.closed"));
             }
             else if (Matches(physical, logical, Key.Tab))
             {
@@ -114,14 +112,13 @@ public partial class SalvageRepairSlice
         _galaxyMapSystemTab = false;
         _galaxyMapSelection = 0;
         RefreshGalaxyMapSystems();
-        _galaxyMapFeedback = StageOneVoyage.Location ==
-                StageOneVoyageLocation.OrbitalStation &&
-            StageOneVoyage.Piloted
-            ? "select a system and press Enter to jump"
-            : "map available; hyperspace requires a piloted ship docked at an orbital station";
+        _galaxyMapFeedback = L(StageOneVoyage.Location ==
+                StageOneVoyageLocation.OrbitalStation && StageOneVoyage.Piloted
+            ? "ui.galaxy.jump_prompt"
+            : "ui.galaxy.jump_requirement");
         _galaxyMapPanel.Visible = true;
         UpdateGalaxyMapPanel();
-        _status = "galaxy map opened";
+        _status = L("ui.galaxy.opened");
     }
 
     private void CloseGalaxyMap(string status = "")
@@ -201,7 +198,7 @@ public partial class SalvageRepairSlice
     {
         if (_galaxyMapSystems.Count == 0)
         {
-            _galaxyMapFeedback = "no generated destination is available";
+            _galaxyMapFeedback = L("ui.galaxy.no_destination");
             UpdateGalaxyMapPanel();
             return;
         }
@@ -215,8 +212,8 @@ public partial class SalvageRepairSlice
             stats.HyperdriveRange);
         if (!route.Reachable)
         {
-            _galaxyMapFeedback =
-                $"route unavailable within {stats.HyperdriveRange:0.#} ly range";
+            _galaxyMapFeedback = LF("ui.galaxy.route_unavailable",
+                ("range", stats.HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)));
             UpdateGalaxyMapPanel();
             return;
         }
@@ -268,74 +265,106 @@ public partial class SalvageRepairSlice
         GalaxySystemDefinition current = GalaxyNavigation.CurrentSystem;
         if (_galaxyMapSystemTab)
         {
-            string planets = string.Join(
-                "\n",
-                current.Planets.Select((planet, index) =>
-                {
-                    string marker = index == _galaxyMapSelection ? ">" : " ";
-                    return $"{marker} {planet.OrbitIndex:00} " +
-                        $"{planet.Archetype,-12} moons={planet.MoonCount} " +
-                        $"atmosphere={(planet.HasAtmosphere ? 1 : 0)} " +
-                        $"water={(planet.HasWater ? 1 : 0)}";
-                }));
-            _galaxyMapLabel.Text =
-                "SYSTEM MAP [Tab: Galaxy]\n" +
-                $"{current.DisplayName} • {current.SystemId} • {current.GalaxyId}\n" +
-                $"sector={current.SectorX},{current.SectorY},{current.SectorZ} • " +
-                $"star={current.StarType} • economy={current.EconomyType} • " +
-                $"danger={current.DangerLevel}\n" +
-                $"Planets {current.Planets.Count}/8:\n{planets}\n\n" +
-                "Up/Down select • Tab galaxy • M/Esc close\n" +
-                $"Status: {_galaxyMapFeedback}";
+            string planets = string.Join("\n", current.Planets.Select((planet, index) =>
+            {
+                string marker = index == _galaxyMapSelection ? ">" : " ";
+                return $"{marker} " + LF("ui.galaxy.planet_row",
+                    ("index", planet.OrbitIndex.ToString("00", CultureInfo.InvariantCulture)),
+                    ("archetype", LocalizeGalaxyPlanetArchetype(planet.Archetype)),
+                    ("moons", planet.MoonCount),
+                    ("atmosphere", planet.HasAtmosphere ? 1 : 0),
+                    ("water", planet.HasWater ? 1 : 0));
+            }));
+            _galaxyMapLabel.Text = string.Join("\n", new[]
+            {
+                L("ui.galaxy.system_header"),
+                LF("ui.galaxy.system_summary", ("name", current.DisplayName), ("system", current.SystemId), ("galaxy", current.GalaxyId)),
+                LF("ui.galaxy.system_detail", ("x", current.SectorX), ("y", current.SectorY), ("z", current.SectorZ), ("star", LocalizeGalaxyStar(current.StarType)), ("economy", LocalizeGalaxyEconomy(current.EconomyType)), ("danger", current.DangerLevel)),
+                LF("ui.galaxy.planets", ("count", current.Planets.Count)),
+                planets,
+                "",
+                L("ui.galaxy.system_controls"),
+                LF("ui.galaxy.status", ("status", _galaxyMapFeedback))
+            });
             return;
         }
 
         ShipEffectiveStats stats = ShipSystems.GetEffectiveStats();
-        string systems = string.Join(
-            "\n",
-            _galaxyMapSystems.Select((system, index) =>
-            {
-                string marker = index == _galaxyMapSelection ? ">" : " ";
-                string visited = GalaxyNavigation.VisitedSystemIds.Contains(
-                    system.SystemId)
-                    ? "VISITED"
-                    : "NEW";
-                double distance = GalaxyNavigationRuntime.Distance(
-                    current,
-                    system);
-                GalaxyRoutePlan route = GalaxyNavigation.PlanRoute(
-                    system,
-                    stats.HyperdriveRange);
-                int jumps = route.Reachable
-                    ? Math.Max(0, route.Systems.Count - 1)
-                    : -1;
-                return $"{marker} {system.DisplayName,-20} " +
-                    $"[{system.SectorX,2},{system.SectorY,2},{system.SectorZ,2}] " +
-                    $"{system.StarType,-16} {distance,6:0.0}ly " +
-                    $"route={(jumps < 0 ? "--" : jumps.ToString(CultureInfo.InvariantCulture))} " +
-                    $"{visited}";
-            }));
-        _galaxyMapLabel.Text =
-            "GALAXY MAP [Tab: System]\n" +
-            $"Current: {current.DisplayName} • {current.SystemId} • {current.GalaxyId}\n" +
-            $"hyperdriveRange={stats.HyperdriveRange:0.#}ly • " +
-            $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)} • " +
-            $"fuel={ShipSystems.Fuel:0.#}/{stats.FuelCapacity:0.#} • " +
-            $"visited={GalaxyNavigation.VisitedSystemIds.Count} • " +
-            $"jumps={GalaxyNavigation.JumpCount}\n" +
-            systems + "\n\n" +
-            "Up/Down select • Enter route/jump • Tab system • M/Esc close\n" +
-            "Jump requires: commissioned + flight-ready + hyperdrive module + orbital dock\n" +
-            $"Status: {_galaxyMapFeedback}";
+        string systems = string.Join("\n", _galaxyMapSystems.Select((system, index) =>
+        {
+            string marker = index == _galaxyMapSelection ? ">" : " ";
+            string visited = L(GalaxyNavigation.VisitedSystemIds.Contains(system.SystemId) ? "ui.galaxy.visited" : "ui.galaxy.new");
+            double distance = GalaxyNavigationRuntime.Distance(current, system);
+            GalaxyRoutePlan route = GalaxyNavigation.PlanRoute(system, stats.HyperdriveRange);
+            int jumps = route.Reachable ? Math.Max(0, route.Systems.Count - 1) : -1;
+            return $"{marker} " + LF("ui.galaxy.system_row",
+                ("name", system.DisplayName), ("x", system.SectorX), ("y", system.SectorY), ("z", system.SectorZ),
+                ("star", LocalizeGalaxyStar(system.StarType)), ("distance", distance.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("route", jumps < 0 ? "--" : jumps.ToString(CultureInfo.InvariantCulture)), ("visited", visited));
+        }));
+        _galaxyMapLabel.Text = string.Join("\n", new[]
+        {
+            L("ui.galaxy.galaxy_header"),
+            LF("ui.galaxy.current", ("name", current.DisplayName), ("system", current.SystemId), ("galaxy", current.GalaxyId)),
+            LF("ui.galaxy.flight_summary",
+                ("range", stats.HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("ready", ShipSystems.HyperspaceReady ? 1 : 0),
+                ("fuel", ShipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("capacity", stats.FuelCapacity.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("visited", GalaxyNavigation.VisitedSystemIds.Count), ("jumps", GalaxyNavigation.JumpCount)),
+            systems,
+            "",
+            L("ui.galaxy.controls"),
+            L("ui.galaxy.jump_requires"),
+            LF("ui.galaxy.status", ("status", _galaxyMapFeedback))
+        });
+    }
+
+    private static string LocalizeGalaxyStar(GalaxyStarType starType)
+    {
+        string suffix = starType switch
+        {
+            GalaxyStarType.RedDwarf => "red_dwarf",
+            GalaxyStarType.OrangeDwarf => "orange_dwarf",
+            GalaxyStarType.YellowStar => "yellow_star",
+            GalaxyStarType.WhiteStar => "white_star",
+            GalaxyStarType.BlueStar => "blue_star",
+            GalaxyStarType.BinaryDecorative => "binary_decorative",
+            _ => throw new ArgumentOutOfRangeException(nameof(starType), starType, null)
+        };
+        return L("ui.galaxy.star." + suffix);
+    }
+
+    private static string LocalizeGalaxyEconomy(string economyType)
+    {
+        string key = "ui.galaxy.economy." + economyType.ToLowerInvariant();
+        return GameLocalizationService.ContainsKey(key)
+            ? L(key)
+            : economyType;
+    }
+
+    private static string LocalizeGalaxyPlanetArchetype(string archetype)
+    {
+        string key = "ui.galaxy.planet." + archetype.ToLowerInvariant();
+        return GameLocalizationService.ContainsKey(key)
+            ? L(key)
+            : archetype;
     }
 
     private string BuildGalaxyNavigationHudLine()
     {
-        return _galaxyNavigationRuntime is null
-            ? "Galaxy navigation: unavailable"
-            : "Galaxy navigation: " + GalaxyNavigation.BuildSummary() +
-              $"; range={ShipSystems.GetEffectiveStats().HyperdriveRange:0.#}ly; " +
-              $"ready={(ShipSystems.HyperspaceReady ? 1 : 0)}; map=M";
+        if (_galaxyNavigationRuntime is null)
+        {
+            return L("ui.hud.galaxy.unavailable");
+        }
+        return LF(
+            "ui.hud.galaxy.summary",
+            ("system", GalaxyNavigation.CurrentSystem.SystemId),
+            ("galaxy", GalaxyNavigation.CurrentSystem.GalaxyId),
+            ("jumps", GalaxyNavigation.JumpCount),
+            ("visited", GalaxyNavigation.VisitedSystemIds.Count),
+            ("range", ShipSystems.GetEffectiveStats().HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("ready", ShipSystems.HyperspaceReady ? 1 : 0));
     }
 
     private void BeginGalaxyNavigationAcceptance(string directory)

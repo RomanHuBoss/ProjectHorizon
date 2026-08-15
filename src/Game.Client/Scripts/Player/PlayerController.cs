@@ -147,15 +147,15 @@ public partial class PlayerController : CharacterBody3D
     {
         if (TryGetRayInteractable(out _, out Node3D rayNode))
         {
-            return $"aimed at {rayNode.Name} — press E";
+            return GameLocalizationService.Format("ui.player.interaction.aimed", ("target", rayNode.Name));
         }
 
         if (TryGetFallbackInteractable(out _, out Node3D fallbackNode, out float distance))
         {
-            return $"near {fallbackNode.Name} ({distance:0.0} m) — press E";
+            return GameLocalizationService.Format("ui.player.interaction.near", ("target", fallbackNode.Name), ("distance", distance.ToString("0.0", System.Globalization.CultureInfo.InvariantCulture)));
         }
 
-        return "no target in interaction range";
+        return GameLocalizationService.Text("ui.player.interaction.none");
     }
 
     public void ReceiveExternalDamage(double damage, string source)

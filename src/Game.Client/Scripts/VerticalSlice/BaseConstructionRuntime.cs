@@ -107,37 +107,37 @@ public sealed class BaseConstructionRuntime
                 moduleId,
                 out BaseModuleDefinition? definition))
         {
-            result = $"unknown module {moduleId}";
+            result = GameLocalizationService.Format("ui.base.unknown_module", ("module", moduleId));
             return BasePlacementResult.UnknownModule;
         }
 
         if (GetStock(moduleId) <= 0)
         {
-            result = $"module {moduleId} is out of stock";
+            result = GameLocalizationService.Format("ui.base.out_of_stock", ("module", moduleId));
             return BasePlacementResult.OutOfStock;
         }
 
         if (_placements.Count == 0 && !definition.IsAnchor)
         {
-            result = "the first module must be the base anchor";
+            result = GameLocalizationService.Text("ui.base.anchor_required");
             return BasePlacementResult.AnchorRequired;
         }
 
         if (FindAt(gridX, gridZ) is not null)
         {
-            result = $"grid cell {gridX},{gridZ} is occupied";
+            result = GameLocalizationService.Format("ui.base.cell_occupied", ("x", gridX), ("z", gridZ));
             return BasePlacementResult.Overlap;
         }
 
         if (_placements.Count > 0 && !HasAdjacentModule(gridX, gridZ))
         {
-            result = "module must snap to a cardinally adjacent base module";
+            result = GameLocalizationService.Text("ui.base.snap_required");
             return BasePlacementResult.NotSnapped;
         }
 
         if (WouldExceedLimits(definition))
         {
-            result = "base construction limit would be exceeded";
+            result = GameLocalizationService.Text("ui.base.limit_exceeded");
             return BasePlacementResult.LimitExceeded;
         }
 
@@ -154,7 +154,7 @@ public sealed class BaseConstructionRuntime
         _placements.Add(instanceId, placement);
         _stock[moduleId]--;
         RecomputePower(0.0);
-        result = $"placed {moduleId} at {gridX},{gridZ}";
+        result = GameLocalizationService.Format("ui.base.placed", ("module", moduleId), ("x", gridX), ("z", gridZ));
         return BasePlacementResult.Placed;
     }
 
@@ -164,7 +164,7 @@ public sealed class BaseConstructionRuntime
                 instanceId,
                 out BaseModulePlacement? placement))
         {
-            result = $"unknown module instance {instanceId}";
+            result = GameLocalizationService.Format("ui.base.unknown_instance", ("instance", instanceId));
             return false;
         }
 
@@ -173,13 +173,13 @@ public sealed class BaseConstructionRuntime
             (!HasAnchor() || CountConnectedComponents() != 1))
         {
             _placements.Add(instanceId, placement);
-            result = "removal would disconnect the base network";
+            result = GameLocalizationService.Text("ui.base.disconnect");
             return false;
         }
 
         _stock[placement.ModuleId] = GetStock(placement.ModuleId) + 1;
         RecomputePower(0.0);
-        result = $"removed {placement.ModuleId}; stock refunded";
+        result = GameLocalizationService.Format("ui.base.removed", ("module", placement.ModuleId));
         return true;
     }
 
@@ -189,7 +189,7 @@ public sealed class BaseConstructionRuntime
                 instanceId,
                 out BaseModulePlacement? placement))
         {
-            result = $"unknown module instance {instanceId}";
+            result = GameLocalizationService.Format("ui.base.unknown_instance", ("instance", instanceId));
             return false;
         }
 
@@ -201,7 +201,7 @@ public sealed class BaseConstructionRuntime
             definition.BatteryCapacity > 0.0;
         if (!isDevice)
         {
-            result = $"module {placement.ModuleId} has no switchable device";
+            result = GameLocalizationService.Format("ui.base.no_switch", ("module", placement.ModuleId));
             return false;
         }
 
@@ -211,8 +211,9 @@ public sealed class BaseConstructionRuntime
         };
         _placements[instanceId] = updated;
         RecomputePower(0.0);
-        result = $"{updated.ModuleId} " +
-            (updated.Enabled ? "enabled" : "disabled");
+        result = GameLocalizationService.Format(
+            updated.Enabled ? "ui.base.enabled" : "ui.base.disabled",
+            ("module", updated.ModuleId));
         return true;
     }
 

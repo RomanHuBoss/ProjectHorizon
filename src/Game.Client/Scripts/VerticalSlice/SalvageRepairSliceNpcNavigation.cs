@@ -79,18 +79,24 @@ public partial class SalvageRepairSlice
     {
         if (_npcNavigationSurface is null || !_npcNavigationSurface.IsConfigured)
         {
-            return "NPC navigation: unavailable";
+            return L("ui.hud.npc_navigation.unavailable");
         }
         NpcNavigationSurfaceSnapshot snapshot = _npcNavigationSurface.CreateSnapshot();
         NpcNavigationAgentDiagnostics[] diagnostics = GetNpcNavigationDiagnostics();
         int active = diagnostics.Count(item => item.NavigationActive);
         int requests = diagnostics.Sum(item => item.PathRequests);
         int recoveries = diagnostics.Sum(item => item.StuckRecoveries);
-        return
-            $"NPC navigation: regions={snapshot.ActiveRegions}/{snapshot.MaximumRegions} • " +
-            $"cells={snapshot.WalkableCells} • obstacles={snapshot.StaticObstacles} • " +
-            $"agents={active}/{diagnostics.Length} • paths={requests} • recovery={recoveries} • " +
-            $"sync={(snapshot.ReadyForQueries ? "READY" : "WAIT")}";
+        return LF(
+            "ui.hud.npc_navigation.summary",
+            ("regions", snapshot.ActiveRegions),
+            ("maxRegions", snapshot.MaximumRegions),
+            ("cells", snapshot.WalkableCells),
+            ("obstacles", snapshot.StaticObstacles),
+            ("active", active),
+            ("agents", diagnostics.Length),
+            ("paths", requests),
+            ("recoveries", recoveries),
+            ("sync", L(snapshot.ReadyForQueries ? "ui.common.ready" : "ui.common.wait")));
     }
 
     private void BeginNpcNavigationAcceptance()

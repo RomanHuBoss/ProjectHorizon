@@ -18,7 +18,7 @@ public sealed record FactionServiceDefinition(
     IReadOnlyList<string> PreferredTags,
     IReadOnlyList<string> QuestTypes,
     string VisualStyle,
-    IReadOnlyList<string> NamePool,
+    IReadOnlyList<string> NamePoolKeys,
     IReadOnlyDictionary<string, int> Relations);
 
 public sealed record MarketServiceDefinition(
@@ -39,7 +39,6 @@ public sealed record MarketServiceDefinition(
 public sealed record DialogueOptionServiceDefinition(
     string OptionId,
     string LocalizationKey,
-    string Text,
     string Action,
     int MinimumReputation,
     int ReputationDelta);
@@ -47,8 +46,8 @@ public sealed record DialogueOptionServiceDefinition(
 public sealed record DialogueServiceDefinition(
     string DialogueId,
     string LocalizationKey,
-    string Greeting,
-    string Farewell,
+    string GreetingKey,
+    string FarewellKey,
     IReadOnlyList<DialogueOptionServiceDefinition> Options);
 
 public sealed record NpcServiceDefinition(
@@ -375,9 +374,10 @@ public sealed class StationServicesCatalog
                 faction.QuestTypes is null ||
                 faction.QuestTypes.Count == 0 ||
                 faction.QuestTypes.Any(value => string.IsNullOrWhiteSpace(value)) ||
-                faction.NamePool is null ||
-                faction.NamePool.Count == 0 ||
-                faction.NamePool.Any(value => string.IsNullOrWhiteSpace(value)) ||
+                faction.NamePoolKeys is null ||
+                faction.NamePoolKeys.Count == 0 ||
+                faction.NamePoolKeys.Any(value =>
+                    !GameContentCatalog.IsStableId(value)) ||
                 faction.Relations is null ||
                 string.IsNullOrWhiteSpace(faction.VisualStyle))
             {
@@ -440,8 +440,14 @@ public sealed class StationServicesCatalog
                 dialogue.LocalizationKey,
                 dialogue.DialogueId,
                 "localization key");
-            ValidateText(dialogue.Greeting, dialogue.DialogueId, "greeting");
-            ValidateText(dialogue.Farewell, dialogue.DialogueId, "farewell");
+            ValidateText(dialogue.GreetingKey, dialogue.DialogueId, "greeting key");
+            ValidateText(dialogue.FarewellKey, dialogue.DialogueId, "farewell key");
+            if (!GameContentCatalog.IsStableId(dialogue.GreetingKey) ||
+                !GameContentCatalog.IsStableId(dialogue.FarewellKey))
+            {
+                throw new ContentValidationException(
+                    $"Dialogue {dialogue.DialogueId} contains invalid localization keys.");
+            }
             if (dialogue.Options is null || dialogue.Options.Count == 0)
             {
                 throw new ContentValidationException(
@@ -462,7 +468,11 @@ public sealed class StationServicesCatalog
                 }
 
                 ValidateText(option.LocalizationKey, option.OptionId, "localization key");
-                ValidateText(option.Text, option.OptionId, "text");
+                if (!GameContentCatalog.IsStableId(option.LocalizationKey))
+                {
+                    throw new ContentValidationException(
+                        $"Dialogue option {option.OptionId} has invalid localization key.");
+                }
                 actions.Add(option.Action);
                 if (option.Action is not ("OpenTrade" or "OpenQuests" or "Close"))
                 {

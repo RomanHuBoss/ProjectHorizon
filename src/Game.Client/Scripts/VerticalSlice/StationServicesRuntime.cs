@@ -284,7 +284,7 @@ public sealed class StationServicesRuntime
                 quantity,
                 total,
                 isBuy: true,
-                $"market stock is short by {quantity - quote.Stock}");
+                GameLocalizationService.Format("ui.station.trade.stock_short", ("quantity", quantity - quote.Stock)));
         }
 
         if (PlayerCredits < total)
@@ -294,7 +294,7 @@ public sealed class StationServicesRuntime
                 quantity,
                 total,
                 isBuy: true,
-                $"missing {total - PlayerCredits} credits");
+                GameLocalizationService.Format("ui.station.trade.credits_short", ("credits", total - PlayerCredits)));
         }
 
         int updatedMerchantCredits = checked(MerchantCredits + total);
@@ -309,7 +309,7 @@ public sealed class StationServicesRuntime
             quantity);
         return new StationServiceTradeResult(
             true,
-            $"bought {quantity} x {definitionId} for {total} credits",
+            GameLocalizationService.Format("ui.station.trade.bought", ("quantity", quantity), ("item", definitionId), ("credits", total)),
             definitionId,
             quantity,
             total,
@@ -334,7 +334,7 @@ public sealed class StationServicesRuntime
                 quantity,
                 total,
                 isBuy: false,
-                $"merchant is short by {total - MerchantCredits}");
+                GameLocalizationService.Format("ui.station.trade.merchant_short", ("credits", total - MerchantCredits)));
         }
 
         int updatedStock = checked(_stock[definitionId] + quantity);
@@ -361,7 +361,7 @@ public sealed class StationServicesRuntime
             quantity);
         return new StationServiceTradeResult(
             true,
-            $"sold {quantity} x {definitionId} for {total} credits",
+            GameLocalizationService.Format("ui.station.trade.sold", ("quantity", quantity), ("item", definitionId), ("credits", total)),
             definitionId,
             quantity,
             total,
@@ -375,14 +375,14 @@ public sealed class StationServicesRuntime
         MutableQuestState quest = GetQuest(questId);
         if (quest.Status != StationServiceQuestStatus.Offered)
         {
-            result = $"quest {questId} cannot be accepted from {quest.Status}";
+            result = GameLocalizationService.Format("ui.station.quest.cannot_accept", ("quest", questId), ("status", quest.Status));
             return false;
         }
 
         quest.Status = StationServiceQuestStatus.Accepted;
         quest.CurrentNodeId = quest.Definition.StartNodeId;
         quest.Progress = 0;
-        result = $"quest {questId} accepted";
+        result = GameLocalizationService.Format("ui.station.quest.accepted", ("quest", questId));
         return true;
     }
 
@@ -438,7 +438,7 @@ public sealed class StationServicesRuntime
         MutableQuestState quest = GetQuest(questId);
         if (quest.Status != StationServiceQuestStatus.ReadyToClaim)
         {
-            result = $"quest {questId} is not ready to claim";
+            result = GameLocalizationService.Format("ui.station.quest.not_ready", ("quest", questId));
             return false;
         }
 
@@ -449,9 +449,11 @@ public sealed class StationServicesRuntime
             checked(Reputation + quest.Definition.ReputationReward),
             -100,
             100);
-        result = $"quest {questId} completed; reward=" +
-            $"{quest.Definition.RewardCredits} credits; " +
-            $"reputation={Reputation}";
+        result = GameLocalizationService.Format(
+            "ui.station.quest.claimed",
+            ("quest", questId),
+            ("credits", quest.Definition.RewardCredits),
+            ("reputation", Reputation));
         return true;
     }
 
@@ -485,8 +487,11 @@ public sealed class StationServicesRuntime
                 -100,
                 100);
         }
-        return $"external quest reward={credits} credits; faction={factionId}; " +
-            $"localReputation={(localFaction ? Reputation : 0)}";
+        return GameLocalizationService.Format(
+            "ui.station.external_reward",
+            ("credits", credits),
+            ("faction", factionId),
+            ("reputation", localFaction ? Reputation : 0));
     }
 
     public StationServicesSaveData CreateSaveData()

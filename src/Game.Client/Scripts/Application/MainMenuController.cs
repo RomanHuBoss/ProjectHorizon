@@ -28,9 +28,11 @@ public partial class MainMenuController : Control
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GameUserSettingsService.ReloadAndApply();
+        GameLocalizationService.LocaleChanged += OnLocaleChanged;
         BuildUi();
+        GameLocalizationService.LocalizeControlTree(this);
         ShowMain();
-        _status!.Text = "Inspecting primary save slot…";
+        _status!.Text = GameLocalizationService.Text("ui.main.status.inspecting");
         _scanTask = ScanPrimarySlotAsync(_lifetime.Token);
         GD.Print("TASK-130 application shell READY: mainMenu=1; newGame=1; load=1; settings=1; pause=1; death=1; separateSettings=1; keyboardRemap=1; gamepad=1.");
     }
@@ -44,6 +46,7 @@ public partial class MainMenuController : Control
 
     public override void _ExitTree()
     {
+        GameLocalizationService.LocaleChanged -= OnLocaleChanged;
         _lifetime.Cancel();
         _lifetime.Dispose();
     }
@@ -79,12 +82,12 @@ public partial class MainMenuController : Control
         VBoxContainer root = new();
         root.AddThemeConstantOverride("separation", 16);
         margin.AddChild(root);
-        Label title = new() { Text = "PROJECT HORIZON" };
+        Label title = new() { Text = "ui.main.title" };
         title.AddThemeFontSizeOverride("font_size", 44);
         root.AddChild(title);
         Label subtitle = new()
         {
-            Text = "DEEP-SPACE SURVIVAL • EXPLORATION • INDUSTRY",
+            Text = "ui.main.subtitle",
             Modulate = new Color(0.68f, 0.86f, 0.94f, 1.0f)
         };
         subtitle.AddThemeFontSizeOverride("font_size", 15);
@@ -101,19 +104,19 @@ public partial class MainMenuController : Control
         body.AddChild(nav);
         _mainPanel = nav;
 
-        _continueButton = MenuButton("CONTINUE");
+        _continueButton = MenuButton("ui.main.continue");
         _continueButton.Pressed += ContinueGame;
         nav.AddChild(_continueButton);
-        Button newGame = MenuButton("NEW GAME");
+        Button newGame = MenuButton("ui.main.new_game");
         newGame.Pressed += ShowNewGame;
         nav.AddChild(newGame);
-        _loadButton = MenuButton("LOAD GAME");
+        _loadButton = MenuButton("ui.main.load_game");
         _loadButton.Pressed += ShowLoad;
         nav.AddChild(_loadButton);
-        Button settings = MenuButton("SETTINGS");
+        Button settings = MenuButton("ui.main.settings");
         settings.Pressed += ShowSettings;
         nav.AddChild(settings);
-        Button quit = MenuButton("QUIT");
+        Button quit = MenuButton("ui.main.quit");
         quit.Pressed += () => GetTree().Quit();
         nav.AddChild(quit);
 
@@ -126,14 +129,14 @@ public partial class MainMenuController : Control
         body.AddChild(info);
         Label version = new()
         {
-            Text = "APPLICATION SHELL / TASK-130",
+            Text = "ui.main.version",
             HorizontalAlignment = HorizontalAlignment.Right,
             Modulate = new Color(0.55f, 0.72f, 0.79f, 1.0f)
         };
         info.AddChild(version);
         _saveSummary = new Label
         {
-            Text = "SAVE SLOT\nScanning…",
+            Text = "ui.main.save_scanning",
             HorizontalAlignment = HorizontalAlignment.Right,
             AutowrapMode = TextServer.AutowrapMode.WordSmart,
             SizeFlagsVertical = SizeFlags.ExpandFill
@@ -141,22 +144,22 @@ public partial class MainMenuController : Control
         _saveSummary.AddThemeFontSizeOverride("font_size", 18);
         info.AddChild(_saveSummary);
 
-        _newGamePanel = BuildSubPanel("NEW GAME");
+        _newGamePanel = BuildSubPanel("ui.main.new_game");
         AddChild(_newGamePanel);
         Label newText = new()
         {
-            Text = "Start a fresh primary profile. Existing gameplay progress in save_1 will be reset through the persistence API; user settings remain untouched.",
+            Text = "ui.main.new_game_info",
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         _newGamePanel.AddChild(newText);
-        Button start = MenuButton("START STANDARD GAME");
+        Button start = MenuButton("ui.main.start_standard");
         start.Pressed += BeginNewGame;
         _newGamePanel.AddChild(start);
-        Button newBack = MenuButton("BACK");
+        Button newBack = MenuButton("ui.common.back");
         newBack.Pressed += ShowMain;
         _newGamePanel.AddChild(newBack);
 
-        _loadPanel = BuildSubPanel("LOAD GAME");
+        _loadPanel = BuildSubPanel("ui.main.load_game");
         AddChild(_loadPanel);
         Label loadText = new()
         {
@@ -164,11 +167,11 @@ public partial class MainMenuController : Control
             AutowrapMode = TextServer.AutowrapMode.WordSmart
         };
         _loadPanel.AddChild(loadText);
-        Button loadPrimary = MenuButton("LOAD PRIMARY SLOT");
+        Button loadPrimary = MenuButton("ui.main.load_primary");
         loadPrimary.Name = "LoadPrimary";
         loadPrimary.Pressed += ContinueGame;
         _loadPanel.AddChild(loadPrimary);
-        Button loadBack = MenuButton("BACK");
+        Button loadBack = MenuButton("ui.common.back");
         loadBack.Pressed += ShowMain;
         _loadPanel.AddChild(loadBack);
 
@@ -273,7 +276,7 @@ public partial class MainMenuController : Control
     {
         if (_snapshot is null || _newGameTask is not null)
         {
-            _status!.Text = "No valid save slot is available yet.";
+            _status!.Text = GameLocalizationService.Text("ui.main.status.no_slot");
             return;
         }
         ChangeToGameplay("continue");
@@ -285,7 +288,7 @@ public partial class MainMenuController : Control
         {
             return;
         }
-        _status!.Text = "Resetting gameplay slot through SaveDatabase…";
+        _status!.Text = GameLocalizationService.Text("ui.main.status.resetting");
         _newGameTask = ResetPrimarySlotAsync(_lifetime.Token);
     }
 
@@ -301,15 +304,14 @@ public partial class MainMenuController : Control
         {
             _snapshot = task.GetAwaiter().GetResult();
             RefreshSaveSummary();
-            _status!.Text = _snapshot is null
-                ? "Primary slot is empty. Start a New Game."
-                : "Primary slot ready.";
+            _status!.Text = GameLocalizationService.Text(
+                _snapshot is null ? "ui.main.status.empty" : "ui.main.status.ready");
         }
         catch (Exception exception)
         {
             _snapshot = null;
             RefreshSaveSummary();
-            _status!.Text = $"Save inspection failed: {exception.Message}";
+            _status!.Text = GameLocalizationService.Format("ui.main.status.scan_failed", ("error", exception.Message));
             GD.PushError($"TASK-130 save scan FAILED: {exception}");
         }
     }
@@ -331,7 +333,7 @@ public partial class MainMenuController : Control
         }
         catch (Exception exception)
         {
-            _status!.Text = $"New Game failed: {exception.Message}";
+            _status!.Text = GameLocalizationService.Format("ui.main.status.new_failed", ("error", exception.Message));
             GD.PushError($"TASK-130 new-game reset FAILED: {exception}");
         }
     }
@@ -343,8 +345,13 @@ public partial class MainMenuController : Control
         if (_loadButton is not null) _loadButton.Disabled = !available;
         if (_saveSummary is null) return;
         _saveSummary.Text = available
-            ? $"SAVE SLOT ✓\nRevision {_snapshot!.Revision}\nUpdated {_snapshot.UpdatedUtc}\nSystem {_snapshot.GalaxyNavigation?.CurrentSystemId ?? "legacy"}\nInventory {_snapshot.Inventory.Count} rows"
-            : "SAVE SLOT ○\nNo gameplay save";
+            ? GameLocalizationService.Format(
+                "ui.main.save_present",
+                ("revision", _snapshot!.Revision),
+                ("updated", _snapshot.UpdatedUtc),
+                ("system", _snapshot.GalaxyNavigation?.CurrentSystemId ?? "legacy"),
+                ("inventory", _snapshot.Inventory.Count))
+            : GameLocalizationService.Text("ui.main.save_empty");
         UpdateLoadPanel();
     }
 
@@ -356,8 +363,13 @@ public partial class MainMenuController : Control
         if (summary is null || load is null) return;
         bool available = _snapshot is not null;
         summary.Text = available
-            ? $"PRIMARY SLOT\nRevision: {_snapshot!.Revision}\nUpdated: {_snapshot.UpdatedUtc}\nShip: {_snapshot.Ship.DisplayName}\nSystem: {_snapshot.GalaxyNavigation?.CurrentSystemId ?? "legacy"}"
-            : "PRIMARY SLOT\nEmpty or unavailable.";
+            ? GameLocalizationService.Format(
+                "ui.main.primary_present",
+                ("revision", _snapshot!.Revision),
+                ("updated", _snapshot.UpdatedUtc),
+                ("ship", _snapshot.Ship.DisplayName),
+                ("system", _snapshot.GalaxyNavigation?.CurrentSystemId ?? "legacy"))
+            : GameLocalizationService.Text("ui.main.primary_empty");
         load.Disabled = !available;
     }
 
@@ -366,10 +378,22 @@ public partial class MainMenuController : Control
         Error result = GetTree().ChangeSceneToFile(GameplayScene);
         if (result != Error.Ok)
         {
-            _status!.Text = $"Scene transition failed: {result}";
+            _status!.Text = GameLocalizationService.Format("ui.main.status.scene_failed", ("error", result));
             return;
         }
         GD.Print($"TASK-130 application transition PASS: source={source}; destination=vertical-slice.");
+    }
+
+    private void OnLocaleChanged(string _)
+    {
+        GameLocalizationService.LocalizeControlTree(this);
+        RefreshSaveSummary();
+        UpdateLoadPanel();
+        if (_status is not null)
+        {
+            _status.Text = GameLocalizationService.Text(
+                _snapshot is null ? "ui.main.status.empty" : "ui.main.status.ready");
+        }
     }
 
     private static async Task<SaveGameSnapshot?> ScanPrimarySlotAsync(CancellationToken cancellationToken)

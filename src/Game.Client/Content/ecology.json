@@ -7,170 +7,152 @@
   "Biomes": [
     {
       "BiomeId": "biome.temperate_plain",
-      "DisplayNameEn": "Temperate Plain",
-      "DisplayNameRu": "Умеренная равнина",
       "TemperatureMin": 8,
       "TemperatureMax": 24,
       "MoistureMin": 0.35,
       "MoistureMax": 0.7,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.temperate_plain"
     },
     {
       "BiomeId": "biome.temperate_forest",
-      "DisplayNameEn": "Temperate Forest",
-      "DisplayNameRu": "Умеренный лес",
       "TemperatureMin": 6,
       "TemperatureMax": 22,
       "MoistureMin": 0.55,
       "MoistureMax": 0.9,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.temperate_forest"
     },
     {
       "BiomeId": "biome.marsh",
-      "DisplayNameEn": "Marsh",
-      "DisplayNameRu": "Болото",
       "TemperatureMin": 10,
       "TemperatureMax": 28,
       "MoistureMin": 0.75,
       "MoistureMax": 1.0,
-      "SupportsWater": true
+      "SupportsWater": true,
+      "LocalizationKey": "biome.marsh"
     },
     {
       "BiomeId": "biome.desert",
-      "DisplayNameEn": "Desert",
-      "DisplayNameRu": "Пустыня",
       "TemperatureMin": 24,
       "TemperatureMax": 46,
       "MoistureMin": 0.0,
       "MoistureMax": 0.25,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.desert"
     },
     {
       "BiomeId": "biome.mountains",
-      "DisplayNameEn": "Mountains",
-      "DisplayNameRu": "Горы",
       "TemperatureMin": -8,
       "TemperatureMax": 18,
       "MoistureMin": 0.15,
       "MoistureMax": 0.6,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.mountains"
     },
     {
       "BiomeId": "biome.tundra",
-      "DisplayNameEn": "Tundra",
-      "DisplayNameRu": "Тундра",
       "TemperatureMin": -22,
       "TemperatureMax": 6,
       "MoistureMin": 0.15,
       "MoistureMax": 0.55,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.tundra"
     },
     {
       "BiomeId": "biome.glacier",
-      "DisplayNameEn": "Glacier",
-      "DisplayNameRu": "Ледник",
       "TemperatureMin": -45,
       "TemperatureMax": -5,
       "MoistureMin": 0.0,
       "MoistureMax": 0.35,
-      "SupportsWater": true
+      "SupportsWater": true,
+      "LocalizationKey": "biome.glacier"
     },
     {
       "BiomeId": "biome.volcanic_field",
-      "DisplayNameEn": "Volcanic Field",
-      "DisplayNameRu": "Вулканическое поле",
       "TemperatureMin": 28,
       "TemperatureMax": 70,
       "MoistureMin": 0.0,
       "MoistureMax": 0.3,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.volcanic_field"
     },
     {
       "BiomeId": "biome.rocky_plateau",
-      "DisplayNameEn": "Rocky Plateau",
-      "DisplayNameRu": "Каменистое плато",
       "TemperatureMin": 0,
       "TemperatureMax": 34,
       "MoistureMin": 0.05,
       "MoistureMax": 0.4,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.rocky_plateau"
     },
     {
       "BiomeId": "biome.radioactive_waste",
-      "DisplayNameEn": "Radioactive Wasteland",
-      "DisplayNameRu": "Радиоактивная пустошь",
       "TemperatureMin": 4,
       "TemperatureMax": 38,
       "MoistureMin": 0.05,
       "MoistureMax": 0.35,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.radioactive_waste"
     },
     {
       "BiomeId": "biome.toxic_thicket",
-      "DisplayNameEn": "Toxic Thicket",
-      "DisplayNameRu": "Токсичные заросли",
       "TemperatureMin": 16,
       "TemperatureMax": 38,
       "MoistureMin": 0.55,
       "MoistureMax": 0.95,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.toxic_thicket"
     },
     {
       "BiomeId": "biome.coast",
-      "DisplayNameEn": "Coastal Zone",
-      "DisplayNameRu": "Прибрежная зона",
       "TemperatureMin": 8,
       "TemperatureMax": 30,
       "MoistureMin": 0.55,
       "MoistureMax": 0.95,
-      "SupportsWater": true
+      "SupportsWater": true,
+      "LocalizationKey": "biome.coast"
     },
     {
       "BiomeId": "biome.savanna",
-      "DisplayNameEn": "Savanna",
-      "DisplayNameRu": "Саванна",
       "TemperatureMin": 18,
       "TemperatureMax": 38,
       "MoistureMin": 0.2,
       "MoistureMax": 0.5,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.savanna"
     },
     {
       "BiomeId": "biome.fungal_grove",
-      "DisplayNameEn": "Fungal Grove",
-      "DisplayNameRu": "Грибная роща",
       "TemperatureMin": 4,
       "TemperatureMax": 24,
       "MoistureMin": 0.65,
       "MoistureMax": 1.0,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.fungal_grove"
     },
     {
       "BiomeId": "biome.crystal_steppe",
-      "DisplayNameEn": "Crystal Steppe",
-      "DisplayNameRu": "Кристаллическая степь",
       "TemperatureMin": -2,
       "TemperatureMax": 30,
       "MoistureMin": 0.05,
       "MoistureMax": 0.45,
-      "SupportsWater": false
+      "SupportsWater": false,
+      "LocalizationKey": "biome.crystal_steppe"
     },
     {
       "BiomeId": "biome.oasis",
-      "DisplayNameEn": "Oasis",
-      "DisplayNameRu": "Оазис",
       "TemperatureMin": 20,
       "TemperatureMax": 42,
       "MoistureMin": 0.55,
       "MoistureMax": 0.95,
-      "SupportsWater": true
+      "SupportsWater": true,
+      "LocalizationKey": "biome.oasis"
     }
   ],
   "Flora": [
     {
       "FloraId": "flora.amber_needlegrass",
-      "DisplayNameEn": "Amber Needlegrass",
-      "DisplayNameRu": "Amber Needlegrass",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -185,12 +167,11 @@
       "ColorB": 0.2925,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.amber_needlegrass"
     },
     {
       "FloraId": "flora.azure_reed",
-      "DisplayNameEn": "Azure Reed",
-      "DisplayNameRu": "Azure Reed",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.temperate_forest",
@@ -205,12 +186,11 @@
       "ColorB": 0.75,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.azure_reed"
     },
     {
       "FloraId": "flora.blackglass_fern",
-      "DisplayNameEn": "Blackglass Fern",
-      "DisplayNameRu": "Blackglass Fern",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.marsh",
@@ -225,12 +205,11 @@
       "ColorB": 0.17,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.blackglass_fern"
     },
     {
       "FloraId": "flora.cinder_bloom",
-      "DisplayNameEn": "Cinder Bloom",
-      "DisplayNameRu": "Cinder Bloom",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.desert",
@@ -245,12 +224,11 @@
       "ColorB": 0.8849,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.cinder_bloom"
     },
     {
       "FloraId": "flora.copper_moss",
-      "DisplayNameEn": "Copper Moss",
-      "DisplayNameRu": "Copper Moss",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.mountains",
@@ -265,12 +243,11 @@
       "ColorB": 0.5766,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.copper_moss"
     },
     {
       "FloraId": "flora.crownleaf_shrub",
-      "DisplayNameEn": "Crownleaf Shrub",
-      "DisplayNameRu": "Crownleaf Shrub",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -285,12 +262,11 @@
       "ColorB": 0.15,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.crownleaf_shrub"
     },
     {
       "FloraId": "flora.drift_bell",
-      "DisplayNameEn": "Drift Bell",
-      "DisplayNameRu": "Drift Bell",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.glacier",
@@ -305,12 +281,11 @@
       "ColorB": 0.85,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.drift_bell"
     },
     {
       "FloraId": "flora.dusk_orchid",
-      "DisplayNameEn": "Dusk Orchid",
-      "DisplayNameRu": "Dusk Orchid",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.volcanic_field",
@@ -325,12 +300,11 @@
       "ColorB": 0.3087,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.dusk_orchid"
     },
     {
       "FloraId": "flora.ember_thorn",
-      "DisplayNameEn": "Ember Thorn",
-      "DisplayNameRu": "Ember Thorn",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.rocky_plateau",
@@ -345,12 +319,11 @@
       "ColorB": 0.3039,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.ember_thorn"
     },
     {
       "FloraId": "flora.frost_lace",
-      "DisplayNameEn": "Frost Lace",
-      "DisplayNameRu": "Frost Lace",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.radioactive_waste",
@@ -365,12 +338,11 @@
       "ColorB": 0.75,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.frost_lace"
     },
     {
       "FloraId": "flora.glowcap_cluster",
-      "DisplayNameEn": "Glowcap Cluster",
-      "DisplayNameRu": "Glowcap Cluster",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -385,12 +357,11 @@
       "ColorB": 0.2762,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.glowcap_cluster"
     },
     {
       "FloraId": "flora.golden_fan",
-      "DisplayNameEn": "Golden Fan",
-      "DisplayNameRu": "Golden Fan",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.coast",
@@ -405,12 +376,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.golden_fan"
     },
     {
       "FloraId": "flora.ironroot_tuft",
-      "DisplayNameEn": "Ironroot Tuft",
-      "DisplayNameRu": "Ironroot Tuft",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.savanna",
@@ -425,12 +395,11 @@
       "ColorB": 0.4707,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.ironroot_tuft"
     },
     {
       "FloraId": "flora.jade_coil",
-      "DisplayNameEn": "Jade Coil",
-      "DisplayNameRu": "Jade Coil",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.fungal_grove",
@@ -445,12 +414,11 @@
       "ColorB": 0.2437,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.jade_coil"
     },
     {
       "FloraId": "flora.lumen_grass",
-      "DisplayNameEn": "Lumen Grass",
-      "DisplayNameRu": "Lumen Grass",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.crystal_steppe",
@@ -465,12 +433,11 @@
       "ColorB": 0.85,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.lumen_grass"
     },
     {
       "FloraId": "flora.mist_frond",
-      "DisplayNameEn": "Mist Frond",
-      "DisplayNameRu": "Mist Frond",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -485,12 +452,11 @@
       "ColorB": 0.4275,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.mist_frond"
     },
     {
       "FloraId": "flora.night_spindle",
-      "DisplayNameEn": "Night Spindle",
-      "DisplayNameRu": "Night Spindle",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -505,12 +471,11 @@
       "ColorB": 0.5047,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.night_spindle"
     },
     {
       "FloraId": "flora.ochre_brush",
-      "DisplayNameEn": "Ochre Brush",
-      "DisplayNameRu": "Ochre Brush",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.temperate_forest",
@@ -525,12 +490,11 @@
       "ColorB": 0.75,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.ochre_brush"
     },
     {
       "FloraId": "flora.pearl_reed",
-      "DisplayNameEn": "Pearl Reed",
-      "DisplayNameRu": "Pearl Reed",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.marsh",
@@ -545,12 +509,11 @@
       "ColorB": 0.3825,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.pearl_reed"
     },
     {
       "FloraId": "flora.quartz_petal",
-      "DisplayNameEn": "Quartz Petal",
-      "DisplayNameRu": "Quartz Petal",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.desert",
@@ -565,12 +528,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.quartz_petal"
     },
     {
       "FloraId": "flora.red_veil_moss",
-      "DisplayNameEn": "Red Veil Moss",
-      "DisplayNameRu": "Red Veil Moss",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -585,12 +547,11 @@
       "ColorB": 0.2153,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.red_veil_moss"
     },
     {
       "FloraId": "flora.sable_cactus",
-      "DisplayNameEn": "Sable Cactus",
-      "DisplayNameRu": "Sable Cactus",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.tundra",
@@ -605,12 +566,11 @@
       "ColorB": 0.3902,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.sable_cactus"
     },
     {
       "FloraId": "flora.silverleaf",
-      "DisplayNameEn": "Silverleaf",
-      "DisplayNameRu": "Silverleaf",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.glacier",
@@ -625,12 +585,11 @@
       "ColorB": 0.85,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.silverleaf"
     },
     {
       "FloraId": "flora.spore_lantern",
-      "DisplayNameEn": "Spore Lantern",
-      "DisplayNameRu": "Spore Lantern",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.volcanic_field",
@@ -645,12 +604,11 @@
       "ColorB": 0.19,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.spore_lantern"
     },
     {
       "FloraId": "flora.sunscale_fern",
-      "DisplayNameEn": "Sunscale Fern",
-      "DisplayNameRu": "Sunscale Fern",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.rocky_plateau",
@@ -665,12 +623,11 @@
       "ColorB": 0.65,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.sunscale_fern"
     },
     {
       "FloraId": "flora.thorn_crown",
-      "DisplayNameEn": "Thorn Crown",
-      "DisplayNameRu": "Thorn Crown",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.temperate_plain"
@@ -684,12 +641,11 @@
       "ColorB": 0.6007,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.thorn_crown"
     },
     {
       "FloraId": "flora.umber_reed",
-      "DisplayNameEn": "Umber Reed",
-      "DisplayNameRu": "Umber Reed",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.toxic_thicket",
@@ -704,12 +660,11 @@
       "ColorB": 0.17,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.umber_reed"
     },
     {
       "FloraId": "flora.violet_spire",
-      "DisplayNameEn": "Violet Spire",
-      "DisplayNameRu": "Violet Spire",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.coast",
@@ -724,12 +679,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.violet_spire"
     },
     {
       "FloraId": "flora.whitecap_fungus",
-      "DisplayNameEn": "Whitecap Fungus",
-      "DisplayNameRu": "Whitecap Fungus",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.savanna",
@@ -744,12 +698,11 @@
       "ColorB": 0.2112,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.whitecap_fungus"
     },
     {
       "FloraId": "flora.windgrass",
-      "DisplayNameEn": "Windgrass",
-      "DisplayNameRu": "Windgrass",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.fungal_grove",
@@ -764,12 +717,11 @@
       "ColorB": 0.4273,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.windgrass"
     },
     {
       "FloraId": "flora.acid_lace",
-      "DisplayNameEn": "Acid Lace",
-      "DisplayNameRu": "Acid Lace",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -784,12 +736,11 @@
       "ColorB": 0.85,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.acid_lace"
     },
     {
       "FloraId": "flora.basalt_bloom",
-      "DisplayNameEn": "Basalt Bloom",
-      "DisplayNameRu": "Basalt Bloom",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.oasis",
@@ -804,12 +755,11 @@
       "ColorB": 0.3087,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.basalt_bloom"
     },
     {
       "FloraId": "flora.brine_lily",
-      "DisplayNameEn": "Brine Lily",
-      "DisplayNameRu": "Brine Lily",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -824,12 +774,11 @@
       "ColorB": 0.65,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.brine_lily"
     },
     {
       "FloraId": "flora.cloud_moss",
-      "DisplayNameEn": "Cloud Moss",
-      "DisplayNameRu": "Cloud Moss",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.temperate_forest",
@@ -844,12 +793,11 @@
       "ColorB": 0.4904,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.cloud_moss"
     },
     {
       "FloraId": "flora.crimson_pod",
-      "DisplayNameEn": "Crimson Pod",
-      "DisplayNameRu": "Crimson Pod",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.marsh",
@@ -864,12 +812,11 @@
       "ColorB": 0.2762,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.crimson_pod"
     },
     {
       "FloraId": "flora.dust_fan",
-      "DisplayNameEn": "Dust Fan",
-      "DisplayNameRu": "Dust Fan",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -884,12 +831,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.dust_fan"
     },
     {
       "FloraId": "flora.echo_reed",
-      "DisplayNameEn": "Echo Reed",
-      "DisplayNameRu": "Echo Reed",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.mountains",
@@ -904,12 +850,11 @@
       "ColorB": 0.2925,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.echo_reed"
     },
     {
       "FloraId": "flora.flare_cactus",
-      "DisplayNameEn": "Flare Cactus",
-      "DisplayNameRu": "Flare Cactus",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.tundra",
@@ -924,12 +869,11 @@
       "ColorB": 0.647,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.flare_cactus"
     },
     {
       "FloraId": "flora.glass_frond",
-      "DisplayNameEn": "Glass Frond",
-      "DisplayNameRu": "Glass Frond",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.glacier",
@@ -944,12 +888,11 @@
       "ColorB": 0.79,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.glass_frond"
     },
     {
       "FloraId": "flora.halo_fungus",
-      "DisplayNameEn": "Halo Fungus",
-      "DisplayNameRu": "Halo Fungus",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.volcanic_field",
@@ -964,12 +907,11 @@
       "ColorB": 0.4275,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.halo_fungus"
     },
     {
       "FloraId": "flora.ice_needle",
-      "DisplayNameEn": "Ice Needle",
-      "DisplayNameRu": "Ice Needle",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -984,12 +926,11 @@
       "ColorB": 0.65,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.ice_needle"
     },
     {
       "FloraId": "flora.juniper_coil",
-      "DisplayNameEn": "Juniper Coil",
-      "DisplayNameRu": "Juniper Coil",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.radioactive_waste",
@@ -1004,12 +945,11 @@
       "ColorB": 0.1718,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.juniper_coil"
     },
     {
       "FloraId": "flora.kelp_crown",
-      "DisplayNameEn": "Kelp Crown",
-      "DisplayNameRu": "Kelp Crown",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.toxic_thicket",
@@ -1024,12 +964,11 @@
       "ColorB": 0.5019,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.kelp_crown"
     },
     {
       "FloraId": "flora.lava_moss",
-      "DisplayNameEn": "Lava Moss",
-      "DisplayNameRu": "Lava Moss",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.coast",
@@ -1044,12 +983,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.lava_moss"
     },
     {
       "FloraId": "flora.moon_brush",
-      "DisplayNameEn": "Moon Brush",
-      "DisplayNameRu": "Moon Brush",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.savanna",
@@ -1064,12 +1002,11 @@
       "ColorB": 0.13,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.moon_brush"
     },
     {
       "FloraId": "flora.nacre_bloom",
-      "DisplayNameEn": "Nacre Bloom",
-      "DisplayNameRu": "Nacre Bloom",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -1084,12 +1021,11 @@
       "ColorB": 0.75,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.nacre_bloom"
     },
     {
       "FloraId": "flora.opal_grass",
-      "DisplayNameEn": "Opal Grass",
-      "DisplayNameRu": "Opal Grass",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.crystal_steppe",
@@ -1104,12 +1040,11 @@
       "ColorB": 0.6075,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.opal_grass"
     },
     {
       "FloraId": "flora.prism_thorn",
-      "DisplayNameEn": "Prism Thorn",
-      "DisplayNameRu": "Prism Thorn",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.oasis",
@@ -1124,12 +1059,11 @@
       "ColorB": 0.19,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.prism_thorn"
     },
     {
       "FloraId": "flora.radiant_reed",
-      "DisplayNameEn": "Radiant Reed",
-      "DisplayNameRu": "Radiant Reed",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -1144,12 +1078,11 @@
       "ColorB": 0.65,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.radiant_reed"
     },
     {
       "FloraId": "flora.salt_fan",
-      "DisplayNameEn": "Salt Fan",
-      "DisplayNameRu": "Salt Fan",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.temperate_forest",
@@ -1164,12 +1097,11 @@
       "ColorB": 0.2437,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.salt_fan"
     },
     {
       "FloraId": "flora.toxic_lantern",
-      "DisplayNameEn": "Toxic Lantern",
-      "DisplayNameRu": "Toxic Lantern",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -1184,12 +1116,11 @@
       "ColorB": 0.5711,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.toxic_lantern"
     },
     {
       "FloraId": "flora.verdant_spire",
-      "DisplayNameEn": "Verdant Spire",
-      "DisplayNameRu": "Verdant Spire",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.desert",
@@ -1204,12 +1135,11 @@
       "ColorB": 0.95,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.verdant_spire"
     },
     {
       "FloraId": "flora.wisp_fern",
-      "DisplayNameEn": "Wisp Fern",
-      "DisplayNameRu": "Wisp Fern",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.mountains",
@@ -1224,12 +1154,11 @@
       "ColorB": 0.2112,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.wisp_fern"
     },
     {
       "FloraId": "flora.xeno_bloom",
-      "DisplayNameEn": "Xeno Bloom",
-      "DisplayNameRu": "Xeno Bloom",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.tundra",
@@ -1244,12 +1173,11 @@
       "ColorB": 0.75,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.xeno_bloom"
     },
     {
       "FloraId": "flora.yellowglass_moss",
-      "DisplayNameEn": "Yellowglass Moss",
-      "DisplayNameRu": "Yellowglass Moss",
       "Shape": "Spire",
       "BiomeIds": [
         "biome.glacier",
@@ -1264,12 +1192,11 @@
       "ColorB": 0.4961,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.yellowglass_moss"
     },
     {
       "FloraId": "flora.zephyr_grass",
-      "DisplayNameEn": "Zephyr Grass",
-      "DisplayNameRu": "Zephyr Grass",
       "Shape": "Canopy",
       "BiomeIds": [
         "biome.temperate_plain",
@@ -1284,12 +1211,11 @@
       "ColorB": 0.34,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.zephyr_grass"
     },
     {
       "FloraId": "flora.ash_petal",
-      "DisplayNameEn": "Ash Petal",
-      "DisplayNameRu": "Ash Petal",
       "Shape": "Tuft",
       "BiomeIds": [
         "biome.rocky_plateau",
@@ -1304,12 +1230,11 @@
       "ColorB": 0.65,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 2,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.ash_petal"
     },
     {
       "FloraId": "flora.bluefire_shrub",
-      "DisplayNameEn": "Bluefire Shrub",
-      "DisplayNameRu": "Bluefire Shrub",
       "Shape": "Frond",
       "BiomeIds": [
         "biome.radioactive_waste",
@@ -1324,12 +1249,11 @@
       "ColorB": 0.3375,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 3,
-      "Hazard": "Irritant"
+      "Hazard": "Irritant",
+      "LocalizationKey": "flora.bluefire_shrub"
     },
     {
       "FloraId": "flora.coral_reed",
-      "DisplayNameEn": "Coral Reed",
-      "DisplayNameRu": "Coral Reed",
       "Shape": "Pad",
       "BiomeIds": [
         "biome.toxic_thicket",
@@ -1344,12 +1268,11 @@
       "ColorB": 0.8065,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 4,
-      "Hazard": "None"
+      "Hazard": "None",
+      "LocalizationKey": "flora.coral_reed"
     },
     {
       "FloraId": "flora.deepglow_fungus",
-      "DisplayNameEn": "Deepglow Fungus",
-      "DisplayNameRu": "Deepglow Fungus",
       "Shape": "Fungus",
       "BiomeIds": [
         "biome.coast",
@@ -1364,14 +1287,13 @@
       "ColorB": 0.7859,
       "HarvestDefinitionId": "resource.flora_pulp",
       "ScanPoints": 5,
-      "Hazard": "Toxic"
+      "Hazard": "Toxic",
+      "LocalizationKey": "flora.deepglow_fungus"
     }
   ],
   "Fauna": [
     {
       "FaunaId": "fauna.ground.meadow_strider",
-      "DisplayNameEn": "Meadow Strider",
-      "DisplayNameRu": "Наземный шагоход",
       "MovementMode": "Ground",
       "BodyPlan": "Quadruped",
       "Diet": "Herbivore",
@@ -1401,12 +1323,11 @@
       "ColorG": 0.6283,
       "ColorB": 0.396,
       "Scale": 0.65,
-      "ScanPoints": 5
+      "ScanPoints": 5,
+      "LocalizationKey": "fauna.ground.meadow_strider"
     },
     {
       "FaunaId": "fauna.ground.ridge_biped",
-      "DisplayNameEn": "Ridge Biped",
-      "DisplayNameRu": "Горный двуног",
       "MovementMode": "Ground",
       "BodyPlan": "Biped",
       "Diet": "Omnivore",
@@ -1435,12 +1356,11 @@
       "ColorG": 0.88,
       "ColorB": 0.396,
       "Scale": 0.73,
-      "ScanPoints": 6
+      "ScanPoints": 6,
+      "LocalizationKey": "fauna.ground.ridge_biped"
     },
     {
       "FaunaId": "fauna.ground.sixleg_forager",
-      "DisplayNameEn": "Sixleg Forager",
-      "DisplayNameRu": "Шестиногий фуражир",
       "MovementMode": "Ground",
       "BodyPlan": "Hexapod",
       "Diet": "Herbivore",
@@ -1470,12 +1390,11 @@
       "ColorG": 0.88,
       "ColorB": 0.4212,
       "Scale": 0.81,
-      "ScanPoints": 7
+      "ScanPoints": 7,
+      "LocalizationKey": "fauna.ground.sixleg_forager"
     },
     {
       "FaunaId": "fauna.ground.dune_crawler",
-      "DisplayNameEn": "Dune Crawler",
-      "DisplayNameRu": "Пустынный ползун",
       "MovementMode": "Ground",
       "BodyPlan": "Crawler",
       "Diet": "Omnivore",
@@ -1505,12 +1424,11 @@
       "ColorG": 0.88,
       "ColorB": 0.8016,
       "Scale": 0.89,
-      "ScanPoints": 8
+      "ScanPoints": 8,
+      "LocalizationKey": "fauna.ground.dune_crawler"
     },
     {
       "FaunaId": "fauna.ground.marsh_grazer",
-      "DisplayNameEn": "Marsh Grazer",
-      "DisplayNameRu": "Болотный травояд",
       "MovementMode": "Ground",
       "BodyPlan": "Quadruped",
       "Diet": "Herbivore",
@@ -1540,12 +1458,11 @@
       "ColorG": 0.578,
       "ColorB": 0.88,
       "Scale": 0.97,
-      "ScanPoints": 9
+      "ScanPoints": 9,
+      "LocalizationKey": "fauna.ground.marsh_grazer"
     },
     {
       "FaunaId": "fauna.ground.tundra_hornback",
-      "DisplayNameEn": "Tundra Hornback",
-      "DisplayNameRu": "Тундровый рогач",
       "MovementMode": "Ground",
       "BodyPlan": "Quadruped",
       "Diet": "Herbivore",
@@ -1576,12 +1493,11 @@
       "ColorG": 0.396,
       "ColorB": 0.88,
       "Scale": 1.05,
-      "ScanPoints": 5
+      "ScanPoints": 5,
+      "LocalizationKey": "fauna.ground.tundra_hornback"
     },
     {
       "FaunaId": "fauna.ground.ash_mauler",
-      "DisplayNameEn": "Ash Mauler",
-      "DisplayNameRu": "Пепельный хищник",
       "MovementMode": "Ground",
       "BodyPlan": "Quadruped",
       "Diet": "Carnivore",
@@ -1611,12 +1527,11 @@
       "ColorG": 0.396,
       "ColorB": 0.7851,
       "Scale": 0.65,
-      "ScanPoints": 6
+      "ScanPoints": 6,
+      "LocalizationKey": "fauna.ground.ash_mauler"
     },
     {
       "FaunaId": "fauna.ground.toxic_stalker",
-      "DisplayNameEn": "Toxic Stalker",
-      "DisplayNameRu": "Токсичный охотник",
       "MovementMode": "Ground",
       "BodyPlan": "Biped",
       "Diet": "Carnivore",
@@ -1646,12 +1561,11 @@
       "ColorG": 0.396,
       "ColorB": 0.4047,
       "Scale": 0.73,
-      "ScanPoints": 7
+      "ScanPoints": 7,
+      "LocalizationKey": "fauna.ground.toxic_stalker"
     },
     {
       "FaunaId": "fauna.ground.crystal_shellrunner",
-      "DisplayNameEn": "Crystal Shellrunner",
-      "DisplayNameRu": "Кристаллический панцирник",
       "MovementMode": "Ground",
       "BodyPlan": "Hexapod",
       "Diet": "Omnivore",
@@ -1680,12 +1594,11 @@
       "ColorG": 0.7677,
       "ColorB": 0.396,
       "Scale": 0.81,
-      "ScanPoints": 8
+      "ScanPoints": 8,
+      "LocalizationKey": "fauna.ground.crystal_shellrunner"
     },
     {
       "FaunaId": "fauna.ground.fungal_browser",
-      "DisplayNameEn": "Fungal Browser",
-      "DisplayNameRu": "Грибной собиратель",
       "MovementMode": "Ground",
       "BodyPlan": "Quadruped",
       "Diet": "Herbivore",
@@ -1715,12 +1628,11 @@
       "ColorG": 0.88,
       "ColorB": 0.396,
       "Scale": 0.89,
-      "ScanPoints": 9
+      "ScanPoints": 9,
+      "LocalizationKey": "fauna.ground.fungal_browser"
     },
     {
       "FaunaId": "fauna.ground.radiant_scavenger",
-      "DisplayNameEn": "Radiant Scavenger",
-      "DisplayNameRu": "Радиационный падальщик",
       "MovementMode": "Ground",
       "BodyPlan": "Biped",
       "Diet": "Omnivore",
@@ -1750,12 +1662,11 @@
       "ColorG": 0.88,
       "ColorB": 0.5606,
       "Scale": 0.97,
-      "ScanPoints": 5
+      "ScanPoints": 5,
+      "LocalizationKey": "fauna.ground.radiant_scavenger"
     },
     {
       "FaunaId": "fauna.ground.coastal_skitter",
-      "DisplayNameEn": "Coastal Skitter",
-      "DisplayNameRu": "Прибрежный бегунок",
       "MovementMode": "Ground",
       "BodyPlan": "Hexapod",
       "Diet": "Omnivore",
@@ -1784,12 +1695,11 @@
       "ColorG": 0.819,
       "ColorB": 0.88,
       "Scale": 1.05,
-      "ScanPoints": 6
+      "ScanPoints": 6,
+      "LocalizationKey": "fauna.ground.coastal_skitter"
     },
     {
       "FaunaId": "fauna.flying.sky_glider",
-      "DisplayNameEn": "Sky Glider",
-      "DisplayNameRu": "Небесный планер",
       "MovementMode": "Flying",
       "BodyPlan": "Flying",
       "Diet": "Herbivore",
@@ -1819,12 +1729,11 @@
       "ColorG": 0.4386,
       "ColorB": 0.88,
       "Scale": 0.65,
-      "ScanPoints": 7
+      "ScanPoints": 7,
+      "LocalizationKey": "fauna.flying.sky_glider"
     },
     {
       "FaunaId": "fauna.flying.ash_wing",
-      "DisplayNameEn": "Ash Wing",
-      "DisplayNameRu": "Пепельнокрыл",
       "MovementMode": "Flying",
       "BodyPlan": "Flying",
       "Diet": "Omnivore",
@@ -1854,12 +1763,11 @@
       "ColorG": 0.396,
       "ColorB": 0.88,
       "Scale": 0.73,
-      "ScanPoints": 8
+      "ScanPoints": 8,
+      "LocalizationKey": "fauna.flying.ash_wing"
     },
     {
       "FaunaId": "fauna.flying.spore_manta",
-      "DisplayNameEn": "Spore Manta",
-      "DisplayNameRu": "Споровая манта",
       "MovementMode": "Flying",
       "BodyPlan": "Flying",
       "Diet": "Filter",
@@ -1888,12 +1796,11 @@
       "ColorG": 0.396,
       "ColorB": 0.6457,
       "Scale": 0.81,
-      "ScanPoints": 9
+      "ScanPoints": 9,
+      "LocalizationKey": "fauna.flying.spore_manta"
     },
     {
       "FaunaId": "fauna.flying.storm_hunter",
-      "DisplayNameEn": "Storm Hunter",
-      "DisplayNameRu": "Грозовой охотник",
       "MovementMode": "Flying",
       "BodyPlan": "Flying",
       "Diet": "Carnivore",
@@ -1923,12 +1830,11 @@
       "ColorG": 0.5267,
       "ColorB": 0.396,
       "Scale": 0.89,
-      "ScanPoints": 5
+      "ScanPoints": 5,
+      "LocalizationKey": "fauna.flying.storm_hunter"
     },
     {
       "FaunaId": "fauna.aquatic.reef_swimmer",
-      "DisplayNameEn": "Reef Swimmer",
-      "DisplayNameRu": "Рифовый пловец",
       "MovementMode": "Aquatic",
       "BodyPlan": "Aquatic",
       "Diet": "Herbivore",
@@ -1958,12 +1864,11 @@
       "ColorG": 0.88,
       "ColorB": 0.396,
       "Scale": 0.97,
-      "ScanPoints": 6
+      "ScanPoints": 6,
+      "LocalizationKey": "fauna.aquatic.reef_swimmer"
     },
     {
       "FaunaId": "fauna.aquatic.armored_eel",
-      "DisplayNameEn": "Armored Eel",
-      "DisplayNameRu": "Панцирный угорь",
       "MovementMode": "Aquatic",
       "BodyPlan": "Aquatic",
       "Diet": "Carnivore",
@@ -1994,12 +1899,11 @@
       "ColorG": 0.88,
       "ColorB": 0.396,
       "Scale": 1.05,
-      "ScanPoints": 7
+      "ScanPoints": 7,
+      "LocalizationKey": "fauna.aquatic.armored_eel"
     },
     {
       "FaunaId": "fauna.aquatic.filter_ray",
-      "DisplayNameEn": "Filter Ray",
-      "DisplayNameRu": "Фильтрующий скат",
       "MovementMode": "Aquatic",
       "BodyPlan": "Aquatic",
       "Diet": "Filter",
@@ -2028,12 +1932,11 @@
       "ColorG": 0.88,
       "ColorB": 0.7,
       "Scale": 0.65,
-      "ScanPoints": 8
+      "ScanPoints": 8,
+      "LocalizationKey": "fauna.aquatic.filter_ray"
     },
     {
       "FaunaId": "fauna.aquatic.abyss_skimmer",
-      "DisplayNameEn": "Abyss Skimmer",
-      "DisplayNameRu": "Глубинный скользун",
       "MovementMode": "Aquatic",
       "BodyPlan": "Aquatic",
       "Diet": "Omnivore",
@@ -2063,7 +1966,8 @@
       "ColorG": 0.6796,
       "ColorB": 0.88,
       "Scale": 0.73,
-      "ScanPoints": 9
+      "ScanPoints": 9,
+      "LocalizationKey": "fauna.aquatic.abyss_skimmer"
     }
   ]
 }

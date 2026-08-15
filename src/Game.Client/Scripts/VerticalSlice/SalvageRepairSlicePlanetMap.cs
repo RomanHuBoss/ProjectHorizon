@@ -25,7 +25,7 @@ public partial class SalvageRepairSlice
     {
         if (_planetMapOpen)
         {
-            ClosePlanetMap("planet map closed");
+            ClosePlanetMap(L("ui.planet_map.closed"));
             return true;
         }
 
@@ -50,7 +50,7 @@ public partial class SalvageRepairSlice
         }
         if (Matches(physical, logical, Key.Escape))
         {
-            ClosePlanetMap("planet map closed");
+            ClosePlanetMap(L("ui.planet_map.closed"));
         }
         return true;
     }
@@ -74,7 +74,7 @@ public partial class SalvageRepairSlice
         _planetMapOpen = true;
         _planetMapPanel.Visible = true;
         UpdatePlanetMapPanel();
-        _status = "planet map opened";
+        _status = L("ui.planet_map.opened");
     }
 
     private void ClosePlanetMap(string status = "")

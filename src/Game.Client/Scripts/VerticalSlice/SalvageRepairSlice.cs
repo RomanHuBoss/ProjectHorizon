@@ -186,7 +186,7 @@ public partial class SalvageRepairSlice : Node3D
     private double _autosaveElapsedSeconds;
     private bool _closeRequested;
     private bool _previousAutoAcceptQuit = true;
-    private string _status = "initializing SQLite";
+    private string _status = "";
     private string _acceptanceHud = "READY";
     private string _catalogResourceLifecycleAcceptanceHud = "READY";
     private string _contentAcceptanceHud = "READY";
@@ -410,6 +410,8 @@ public partial class SalvageRepairSlice : Node3D
         BindPlayerSurvivalSceneNodes();
         BindPlanetMapSceneNodes();
         BindApplicationShellSceneNodes();
+        BindLocalizationRuntime();
+        _status = L("ui.game.status.initializing");
 
         GameContentCatalog catalog = LoadContentCatalog();
         StationServicesCatalog stationServicesCatalog =
@@ -726,6 +728,7 @@ public partial class SalvageRepairSlice : Node3D
 
     public override void _ExitTree()
     {
+        DisposeLocalizationRuntime();
         GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
         _lifetimeCancellation.Cancel();
         _autosave?.Dispose();
@@ -877,7 +880,7 @@ public partial class SalvageRepairSlice : Node3D
             if (Matches(physical, logical, Key.Escape) ||
                 Matches(physical, logical, Key.U))
             {
-                CloseShipManagement("ship management closed");
+                CloseShipManagement(L("ui.ship.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -921,7 +924,7 @@ public partial class SalvageRepairSlice : Node3D
             if (Matches(physical, logical, Key.Escape) ||
                 Matches(physical, logical, Key.G))
             {
-                CloseBaseBuildMode("base construction closed");
+                CloseBaseBuildMode(L("ui.base.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -961,7 +964,7 @@ public partial class SalvageRepairSlice : Node3D
             if (Matches(physical, logical, Key.Escape) ||
                 Matches(physical, logical, Key.J))
             {
-                CloseDiscoveryCatalog("discovery catalog closed");
+                CloseDiscoveryCatalog(L("ui.poi.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -1000,7 +1003,7 @@ public partial class SalvageRepairSlice : Node3D
             }
             else if (Matches(physical, logical, Key.Escape))
             {
-                CloseStationServices("station services closed");
+                CloseStationServices(L("ui.station.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -1041,7 +1044,7 @@ public partial class SalvageRepairSlice : Node3D
         {
             if (Matches(physical, logical, Key.Escape))
             {
-                CloseRecipeSelector("recipe selector closed");
+                CloseRecipeSelector(L("ui.craft.closed"));
             }
             else if (Matches(physical, logical, Key.Up))
             {
@@ -1219,7 +1222,7 @@ public partial class SalvageRepairSlice : Node3D
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until the current persistence operation completes";
+            _status = L("ui.game.status.persistence_wait");
             return;
         }
 
@@ -1228,7 +1231,7 @@ public partial class SalvageRepairSlice : Node3D
             StationServices.NpcId,
             StringComparison.Ordinal))
         {
-            _status = $"unknown station services NPC {npc.NpcId}";
+            _status = LF("ui.station.unknown_npc", ("npc", npc.NpcId));
             return;
         }
 
@@ -1248,7 +1251,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         UpdateStationServicesPanel();
-        _status = $"station services opened: {npc.Name}";
+        _status = LF("ui.station.opened", ("npc", npc.Name));
         _lastDomainEvent = $"NpcInteraction({npc.NpcId})";
         RecordProceduralQuestReturnAtCurrentNpc();
         GD.Print(
@@ -1353,7 +1356,7 @@ public partial class SalvageRepairSlice : Node3D
             npc.DialogueId);
         if (dialogue.Options.Count == 0)
         {
-            _stationServicesFeedback = dialogue.Greeting;
+            _stationServicesFeedback = GameLocalizationService.Text(dialogue.GreetingKey);
             return;
         }
 
@@ -1365,8 +1368,7 @@ public partial class SalvageRepairSlice : Node3D
             dialogue.Options[_stationServicesIndex];
         if (StationServices.Reputation < option.MinimumReputation)
         {
-            _stationServicesFeedback =
-                $"requires reputation {option.MinimumReputation}";
+            _stationServicesFeedback = LF("ui.station.require_reputation", ("value", option.MinimumReputation));
             return;
         }
 
@@ -1381,14 +1383,14 @@ public partial class SalvageRepairSlice : Node3D
         {
             case "OpenTrade":
                 SetStationServicesTab(StationServicesTab.Buy);
-                _stationServicesFeedback = option.Text;
+                _stationServicesFeedback = GameLocalizationService.Text(option.LocalizationKey);
                 break;
             case "OpenQuests":
                 SetStationServicesTab(StationServicesTab.Quests);
-                _stationServicesFeedback = option.Text;
+                _stationServicesFeedback = GameLocalizationService.Text(option.LocalizationKey);
                 break;
             case "Close":
-                CloseStationServices(dialogue.Farewell);
+                CloseStationServices(GameLocalizationService.Text(dialogue.FarewellKey));
                 break;
             default:
                 throw new InvalidOperationException(
@@ -1407,9 +1409,7 @@ public partial class SalvageRepairSlice : Node3D
             .ToArray();
         if (offers.Length == 0)
         {
-            _stationServicesFeedback = isBuy
-                ? "market has no available stock"
-                : "player inventory has no tradable items";
+            _stationServicesFeedback = L(isBuy ? "ui.station.market_no_stock" : "ui.station.player_no_tradable");
             return;
         }
 
@@ -1429,8 +1429,7 @@ public partial class SalvageRepairSlice : Node3D
             }
             catch (OverflowException)
             {
-                _stationServicesFeedback =
-                    $"inventory mirror capacity exceeded for {offer.DefinitionId}";
+                _stationServicesFeedback = LF("ui.station.mirror_capacity", ("item", offer.DefinitionId));
                 _lastDomainEvent = "TradeBuyBlocked";
                 return;
             }
@@ -1442,9 +1441,7 @@ public partial class SalvageRepairSlice : Node3D
                     queue.GetQuantity(offer.DefinitionId) < 1);
             if (missingMirror is not null)
             {
-                _stationServicesFeedback =
-                    $"inventory mirror {missingMirror.StationId} is missing " +
-                    offer.DefinitionId;
+                _stationServicesFeedback = LF("ui.station.mirror_missing", ("station", missingMirror.StationId), ("item", offer.DefinitionId));
                 _lastDomainEvent = "TradeSellBlocked";
                 return;
             }
@@ -1500,7 +1497,7 @@ public partial class SalvageRepairSlice : Node3D
         StationServiceQuestView[] quests = StationServices.Quests.ToArray();
         if (quests.Length == 0)
         {
-            _stationServicesFeedback = "no quests available";
+            _stationServicesFeedback = L("ui.station.no_quests");
             return;
         }
 
@@ -1531,9 +1528,8 @@ public partial class SalvageRepairSlice : Node3D
             trigger = AutosaveTrigger.BaseChanged;
             _stationServicesFeedback = quest.Status ==
                 StationServiceQuestStatus.Completed
-                ? "quest already completed"
-                : $"quest progress {quest.ClampedProgress}/" +
-                  quest.CurrentNode.RequiredQuantity;
+                ? L("ui.station.quest_completed")
+                : LF("ui.station.quest_progress", ("current", quest.ClampedProgress), ("required", quest.CurrentNode.RequiredQuantity));
         }
 
         if (!changed)
@@ -1573,24 +1569,28 @@ public partial class SalvageRepairSlice : Node3D
             StationServices.NpcId);
         DialogueServiceDefinition dialogue = StationServiceCatalog.GetDialogue(
             npc.DialogueId);
+        string stationTabs = string.Join(" | ", Enum.GetValues<StationServicesTab>()
+            .Select(tab =>
+            {
+                string text = L($"ui.station.tab.{tab.ToString().ToLowerInvariant()}");
+                return tab == _stationServicesTab ? $"[{text}]" : text;
+            }));
         List<string> lines = new()
         {
-            "STATION SERVICES — FRONTIER EXCHANGE",
-            $"NPC: {npc.NpcId} • type={npc.NpcType} • faction={npc.FactionId}",
-            $"Wallet: {StationServices.PlayerCredits} credits • " +
-            $"Reputation: {StationServices.Reputation} • " +
-            $"Completed quests: {StationServices.CompletedQuestCount}/" +
-            $"{StationServiceCatalog.Quests.Count}",
-            "Tabs: " + string.Join(" | ", Enum.GetValues<StationServicesTab>()
-                .Select(tab => tab == _stationServicesTab
-                    ? $"[{tab}]"
-                    : tab.ToString())),
+            L("ui.station.header"),
+            LF("ui.station.npc_line", ("npc", npc.NpcId), ("type", npc.NpcType), ("faction", npc.FactionId)),
+            LF("ui.station.wallet_line",
+                ("credits", StationServices.PlayerCredits),
+                ("reputation", StationServices.Reputation),
+                ("completed", StationServices.CompletedQuestCount),
+                ("total", StationServiceCatalog.Quests.Count)),
+            LF("ui.station.tabs", ("tabs", stationTabs)),
             ""
         };
 
         if (_stationServicesTab == StationServicesTab.Dialogue)
         {
-            lines.Add(dialogue.Greeting);
+            lines.Add(GameLocalizationService.Text(dialogue.GreetingKey));
             lines.Add("");
             _stationServicesIndex = dialogue.Options.Count == 0
                 ? 0
@@ -1602,17 +1602,18 @@ public partial class SalvageRepairSlice : Node3D
             {
                 DialogueOptionServiceDefinition option = dialogue.Options[index];
                 string cursor = index == _stationServicesIndex ? ">" : " ";
-                lines.Add(
-                    $"{cursor} {option.Text} [{option.Action}] " +
-                    $"minRep={option.MinimumReputation}");
+                lines.Add($"{cursor} " + LF(
+                    "ui.station.option_row",
+                    ("text", GameLocalizationService.Text(option.LocalizationKey)),
+                    ("reputation", option.MinimumReputation)));
             }
 
             lines.Add("");
-            lines.Add("Price = BasePrice × system × supply/demand × faction × " +
-                "reputation × deterministic daily modifier.");
-            lines.Add($"Market coverage: {StationServices.TradableItemCount}/" +
-                $"{ContentCatalog.Items.Count} catalog items • " +
-                $"economy day={StationServices.DayIndex}.");
+            lines.Add(L("ui.station.price_formula"));
+            lines.Add(LF("ui.station.market_coverage",
+                ("tradable", StationServices.TradableItemCount),
+                ("total", ContentCatalog.Items.Count),
+                ("day", StationServices.DayIndex)));
         }
         else if (_stationServicesTab is StationServicesTab.Buy or
                  StationServicesTab.Sell)
@@ -1624,9 +1625,9 @@ public partial class SalvageRepairSlice : Node3D
                 .ToArray();
             if (offers.Length == 0)
             {
-                lines.Add(_stationServicesTab == StationServicesTab.Buy
-                    ? "No market stock."
-                    : "No tradable player inventory.");
+                lines.Add(L(_stationServicesTab == StationServicesTab.Buy
+                    ? "ui.station.no_market_stock"
+                    : "ui.station.no_player_inventory"));
             }
             else
             {
@@ -1643,21 +1644,25 @@ public partial class SalvageRepairSlice : Node3D
                     string cursor = index == _stationServicesIndex ? ">" : " ";
                     int playerQuantity = Session.GetAvailableQuantity(
                         quote.DefinitionId);
-                    lines.Add(
-                        $"{cursor} {GetShortContentId(quote.DefinitionId),-34} " +
-                        $"buy={quote.BuyPrice,5} sell={quote.SellPrice,5} " +
-                        $"stock={quote.Stock,3} inv={playerQuantity,3}");
+                    lines.Add($"{cursor} " + LF(
+                        "ui.station.offer_row",
+                        ("item", GetShortContentId(quote.DefinitionId)),
+                        ("buy", quote.BuyPrice),
+                        ("sell", quote.SellPrice),
+                        ("stock", quote.Stock),
+                        ("inventory", playerQuantity)));
                 }
 
                 MarketPriceQuote selected = offers[_stationServicesIndex];
                 lines.Add("");
-                lines.Add(
-                    $"Selected factors: base={selected.BasePrice:0.##} • " +
-                    $"system={selected.SystemEconomyModifier:0.###} • " +
-                    $"supply={selected.SupplyDemandModifier:0.###} • " +
-                    $"faction={selected.FactionModifier:0.###} • " +
-                    $"reputation={selected.ReputationModifier:0.###} • " +
-                    $"daily={selected.RandomDailyModifier:0.###}");
+                lines.Add(LF(
+                    "ui.station.selected_factors",
+                    ("base", selected.BasePrice.ToString("0.##", CultureInfo.InvariantCulture)),
+                    ("system", selected.SystemEconomyModifier.ToString("0.###", CultureInfo.InvariantCulture)),
+                    ("supply", selected.SupplyDemandModifier.ToString("0.###", CultureInfo.InvariantCulture)),
+                    ("faction", selected.FactionModifier.ToString("0.###", CultureInfo.InvariantCulture)),
+                    ("reputation", selected.ReputationModifier.ToString("0.###", CultureInfo.InvariantCulture)),
+                    ("daily", selected.RandomDailyModifier.ToString("0.###", CultureInfo.InvariantCulture))));
             }
         }
         else
@@ -1670,27 +1675,29 @@ public partial class SalvageRepairSlice : Node3D
             {
                 StationServiceQuestView quest = quests[index];
                 string cursor = index == _stationServicesIndex ? ">" : " ";
-                lines.Add(
-                    $"{cursor} {GetShortContentId(quest.Definition.QuestId)} " +
-                    $"[{quest.Status}] {quest.ClampedProgress}/" +
-                    $"{quest.CurrentNode.RequiredQuantity}");
-                lines.Add(
-                    $"    {quest.CurrentNode.ObjectiveType}: " +
-                    $"{quest.CurrentNode.TargetDefinitionId} • reward=" +
-                    $"{quest.Definition.RewardCredits}cr +" +
-                    $"{quest.Definition.ReputationReward} rep");
+                lines.Add($"{cursor} " + LF(
+                    "ui.station.quest_row",
+                    ("quest", GetShortContentId(quest.Definition.QuestId)),
+                    ("status", quest.Status),
+                    ("current", quest.ClampedProgress),
+                    ("required", quest.CurrentNode.RequiredQuantity)));
+                lines.Add("    " + LF(
+                    "ui.station.quest_detail",
+                    ("objective", quest.CurrentNode.ObjectiveType),
+                    ("target", quest.CurrentNode.TargetDefinitionId),
+                    ("credits", quest.Definition.RewardCredits),
+                    ("reputation", quest.Definition.ReputationReward)));
             }
         }
 
         if (!string.IsNullOrWhiteSpace(_stationServicesFeedback))
         {
             lines.Add("");
-            lines.Add($"Result: {_stationServicesFeedback}");
+            lines.Add(LF("ui.common.result", ("result", _stationServicesFeedback)));
         }
 
         lines.Add("");
-        lines.Add("Up/Down - select • Tab - next tab • B - Buy • S - Sell • " +
-            "Q - Quests • Enter/E - action • Esc - close");
+        lines.Add(L("ui.station.controls"));
         _stationServicesLabel.Text = string.Join("\n", lines);
     }
 
@@ -1703,13 +1710,13 @@ public partial class SalvageRepairSlice : Node3D
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until the current persistence operation completes";
+            _status = L("ui.game.status.persistence_wait");
             return;
         }
 
         if (_craftTimer.IsRunning)
         {
-            _status = $"recipe {_craftTimer.RecipeId} is already processing";
+            _status = LF("ui.craft.recipe_processing", ("recipe", _craftTimer.RecipeId));
             return;
         }
 
@@ -1718,7 +1725,7 @@ public partial class SalvageRepairSlice : Node3D
             GetSelectorRecipes(station.StationId);
         if (recipes.Count == 0)
         {
-            _status = $"station {station.StationId} has no runtime recipes";
+            _status = LF("ui.craft.station_no_recipes", ("station", station.StationId));
             return;
         }
 
@@ -1747,8 +1754,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         UpdateRecipeSelector();
-        _status = $"recipe selector opened: {recipes.Count} recipes at " +
-            station.Name;
+        _status = LF("ui.craft.selector_opened", ("count", recipes.Count), ("station", station.Name));
     }
 
     private void CloseRecipeSelector(string status = "")
@@ -1901,7 +1907,7 @@ public partial class SalvageRepairSlice : Node3D
                 GetSelectorTechnologies(station.StationId);
             if (technologies.Count == 0)
             {
-                _selectorFeedback = "No relevant technologies.";
+                _selectorFeedback = L("ui.craft.no_technologies");
                 UpdateRecipeSelector();
                 return;
             }
@@ -1935,7 +1941,7 @@ public partial class SalvageRepairSlice : Node3D
             GetSelectorRecipeEntries(station.StationId);
         if (entries.Count == 0)
         {
-            _selectorFeedback = "No runtime recipes.";
+            _selectorFeedback = L("ui.craft.no_runtime_recipes");
             UpdateRecipeSelector();
             return;
         }
@@ -1944,24 +1950,21 @@ public partial class SalvageRepairSlice : Node3D
             entries[Math.Clamp(_selectorIndex, 0, entries.Count - 1)];
         if (entry.Crafted)
         {
-            _selectorFeedback =
-                $"Recipe {entry.Recipe.RecipeId} is already completed.";
+            _selectorFeedback = LF("ui.craft.recipe_completed", ("recipe", entry.Recipe.RecipeId));
             UpdateRecipeSelector();
             return;
         }
 
         if (!entry.TechnologyUnlocked)
         {
-            _selectorFeedback =
-                $"LOCKED: research {entry.Recipe.RequiredTechnology}.";
+            _selectorFeedback = LF("ui.craft.locked_research", ("technology", entry.Recipe.RequiredTechnology));
             UpdateRecipeSelector();
             return;
         }
 
         if (!entry.InputsAvailable)
         {
-            _selectorFeedback =
-                $"Missing {entry.MissingInputQuantity} input unit(s).";
+            _selectorFeedback = LF("ui.craft.missing_inputs", ("quantity", entry.MissingInputQuantity));
             UpdateRecipeSelector();
             return;
         }
@@ -2006,7 +2009,7 @@ public partial class SalvageRepairSlice : Node3D
             GetDismantleRecipes(station.StationId);
         if (recipes.Count == 0)
         {
-            _selectorFeedback = "No dismantlable crafted items.";
+            _selectorFeedback = L("ui.craft.no_dismantle");
             UpdateRecipeSelector();
             return;
         }
@@ -2092,7 +2095,7 @@ public partial class SalvageRepairSlice : Node3D
             GetSelectorRecipeEntries(station.StationId);
         if (entries.Count == 0)
         {
-            _selectorFeedback = "No runtime recipes.";
+            _selectorFeedback = L("ui.craft.no_runtime_recipes");
             UpdateRecipeSelector();
             return;
         }
@@ -2102,24 +2105,21 @@ public partial class SalvageRepairSlice : Node3D
         CraftingRecipeDefinition recipe = entry.Recipe;
         if (entry.Crafted)
         {
-            _selectorFeedback =
-                $"Recipe {recipe.RecipeId} is already completed.";
+            _selectorFeedback = LF("ui.craft.recipe_completed", ("recipe", recipe.RecipeId));
             UpdateRecipeSelector();
             return;
         }
 
         if (!entry.TechnologyUnlocked)
         {
-            _selectorFeedback =
-                $"LOCKED: research {recipe.RequiredTechnology}.";
+            _selectorFeedback = LF("ui.craft.locked_research", ("technology", recipe.RequiredTechnology));
             UpdateRecipeSelector();
             return;
         }
 
         if (!entry.InputsAvailable)
         {
-            _selectorFeedback =
-                $"Missing {entry.MissingInputQuantity} input unit(s).";
+            _selectorFeedback = LF("ui.craft.missing_inputs", ("quantity", entry.MissingInputQuantity));
             UpdateRecipeSelector();
             return;
         }
@@ -2131,8 +2131,7 @@ public partial class SalvageRepairSlice : Node3D
                 recipe.RecipeId,
                 StringComparison.Ordinal)))
         {
-            _selectorFeedback =
-                $"Recipe {recipe.RecipeId} is already in the queue.";
+            _selectorFeedback = LF("ui.craft.already_queued", ("recipe", recipe.RecipeId));
             UpdateRecipeSelector();
             return;
         }
@@ -2216,7 +2215,7 @@ public partial class SalvageRepairSlice : Node3D
         ProductionQueueJobView? job = GetSelectedQueueJob();
         if (job is null)
         {
-            _selectorFeedback = "Queue is empty.";
+            _selectorFeedback = L("ui.craft.queue_empty");
             UpdateRecipeSelector();
             return;
         }
@@ -2259,7 +2258,7 @@ public partial class SalvageRepairSlice : Node3D
         ProductionQueueJobView? job = GetSelectedQueueJob();
         if (job is null)
         {
-            _selectorFeedback = "Queue is empty.";
+            _selectorFeedback = L("ui.craft.queue_empty");
             UpdateRecipeSelector();
             return;
         }
@@ -2344,16 +2343,23 @@ public partial class SalvageRepairSlice : Node3D
         ProductionQueueRuntime queue = GetGameplayQueue(stationId);
         ProductionQueueTerminalSnapshot queueSnapshot =
             ProductionQueueTerminalModel.Build(queue);
+        string selectorMode = L($"ui.craft.mode.{_selectorMode.ToString().ToLowerInvariant()}");
         List<string> lines = new()
         {
-            $"INDUSTRY TERMINAL - {station.Name}",
-            $"Station: {stationId}",
-            $"Mode: {_selectorMode} | RP: {TechnologyProgress.ResearchPoints} | " +
-            $"Unlocked: {TechnologyProgress.UnlockedCount}/{ContentCatalog.Technologies.Count}",
-            $"Energy: {queueSnapshot.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}/" +
-            $"{queueSnapshot.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)} | " +
-            $"Slots: {queueSnapshot.RunningJobs}/{queueSnapshot.ParallelSlots} | " +
-            $"Waiting: {queueSnapshot.QueuedJobs} | Paused: {queueSnapshot.PausedJobs}",
+            LF("ui.craft.header", ("station", station.Name)),
+            LF("ui.craft.station_line", ("station", stationId)),
+            LF("ui.craft.mode_line",
+                ("mode", selectorMode),
+                ("rp", TechnologyProgress.ResearchPoints),
+                ("unlocked", TechnologyProgress.UnlockedCount),
+                ("total", ContentCatalog.Technologies.Count)),
+            LF("ui.craft.energy_line",
+                ("energy", queueSnapshot.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)),
+                ("capacity", queueSnapshot.EnergyCapacity.ToString("0.###", CultureInfo.InvariantCulture)),
+                ("running", queueSnapshot.RunningJobs),
+                ("slots", queueSnapshot.ParallelSlots),
+                ("waiting", queueSnapshot.QueuedJobs),
+                ("paused", queueSnapshot.PausedJobs)),
             ""
         };
 
@@ -2373,12 +2379,12 @@ public partial class SalvageRepairSlice : Node3D
                 string status = queuedJob is not null
                     ? queuedJob.Status.ToString().ToUpperInvariant()
                     : entry.Crafted
-                        ? "DONE"
+                        ? L("ui.craft.status.done")
                         : !entry.TechnologyUnlocked
-                            ? $"LOCKED {recipe.RequiredTechnology}"
+                            ? LF("ui.craft.status.locked", ("technology", recipe.RequiredTechnology))
                             : !entry.InputsAvailable
-                                ? $"MISSING {entry.MissingInputQuantity}"
-                                : "READY";
+                                ? LF("ui.craft.status.missing", ("quantity", entry.MissingInputQuantity))
+                                : L("ui.craft.status.ready");
                 string inputs = string.Join(
                     " + ",
                     recipe.Inputs.Select(input =>
@@ -2389,11 +2395,13 @@ public partial class SalvageRepairSlice : Node3D
                     recipe.Outputs.Select(output =>
                         $"{output.Quantity} {GetShortContentId(output.DefinitionId)}"));
                 string cursor = index == _selectorIndex ? ">" : " ";
-                lines.Add(
-                    $"{cursor} [{status}] {GetShortContentId(recipe.RecipeId)} " +
-                    $"T{recipe.TechnologyTier} {recipe.CraftTimeSeconds:0.##}s " +
-                    $"E{recipe.EnergyCost:0.###}");
-                lines.Add($"    {inputs} -> {outputs}");
+                lines.Add($"{cursor} [{status}] " + LF(
+                    "ui.craft.recipe_row",
+                    ("recipe", GetShortContentId(recipe.RecipeId)),
+                    ("tier", recipe.TechnologyTier),
+                    ("seconds", recipe.CraftTimeSeconds.ToString("0.##", CultureInfo.InvariantCulture)),
+                    ("energy", recipe.EnergyCost.ToString("0.###", CultureInfo.InvariantCulture))));
+                lines.Add("    " + LF("ui.craft.io_row", ("inputs", inputs), ("outputs", outputs)));
             }
         }
         else if (_selectorMode == StationSelectorMode.Research)
@@ -2408,28 +2416,27 @@ public partial class SalvageRepairSlice : Node3D
                         technology.TechnologyId);
                 string status = TechnologyProgress.IsUnlocked(
                     technology.TechnologyId)
-                    ? "UNLOCKED"
+                    ? L("ui.craft.research.unlocked")
                     : missing.Count > 0
-                        ? $"LOCKED requires {string.Join(",", missing)}"
+                        ? LF("ui.craft.research.locked", ("requirements", string.Join(",", missing)))
                         : TechnologyProgress.ResearchPoints >=
                             technology.ResearchCost
-                            ? $"AVAILABLE {technology.ResearchCost} RP"
-                            : $"NEED {technology.ResearchCost} RP";
+                            ? LF("ui.craft.research.available", ("cost", technology.ResearchCost))
+                            : LF("ui.craft.research.need", ("cost", technology.ResearchCost));
                 string cursor = index == _selectorIndex ? ">" : " ";
-                lines.Add(
-                    $"{cursor} [{status}] {technology.TechnologyId} " +
-                    $"(tier {technology.Tier})");
+                lines.Add($"{cursor} [{status}] " + LF(
+                    "ui.craft.research_row",
+                    ("technology", technology.TechnologyId),
+                    ("tier", technology.Tier)));
             }
         }
         else if (_selectorMode == StationSelectorMode.Queue)
         {
-            lines.Add(
-                $"Queue jobs: {queueSnapshot.Jobs.Count} | " +
-                "freeze-and-resume persistence | offline progress: 0");
+            lines.Add(LF("ui.craft.queue_summary", ("count", queueSnapshot.Jobs.Count)));
             lines.Add("");
             if (queueSnapshot.Jobs.Count == 0)
             {
-                lines.Add("  Queue is empty. Select a recipe and press Q to enqueue.");
+                lines.Add("  " + L("ui.craft.queue_hint"));
             }
             else
             {
@@ -2438,13 +2445,16 @@ public partial class SalvageRepairSlice : Node3D
                     ProductionQueueTerminalJobRow row =
                         queueSnapshot.Jobs[index];
                     string cursor = index == _selectorIndex ? ">" : " ";
-                    lines.Add(
-                        $"{cursor} [{row.Status.ToString().ToUpperInvariant()}] " +
-                        $"{GetShortContentId(row.RecipeId)} {row.ProgressBar} " +
-                        $"{row.TimingText} {row.SlotText}");
-                    lines.Add(
-                        $"    reserve E{row.ReservedEnergy.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-                        row.ReservationText);
+                    lines.Add($"{cursor} [{row.Status.ToString().ToUpperInvariant()}] " + LF(
+                        "ui.craft.queue_row",
+                        ("recipe", GetShortContentId(row.RecipeId)),
+                        ("progress", row.ProgressBar),
+                        ("timing", row.TimingText),
+                        ("slot", row.SlotText)));
+                    lines.Add("    " + LF(
+                        "ui.craft.queue_reserve",
+                        ("energy", row.ReservedEnergy.ToString("0.###", CultureInfo.InvariantCulture)),
+                        ("reservation", row.ReservationText)));
                 }
             }
         }
@@ -2452,13 +2462,11 @@ public partial class SalvageRepairSlice : Node3D
         {
             IReadOnlyList<CraftingRecipeDefinition> recipes =
                 GetDismantleRecipes(stationId);
-            lines.Add(
-                $"Dismantlable items: {recipes.Count} | returns are scaled by " +
-                "quality/purity/stability");
+            lines.Add(LF("ui.craft.dismantle_summary", ("count", recipes.Count)));
             lines.Add("");
             if (recipes.Count == 0)
             {
-                lines.Add("  No crafted items with dismantle returns.");
+                lines.Add("  " + L("ui.craft.no_dismantle_returns"));
             }
             else
             {
@@ -2472,15 +2480,20 @@ public partial class SalvageRepairSlice : Node3D
                         ItemPropertyRuntime.Dismantle(recipe, properties);
                     string cursor = index == _selectorIndex ? ">" : " ";
                     string returns = preview.Returns.Count == 0
-                        ? "no recoverable material"
+                        ? L("ui.craft.no_recoverable")
                         : string.Join(" + ", preview.Returns.Select(item =>
                             $"{item.Quantity} {GetShortContentId(item.DefinitionId)}"));
-                    lines.Add(
-                        $"{cursor} {GetShortContentId(output.DefinitionId)} x" +
-                        $"{Session.GetCraftedQuantity(output.DefinitionId)} " +
-                        $"Q{properties.Quality}/P{properties.Purity}/S{properties.Stability}");
-                    lines.Add(
-                        $"    recovery {preview.RecoveryEfficiency * 100.0:0}% -> {returns}");
+                    lines.Add($"{cursor} " + LF(
+                        "ui.craft.dismantle_row",
+                        ("item", GetShortContentId(output.DefinitionId)),
+                        ("quantity", Session.GetCraftedQuantity(output.DefinitionId)),
+                        ("quality", properties.Quality),
+                        ("purity", properties.Purity),
+                        ("stability", properties.Stability)));
+                    lines.Add("    " + LF(
+                        "ui.craft.recovery_row",
+                        ("efficiency", (preview.RecoveryEfficiency * 100.0).ToString("0", CultureInfo.InvariantCulture)),
+                        ("returns", returns)));
                 }
             }
         }
@@ -2488,24 +2501,16 @@ public partial class SalvageRepairSlice : Node3D
         if (!string.IsNullOrWhiteSpace(_selectorFeedback))
         {
             lines.Add("");
-            lines.Add($"Result: {_selectorFeedback}");
+            lines.Add(LF("ui.common.result", ("result", _selectorFeedback)));
         }
 
         lines.Add("");
         lines.Add(_selectorMode switch
         {
-            StationSelectorMode.Recipes =>
-                "Up/Down - select | Enter/E - craft now | Q - enqueue | " +
-                "Tab - next tab | R - Research | Esc - close",
-            StationSelectorMode.Research =>
-                "Up/Down - select | Enter/E - unlock | Q - Queue | " +
-                "Tab - next tab | R - Recipes | D - Dismantle | Esc - close",
-            StationSelectorMode.Queue =>
-                "Up/Down - select | Enter/E - pause/resume | C/Delete - cancel | " +
-                "D - Dismantle | Tab - next tab | R - Research | Esc - close",
-            _ =>
-                "Up/Down - select | Enter/E - dismantle | Tab - next tab | " +
-                "R - Research | Q - Queue | Esc - close"
+            StationSelectorMode.Recipes => L("ui.craft.controls.recipes"),
+            StationSelectorMode.Research => L("ui.craft.controls.research"),
+            StationSelectorMode.Queue => L("ui.craft.controls.queue"),
+            _ => L("ui.craft.controls.dismantle")
         });
         _recipeSelectorLabel.Text = string.Join("\n", lines);
     }
@@ -2522,7 +2527,7 @@ public partial class SalvageRepairSlice : Node3D
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until the current persistence operation completes";
+            _status = L("ui.game.status.persistence_wait");
             return false;
         }
 
@@ -2568,7 +2573,7 @@ public partial class SalvageRepairSlice : Node3D
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until the current persistence operation completes";
+            _status = L("ui.game.status.persistence_wait");
             return;
         }
 
@@ -2609,7 +2614,7 @@ public partial class SalvageRepairSlice : Node3D
         _shipTerminal?.SetRepaired(true);
         RecordPlayerMultitoolUse(PlayerMultitoolFunction.Repair, "starter-ship");
         _lastDomainEvent = "StarterRepairQuestCompleted";
-        _status = "starter ship repaired and commissioned; press E on it again to board";
+        _status = L("ui.craft.starter_repaired");
         RecordProceduralQuestObjective(
             ProceduralQuestObjectiveType.RepairObject,
             "object.ship.starter",
@@ -2635,13 +2640,13 @@ public partial class SalvageRepairSlice : Node3D
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until the current persistence operation completes";
+            _status = L("ui.game.status.persistence_wait");
             return;
         }
 
         if (!TryResolveStationRecipe(recipeId, out CraftingRecipeDefinition recipe))
         {
-            _status = $"unknown station recipe {recipeId}";
+            _status = LF("ui.craft.unknown_recipe", ("recipe", recipeId));
             return;
         }
 
@@ -2650,15 +2655,14 @@ public partial class SalvageRepairSlice : Node3D
         if (stationQueue.Jobs.Count > 0)
         {
             _lastDomainEvent = "ProductionQueueBusy";
-            _status = "this station queue is active; open the Queue tab to manage it";
+            _status = L("ui.craft.queue_active");
             return;
         }
 
         if (_craftTimer.IsRunning)
         {
             _lastDomainEvent = "StationCraftRunning";
-            _status = $"recipe {_craftTimer.RecipeId} is already processing; " +
-                $"remaining={_craftTimer.RemainingSeconds:0.0}s";
+            _status = LF("ui.craft.recipe_processing", ("recipe", _craftTimer.RecipeId));
             return;
         }
 
@@ -2709,8 +2713,9 @@ public partial class SalvageRepairSlice : Node3D
         _lastDomainEvent = BuildCraftEventName(
             recipeId,
             "CraftStarted");
-        _status = $"crafting {recipeId}: 0.0/" +
-            $"{_craftTimer.DurationSeconds:0.0}s";
+        _status = LF("ui.craft.timer_running",
+            ("recipe", recipeId), ("elapsed", "0.0"),
+            ("total", _craftTimer.DurationSeconds.ToString("0.0", CultureInfo.InvariantCulture)));
         GD.Print(
             $"{GetCraftTaskId(recipeId)} timed craft started: " +
             $"recipe={recipeId}; station={stationId}; " +
@@ -2728,9 +2733,10 @@ public partial class SalvageRepairSlice : Node3D
         CraftTimerAdvanceResult advanceResult = _craftTimer.Advance(
             delta,
             out _);
-        _status = $"crafting {_craftTimer.RecipeId}: " +
-            $"{_craftTimer.ElapsedSeconds:0.0}/" +
-            $"{_craftTimer.DurationSeconds:0.0}s";
+        _status = LF("ui.craft.timer_running",
+            ("recipe", _craftTimer.RecipeId),
+            ("elapsed", _craftTimer.ElapsedSeconds.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("total", _craftTimer.DurationSeconds.ToString("0.0", CultureInfo.InvariantCulture)));
         if (advanceResult != CraftTimerAdvanceResult.Completed)
         {
             return;
@@ -2745,7 +2751,7 @@ public partial class SalvageRepairSlice : Node3D
             _craftingInteractorName = "unknown";
             _lastDomainEvent = "StationCraftCancelled";
             _state = SalvageRepairSliceState.Failed;
-            _status = "timed craft failed: crafting station became unavailable";
+            _status = L("ui.craft.station_unavailable");
             GD.PushError(
                 $"{GetCraftTaskId(cancelledRecipeId)} timed craft cancelled safely: " +
                 $"recipe={cancelledRecipeId}; " +
@@ -2863,7 +2869,7 @@ public partial class SalvageRepairSlice : Node3D
         _activeCraftingStation?.SetCrafting(false);
         _activeCraftingStation = null;
         _lastDomainEvent = "StationCraftCancelled";
-        _status = $"timed craft cancelled: {reason}";
+        _status = LF("ui.craft.cancelled", ("reason", reason));
         GD.Print(
             $"{GetCraftTaskId(recipeId)} timed craft cancelled safely: " +
             $"recipe={recipeId}; elapsed={elapsed.ToString("0.0", CultureInfo.InvariantCulture)}; " +
@@ -3751,7 +3757,7 @@ public partial class SalvageRepairSlice : Node3D
         _shipManagementTab = (ShipManagementTab)(
             ((int)_shipManagementTab + 1) % 3);
         _shipManagementIndex = 0;
-        _shipManagementFeedback = $"tab={_shipManagementTab}";
+        _shipManagementFeedback = LF("ui.ship.feedback.tab", ("tab", L($"ui.ship.tab.{_shipManagementTab.ToString().ToLowerInvariant()}")));
         UpdateShipManagementPanel();
     }
 
@@ -3786,7 +3792,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair and commission the starter ship first";
+            _shipManagementFeedback = L("ui.ship.repair_first");
             return;
         }
 
@@ -3845,7 +3851,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair and commission the starter ship first";
+            _shipManagementFeedback = L("ui.ship.repair_first");
             return;
         }
 
@@ -3884,7 +3890,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair and commission the starter ship first";
+            _shipManagementFeedback = L("ui.ship.repair_first");
             return;
         }
 
@@ -3925,7 +3931,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair and commission the starter ship first";
+            _shipManagementFeedback = L("ui.ship.repair_first");
             return;
         }
 
@@ -3944,7 +3950,7 @@ public partial class SalvageRepairSlice : Node3D
         double maximum = ShipSystems.GetSystemMaximumHealth(definition.SystemId);
         if (current + 0.0001 >= maximum)
         {
-            _shipManagementFeedback = $"{definition.SystemId} is already full";
+            _shipManagementFeedback = LF("ui.ship.system_full", ("system", definition.SystemId));
             return;
         }
 
@@ -3990,14 +3996,14 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (!Session.ShipRepaired || !ShipSystems.Commissioned)
         {
-            _shipManagementFeedback = "repair and commission the starter ship first";
+            _shipManagementFeedback = L("ui.ship.repair_first");
             return;
         }
 
         double capacity = ShipSystems.GetEffectiveStats().FuelCapacity;
         if (ShipSystems.Fuel + 0.0001 >= capacity)
         {
-            _shipManagementFeedback = "fuel tank is already full";
+            _shipManagementFeedback = L("ui.ship.fuel_full");
             return;
         }
 
@@ -4014,12 +4020,11 @@ public partial class SalvageRepairSlice : Node3D
         if (added <= 0.0)
         {
             GrantSharedInventory(ShipSystemsAcceptanceRunner.FuelDefinitionId, 1);
-            _shipManagementFeedback = "refuel produced no fuel";
+            _shipManagementFeedback = L("ui.ship.refuel_none");
             return;
         }
 
-        _shipManagementFeedback =
-            $"refueled +{added:0.#}; fuel={ShipSystems.Fuel:0.#}/{capacity:0.#}";
+        _shipManagementFeedback = LF("ui.ship.refueled", ("added", added.ToString("0.#", CultureInfo.InvariantCulture)), ("fuel", ShipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)), ("capacity", capacity.ToString("0.#", CultureInfo.InvariantCulture)));
         _lastDomainEvent = "ShipRefueled";
         QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
         GD.Print(
@@ -4036,7 +4041,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (Session.GetAvailableQuantity(definitionId) < quantity)
         {
-            result = $"missing {quantity} x {definitionId}";
+            result = LF("ui.ship.inventory_missing", ("quantity", quantity), ("item", definitionId));
             return false;
         }
 
@@ -4045,8 +4050,7 @@ public partial class SalvageRepairSlice : Node3D
                 queue.GetQuantity(definitionId) < quantity);
         if (missingMirror is not null)
         {
-            result = $"inventory mirror {missingMirror.StationId} is missing " +
-                $"{definitionId}";
+            result = LF("ui.station.mirror_missing", ("station", missingMirror.StationId), ("item", definitionId));
             return false;
         }
 
@@ -4067,6 +4071,14 @@ public partial class SalvageRepairSlice : Node3D
             new[] { new CraftingStackDefinition(definitionId, quantity) });
     }
 
+    private static string LocalizeShipSlot(string slotType)
+    {
+        string key = "ui.ship.slot." + slotType.ToLowerInvariant();
+        return GameLocalizationService.ContainsKey(key)
+            ? GameLocalizationService.Text(key)
+            : slotType;
+    }
+
     private void UpdateShipManagementPanel()
     {
         if (_shipManagementPanel is null || _shipManagementLabel is null)
@@ -4084,91 +4096,81 @@ public partial class SalvageRepairSlice : Node3D
         string tabs = string.Join(
             "  ",
             Enum.GetValues<ShipManagementTab>().Select(tab =>
-                tab == _shipManagementTab ? $"[{tab}]" : tab.ToString()));
+            {
+                string text = L($"ui.ship.tab.{tab.ToString().ToLowerInvariant()}");
+                return tab == _shipManagementTab ? $"[{text}]" : text;
+            }));
         string content;
         if (_shipManagementTab == ShipManagementTab.Overview)
         {
-            content =
-                $"Class: {GetShortContentId(ShipSystems.ShipClassId)}\n" +
-                $"Hull={stats.Hull:0.#}  Shield={stats.Shield:0.#}  Cargo={stats.CargoCapacity}\n" +
-                $"Fuel={ShipSystems.Fuel:0.#}/{stats.FuelCapacity:0.#}  " +
-                $"Accel={stats.Acceleration:0.#}  Speed={stats.MaxSpeed:0.#}\n" +
-                $"Maneuver={stats.Maneuverability:0.#}  HyperRange={stats.HyperdriveRange:0.#}  " +
-                $"Atmos={stats.AtmosphericEfficiency:0.#}%\n" +
-                $"Slots: weapon={ShipSystems.InstalledWeaponModules}/{stats.WeaponSlots}  " +
-                $"technology={ShipSystems.InstalledTechnologyModules}/{stats.TechnologySlots}\n" +
-                $"Readiness: commissioned={(ShipSystems.Commissioned ? "YES" : "NO")}  " +
-                $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")}  " +
-                $"hyperspace={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")}  " +
-                $"offlineSystems={ShipSystems.DisabledSystemCount}\n\n" +
-                $"Enter/E: refuel with 1 x {ShipSystemsAcceptanceRunner.FuelDefinitionId} " +
-                $"(inventory={Session.GetAvailableQuantity(ShipSystemsAcceptanceRunner.FuelDefinitionId)})";
+            content = string.Join("\n", new[]
+            {
+                LF("ui.ship.overview.class", ("class", L(ShipSystemsCatalog.GetClass(ShipSystems.ShipClassId).LocalizationKey))),
+                LF("ui.ship.overview.hull", ("hull", stats.Hull.ToString("0.#", CultureInfo.InvariantCulture)), ("shield", stats.Shield.ToString("0.#", CultureInfo.InvariantCulture)), ("cargo", stats.CargoCapacity)),
+                LF("ui.ship.overview.flight", ("fuel", ShipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)), ("capacity", stats.FuelCapacity.ToString("0.#", CultureInfo.InvariantCulture)), ("acceleration", stats.Acceleration.ToString("0.#", CultureInfo.InvariantCulture)), ("speed", stats.MaxSpeed.ToString("0.#", CultureInfo.InvariantCulture))),
+                LF("ui.ship.overview.performance", ("maneuver", stats.Maneuverability.ToString("0.#", CultureInfo.InvariantCulture)), ("range", stats.HyperdriveRange.ToString("0.#", CultureInfo.InvariantCulture)), ("atmosphere", stats.AtmosphericEfficiency.ToString("0.#", CultureInfo.InvariantCulture))),
+                LF("ui.ship.overview.slots", ("weaponUsed", ShipSystems.InstalledWeaponModules), ("weaponTotal", stats.WeaponSlots), ("techUsed", ShipSystems.InstalledTechnologyModules), ("techTotal", stats.TechnologySlots)),
+                LF("ui.ship.overview.readiness", ("commissioned", L(ShipSystems.Commissioned ? "ui.common.yes" : "ui.common.no")), ("flight", L(ShipSystems.FlightReady ? "ui.common.ready" : "ui.common.blocked")), ("hyperspace", L(ShipSystems.HyperspaceReady ? "ui.common.ready" : "ui.common.blocked")), ("offline", ShipSystems.DisabledSystemCount)),
+                "",
+                LF("ui.ship.overview.refuel", ("item", ShipSystemsAcceptanceRunner.FuelDefinitionId), ("inventory", Session.GetAvailableQuantity(ShipSystemsAcceptanceRunner.FuelDefinitionId)))
+            });
         }
         else if (_shipManagementTab == ShipManagementTab.Modules)
         {
             IReadOnlyList<ShipModuleDefinition> modules = ShipModuleDefinitions;
-            _shipManagementIndex = Math.Clamp(
-                _shipManagementIndex,
-                0,
-                Math.Max(0, modules.Count - 1));
-            int start = Math.Max(0, _shipManagementIndex - 5);
-            int end = Math.Min(modules.Count, start + 11);
-            start = Math.Max(0, end - 11);
+            _shipManagementIndex = Math.Clamp(_shipManagementIndex, 0, Math.Max(0, modules.Count - 1));
+            int first = Math.Max(0, _shipManagementIndex - 5);
+            int last = Math.Min(modules.Count, first + 11);
+            first = Math.Max(0, last - 11);
             List<string> lines = new();
-            for (int index = start; index < end; index++)
+            for (int index = first; index < last; index++)
             {
                 ShipModuleDefinition module = modules[index];
-                InstalledShipModuleState? installed = ShipSystems.InstalledModules
-                    .FirstOrDefault(value => string.Equals(
-                        value.Definition.ModuleId,
-                        module.ModuleId,
-                        StringComparison.Ordinal));
+                InstalledShipModuleState? installed = ShipSystems.InstalledModules.FirstOrDefault(value => string.Equals(value.Definition.ModuleId, module.ModuleId, StringComparison.Ordinal));
                 string state = installed is null
-                    ? "AVAILABLE"
-                    : installed.Active ? "INSTALLED/ACTIVE" : "INSTALLED/OFFLINE";
-                lines.Add(
-                    $"{(index == _shipManagementIndex ? ">" : " ")} " +
-                    $"{GetShortContentId(module.ModuleId),-24} " +
-                    $"{module.SlotType,-10} {state,-18} " +
-                    $"inv={Session.GetAvailableQuantity(module.ModuleId)}");
+                    ? L("ui.ship.module_state.available")
+                    : installed.Active ? L("ui.ship.module_state.active") : L("ui.ship.module_state.offline");
+                lines.Add($"{(index == _shipManagementIndex ? ">" : " ")} " + LF(
+                    "ui.ship.module_row",
+                    ("module", L(module.LocalizationKey)),
+                    ("slot", LocalizeShipSlot(module.SlotType)),
+                    ("state", state),
+                    ("inventory", Session.GetAvailableQuantity(module.ModuleId))));
             }
 
-            content = string.Join("\n", lines) +
-                "\n\nEnter/E: install selected  X: uninstall selected";
+            content = string.Join("\n", lines) + "\n\n" + L("ui.ship.modules_controls");
         }
         else
         {
             IReadOnlyList<ShipSystemDefinition> systems = ShipSystemDefinitions;
-            _shipManagementIndex = Math.Clamp(
-                _shipManagementIndex,
-                0,
-                Math.Max(0, systems.Count - 1));
+            _shipManagementIndex = Math.Clamp(_shipManagementIndex, 0, Math.Max(0, systems.Count - 1));
             List<string> lines = new();
             for (int index = 0; index < systems.Count; index++)
             {
                 ShipSystemDefinition system = systems[index];
                 double health = ShipSystems.GetSystemHealth(system.SystemId);
                 double maximum = ShipSystems.GetSystemMaximumHealth(system.SystemId);
-                lines.Add(
-                    $"{(index == _shipManagementIndex ? ">" : " ")} " +
-                    $"{GetShortContentId(system.SystemId),-14} " +
-                    $"{health,6:0.#}/{maximum,-6:0.#} " +
-                    $"repair={GetShortContentId(system.RepairDefinitionId)} " +
-                    $"inv={Session.GetAvailableQuantity(system.RepairDefinitionId)}");
+                lines.Add($"{(index == _shipManagementIndex ? ">" : " ")} " + LF(
+                    "ui.ship.system_row",
+                    ("system", L(system.LocalizationKey)),
+                    ("health", health.ToString("0.#", CultureInfo.InvariantCulture)),
+                    ("maximum", maximum.ToString("0.#", CultureInfo.InvariantCulture)),
+                    ("repair", GetShortContentId(system.RepairDefinitionId)),
+                    ("inventory", Session.GetAvailableQuantity(system.RepairDefinitionId))));
             }
 
-            content = string.Join("\n", lines) +
-                "\n\nEnter/E or R: repair selected  D: apply 25 test damage";
+            content = string.Join("\n", lines) + "\n\n" + L("ui.ship.systems_controls");
         }
 
         _shipManagementLabel.Text =
-            "SHIP MANAGEMENT - TASK-110\n" +
+            L("ui.ship.header") + "\n" +
             tabs + "\n" +
-            $"Starter repair: {(Session.ShipRepaired ? "COMPLETE" : "REQUIRED")}  " +
-            $"Commissioned: {(ShipSystems.Commissioned ? "YES" : "NO")}\n\n" +
+            LF("ui.ship.starter_repair",
+                ("state", L(Session.ShipRepaired ? "ui.ship.state.complete" : "ui.ship.state.required")),
+                ("commissioned", L(ShipSystems.Commissioned ? "ui.common.yes" : "ui.common.no"))) + "\n\n" +
             content + "\n\n" +
-            $"Status: {_shipManagementFeedback}\n" +
-            "Up/Down select  Tab pages  U/Esc close";
+            LF("ui.ship.status_line", ("status", _shipManagementFeedback)) + "\n" +
+            L("ui.ship.controls");
     }
 
     private IReadOnlyList<BaseModuleDefinition> BaseBuildDefinitions =>
@@ -4200,9 +4202,9 @@ public partial class SalvageRepairSlice : Node3D
                 Math.Max(0, definitions.Count - 1));
         }
 
-        _baseBuildFeedback = BaseConstruction.ModuleCount == 0
-            ? "anchor selected; place it to start the connected base graph"
-            : "select a module and place it on an adjacent grid cell";
+        _baseBuildFeedback = L(BaseConstruction.ModuleCount == 0
+            ? "ui.base.anchor_selected"
+            : "ui.base.select_module");
         if (_baseConstructionPanel is not null)
         {
             _baseConstructionPanel.Visible = true;
@@ -4215,7 +4217,7 @@ public partial class SalvageRepairSlice : Node3D
 
         UpdateBaseConstructionPanel();
         UpdateBaseBuildPreview();
-        _status = "base construction mode";
+        _status = L("ui.base.mode");
         GD.Print(
             "TASK-106 player base construction mode PASS: " +
             $"modules={BaseConstruction.ModuleCount}; " +
@@ -4256,7 +4258,7 @@ public partial class SalvageRepairSlice : Node3D
             _baseBuildIndex += definitions.Count;
         }
 
-        _baseBuildFeedback = "module selection changed";
+        _baseBuildFeedback = L("ui.base.selection_changed");
         UpdateBaseConstructionPanel();
         UpdateBaseBuildPreview();
     }
@@ -4310,7 +4312,7 @@ public partial class SalvageRepairSlice : Node3D
         BaseModulePlacement? placement = BaseConstruction.FindAt(gridX, gridZ);
         if (placement is null)
         {
-            _baseBuildFeedback = $"no base module at {gridX},{gridZ}";
+            _baseBuildFeedback = LF("ui.base.no_module_at", ("x", gridX), ("z", gridZ));
             UpdateBaseConstructionPanel();
             return;
         }
@@ -4342,7 +4344,7 @@ public partial class SalvageRepairSlice : Node3D
         BaseModulePlacement? placement = BaseConstruction.FindAt(gridX, gridZ);
         if (placement is null)
         {
-            _baseBuildFeedback = $"no base module at {gridX},{gridZ}";
+            _baseBuildFeedback = LF("ui.base.no_module_at", ("x", gridX), ("z", gridZ));
             UpdateBaseConstructionPanel();
             return;
         }
@@ -4401,6 +4403,14 @@ public partial class SalvageRepairSlice : Node3D
                 (float)(gridZ * gridSize)));
     }
 
+    private static string LocalizeBaseCategory(string category)
+    {
+        string key = "ui.base.category." + category.ToLowerInvariant();
+        return GameLocalizationService.ContainsKey(key)
+            ? GameLocalizationService.Text(key)
+            : category;
+    }
+
     private void UpdateBaseConstructionPanel()
     {
         if (_baseConstructionLabel is null || !_baseBuildMode)
@@ -4411,75 +4421,80 @@ public partial class SalvageRepairSlice : Node3D
         IReadOnlyList<BaseModuleDefinition> definitions = BaseBuildDefinitions;
         if (definitions.Count == 0)
         {
-            _baseConstructionLabel.Text = "BASE CONSTRUCTION\nNo modules.";
+            _baseConstructionLabel.Text = L("ui.base.no_modules");
             return;
         }
 
-        _baseBuildIndex = Math.Clamp(
-            _baseBuildIndex,
-            0,
-            definitions.Count - 1);
+        _baseBuildIndex = Math.Clamp(_baseBuildIndex, 0, definitions.Count - 1);
         BaseModuleDefinition selected = definitions[_baseBuildIndex];
         (int gridX, int gridZ, Vector3 worldPosition) = GetBaseBuildTarget();
-        BaseModulePlacement? targetModule = BaseConstruction.FindAt(
-            gridX,
-            gridZ);
+        BaseModulePlacement? targetModule = BaseConstruction.FindAt(gridX, gridZ);
+        string occupant = targetModule is null
+            ? L("ui.base.empty")
+            : LF(
+                "ui.base.target_module",
+                ("module", L(BaseConstructionCatalog.GetModule(targetModule.ModuleId).LocalizationKey)),
+                ("instance", targetModule.InstanceId));
         List<string> lines = new()
         {
-            "BASE CONSTRUCTION — Stage 2 foundation subsystem",
-            $"Base: {BaseConstruction.BuildSummary()}",
-            $"Target: grid={gridX},{gridZ} • world=" +
-                $"X={worldPosition.X:0.0} Z={worldPosition.Z:0.0} • " +
-                (targetModule is null
-                    ? "empty"
-                    : $"{targetModule.ModuleId} ({targetModule.InstanceId})"),
-            $"Selected: {selected.ModuleId} • category={selected.Category} • " +
-                $"stock={BaseConstruction.GetStock(selected.ModuleId)} • " +
-                $"rotation={_baseBuildRotation * 90}°",
-            $"Power: generation={BaseConstruction.Power.Generation:0.#} • " +
-                $"consumption={BaseConstruction.Power.Consumption:0.#} • " +
-                $"battery={BaseConstruction.Power.BatteryStored:0.#}/" +
-                $"{BaseConstruction.Power.BatteryCapacity:0.#} • " +
-                $"powered={BaseConstruction.Power.PoweredConsumers}/" +
-                $"{BaseConstruction.Power.EnabledConsumers}",
+            L("ui.base.header"),
+            LF("ui.base.summary", ("summary", LF(
+                "ui.base.summary_detail",
+                ("modules", BaseConstruction.Power.Modules),
+                ("maxModules", BaseConstructionCatalog.Limits.MaximumModules),
+                ("devices", BaseConstruction.Power.InteractiveDevices),
+                ("maxDevices", BaseConstructionCatalog.Limits.MaximumInteractiveDevices),
+                ("generation", BaseConstruction.Power.Generation.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("consumption", BaseConstruction.Power.Consumption.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("battery", BaseConstruction.Power.BatteryStored.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("capacity", BaseConstruction.Power.BatteryCapacity.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("components", BaseConstruction.Power.ConnectedComponents)))),
+            LF("ui.base.target", ("x", gridX), ("z", gridZ),
+                ("worldX", worldPosition.X.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("worldZ", worldPosition.Z.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("occupant", occupant)),
+            LF("ui.base.selected", ("module", L(selected.LocalizationKey)), ("category", LocalizeBaseCategory(selected.Category)),
+                ("stock", BaseConstruction.GetStock(selected.ModuleId)), ("rotation", _baseBuildRotation * 90)),
+            LF("ui.base.power",
+                ("generation", BaseConstruction.Power.Generation.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("consumption", BaseConstruction.Power.Consumption.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("battery", BaseConstruction.Power.BatteryStored.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("capacity", BaseConstruction.Power.BatteryCapacity.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("powered", BaseConstruction.Power.PoweredConsumers),
+                ("enabled", BaseConstruction.Power.EnabledConsumers)),
             "",
-            "MODULE PALETTE"
+            L("ui.base.module_palette")
         };
         const int visiblePaletteRows = 11;
-        int paletteStart = Math.Clamp(
-            _baseBuildIndex - visiblePaletteRows / 2,
-            0,
-            Math.Max(0, definitions.Count - visiblePaletteRows));
-        int paletteEnd = Math.Min(
-            definitions.Count,
-            paletteStart + visiblePaletteRows);
+        int paletteStart = Math.Clamp(_baseBuildIndex - visiblePaletteRows / 2, 0, Math.Max(0, definitions.Count - visiblePaletteRows));
+        int paletteEnd = Math.Min(definitions.Count, paletteStart + visiblePaletteRows);
         if (paletteStart > 0)
         {
-            lines.Add($"  ... {paletteStart} earlier modules ...");
+            lines.Add("  " + LF("ui.base.earlier", ("count", paletteStart)));
         }
 
         for (int index = paletteStart; index < paletteEnd; index++)
         {
             BaseModuleDefinition definition = definitions[index];
-            lines.Add(
-                $"{(index == _baseBuildIndex ? ">" : " ")} " +
-                $"{definition.ModuleId} [{definition.Category}] " +
-                $"stock={BaseConstruction.GetStock(definition.ModuleId)} " +
-                $"P={definition.PowerGeneration:0.#}/" +
-                $"{definition.PowerConsumption:0.#} " +
-                $"B={definition.BatteryCapacity:0.#}");
+            lines.Add($"{(index == _baseBuildIndex ? ">" : " ")} " + LF(
+                "ui.base.palette_row",
+                ("module", definition.ModuleId),
+                ("category", definition.Category),
+                ("stock", BaseConstruction.GetStock(definition.ModuleId)),
+                ("generation", definition.PowerGeneration.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("consumption", definition.PowerConsumption.ToString("0.#", CultureInfo.InvariantCulture)),
+                ("battery", definition.BatteryCapacity.ToString("0.#", CultureInfo.InvariantCulture))));
         }
 
         if (paletteEnd < definitions.Count)
         {
-            lines.Add(
-                $"  ... {definitions.Count - paletteEnd} later modules ...");
+            lines.Add("  " + LF("ui.base.later", ("count", definitions.Count - paletteEnd)));
         }
 
         lines.Add("");
-        lines.Add("Up/Down select • R rotate • Enter place • X/Delete remove");
-        lines.Add("T enable/disable targeted device • G/Esc close");
-        lines.Add($"Result: {_baseBuildFeedback}");
+        lines.Add(L("ui.base.controls1"));
+        lines.Add(L("ui.base.controls2"));
+        lines.Add(LF("ui.common.result", ("result", _baseBuildFeedback)));
         _baseConstructionLabel.Text = string.Join("\n", lines);
     }
 
@@ -4662,7 +4677,7 @@ public partial class SalvageRepairSlice : Node3D
     {
         if (_player is null || _planetaryPoiNodes.Count == 0)
         {
-            _status = "planetary scanner unavailable";
+            _status = L("ui.poi.scanner_unavailable");
             return;
         }
 
@@ -4698,7 +4713,7 @@ public partial class SalvageRepairSlice : Node3D
         PlanetaryPoiScanResult result = PlanetaryExploration.Scan(
             nearest.Node.InstanceId,
             out string message);
-        _status = $"scanner: {message}";
+        _status = LF("ui.game.scanner_result", ("result", message));
         _lastDomainEvent =
             $"PoiScanned({nearest.Node.InstanceId}, result={result})";
         ApplyPlanetaryPoiStateToScene();
@@ -4791,7 +4806,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         UpdateDiscoveryCatalogPanel();
-        _status = "discovery catalog opened";
+        _status = L("ui.poi.catalog_opened");
     }
 
     private void CloseDiscoveryCatalog(string status = "")
@@ -4841,7 +4856,7 @@ public partial class SalvageRepairSlice : Node3D
             _discoveryCatalogIndex,
             0,
             states.Count - 1)];
-        string generatedName = $"Waypoint {_discoveryCatalogIndex + 1:00}";
+        string generatedName = LF("ui.poi.generated_name", ("number", (_discoveryCatalogIndex + 1).ToString("00", CultureInfo.InvariantCulture)));
         bool renamed = PlanetaryExploration.TryRename(
             selected.Placement.InstanceId,
             generatedName,
@@ -4875,27 +4890,20 @@ public partial class SalvageRepairSlice : Node3D
             return;
         }
 
-        IReadOnlyList<PlanetaryPoiRuntimeState> states =
-            GetDiscoveryCatalogStates();
+        IReadOnlyList<PlanetaryPoiRuntimeState> states = GetDiscoveryCatalogStates();
         if (states.Count == 0)
         {
-            _discoveryCatalogLabel.Text = "DISCOVERY CATALOG\nNo POIs available.";
+            _discoveryCatalogLabel.Text = L("ui.poi.no_pois");
             return;
         }
 
-        _discoveryCatalogIndex = Math.Clamp(
-            _discoveryCatalogIndex,
-            0,
-            states.Count - 1);
+        _discoveryCatalogIndex = Math.Clamp(_discoveryCatalogIndex, 0, states.Count - 1);
         PlanetaryPoiRuntimeState selected = states[_discoveryCatalogIndex];
         List<string> lines = new()
         {
-            "DISCOVERY CATALOG — planetary POIs",
-            $"Discovered {PlanetaryExploration.DiscoveredCount}/{states.Count} | " +
-            $"Resolved {PlanetaryExploration.ResolvedCount}/{states.Count} | " +
-            $"Named {PlanetaryExploration.NamedCount} | " +
-            $"Points {PlanetaryExploration.DiscoveryPoints}",
-            "P scanner pulse | Up/Down select | N assign waypoint name | J/Esc close",
+            L("ui.poi.header"),
+            LF("ui.poi.summary", ("discovered", PlanetaryExploration.DiscoveredCount), ("resolved", PlanetaryExploration.ResolvedCount), ("total", states.Count), ("named", PlanetaryExploration.NamedCount), ("points", PlanetaryExploration.DiscoveryPoints)),
+            L("ui.poi.controls"),
             string.Empty
         };
         int start = Math.Max(0, _discoveryCatalogIndex - 7);
@@ -4905,33 +4913,34 @@ public partial class SalvageRepairSlice : Node3D
         {
             PlanetaryPoiRuntimeState state = states[index];
             string marker = index == _discoveryCatalogIndex ? ">" : " ";
-            string status = state.Resolved
-                ? "RESOLVED"
-                : state.Discovered ? "DISCOVERED" : "UNKNOWN";
+            string status = L(state.Resolved
+                ? "ui.poi.state.resolved"
+                : state.Discovered ? "ui.poi.state.discovered" : "ui.poi.state.unknown");
             string name = state.Discovered
                 ? PlanetaryExploration.DisplayName(state)
-                : "unidentified signal";
-            lines.Add(
-                $"{marker} [{status,-10}] {name} | {state.Definition.Category}");
+                : L("ui.poi.unidentified");
+            lines.Add($"{marker} " + LF("ui.poi.list_row", ("status", status), ("name", name), ("category", state.Definition.Category)));
         }
 
         lines.Add(string.Empty);
-        lines.Add(
-            $"Selected: {(selected.Discovered ? PlanetaryExploration.DisplayName(selected) : "unknown")} | " +
-            $"type={selected.Definition.PoiTypeId} | interaction={selected.Definition.InteractionKind}");
-        lines.Add(
-            $"Position: X={selected.Placement.PositionX:0.0} " +
-            $"Z={selected.Placement.PositionZ:0.0} | " +
-            $"scan={selected.Definition.ScanRange:0.0}m | rarity={selected.Definition.Rarity}");
-        lines.Add(
-            $"Environment: biome={selected.Placement.Environment.BiomeId} | " +
-            $"slope={selected.Placement.Environment.SlopeDegrees:0.0}° | " +
-            $"height={selected.Placement.Environment.Height:0.0} | " +
-            $"water={selected.Placement.Environment.DistanceToWater:0.0}m | " +
-            $"danger={selected.Placement.Environment.Danger}");
+        lines.Add(LF("ui.poi.selected",
+            ("name", selected.Discovered ? PlanetaryExploration.DisplayName(selected) : L("ui.poi.unknown")),
+            ("type", selected.Definition.PoiTypeId),
+            ("interaction", selected.Definition.InteractionKind)));
+        lines.Add(LF("ui.poi.position",
+            ("x", selected.Placement.PositionX.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("z", selected.Placement.PositionZ.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("scan", selected.Definition.ScanRange.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("rarity", selected.Definition.Rarity)));
+        lines.Add(LF("ui.poi.environment",
+            ("biome", selected.Placement.Environment.BiomeId),
+            ("slope", selected.Placement.Environment.SlopeDegrees.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("height", selected.Placement.Environment.Height.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("water", selected.Placement.Environment.DistanceToWater.ToString("0.0", CultureInfo.InvariantCulture)),
+            ("danger", selected.Placement.Environment.Danger)));
         if (!string.IsNullOrWhiteSpace(_discoveryCatalogFeedback))
         {
-            lines.Add($"Result: {_discoveryCatalogFeedback}");
+            lines.Add(LF("ui.common.result", ("result", _discoveryCatalogFeedback)));
         }
 
         _discoveryCatalogLabel.Text = string.Join("\n", lines);
@@ -4990,7 +4999,7 @@ public partial class SalvageRepairSlice : Node3D
     private void RunIndustryCatalogAcceptance()
     {
         _industryCatalogAcceptanceHud = "RUNNING";
-        _status = "TASK-080 industry catalog acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-080 industry catalog"));
         IndustryCatalogAcceptanceReport report =
             IndustryCatalogAcceptanceRunner.Run(ContentCatalog);
         IndustryCatalogAnalysis analysis = report.Analysis;
@@ -5050,7 +5059,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.planetary-exploration-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-080/TASK-108 catalog and exploration acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-080/TASK-108 catalog and exploration"));
         _planetaryExplorationAcceptanceHud = "RUNNING";
         _planetaryExplorationAcceptanceReport = null;
         _planetaryExplorationAcceptanceTask =
@@ -5083,7 +5092,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.resource-lifecycle-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-062/TASK-100 resource acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-062/TASK-100 resource"));
         _acceptanceHud = "RUNNING";
         _catalogResourceLifecycleAcceptanceHud = "RUNNING";
         _acceptanceReport = null;
@@ -5109,7 +5118,7 @@ public partial class SalvageRepairSlice : Node3D
     private void BeginContentAcceptance()
     {
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-064 content acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-064 content"));
         _contentAcceptanceHud = "RUNNING";
         _contentAcceptanceReport = null;
         _contentAcceptanceTask = Task.Run(
@@ -5131,7 +5140,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.crafting-expansion-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-066 crafting acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-066 crafting"));
         _craftingAcceptanceHud = "RUNNING";
         _craftingAcceptanceReport = null;
         _craftingAcceptanceTask = CraftingExpansionAcceptanceRunner.RunAsync(
@@ -5153,7 +5162,7 @@ public partial class SalvageRepairSlice : Node3D
             .OrderBy(binding => binding.ResourceNodeId, StringComparer.Ordinal)
             .ToArray();
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-068 craft-time acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-068 craft-time"));
         _craftTimeAcceptanceHud = "RUNNING";
         _craftTimeAcceptanceReport = null;
         _craftTimeAcceptanceTask = Task.Run(
@@ -5178,7 +5187,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.third-crafting-path-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-070 third crafting path acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-070 third crafting path"));
         _thirdCraftingAcceptanceHud = "RUNNING";
         _thirdCraftingAcceptanceReport = null;
         _thirdCraftingAcceptanceTask =
@@ -5213,7 +5222,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.base-construction-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-072/TASK-106 acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-072/TASK-106"));
         _fourthCraftingAcceptanceHud = "RUNNING";
         _baseConstructionAcceptanceHud = "RUNNING";
         _fourthCraftingAcceptanceReport = null;
@@ -5257,7 +5266,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.production-queue-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-090/TASK-092/TASK-093/TASK-096/TASK-098 acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-090/TASK-092/TASK-093/TASK-096/TASK-098"));
         _productionQueueAcceptanceHud = "RUNNING";
         _queueTerminalAcceptanceHud = "RUNNING";
         _itemQualityDismantleAcceptanceHud = "RUNNING";
@@ -5317,7 +5326,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.chemical-process-runtime-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-083 chemical process runtime acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-083 chemical process runtime"));
         _chemicalProcessAcceptanceHud = "RUNNING";
         _chemicalProcessAcceptanceReport = null;
         _chemicalProcessAcceptanceTask =
@@ -5343,7 +5352,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.technology-selector-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-082 station selector and research acceptance running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-082 station selector and research"));
         _technologySelectorAcceptanceHud = "RUNNING";
         _technologySelectorAcceptanceReport = null;
         _technologySelectorAcceptanceTask =
@@ -5388,7 +5397,7 @@ public partial class SalvageRepairSlice : Node3D
             directory,
             "save_1.catalog-crafting-matrix-test.db");
         _state = SalvageRepairSliceState.Testing;
-        _status = "TASK-076 catalog crafting matrix running";
+        _status = LF("ui.game.acceptance_running", ("task", "TASK-076"));
         _catalogMatrixAcceptanceHud = "RUNNING";
         _catalogMatrixAcceptanceReport = null;
         _catalogMatrixAcceptanceTask =
@@ -5424,8 +5433,9 @@ public partial class SalvageRepairSlice : Node3D
         BeginAerialNavigationAcceptance();
         BeginStarSystemSimulationAcceptance();
         RunApplicationShellAcceptance();
+        RunLocalizationAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, navigation, star-system and application-shell acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, navigation, star-system, application-shell and localization acceptance running";
     }
 
     private void BeginReset()
@@ -5436,7 +5446,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _state = SalvageRepairSliceState.Saving;
-        _status = "resetting vertical-slice slot";
+        _status = L("ui.game.status.resetting");
         _resetTask = _database.ResetSlotAsync(
             SlotId,
             _lifetimeCancellation.Token);
@@ -5474,7 +5484,7 @@ public partial class SalvageRepairSlice : Node3D
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
-        _status = $"autosave queued: {trigger}, rev={_revision}";
+        _status = LF("ui.game.status.autosave_queued", ("trigger", trigger), ("revision", _revision));
     }
 
     private async Task<GracefulExitResult> FlushGracefulExitAsync(
@@ -5540,7 +5550,7 @@ public partial class SalvageRepairSlice : Node3D
             _autosave is null)
         {
             _state = SalvageRepairSliceState.Exiting;
-            _status = "waiting for persistence before exit";
+            _status = L("ui.game.status.waiting_exit");
             return;
         }
 
@@ -5567,7 +5577,7 @@ public partial class SalvageRepairSlice : Node3D
             playerSurvival: PlayerSurvival.CreateSaveData(),
             npcFactions: NpcFactions.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
-        _status = $"graceful-exit flush rev={snapshot.Revision}";
+        _status = LF("ui.game.status.flush", ("revision", snapshot.Revision));
         GD.Print(
             "Vertical slice graceful-exit flush started: " +
             $"revision={snapshot.Revision}; " +
@@ -5621,7 +5631,7 @@ public partial class SalvageRepairSlice : Node3D
         {
             _diagnostics = task.GetAwaiter().GetResult();
             _state = SalvageRepairSliceState.Loading;
-            _status = "loading starter repair state";
+            _status = L("ui.game.status.loading");
             _loadTask = _database?.LoadAsync(
                 SlotId,
                 _lifetimeCancellation.Token);
@@ -5712,8 +5722,8 @@ public partial class SalvageRepairSlice : Node3D
             ApplyStageOneVoyageToScene();
             _state = SalvageRepairSliceState.Ready;
             _status = snapshot is null
-                ? "new starter repair objective"
-                : $"restored revision {_revision}";
+                ? L("ui.game.status.new_objective")
+                : LF("ui.game.status.restored_revision", ("revision", _revision));
             GD.Print(
                 "TASK-062 vertical slice READY: " +
                 $"revision={_revision}; " +
@@ -7084,7 +7094,7 @@ public partial class SalvageRepairSlice : Node3D
         {
             _observedAutosaveFailures = _autosave.FailedBatches;
             _state = SalvageRepairSliceState.Failed;
-            _status = $"autosave FAIL: {_autosave.LastErrorMessage}";
+            _status = LF("ui.game.status.autosave_failed", ("error", _autosave.LastErrorMessage));
             GD.PushError(
                 $"TASK-062 vertical slice autosave failed: " +
                 $"{_autosave.LastErrorMessage}");
@@ -7134,7 +7144,7 @@ public partial class SalvageRepairSlice : Node3D
                 if (transition != Error.Ok)
                 {
                     throw new InvalidOperationException(
-                        $"Unable to return to main menu: {transition}.");
+                        LF("ui.application.return_main_menu_failed", ("reason", transition)));
                 }
                 GD.Print(
                     "TASK-130 graceful main-menu transition PASS: " +
@@ -7273,10 +7283,13 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         string databaseLine = _diagnostics is null
-            ? "DB: initializing"
-            : $"DB: {_state} • schema={_diagnostics.SchemaVersion} • " +
-              $"integrity={_diagnostics.IntegrityResult} • " +
-              $"writes={_database?.CompletedWrites ?? 0}";
+            ? L("ui.hud.database.initializing")
+            : LF(
+                "ui.hud.database.summary",
+                ("state", _state),
+                ("schema", _diagnostics.SchemaVersion),
+                ("integrity", _diagnostics.IntegrityResult),
+                ("writes", _database?.CompletedWrites ?? 0));
         CraftingStackDefinition primaryInput = RepairRecipe.Inputs[0];
         CraftingStackDefinition primaryOutput = RepairRecipe.Outputs[0];
         int craftedCount = CountCraftedStationRecipes();
@@ -7291,8 +7304,7 @@ public partial class SalvageRepairSlice : Node3D
             ? null
             : ProductionQueueTerminalModel.Build(activeQueue);
         ProductionQueueTerminalJobRow? activeQueueJob = queueSnapshot?.Jobs
-            .FirstOrDefault(job =>
-                job.Status == ProductionQueueJobStatus.Running) ??
+            .FirstOrDefault(job => job.Status == ProductionQueueJobStatus.Running) ??
             queueSnapshot?.Jobs.FirstOrDefault();
         ProductionNetworkHudSnapshot networkHud =
             BuildGameplayProductionNetworkHudSnapshot();
@@ -7302,118 +7314,148 @@ public partial class SalvageRepairSlice : Node3D
         string compactStationsLine =
             ProductionNetworkHudModel.FormatStations(networkHud, compact: true);
         string craftProcess = activeQueueJob is not null && activeQueue is not null
-            ? $"QUEUE {activeQueue.StationId} {activeQueueJob.Status} " +
-              $"{activeQueueJob.RecipeId} {activeQueueJob.ProgressBar} " +
-              activeQueueJob.TimingText
+            ? LF(
+                "ui.hud.craft.queue",
+                ("station", activeQueue.StationId),
+                ("status", LocalizeProductionQueueStatus(activeQueueJob.Status)),
+                ("recipe", activeQueueJob.RecipeId),
+                ("progress", activeQueueJob.ProgressBar),
+                ("timing", activeQueueJob.TimingText))
             : _craftTimer.IsRunning
-            ? $"RUNNING {_craftTimer.RecipeId} " +
-              $"{_craftTimer.ElapsedSeconds:0.0}/" +
-              $"{_craftTimer.DurationSeconds:0.0}s " +
-              $"({_craftTimer.Progress01 * 100.0:0}%)"
-            : craftedCount == totalStationRecipes
-                ? "COMPLETE"
-                : "idle";
+                ? LF(
+                    "ui.hud.craft.running",
+                    ("recipe", _craftTimer.RecipeId),
+                    ("elapsed", _craftTimer.ElapsedSeconds.ToString("0.0", CultureInfo.InvariantCulture)),
+                    ("duration", _craftTimer.DurationSeconds.ToString("0.0", CultureInfo.InvariantCulture)),
+                    ("percent", (_craftTimer.Progress01 * 100.0).ToString("0", CultureInfo.InvariantCulture)))
+                : craftedCount == totalStationRecipes
+                    ? L("ui.hud.craft.complete")
+                    : L("ui.hud.craft.idle");
 
         string objective;
         if (!Session.ShipRepaired)
         {
-            objective = $"Objective: collect salvage " +
-                $"{Session.SalvageQuantity}/{Session.RequiredSalvage}, " +
-                "then interact with ship";
+            objective = LF(
+                "ui.hud.objective.salvage",
+                ("current", Session.SalvageQuantity),
+                ("required", Session.RequiredSalvage));
         }
         else if (activeQueueJob is not null)
         {
-            objective = $"Objective: queued production {activeQueueJob.RecipeId} " +
-                $"({activeQueueJob.Progress01 * 100.0:0}%)";
+            objective = LF(
+                "ui.hud.objective.queue",
+                ("recipe", activeQueueJob.RecipeId),
+                ("percent", (activeQueueJob.Progress01 * 100.0).ToString("0", CultureInfo.InvariantCulture)));
         }
         else if (_craftTimer.IsRunning)
         {
-            objective = $"Objective: fabricating {_craftTimer.RecipeId}";
+            objective = LF("ui.hud.objective.fabricating", ("recipe", _craftTimer.RecipeId));
         }
         else if (nextRecipe is not null)
         {
-            objective = $"Objective: components {craftedCount}/{totalStationRecipes}; " +
-                $"next {BuildRecipeProgress(nextRecipe)}";
+            objective = LF(
+                "ui.hud.objective.components",
+                ("crafted", craftedCount),
+                ("total", totalStationRecipes),
+                ("next", BuildRecipeProgress(nextRecipe)));
         }
         else
         {
-            objective =
-                $"Objective: COMPLETE - ship repaired and all " +
-                $"{totalStationRecipes} station components crafted";
+            objective = LF("ui.hud.objective.complete", ("total", totalStationRecipes));
         }
 
         string ship = !Session.ShipRepaired
-            ? $"Ship: DAMAGED • repair requires {Session.RequiredSalvage} " +
-              Session.SalvageDefinitionId
-            : $"Ship: REPAIRED • components={craftedCount}/" +
-              $"{totalStationRecipes} READY";
-        string contentLine =
-            $"Content: schema={ContentCatalog.SchemaVersion} • " +
-            $"items={ContentCatalog.Items.Count} • " +
-            $"resources={ContentCatalog.Resources.Count} • " +
-            $"recipes={ContentCatalog.Recipes.Count} • " +
-            $"stations={ContentCatalog.Stations.Count} • " +
-            $"tech={ContentCatalog.Technologies.Count}";
-        string technologyLine =
-            $"Research: RP={TechnologyProgress.ResearchPoints} • " +
-            $"unlocked={TechnologyProgress.UnlockedCount}/" +
-            $"{ContentCatalog.Technologies.Count} • " +
-            "interact with the fabricator to open Recipes/Research/Queue/Dismantle";
-        string repairLine =
-            $"Repair: {RepairRecipe.RecipeId} • " +
-            $"{primaryInput.Quantity}x{primaryInput.DefinitionId} -> " +
-            $"{primaryOutput.Quantity}x{primaryOutput.DefinitionId}";
-        string matrixLine =
-            $"Craft catalog: runtimeRecipes={StationRecipes.Count} • " +
-            $"shipObjectives={craftedCount}/{totalStationRecipes} • " +
-            $"pendingObjectives={totalStationRecipes - craftedCount} • " +
-            $"physicalStations={_craftingStations.Count}";
+            ? LF(
+                "ui.hud.ship.damaged",
+                ("required", Session.RequiredSalvage),
+                ("resource", Session.SalvageDefinitionId))
+            : LF(
+                "ui.hud.ship.repaired",
+                ("crafted", craftedCount),
+                ("total", totalStationRecipes));
+        string contentLine = LF(
+            "ui.hud.content",
+            ("schema", ContentCatalog.SchemaVersion),
+            ("items", ContentCatalog.Items.Count),
+            ("resources", ContentCatalog.Resources.Count),
+            ("recipes", ContentCatalog.Recipes.Count),
+            ("stations", ContentCatalog.Stations.Count),
+            ("tech", ContentCatalog.Technologies.Count));
+        string technologyLine = LF(
+            "ui.hud.research",
+            ("points", TechnologyProgress.ResearchPoints),
+            ("unlocked", TechnologyProgress.UnlockedCount),
+            ("total", ContentCatalog.Technologies.Count));
+        string repairLine = LF(
+            "ui.hud.repair",
+            ("recipe", RepairRecipe.RecipeId),
+            ("inputQty", primaryInput.Quantity),
+            ("input", primaryInput.DefinitionId),
+            ("outputQty", primaryOutput.Quantity),
+            ("output", primaryOutput.DefinitionId));
+        string matrixLine = LF(
+            "ui.hud.craft_catalog",
+            ("recipes", StationRecipes.Count),
+            ("crafted", craftedCount),
+            ("total", totalStationRecipes),
+            ("pending", totalStationRecipes - craftedCount),
+            ("stations", _craftingStations.Count));
         string pendingPreview = BuildPendingRecipePreview();
         double nextAutosave = Math.Max(
             0.0,
             AutosaveIntervalSeconds - _autosaveElapsedSeconds);
         string autosave = _autosave is null
-            ? "Autosave: unavailable"
-            : $"Autosave: {(_autosave.IsBusy ? "RUNNING" : "idle")} • " +
-              $"lastRev={_autosave.LastSavedRevision} • " +
-              $"last={_autosave.LastCompletedTriggerSummary} • " +
-              $"next={nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)}s";
+            ? L("ui.hud.autosave.unavailable")
+            : LF(
+                "ui.hud.autosave.summary",
+                ("state", L(_autosave.IsBusy ? "ui.common.running" : "ui.common.idle")),
+                ("revision", _autosave.LastSavedRevision),
+                ("trigger", _autosave.LastCompletedTriggerSummary),
+                ("next", nextAutosave.ToString("0.0", CultureInfo.InvariantCulture)));
         string interaction = (_stageOneVoyageRuntime?.Piloted ?? false)
             ? StageOneVoyage.Location switch
             {
-                StageOneVoyageLocation.PlanetSurface =>
-                    "ship landed — E disembark",
-                StageOneVoyageLocation.OutboundFlight =>
-                    "fly to blue orbital beacon — Enter dock when slow and within 14 m",
-                StageOneVoyageLocation.OrbitalStation =>
-                    "docked — E station services, T undock after closing services",
-                StageOneVoyageLocation.InboundFlight =>
-                    "fly to green landing ring — Enter land when slow and within 18 m",
-                _ => "voyage interaction unavailable"
+                StageOneVoyageLocation.PlanetSurface => L("ui.hud.interaction.ship_landed"),
+                StageOneVoyageLocation.OutboundFlight => L("ui.hud.interaction.outbound"),
+                StageOneVoyageLocation.OrbitalStation => L("ui.hud.interaction.docked"),
+                StageOneVoyageLocation.InboundFlight => L("ui.hud.interaction.inbound"),
+                _ => L("ui.hud.interaction.voyage_unavailable")
             }
-            : _player?.GetInteractionPrompt() ?? "interaction unavailable";
-        string stationServicesLine =
-            $"Station services: {StationServices.BuildSummary()} • " +
-            $"NPC={StationServices.NpcId}";
-        string baseConstructionLine =
-            $"Base construction: {BaseConstruction.BuildSummary()}";
-        string explorationLine =
-            $"Exploration: POIs={PlanetaryPoiCatalog.Definitions.Count} • " +
-            $"discovered={PlanetaryExploration.DiscoveredCount} • " +
-            $"resolved={PlanetaryExploration.ResolvedCount} • " +
-            $"named={PlanetaryExploration.NamedCount} • " +
-            $"points={PlanetaryExploration.DiscoveryPoints} • scanner=P • catalog=J";
+            : _player?.GetInteractionPrompt() ?? L("ui.player.interaction.unavailable");
+        string stationServicesLine = LF(
+            "ui.hud.station_services",
+            ("credits", StationServices.PlayerCredits),
+            ("reputation", StationServices.Reputation),
+            ("market", StationServices.MarketId),
+            ("npc", StationServices.NpcId));
+        BasePowerNetworkSnapshot basePower = BaseConstruction.Power;
+        string baseConstructionLine = LF(
+            "ui.hud.base",
+            ("modules", basePower.Modules),
+            ("maxModules", BaseConstructionCatalog.Limits.MaximumModules),
+            ("generation", basePower.Generation.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("consumption", basePower.Consumption.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("enabled", basePower.EnabledConsumers));
+        string explorationLine = LF(
+            "ui.hud.exploration",
+            ("pois", PlanetaryPoiCatalog.Definitions.Count),
+            ("discovered", PlanetaryExploration.DiscoveredCount),
+            ("resolved", PlanetaryExploration.ResolvedCount),
+            ("named", PlanetaryExploration.NamedCount),
+            ("points", PlanetaryExploration.DiscoveryPoints));
         ShipEffectiveStats shipStats = ShipSystems.GetEffectiveStats();
-        string shipSystemsLine =
-            $"Ship systems: class={GetShortContentId(ShipSystems.ShipClassId)} • " +
-            $"modules={ShipSystems.InstalledModuleCount}/" +
-            $"{shipStats.WeaponSlots + shipStats.TechnologySlots} • " +
-            $"fuel={ShipSystems.Fuel:0.#}/{shipStats.FuelCapacity:0.#} • " +
-            $"offline={ShipSystems.DisabledSystemCount}/" +
-            $"{ShipSystemsCatalog.Systems.Count} • " +
-            $"commissioned={(ShipSystems.Commissioned ? 1 : 0)} • " +
-            $"flight={(ShipSystems.FlightReady ? "READY" : "BLOCKED")} • " +
-            $"hyper={(ShipSystems.HyperspaceReady ? "READY" : "BLOCKED")} • manager=U";
+        string shipSystemsLine = LF(
+            "ui.hud.ship_systems",
+            ("class", GetShortContentId(ShipSystems.ShipClassId)),
+            ("modules", ShipSystems.InstalledModuleCount),
+            ("slots", shipStats.WeaponSlots + shipStats.TechnologySlots),
+            ("fuel", ShipSystems.Fuel.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("capacity", shipStats.FuelCapacity.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("offline", ShipSystems.DisabledSystemCount),
+            ("systems", ShipSystemsCatalog.Systems.Count),
+            ("commissioned", ShipSystems.Commissioned ? 1 : 0),
+            ("flight", L(ShipSystems.FlightReady ? "ui.common.ready" : "ui.common.blocked")),
+            ("hyper", L(ShipSystems.HyperspaceReady ? "ui.common.ready" : "ui.common.blocked")));
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
@@ -7423,133 +7465,115 @@ public partial class SalvageRepairSlice : Node3D
         string aerialNavigationLine = BuildAerialNavigationHudLine();
         string missionLine = BuildProceduralQuestHudLine();
 
+        string acceptanceCompact = string.Join("\n", new[]
+        {
+            $"TASK-090 (F1): {_productionQueueAcceptanceHud}",
+            $"TASK-092 (F1): {_queueTerminalAcceptanceHud}",
+            $"TASK-093 (F1): {_itemQualityDismantleAcceptanceHud}",
+            $"TASK-096 (F1): {_multiStationIndustryAcceptanceHud}",
+            $"TASK-098 (F1): {_productionNetworkHudAcceptanceHud}",
+            $"TASK-100 (F7): {_catalogResourceLifecycleAcceptanceHud}",
+            $"TASK-083 (F2): {_chemicalProcessAcceptanceHud}",
+            $"TASK-082 (F3): {_technologySelectorAcceptanceHud}",
+            $"TASK-102 (F3): {_stationServicesAcceptanceHud}",
+            $"TASK-106 (F6): {_baseConstructionAcceptanceHud}",
+            $"TASK-080 (F4): {_industryCatalogAcceptanceHud}",
+            $"TASK-108 (F4): {_planetaryExplorationAcceptanceHud}",
+            $"TASK-076 (F5): {_catalogMatrixAcceptanceHud}",
+            $"TASK-110 (F5): {_shipSystemsAcceptanceHud}",
+            $"TASK-112 (F5): {_stageOneVoyageAcceptanceHud}",
+            $"TASK-114 (F5): {_galaxyNavigationAcceptanceHud}",
+            $"TASK-116 (F5): {_ecologyAcceptanceHud}",
+            $"TASK-118 (F5): {_proceduralQuestAcceptanceHud}",
+            $"TASK-120 (F5): {_playerSurvivalAcceptanceHud}",
+            $"TASK-122 (F5): {_npcFactionAcceptanceHud}",
+            $"TASK-124 (F5): {_npcNavigationAcceptanceHud}",
+            $"TASK-126 (F5): {_aerialNavigationAcceptanceHud}",
+            $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
+            $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}" 
+        });
+
         if (_hudMode == SalvageRepairHudMode.Compact)
         {
-            _hudLabel.Text =
-                "VERTICAL SLICE 1 • INDUSTRY + EXPLORATION + SHIP SYSTEMS + STAGE 1 VOYAGE • H - HUD\n" +
-                $"{databaseLine}\n" +
-                $"Progress: salvage={Session.SalvageQuantity}/{Session.RequiredSalvage} • " +
-                $"components={craftedCount}/{totalStationRecipes} • rev={_revision}\n" +
-                $"Craft: {craftProcess}\n" +
-                networkLine + "\n" +
-                compactStationsLine + "\n" +
-                stationServicesLine + "\n" +
-                baseConstructionLine + "\n" +
-                explorationLine + "\n" +
-                shipSystemsLine + "\n" +
-                voyageLine + "\n" +
-                galaxyLine + "\n" +
-                starSystemLine + "\n" +
-                ecologyLine + "\n" +
-                npcFactionLine + "\n" +
-                npcNavigationLine + "\n" +
-                aerialNavigationLine + "\n" +
-                missionLine + "\n" +
-                $"{technologyLine}\n" +
-                $"Interaction: {interaction}\n" +
-                $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
-                $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
-                $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
-                $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
-                $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
-                $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
-                $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
-                $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
-                $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
-                $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
-                $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
-                $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
-                $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
-                $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
-                $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
-                $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
-                $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
-                $"TASK-118 procedural quests (F5): {_proceduralQuestAcceptanceHud}\n" +
-                $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
-                $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
-                $"TASK-124 NPC navigation (F5): {_npcNavigationAcceptanceHud}\n" +
-                $"TASK-126 aerial navigation (F5): {_aerialNavigationAcceptanceHud}\n" +
-                $"TASK-128 star-system simulation (F5): {_starSystemSimulationAcceptanceHud}\n" +
-                $"Status: {_status}\n" +
-                "E - interact/select • I - exosuit/multitool • Q - mission journal on foot • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scan • J - discoveries • G - base build • terminal/services: Tab tabs, Enter action, Esc close • " +
-                "services: B buy, S sell, Q quests • F1 - production queue • " +
-                "F2 - chemical runtime • " +
-                "F3 - research + station services • F4 - industry + exploration • F5 - runtime catalog + ship systems + voyage + galaxy + ecology + procedural quests + player survival + NPC/factions + ground/aerial navigation + star-system simulation • " +
-                "F6/F9/F10/F11/F12 - regressions • F7 - all resources";
+            _hudLabel.Text = string.Join("\n", new[]
+            {
+                L("ui.hud.title.compact"),
+                databaseLine,
+                LF("ui.hud.progress", ("salvage", Session.SalvageQuantity), ("required", Session.RequiredSalvage), ("crafted", craftedCount), ("total", totalStationRecipes), ("revision", _revision)),
+                LF("ui.hud.craft_process", ("process", craftProcess)),
+                networkLine,
+                compactStationsLine,
+                stationServicesLine,
+                baseConstructionLine,
+                explorationLine,
+                shipSystemsLine,
+                voyageLine,
+                galaxyLine,
+                starSystemLine,
+                ecologyLine,
+                npcFactionLine,
+                npcNavigationLine,
+                aerialNavigationLine,
+                missionLine,
+                technologyLine,
+                LF("ui.hud.interaction", ("interaction", interaction)),
+                acceptanceCompact,
+                LF("ui.hud.status", ("status", _status)),
+                L("ui.hud.controls.compact")
+            });
             return;
         }
 
-        _hudLabel.Text =
-            "VERTICAL SLICE 1 - SALVAGE -> REPAIR -> INDUSTRY -> EXPLORE -> BOARD -> TAKEOFF -> STATION -> RETURN -> LAND -> AUTOSAVE • H - HUD\n" +
-            databaseLine + "\n" +
-            contentLine + "\n" +
-            technologyLine + "\n" +
-            repairLine + "\n" +
-            matrixLine + "\n" +
-            networkLine + "\n" +
-            detailedStationsLine + "\n" +
-            stationServicesLine + "\n" +
-            baseConstructionLine + "\n" +
-            explorationLine + "\n" +
-            shipSystemsLine + "\n" +
-            voyageLine + "\n" +
-            galaxyLine + "\n" +
-            starSystemLine + "\n" +
-            ecologyLine + "\n" +
-            npcFactionLine + "\n" +
-            npcNavigationLine + "\n" +
-            aerialNavigationLine + "\n" +
-            missionLine + "\n" +
-            pendingPreview + "\n" +
-            $"Craft process: {craftProcess}\n" +
-            $"Resources: types={_resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()}/{ContentCatalog.Resources.Count} • " +
-            $"nodes={_resourceNodes.Count} • collected={Session.CollectedNodeCount} • " +
-            $"generated={_generatedResourcePlacements.Count}\n" +
-            $"Snapshot: rev={_revision}\n" +
-            objective + "\n" +
-            ship + "\n" +
-            $"Interaction: {interaction}\n" +
-            autosave + "\n" +
-            $"Last domain event: {_lastDomainEvent}\n" +
-            $"TASK-090 production queue (F1): {_productionQueueAcceptanceHud}\n" +
-            $"TASK-092 queue terminal (F1): {_queueTerminalAcceptanceHud}\n" +
-            $"TASK-093 item properties (F1): {_itemQualityDismantleAcceptanceHud}\n" +
-            $"TASK-096 multi-station industry (F1): {_multiStationIndustryAcceptanceHud}\n" +
-            $"TASK-098 production network HUD (F1): {_productionNetworkHudAcceptanceHud}\n" +
-            $"TASK-100 resource lifecycle (F7): {_catalogResourceLifecycleAcceptanceHud}\n" +
-            $"TASK-083 chemical runtime (F2): {_chemicalProcessAcceptanceHud}\n" +
-            $"TASK-082 selector/research (F3): {_technologySelectorAcceptanceHud}\n" +
-            $"TASK-102 station services (F3): {_stationServicesAcceptanceHud}\n" +
-            $"TASK-106 base construction (F6): {_baseConstructionAcceptanceHud}\n" +
-            $"TASK-080 industry catalog (F4): {_industryCatalogAcceptanceHud}\n" +
-            $"TASK-108 planetary exploration (F4): {_planetaryExplorationAcceptanceHud}\n" +
-            $"TASK-076 runtime matrix (F5): {_catalogMatrixAcceptanceHud}\n" +
-            $"TASK-110 ship systems (F5): {_shipSystemsAcceptanceHud}\n" +
-            $"TASK-112 Stage 1 voyage (F5): {_stageOneVoyageAcceptanceHud}\n" +
-            $"TASK-114 galaxy navigation (F5): {_galaxyNavigationAcceptanceHud}\n" +
-            $"TASK-116 ecology (F5): {_ecologyAcceptanceHud}\n" +
-            $"TASK-118 procedural quests (F5): {_proceduralQuestAcceptanceHud}\n" +
-            $"TASK-120 player survival (F5): {_playerSurvivalAcceptanceHud}\n" +
-            $"TASK-122 NPC/factions (F5): {_npcFactionAcceptanceHud}\n" +
-            $"TASK-124 NPC navigation (F5): {_npcNavigationAcceptanceHud}\n" +
-            $"TASK-126 aerial navigation (F5): {_aerialNavigationAcceptanceHud}\n" +
-            $"TASK-128 star-system simulation (F5): {_starSystemSimulationAcceptanceHud}\n" +
-            $"TASK-072 legacy fourth path (F6): {_fourthCraftingAcceptanceHud}\n" +
-            $"TASK-062 salvage/repair (F7): {_acceptanceHud}\n" +
-            $"TASK-064 content (F9): {_contentAcceptanceHud}\n" +
-            $"TASK-066 crafting (F10): {_craftingAcceptanceHud}\n" +
-            $"TASK-068 craft time (F11): {_craftTimeAcceptanceHud}\n" +
-            $"TASK-070 legacy third path (F12): {_thirdCraftingAcceptanceHud}\n" +
-            $"Status: {_status}\n" +
-            "WASD/Space - move • Shift sprint • Ctrl crouch • Space jetpack • I exosuit • E - interact/select • Q - procedural mission journal on foot • U - ship management • M - system/galaxy map • V - ecology scan • O - ecology catalogue • P - POI scanner • J - discoveries • G - base build • H - HUD • " +
-            "terminal: Tab tabs, Q queue, D dismantle, Enter action, C cancel • " +
-            "services: Tab tabs, B buy, S sell, Q quests, Enter action • " +
-            "F1 - production queue acceptance • " +
-            "F2 - chemical runtime acceptance • " +
-            "F3 - research + station services acceptance • F4 - industry + planetary exploration • " +
-            "F5 - runtime matrix + ship systems + Stage 1 voyage + galaxy navigation + ecology + procedural quests + player survival + NPC/factions + ground/aerial navigation + star-system simulation • F6 - base construction + legacy regression • " +
-            "F9/F10/F11/F12 - regressions • F7 - all resources • " +
-            "F8 - reset • voyage: E board/services/disembark, Enter dock/land, T launch/undock, K assist, F2 camera • Esc - close selector/release mouse";
+        string acceptanceFull = acceptanceCompact + "\n" + string.Join("\n", new[]
+        {
+            $"TASK-072 (F6): {_fourthCraftingAcceptanceHud}",
+            $"TASK-062 (F7): {_acceptanceHud}",
+            $"TASK-064 (F9): {_contentAcceptanceHud}",
+            $"TASK-066 (F10): {_craftingAcceptanceHud}",
+            $"TASK-068 (F11): {_craftTimeAcceptanceHud}",
+            $"TASK-070 (F12): {_thirdCraftingAcceptanceHud}"
+        });
+        _hudLabel.Text = string.Join("\n", new[]
+        {
+            L("ui.hud.title.full"),
+            databaseLine,
+            contentLine,
+            technologyLine,
+            repairLine,
+            matrixLine,
+            networkLine,
+            detailedStationsLine,
+            stationServicesLine,
+            baseConstructionLine,
+            explorationLine,
+            shipSystemsLine,
+            voyageLine,
+            galaxyLine,
+            starSystemLine,
+            ecologyLine,
+            npcFactionLine,
+            npcNavigationLine,
+            aerialNavigationLine,
+            missionLine,
+            pendingPreview,
+            LF("ui.hud.craft_process", ("process", craftProcess)),
+            LF(
+                "ui.hud.resources",
+                ("types", _resourceNodes.Select(node => node.ResourceDefinitionId).Distinct(StringComparer.Ordinal).Count()),
+                ("totalTypes", ContentCatalog.Resources.Count),
+                ("nodes", _resourceNodes.Count),
+                ("collected", Session.CollectedNodeCount),
+                ("generated", _generatedResourcePlacements.Count)),
+            LF("ui.hud.snapshot", ("revision", _revision)),
+            objective,
+            ship,
+            LF("ui.hud.interaction", ("interaction", interaction)),
+            autosave,
+            LF("ui.hud.last_event", ("event", _lastDomainEvent)),
+            acceptanceFull,
+            LF("ui.hud.status", ("status", _status)),
+            L("ui.hud.controls.full")
+        });
     }
 
     private ProductionNetworkHudSnapshot
@@ -7559,7 +7583,7 @@ public partial class SalvageRepairSlice : Node3D
         if (network is null)
         {
             return ProductionNetworkHudSnapshot.Unavailable(
-                "runtime is not initialized");
+                L("ui.common.unavailable"));
         }
 
         try
@@ -7596,7 +7620,7 @@ public partial class SalvageRepairSlice : Node3D
             .ToArray();
         if (pending.Length == 0)
         {
-            return "Pending recipes: none";
+            return L("ui.hud.pending.none");
         }
 
         int totalPending = ObjectiveRecipes.Count -
@@ -7606,8 +7630,8 @@ public partial class SalvageRepairSlice : Node3D
             pending.Select(BuildRecipeProgress));
         int hidden = totalPending - pending.Length;
         return hidden > 0
-            ? $"Pending recipes: {preview} • +{hidden} more"
-            : $"Pending recipes: {preview}";
+            ? LF("ui.hud.pending.more", ("preview", preview), ("count", hidden))
+            : LF("ui.hud.pending.some", ("preview", preview));
     }
 
     private string BuildRecipeProgress(CraftingRecipeDefinition recipe)
@@ -7618,19 +7642,36 @@ public partial class SalvageRepairSlice : Node3D
                 $"{Session.GetAvailableQuantity(input.DefinitionId)}/" +
                 $"{input.Quantity} {GetShortContentId(input.DefinitionId)}"));
         string outputState = Session.IsRecipeCrafted(recipe.RecipeId)
-            ? "READY"
+            ? L("ui.hud.recipe_state.ready")
             : TechnologyProgress.IsUnlocked(recipe.RequiredTechnology)
-                ? "MISSING"
-                : $"LOCKED:{GetShortContentId(recipe.RequiredTechnology)}";
+                ? L("ui.hud.recipe_state.missing")
+                : LF(
+                    "ui.hud.recipe_state.locked",
+                    ("technology", GetShortContentId(recipe.RequiredTechnology)));
         string stationName = _craftingStations
             .FirstOrDefault(station => string.Equals(
                 station.StationId,
                 recipe.RequiredStation,
                 StringComparison.Ordinal))
             ?.Name.ToString() ?? recipe.RequiredStation;
-        return $"{GetShortContentId(recipe.RecipeId)} " +
-            $"[{inputs} -> {outputState}, {recipe.CraftTimeSeconds:0.##}s, " +
-            $"{stationName}]";
+        return LF(
+            "ui.hud.recipe_progress",
+            ("recipe", GetShortContentId(recipe.RecipeId)),
+            ("inputs", inputs),
+            ("state", outputState),
+            ("seconds", recipe.CraftTimeSeconds.ToString("0.##", CultureInfo.InvariantCulture)),
+            ("station", stationName));
+    }
+
+    private static string LocalizeProductionQueueStatus(ProductionQueueJobStatus status)
+    {
+        return status switch
+        {
+            ProductionQueueJobStatus.Queued => L("ui.craft.queue_status.queued"),
+            ProductionQueueJobStatus.Running => L("ui.craft.queue_status.running"),
+            ProductionQueueJobStatus.Paused => L("ui.craft.queue_status.paused"),
+            _ => status.ToString()
+        };
     }
 
     private static string GetShortContentId(string stableId)
@@ -7874,7 +7915,7 @@ public partial class SalvageRepairSlice : Node3D
     private void Fail(string operation, Exception exception)
     {
         _state = SalvageRepairSliceState.Failed;
-        _status = $"{operation} failed: {exception.Message}";
+        _status = LF("ui.game.status.operation_failed", ("operation", operation), ("error", exception.Message));
         GD.PushError(
             $"TASK-062 vertical slice {operation} failed: {exception}");
     }

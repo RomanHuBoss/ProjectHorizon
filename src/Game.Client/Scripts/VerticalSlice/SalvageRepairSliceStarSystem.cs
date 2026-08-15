@@ -339,18 +339,24 @@ public partial class SalvageRepairSlice
         if (_starSystemSimulationNode is null ||
             _starSystemSimulationRuntime is null)
         {
-            return "Star system: unavailable";
+            return L("ui.hud.star_system.unavailable");
         }
 
         StarSystemSimulationDiagnostics diagnostics =
             _starSystemSimulationNode.CreateDiagnostics();
-        return "Star system: " +
-            $"{diagnostics.SystemId} • bodies={diagnostics.GeneratedBodies} " +
-            $"P/M/S/T={diagnostics.PlanetBodies}/{diagnostics.MoonBodies}/" +
-            $"{diagnostics.StationBodies}/{diagnostics.ShipContacts} • " +
-            $"LOD={diagnostics.Proxies}/{diagnostics.Markers}/{diagnostics.Statistical} • " +
-            $"PlanetRuntime={(_surfaceRuntimeActive ? "ACTIVE" : "PROXY")} • " +
-            $"pipeline=0x{_planetActivationPipelineMask:X2} • " +
-            $"epoch={StarSystemSimulation.SimulationSeconds.ToString("0", CultureInfo.InvariantCulture)}s";
+        return LF(
+            "ui.hud.star_system.summary",
+            ("system", diagnostics.SystemId),
+            ("bodies", diagnostics.GeneratedBodies),
+            ("planets", diagnostics.PlanetBodies),
+            ("moons", diagnostics.MoonBodies),
+            ("stations", diagnostics.StationBodies),
+            ("traffic", diagnostics.ShipContacts),
+            ("proxies", diagnostics.Proxies),
+            ("markers", diagnostics.Markers),
+            ("statistical", diagnostics.Statistical),
+            ("runtime", L(_surfaceRuntimeActive ? "ui.hud.runtime.active" : "ui.hud.runtime.proxy")),
+            ("pipeline", $"0x{_planetActivationPipelineMask:X2}"),
+            ("epoch", StarSystemSimulation.SimulationSeconds.ToString("0", CultureInfo.InvariantCulture)));
     }
 }

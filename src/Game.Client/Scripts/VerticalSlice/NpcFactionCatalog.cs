@@ -18,14 +18,11 @@ public enum NpcArchetype
 
 public sealed record NpcArchetypeDefinition(
     NpcArchetype Archetype,
-    string LocalizationKey,
-    string NameEn,
-    string NameRu);
+    string LocalizationKey);
 
 public sealed record NpcFactionAgentDefinition(
     string NpcId,
-    string DisplayNameEn,
-    string DisplayNameRu,
+    string DisplayNameKey,
     NpcArchetype Archetype,
     string FactionId,
     string DialogueId,
@@ -45,44 +42,23 @@ public sealed record NpcFactionAgentDefinition(
     bool CanBeProtected,
     double ColorR,
     double ColorG,
-    double ColorB)
-{
-    public string DisplayName(bool russian) =>
-        russian ? DisplayNameRu : DisplayNameEn;
-}
+    double ColorB);
 
 public sealed record NpcDialogueOptionDefinition(
     string OptionId,
-    string TextEn,
-    string TextRu,
+    string TextKey,
     string Condition,
     string Action,
     int MinimumReputation,
     int ReputationDelta,
-    string ConsequenceEn,
-    string ConsequenceRu)
-{
-    public string Text(bool russian) => russian ? TextRu : TextEn;
-
-    public string Consequence(bool russian) =>
-        russian ? ConsequenceRu : ConsequenceEn;
-}
+    string ConsequenceKey);
 
 public sealed record NpcDialogueDefinition(
     string DialogueId,
     NpcArchetype Archetype,
-    string GreetingEn,
-    string GreetingRu,
-    string FarewellEn,
-    string FarewellRu,
-    IReadOnlyList<NpcDialogueOptionDefinition> Options)
-{
-    public string Greeting(bool russian) =>
-        russian ? GreetingRu : GreetingEn;
-
-    public string Farewell(bool russian) =>
-        russian ? FarewellRu : FarewellEn;
-}
+    string GreetingKey,
+    string FarewellKey,
+    IReadOnlyList<NpcDialogueOptionDefinition> Options);
 
 public sealed class NpcFactionCatalog
 {
@@ -221,12 +197,8 @@ public sealed class NpcFactionCatalog
                     archetype,
                     new NpcArchetypeDefinition(
                         archetype,
-                        raw.LocalizationKey,
-                        raw.NameEn,
-                        raw.NameRu)) ||
-                !GameContentCatalog.IsStableId(raw.LocalizationKey) ||
-                string.IsNullOrWhiteSpace(raw.NameEn) ||
-                string.IsNullOrWhiteSpace(raw.NameRu))
+                        raw.LocalizationKey)) ||
+                !GameContentCatalog.IsStableId(raw.LocalizationKey))
             {
                 throw new ContentValidationException(
                     $"Invalid or duplicate NPC archetype {raw.Archetype}.");
@@ -248,10 +220,8 @@ public sealed class NpcFactionCatalog
                 !Enum.IsDefined(archetype) ||
                 !GameContentCatalog.IsStableId(raw.DialogueId) ||
                 !raw.DialogueId.StartsWith("dialogue.", StringComparison.Ordinal) ||
-                string.IsNullOrWhiteSpace(raw.GreetingEn) ||
-                string.IsNullOrWhiteSpace(raw.GreetingRu) ||
-                string.IsNullOrWhiteSpace(raw.FarewellEn) ||
-                string.IsNullOrWhiteSpace(raw.FarewellRu) ||
+                !GameContentCatalog.IsStableId(raw.GreetingKey) ||
+                !GameContentCatalog.IsStableId(raw.FarewellKey) ||
                 raw.Options is null || raw.Options.Length == 0 ||
                 !dialogueArchetypes.Add(archetype))
             {
@@ -265,28 +235,24 @@ public sealed class NpcFactionCatalog
                 if (!GameContentCatalog.IsStableId(option.OptionId) ||
                     !option.OptionId.StartsWith("dialogue_option.", StringComparison.Ordinal) ||
                     !optionIds.Add(option.OptionId) ||
-                    string.IsNullOrWhiteSpace(option.TextEn) ||
-                    string.IsNullOrWhiteSpace(option.TextRu) ||
+                    !GameContentCatalog.IsStableId(option.TextKey) ||
                     !ValidateDialogueCondition(option.Condition, option.MinimumReputation) ||
                     !AllowedActions.Contains(option.Action) ||
                     option.MinimumReputation is < -100 or > 100 ||
                     option.ReputationDelta is < -20 or > 20 ||
-                    string.IsNullOrWhiteSpace(option.ConsequenceEn) ||
-                    string.IsNullOrWhiteSpace(option.ConsequenceRu))
+                    !GameContentCatalog.IsStableId(option.ConsequenceKey))
                 {
                     throw new ContentValidationException(
                         $"Dialogue {raw.DialogueId} has invalid option {option.OptionId}.");
                 }
                 return new NpcDialogueOptionDefinition(
                     option.OptionId,
-                    option.TextEn,
-                    option.TextRu,
+                    option.TextKey,
                     option.Condition,
                     option.Action,
                     option.MinimumReputation,
                     option.ReputationDelta,
-                    option.ConsequenceEn,
-                    option.ConsequenceRu);
+                    option.ConsequenceKey);
             }).ToArray();
             if (options.All(option => !string.Equals(
                     option.Action,
@@ -301,10 +267,8 @@ public sealed class NpcFactionCatalog
                     new NpcDialogueDefinition(
                         raw.DialogueId,
                         archetype,
-                        raw.GreetingEn,
-                        raw.GreetingRu,
-                        raw.FarewellEn,
-                        raw.FarewellRu,
+                        raw.GreetingKey,
+                        raw.FarewellKey,
                         options)))
             {
                 throw new ContentValidationException(
@@ -328,8 +292,7 @@ public sealed class NpcFactionCatalog
                 !Enum.IsDefined(archetype) ||
                 !GameContentCatalog.IsStableId(raw.NpcId) ||
                 !raw.NpcId.StartsWith("npc.", StringComparison.Ordinal) ||
-                string.IsNullOrWhiteSpace(raw.DisplayNameEn) ||
-                string.IsNullOrWhiteSpace(raw.DisplayNameRu) ||
+                !GameContentCatalog.IsStableId(raw.DisplayNameKey) ||
                 !GameContentCatalog.IsStableId(raw.DialogueId) ||
                 !dialogues.TryGetValue(raw.DialogueId, out NpcDialogueDefinition? dialogue) ||
                 dialogue.Archetype != archetype ||
@@ -353,8 +316,8 @@ public sealed class NpcFactionCatalog
             bool opponent = archetype == NpcArchetype.Opponent;
             if ((!opponent && (!GameContentCatalog.IsStableId(raw.FactionId) ||
                                !stationServices.Factions.ContainsKey(raw.FactionId) ||
-                               !stationServices.Factions[raw.FactionId].NamePool.Contains(
-                                   raw.DisplayNameEn,
+                               !stationServices.Factions[raw.FactionId].NamePoolKeys.Contains(
+                                   raw.DisplayNameKey,
                                    StringComparer.Ordinal))) ||
                 (opponent && !string.IsNullOrEmpty(raw.FactionId)) ||
                 raw.Hostile != opponent ||
@@ -372,8 +335,7 @@ public sealed class NpcFactionCatalog
 
             NpcFactionAgentDefinition definition = new(
                 raw.NpcId,
-                raw.DisplayNameEn,
-                raw.DisplayNameRu,
+                raw.DisplayNameKey,
                 archetype,
                 raw.FactionId,
                 raw.DialogueId,
@@ -484,7 +446,7 @@ public sealed class NpcFactionCatalog
                     relation is < -100 or > 100) ||
                 !faction.Relations.TryGetValue(faction.FactionId, out int self) ||
                 self != 100 ||
-                faction.NamePool is null || faction.NamePool.Count == 0 ||
+                faction.NamePoolKeys is null || faction.NamePoolKeys.Count == 0 ||
                 faction.PreferredTags is null || faction.PreferredTags.Count == 0 ||
                 faction.QuestTypes is null || faction.QuestTypes.Count == 0 ||
                 string.IsNullOrWhiteSpace(faction.VisualStyle) ||
@@ -514,14 +476,11 @@ public sealed class NpcFactionCatalog
 
     private sealed record NpcArchetypeDocument(
         string Archetype,
-        string LocalizationKey,
-        string NameEn,
-        string NameRu);
+        string LocalizationKey);
 
     private sealed record NpcAgentDocument(
         string NpcId,
-        string DisplayNameEn,
-        string DisplayNameRu,
+        string DisplayNameKey,
         string Archetype,
         string FactionId,
         string DialogueId,
@@ -546,20 +505,16 @@ public sealed class NpcFactionCatalog
     private sealed record NpcDialogueDocument(
         string DialogueId,
         string Archetype,
-        string GreetingEn,
-        string GreetingRu,
-        string FarewellEn,
-        string FarewellRu,
+        string GreetingKey,
+        string FarewellKey,
         NpcDialogueOptionDocument[] Options);
 
     private sealed record NpcDialogueOptionDocument(
         string OptionId,
-        string TextEn,
-        string TextRu,
+        string TextKey,
         string Condition,
         string Action,
         int MinimumReputation,
         int ReputationDelta,
-        string ConsequenceEn,
-        string ConsequenceRu);
+        string ConsequenceKey);
 }

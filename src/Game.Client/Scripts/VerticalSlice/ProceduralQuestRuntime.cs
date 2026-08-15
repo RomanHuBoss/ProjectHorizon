@@ -479,16 +479,16 @@ public sealed class ProceduralQuestRuntime
         MutableState state = Get(questId);
         if (state.Status != ProceduralQuestStatus.Offered)
         {
-            result = $"{questId} is not offered";
+            result = GameLocalizationService.Format("ui.quest.not_offered", ("quest", questId));
             return false;
         }
         if (AcceptedCount >= _catalog.MaximumActive)
         {
-            result = $"active quest limit {_catalog.MaximumActive} reached";
+            result = GameLocalizationService.Format("ui.quest.active_limit", ("limit", _catalog.MaximumActive));
             return false;
         }
         state.Status = ProceduralQuestStatus.Accepted;
-        result = $"accepted {questId}";
+        result = GameLocalizationService.Format("ui.quest.accepted", ("quest", questId));
         return true;
     }
 
@@ -579,13 +579,13 @@ public sealed class ProceduralQuestRuntime
         factionId = state.Definition.FactionId;
         if (state.Status != ProceduralQuestStatus.ReadyToClaim)
         {
-            result = $"{questId} is not ready to claim";
+            result = GameLocalizationService.Format("ui.quest.not_ready", ("quest", questId));
             return false;
         }
         state.Status = ProceduralQuestStatus.Completed;
         rewardCredits = state.Definition.RewardCredits;
         reputationReward = state.Definition.ReputationReward;
-        result = $"completed {questId}";
+        result = GameLocalizationService.Format("ui.quest.completed", ("quest", questId));
         return true;
     }
 

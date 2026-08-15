@@ -100,15 +100,20 @@ public static class ProductionNetworkHudModel
         ArgumentNullException.ThrowIfNull(snapshot);
         if (!snapshot.IsAvailable)
         {
-            return $"Production network: unavailable ({snapshot.Error})";
+            return GameLocalizationService.Format(
+                "ui.network.unavailable",
+                ("error", snapshot.Error));
         }
 
-        return "Production network: " +
-            $"stations={snapshot.Stations} • jobs={snapshot.Jobs} • " +
-            $"running={snapshot.RunningJobs} • queued={snapshot.QueuedJobs} • " +
-            $"paused={snapshot.PausedJobs} • " +
-            $"energy={FormatEnergy(snapshot.EnergyRemaining)}/" +
-            FormatEnergy(snapshot.EnergyCapacity);
+        return GameLocalizationService.Format(
+            "ui.network.aggregate",
+            ("stations", snapshot.Stations),
+            ("jobs", snapshot.Jobs),
+            ("running", snapshot.RunningJobs),
+            ("queued", snapshot.QueuedJobs),
+            ("paused", snapshot.PausedJobs),
+            ("remaining", FormatEnergy(snapshot.EnergyRemaining)),
+            ("capacity", FormatEnergy(snapshot.EnergyCapacity)));
     }
 
     public static string FormatStations(
@@ -118,7 +123,7 @@ public static class ProductionNetworkHudModel
         ArgumentNullException.ThrowIfNull(snapshot);
         if (!snapshot.IsAvailable)
         {
-            return "Stations: unavailable";
+            return GameLocalizationService.Text("ui.network.stations_unavailable");
         }
 
         IReadOnlyList<ProductionNetworkHudStationRow> visibleRows = compact
@@ -132,20 +137,26 @@ public static class ProductionNetworkHudModel
             .ToList();
         if (hiddenIdle > 0)
         {
-            parts.Add($"+{hiddenIdle} idle stations");
+            parts.Add(GameLocalizationService.Format("ui.network.hidden_idle", ("count", hiddenIdle)));
         }
 
         return parts.Count == 0
-            ? "Stations: none"
-            : "Stations: " + string.Join(" • ", parts);
+            ? GameLocalizationService.Text("ui.network.stations_none")
+            : GameLocalizationService.Format(
+                "ui.network.stations",
+                ("stations", string.Join(" • ", parts)));
     }
 
     private static string FormatStation(ProductionNetworkHudStationRow row)
     {
-        return $"{row.DisplayName} " +
-            $"{FormatEnergy(row.EnergyRemaining)}/" +
-            $"{FormatEnergy(row.EnergyCapacity)} " +
-            $"[{row.RunningJobs}R/{row.QueuedJobs}Q/{row.PausedJobs}P]";
+        return GameLocalizationService.Format(
+            "ui.network.station_row",
+            ("name", row.DisplayName),
+            ("remaining", FormatEnergy(row.EnergyRemaining)),
+            ("capacity", FormatEnergy(row.EnergyCapacity)),
+            ("running", row.RunningJobs),
+            ("queued", row.QueuedJobs),
+            ("paused", row.PausedJobs));
     }
 
     private static string FormatEnergy(double value)

@@ -162,7 +162,7 @@ public sealed class ShipSystemsRuntime
     {
         if (!Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.ship.not_commissioned");
             return ShipModuleInstallResult.NotCommissioned;
         }
 
@@ -170,23 +170,23 @@ public sealed class ShipSystemsRuntime
             moduleId,
             out ShipModuleDefinition? definition))
         {
-            result = $"unknown ship module {moduleId}";
+            result = GameLocalizationService.Format("ui.ship.unknown_module", ("module", moduleId));
             return ShipModuleInstallResult.UnknownModule;
         }
 
         if (_installedModules.ContainsKey(moduleId))
         {
-            result = $"{moduleId} is already installed";
+            result = GameLocalizationService.Format("ui.ship.module_installed_already", ("module", moduleId));
             return ShipModuleInstallResult.AlreadyInstalled;
         }
 
         if (GetAvailableSlots(definition.SlotType) <= 0)
         {
-            result = $"no free {definition.SlotType} slot";
+            result = GameLocalizationService.Format("ui.ship.no_slot", ("slot", definition.SlotType));
             return ShipModuleInstallResult.SlotUnavailable;
         }
 
-        result = $"{moduleId} can be installed";
+        result = GameLocalizationService.Format("ui.ship.can_install", ("module", moduleId));
         return ShipModuleInstallResult.Installed;
     }
 
@@ -215,7 +215,7 @@ public sealed class ShipSystemsRuntime
                 definition.SlotType,
                 slotIndex));
         Fuel = Math.Min(Fuel, GetEffectiveStats().FuelCapacity);
-        result = $"installed {moduleId} in {definition.SlotType} slot {slotIndex + 1}";
+        result = GameLocalizationService.Format("ui.ship.installed", ("module", moduleId), ("slot", definition.SlotType), ("index", slotIndex + 1));
         return ShipModuleInstallResult.Installed;
     }
 
@@ -225,13 +225,13 @@ public sealed class ShipSystemsRuntime
     {
         if (!Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.ship.not_commissioned");
             return ShipModuleUninstallResult.NotCommissioned;
         }
 
         if (!_installedModules.Remove(moduleId))
         {
-            result = $"{moduleId} is not installed";
+            result = GameLocalizationService.Format("ui.ship.module_not_installed", ("module", moduleId));
             return ShipModuleUninstallResult.NotInstalled;
         }
 
@@ -243,7 +243,7 @@ public sealed class ShipSystemsRuntime
         }
 
         Fuel = Math.Min(Fuel, GetEffectiveStats().FuelCapacity);
-        result = $"uninstalled {moduleId}";
+        result = GameLocalizationService.Format("ui.ship.uninstalled", ("module", moduleId));
         return ShipModuleUninstallResult.Uninstalled;
     }
 
@@ -251,7 +251,7 @@ public sealed class ShipSystemsRuntime
     {
         if (!Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.ship.not_commissioned");
             return false;
         }
 
@@ -262,12 +262,12 @@ public sealed class ShipSystemsRuntime
 
         if (Fuel + 0.0001 < amount)
         {
-            result = $"insufficient fuel {Fuel:0.#}/{amount:0.#}";
+            result = GameLocalizationService.Format("ui.ship.fuel_insufficient", ("fuel", Fuel.ToString("0.#")), ("required", amount.ToString("0.#")));
             return false;
         }
 
         Fuel -= amount;
-        result = $"fuel consumed {amount:0.#}; remaining={Fuel:0.#}";
+        result = GameLocalizationService.Format("ui.ship.fuel_consumed", ("amount", amount.ToString("0.#")), ("remaining", Fuel.ToString("0.#")));
         return true;
     }
 
@@ -295,13 +295,13 @@ public sealed class ShipSystemsRuntime
     {
         if (!Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.ship.not_commissioned");
             return ShipSystemMutationResult.NotCommissioned;
         }
 
         if (!_systemHealth.TryGetValue(systemId, out double current))
         {
-            result = $"unknown ship system {systemId}";
+            result = GameLocalizationService.Format("ui.ship.unknown_system", ("system", systemId));
             return ShipSystemMutationResult.UnknownSystem;
         }
 
@@ -312,13 +312,13 @@ public sealed class ShipSystemsRuntime
 
         if (current <= 0.0)
         {
-            result = $"{systemId} is already offline";
+            result = GameLocalizationService.Format("ui.ship.system_offline", ("system", systemId));
             return ShipSystemMutationResult.AlreadyOffline;
         }
 
         double next = Math.Max(0.0, current - amount);
         _systemHealth[systemId] = next;
-        result = $"{systemId} damaged {current:0.#}->{next:0.#}";
+        result = GameLocalizationService.Format("ui.ship.system_damaged", ("system", systemId), ("before", current.ToString("0.#")), ("after", next.ToString("0.#")));
         return ShipSystemMutationResult.Applied;
     }
 
@@ -329,13 +329,13 @@ public sealed class ShipSystemsRuntime
     {
         if (!Commissioned)
         {
-            result = "starter ship is not commissioned";
+            result = GameLocalizationService.Text("ui.ship.not_commissioned");
             return ShipSystemMutationResult.NotCommissioned;
         }
 
         if (!_systemHealth.TryGetValue(systemId, out double current))
         {
-            result = $"unknown ship system {systemId}";
+            result = GameLocalizationService.Format("ui.ship.unknown_system", ("system", systemId));
             return ShipSystemMutationResult.UnknownSystem;
         }
 
@@ -347,13 +347,13 @@ public sealed class ShipSystemsRuntime
         double maximum = GetSystemMaximumHealth(systemId);
         if (current >= maximum)
         {
-            result = $"{systemId} is already at maximum health";
+            result = GameLocalizationService.Format("ui.ship.system_full", ("system", systemId));
             return ShipSystemMutationResult.AlreadyFull;
         }
 
         double next = Math.Min(maximum, current + amount);
         _systemHealth[systemId] = next;
-        result = $"{systemId} repaired {current:0.#}->{next:0.#}/{maximum:0.#}";
+        result = GameLocalizationService.Format("ui.ship.system_repaired", ("system", systemId), ("before", current.ToString("0.#")), ("after", next.ToString("0.#")), ("maximum", maximum.ToString("0.#")));
         return ShipSystemMutationResult.Applied;
     }
 
@@ -361,7 +361,7 @@ public sealed class ShipSystemsRuntime
     {
         if (Commissioned)
         {
-            result = "starter ship is already commissioned";
+            result = GameLocalizationService.Text("ui.ship.already_commissioned");
             return false;
         }
 
@@ -372,7 +372,7 @@ public sealed class ShipSystemsRuntime
         }
 
         Fuel = Math.Min(Fuel, GetEffectiveStats().FuelCapacity);
-        result = "starter ship commissioned; all core systems online";
+        result = GameLocalizationService.Text("ui.ship.commissioned");
         return true;
     }
 

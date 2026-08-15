@@ -94,35 +94,43 @@ public sealed class TechnologyProgression
                 out TechnologyDefinition? technology) ||
             technology is null)
         {
-            result = $"unknown technology {technologyId}";
+            result = GameLocalizationService.Format("ui.tech.unknown", ("technology", technologyId));
             return TechnologyUnlockResult.UnknownTechnology;
         }
 
         if (_unlocked.Contains(technologyId))
         {
-            result = $"technology {technologyId} is already unlocked";
+            result = GameLocalizationService.Format("ui.tech.already", ("technology", technologyId));
             return TechnologyUnlockResult.AlreadyUnlocked;
         }
 
         IReadOnlyList<string> missing = GetMissingPrerequisites(technologyId);
         if (missing.Count > 0)
         {
-            result = $"technology {technologyId} requires " +
-                string.Join(", ", missing);
+            result = GameLocalizationService.Format(
+                "ui.tech.prerequisites",
+                ("technology", technologyId),
+                ("requirements", string.Join(", ", missing)));
             return TechnologyUnlockResult.MissingPrerequisites;
         }
 
         if (ResearchPoints < technology.ResearchCost)
         {
-            result = $"technology {technologyId} requires " +
-                $"{technology.ResearchCost} RP; available={ResearchPoints}";
+            result = GameLocalizationService.Format(
+                "ui.tech.points",
+                ("technology", technologyId),
+                ("cost", technology.ResearchCost),
+                ("available", ResearchPoints));
             return TechnologyUnlockResult.InsufficientResearchPoints;
         }
 
         ResearchPoints -= technology.ResearchCost;
         _unlocked.Add(technologyId);
-        result = $"technology {technologyId} unlocked; " +
-            $"cost={technology.ResearchCost}; remaining={ResearchPoints}";
+        result = GameLocalizationService.Format(
+            "ui.tech.unlocked",
+            ("technology", technologyId),
+            ("cost", technology.ResearchCost),
+            ("remaining", ResearchPoints));
         return TechnologyUnlockResult.Unlocked;
     }
 

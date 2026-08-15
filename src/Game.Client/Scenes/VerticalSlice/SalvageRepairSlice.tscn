@@ -725,7 +725,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(1090, 590)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "VERTICAL SLICE 1 — initializing"
+text = "ui.game.hud_initializing"
 autowrap_mode = 2
 
 [node name="RecipeSelector" type="PanelContainer" parent="Hud"]
@@ -742,7 +742,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "INDUSTRY TERMINAL"
+text = "ui.game.industry_terminal"
 autowrap_mode = 2
 
 [node name="StationServices" type="PanelContainer" parent="Hud"]
@@ -759,7 +759,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "FRONTIER EXCHANGE"
+text = "ui.game.frontier_exchange"
 autowrap_mode = 2
 
 [node name="BaseConstruction" type="PanelContainer" parent="Hud"]
@@ -776,7 +776,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "BASE CONSTRUCTION"
+text = "ui.game.base_construction"
 autowrap_mode = 2
 
 [node name="DiscoveryCatalog" type="PanelContainer" parent="Hud"]
@@ -793,7 +793,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "DISCOVERY CATALOG"
+text = "ui.game.discovery_catalog"
 autowrap_mode = 2
 
 [node name="ShipManagement" type="PanelContainer" parent="Hud"]
@@ -810,7 +810,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(840, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "SHIP MANAGEMENT"
+text = "ui.game.ship_management"
 autowrap_mode = 2
 
 [node name="GalaxyMap" type="PanelContainer" parent="Hud"]
@@ -827,7 +827,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(1000, 590)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "GALAXY MAP"
+text = "ui.game.galaxy_map"
 autowrap_mode = 2
 
 [node name="EcologyCatalog" type="PanelContainer" parent="Hud"]
@@ -844,7 +844,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(925, 575)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "PLANETARY ECOLOGY CATALOGUE"
+text = "ui.game.ecology_catalog"
 autowrap_mode = 2
 
 [node name="MissionJournal" type="PanelContainer" parent="Hud"]
@@ -861,7 +861,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(990, 595)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "PROCEDURAL MISSION JOURNAL"
+text = "ui.game.mission_journal"
 autowrap_mode = 2
 
 [node name="NpcInteraction" type="PanelContainer" parent="Hud"]
@@ -878,7 +878,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(925, 545)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "NPC INTERACTION"
+text = "ui.game.npc_interaction"
 autowrap_mode = 2
 
 [node name="PlayerEquipment" type="PanelContainer" parent="Hud"]
@@ -895,7 +895,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(970, 585)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "EXOSUIT & MULTITOOL"
+text = "ui.game.player_equipment"
 autowrap_mode = 2
 
 [node name="PlanetMap" type="PanelContainer" parent="Hud"]
@@ -912,7 +912,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(1000, 600)
 theme_override_colors/font_color = Color(0.86, 0.96, 1, 1)
 theme_override_font_sizes/font_size = 14
-text = "PLANET MAP"
+text = "ui.game.planet_map"
 autowrap_mode = 2
 
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
@@ -931,7 +931,7 @@ mouse_filter = 2
 custom_minimum_size = Vector2(300, 22)
 theme_override_colors/font_color = Color(0.82, 0.96, 1, 1)
 theme_override_font_sizes/font_size = 15
-text = "PLAYER POS unavailable"
+text = "ui.game.player_pos_unavailable"
 horizontal_alignment = 1
 vertical_alignment = 1
 
@@ -948,7 +948,7 @@ theme_override_styles/panel = SubResource("HudPanel")
 mouse_filter = 2
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 16
-text = "HUD hidden — press H"
+text = "ui.game.hud_hidden"
 horizontal_alignment = 1
 vertical_alignment = 1
 

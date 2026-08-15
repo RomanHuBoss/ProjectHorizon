@@ -25,7 +25,7 @@ public partial class SalvageRepairSlice
     private bool _ecologyCatalogOpen;
     private bool _ecologyFaunaTab;
     private int _ecologyCatalogSelection;
-    private string _ecologyFeedback = "V scan • E harvest • O catalogue";
+    private string _ecologyFeedback = "";
     private Task<EcologyAcceptanceReport>? _ecologyAcceptanceTask;
     private EcologyAcceptanceReport? _ecologyAcceptanceReport;
     private string _ecologyAcceptanceHud = "READY";
@@ -278,7 +278,7 @@ public partial class SalvageRepairSlice
             if (Matches(physical, logical, Key.Escape) ||
                 Matches(physical, logical, Key.O))
             {
-                CloseEcologyCatalog("ecology catalogue closed");
+                CloseEcologyCatalog(L("ui.ecology.closed"));
             }
             else if (Matches(physical, logical, Key.Tab))
             {
@@ -342,7 +342,7 @@ public partial class SalvageRepairSlice
         _ecologyCatalogSelection = 0;
         _ecologyCatalogPanel.Visible = true;
         UpdateEcologyCatalogPanel();
-        _status = "ecology catalogue opened";
+        _status = L("ui.ecology.opened");
     }
 
     private void CloseEcologyCatalog(string status = "")
@@ -374,8 +374,7 @@ public partial class SalvageRepairSlice
 
     private void UpdateEcologyCatalogPanel()
     {
-        if (!_ecologyCatalogOpen || _ecologyCatalogLabel is null ||
-            _ecologyRuntime is null || _ecologyCatalog is null)
+        if (!_ecologyCatalogOpen || _ecologyCatalogLabel is null || _ecologyRuntime is null || _ecologyCatalog is null)
         {
             return;
         }
@@ -383,54 +382,56 @@ public partial class SalvageRepairSlice
         string[] lines;
         if (_ecologyFaunaTab)
         {
-            EcologyFaunaDefinition[] definitions = EcologyCatalog.Fauna.Values
-                .OrderBy(definition => definition.FaunaId, StringComparer.Ordinal)
-                .ToArray();
-            _ecologyCatalogSelection = Math.Clamp(
-                _ecologyCatalogSelection,
-                0,
-                Math.Max(0, definitions.Length - 1));
+            EcologyFaunaDefinition[] definitions = EcologyCatalog.Fauna.Values.OrderBy(definition => definition.FaunaId, StringComparer.Ordinal).ToArray();
+            _ecologyCatalogSelection = Math.Clamp(_ecologyCatalogSelection, 0, Math.Max(0, definitions.Length - 1));
             lines = definitions.Select((definition, index) =>
             {
-                bool known = Ecology.DiscoveredFaunaIds.Contains(
-                    definition.FaunaId,
-                    StringComparer.Ordinal);
+                bool known = Ecology.DiscoveredFaunaIds.Contains(definition.FaunaId, StringComparer.Ordinal);
                 string marker = index == _ecologyCatalogSelection ? ">" : " ";
                 return known
-                    ? $"{marker} {definition.DisplayNameEn,-24} {definition.MovementMode,-8} {definition.BodyPlan,-10} diet={definition.Diet,-9} aggression={definition.Aggression:0.00}"
-                    : $"{marker} UNKNOWN FAUNA SIGNAL";
+                    ? $"{marker} " + LF("ui.ecology.fauna_row",
+                        ("name", GameLocalizationService.Text(definition.LocalizationKey)), ("movement", LocalizeEcologyToken(definition.MovementMode)),
+                        ("body", LocalizeEcologyToken(definition.BodyPlan)), ("diet", LocalizeEcologyToken(definition.Diet)),
+                        ("aggression", definition.Aggression.ToString("0.00", CultureInfo.InvariantCulture)))
+                    : $"{marker} {L("ui.ecology.unknown_fauna")}";
             }).ToArray();
         }
         else
         {
-            EcologyFloraDefinition[] definitions = EcologyCatalog.Flora.Values
-                .OrderBy(definition => definition.FloraId, StringComparer.Ordinal)
-                .ToArray();
-            _ecologyCatalogSelection = Math.Clamp(
-                _ecologyCatalogSelection,
-                0,
-                Math.Max(0, definitions.Length - 1));
+            EcologyFloraDefinition[] definitions = EcologyCatalog.Flora.Values.OrderBy(definition => definition.FloraId, StringComparer.Ordinal).ToArray();
+            _ecologyCatalogSelection = Math.Clamp(_ecologyCatalogSelection, 0, Math.Max(0, definitions.Length - 1));
             lines = definitions.Select((definition, index) =>
             {
-                bool known = Ecology.DiscoveredFloraIds.Contains(
-                    definition.FloraId,
-                    StringComparer.Ordinal);
+                bool known = Ecology.DiscoveredFloraIds.Contains(definition.FloraId, StringComparer.Ordinal);
                 string marker = index == _ecologyCatalogSelection ? ">" : " ";
                 return known
-                    ? $"{marker} {definition.DisplayNameEn,-24} {definition.Shape,-8} harvest={GetShortContentId(definition.HarvestDefinitionId),-18} hazard={definition.Hazard}"
-                    : $"{marker} UNKNOWN FLORA SIGNAL";
+                    ? $"{marker} " + LF("ui.ecology.flora_row",
+                        ("name", GameLocalizationService.Text(definition.LocalizationKey)), ("shape", LocalizeEcologyToken(definition.Shape)),
+                        ("harvest", GetShortContentId(definition.HarvestDefinitionId)), ("hazard", LocalizeEcologyToken(definition.Hazard)))
+                    : $"{marker} {L("ui.ecology.unknown_flora")}";
             }).ToArray();
         }
 
         string body = string.Join("\n", lines.Take(26));
-        _ecologyCatalogLabel.Text =
-            "PLANETARY ECOLOGY CATALOGUE  [O close]  [Tab flora/fauna]  [V scan]\n" +
-            $"Region {EcologyCatalog.RegionKey} • seed={EcologyCatalog.WorldSeed} • " +
-            $"flora={Ecology.DiscoveredFloraCount}/{EcologyCatalog.Flora.Count} • " +
-            $"fauna={Ecology.DiscoveredFaunaCount}/{EcologyCatalog.Fauna.Count} • " +
-            $"harvested={Ecology.RemovedFloraCount} • points={Ecology.DiscoveryPoints}\n" +
-            $"TAB: {(_ecologyFaunaTab ? "FAUNA" : "FLORA")} • {_ecologyFeedback}\n\n" +
-            body;
+        _ecologyCatalogLabel.Text = string.Join("\n", new[]
+        {
+            L("ui.ecology.header"),
+            LF("ui.ecology.summary", ("region", EcologyCatalog.RegionKey), ("seed", EcologyCatalog.WorldSeed),
+                ("floraKnown", Ecology.DiscoveredFloraCount), ("floraTotal", EcologyCatalog.Flora.Count),
+                ("faunaKnown", Ecology.DiscoveredFaunaCount), ("faunaTotal", EcologyCatalog.Fauna.Count),
+                ("harvested", Ecology.RemovedFloraCount), ("points", Ecology.DiscoveryPoints)),
+            LF("ui.ecology.tab", ("tab", L(_ecologyFaunaTab ? "ui.ecology.tab.fauna" : "ui.ecology.tab.flora")), ("feedback", _ecologyFeedback)),
+            "",
+            body
+        });
+    }
+
+    private static string LocalizeEcologyToken(string token)
+    {
+        string key = "ui.ecology.token." + token.ToLowerInvariant();
+        return GameLocalizationService.ContainsKey(key)
+            ? GameLocalizationService.Text(key)
+            : token;
     }
 
     private void PulseEcologyScanner()
@@ -465,7 +466,7 @@ public partial class SalvageRepairSlice
 
         if (Math.Min(faunaDistance, floraDistance) > scanRange)
         {
-            _ecologyFeedback = $"no ecology signal within {scanRange:0} m";
+            _ecologyFeedback = LF("ui.ecology.no_signal", ("range", scanRange.ToString("0")));
             _status = _ecologyFeedback;
             return;
         }
@@ -651,15 +652,19 @@ public partial class SalvageRepairSlice
         if (_ecologyRuntime is null || _ecologyPlan is null ||
             _ecologyCatalog is null)
         {
-            return "Ecology: unavailable";
+            return L("ui.hud.ecology.unavailable");
         }
-        return
-            $"Ecology: biomes={EcologyCatalog.Biomes.Count} • " +
-            $"flora={Ecology.DiscoveredFloraCount}/{EcologyCatalog.Flora.Count} " +
-            $"({EcologyPlan.Flora.Count - Ecology.RemovedFloraCount} instanced) • " +
-            $"fauna={Ecology.DiscoveredFaunaCount}/{EcologyCatalog.Fauna.Count} • " +
-            $"active/simplified={EcologyPlan.ActiveFauna.Count}/{EcologyPlan.SimplifiedFauna.Count} • " +
-            $"points={Ecology.DiscoveryPoints} • V scan • O catalogue";
+        return LF(
+            "ui.hud.ecology.summary",
+            ("biomes", EcologyCatalog.Biomes.Count),
+            ("floraFound", Ecology.DiscoveredFloraCount),
+            ("floraTotal", EcologyCatalog.Flora.Count),
+            ("floraInstanced", EcologyPlan.Flora.Count - Ecology.RemovedFloraCount),
+            ("faunaFound", Ecology.DiscoveredFaunaCount),
+            ("faunaTotal", EcologyCatalog.Fauna.Count),
+            ("active", EcologyPlan.ActiveFauna.Count),
+            ("simplified", EcologyPlan.SimplifiedFauna.Count),
+            ("points", Ecology.DiscoveryPoints));
     }
 
     private void BeginEcologyAcceptance(string directory)

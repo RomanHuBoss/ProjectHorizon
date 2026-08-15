@@ -111,6 +111,7 @@ public partial class SalvageRepairSlice
             Math.Abs(roundTrip.ShipMouseSensitivity - before.ShipMouseSensitivity) < 0.000001f &&
             Math.Abs(roundTrip.FieldOfViewDegrees - before.FieldOfViewDegrees) < 0.001f &&
             Math.Abs(roundTrip.UiScale - before.UiScale) < 0.001f &&
+            roundTrip.LanguageCode == before.LanguageCode &&
             roundTrip.SubtitlesEnabled == before.SubtitlesEnabled &&
             roundTrip.CameraShakeEnabled == before.CameraShakeEnabled &&
             roundTrip.MotionBlurEnabled == before.MotionBlurEnabled &&
@@ -179,7 +180,7 @@ public partial class SalvageRepairSlice
             $"accessibility={(accessibility ? 1 : 0)}; " +
             $"uiScale={before.UiScale:0.00}; fov={before.FieldOfViewDegrees:0}; " +
             $"audioBuses={(audioBuses ? 1 : 0)}; " +
-            "localizationBoundary=31.3-deferred.";
+            "localizationBoundary=31.3-closed-by-TASK-132.";
         if (passed)
         {
             GD.Print(line);

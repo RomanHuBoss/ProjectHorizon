@@ -2,13 +2,109 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-ui-application-shell-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-localization-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+## 0. Текущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
+
+### Закрытие UI/application-shell итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-132 журнал синхронизирован:
+
+- `TASK-130` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-131` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка не приписываются среде подготовки задним числом.
+
+### TASK-132 — centralized Russian/English localization and hardcoded-string elimination
+
+**Исходный снимок:** `ProjectHorizon-main-ui-application-shell-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-localization-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §31.3 «Localization»: русский и английский языки,
+запрет hardcoded player-facing strings и обязательный localization key для строк игрового
+интерфейса/контента.
+
+**Реализовано:**
+
+- добавлен единый `GameLocalizationService`, который загружает канонические
+  `localization.en.json` и `localization.ru.json`, проверяет exact key parity/blank values,
+  поддерживает `Automatic / English / Русский`, устанавливает `TranslationServer` locale
+  и предоставляет `Text/Format` с именованными placeholders;
+- язык хранится как user preference в `user://settings.cfg`, а не в SQLite save-slot;
+  `Automatic` выбирает RU для системного `ru` и EN для остальных locale; переключение
+  `English ↔ Русский` выполняется live без перезапуска и без изменения gameplay save;
+- Main Menu, Settings, Pause/Death и shipping vertical-slice UI обновляются при
+  `LocaleChanged`; открытые Station Services, crafting/research/queue/dismantle, Base,
+  Discovery, Ship Management, Galaxy/System Map, Ecology, Mission Journal, equipment,
+  NPC dialogue, Planet Map и HUD перерисовываются немедленно;
+- `station_services.json`, `npc_factions.json` и `ecology.json` переведены с параллельных
+  `...En/...Ru` полей на key-only data model; NPC dialogue options/consequences и name pools
+  также разрешаются централизованно;
+- player-facing action results переведены на localization keys в research, trade/quests,
+  base construction, ship systems, survival/equipment, planetary exploration, galaxy jump,
+  Stage-1 voyage, starter repair, timed crafting, industry/network/dismantle runtime;
+- интерактивный HUD полностью переведён на ключи: objective, autosave, interaction prompts,
+  production network, station/base/exploration/ship summaries, ecology/NPC/ground+aerial
+  navigation, galaxy/voyage/star-system summaries и control hints; `TASK-xxx`, stable IDs и
+  acceptance tokens остаются техническими идентификаторами, а не локализуемой прозой;
+- `PlayerController.GetInteractionPrompt()` теперь локализуется централизованно;
+- дополнительно исправлен старый data defect: 50 `base.module.*` localization keys были
+  объявлены в `base_construction.json`, но отсутствовали в обоих каталогах; все 50 добавлены;
+- итоговый RU/EN catalog содержит **1316 ключей на язык**, exact parity, 0 blank values;
+- добавлен `tools/validate-localization-contract.py`: статический gate проверяет два locale,
+  parity, все content localization references, отсутствие legacy bilingual/raw fields,
+  shipping scene keys и player-facing source sinks; developer prototype scenes и
+  acceptance/log diagnostics намеренно не входят в shipping UI contract;
+- `F5` дополнен `TASK-132` runtime acceptance: catalog diagnostics, required content keys,
+  EN↔RU live switch, settings language configuration, key-only content и scene-key contract.
+
+**Статусы:**
+
+- `TASK-130`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-131`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-132`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-133`: `NOT_STARTED` → `IN_PROGRESS` — clean build + Main Menu/live language/F5 smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Статическая приёмка TASK-132:**
+
+```text
+python tools/validate-localization-contract.py
+TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1316; parity=1; blanks=0; contentKeys=486; dynamicKeys=60; sourceUiKeys=572; sceneKeys=14; keyOnlyContent=1; sourceSinks=0; legacyLiterals=0.
+```
+
+**Минимальная runtime-приёмка TASK-133:**
+
+1. `tools\clean-build-windows10.cmd` → реальный `CoreCompile`, `0 errors`.
+2. В Main Menu открыть Settings и переключить `Automatic → English → Русский → English`:
+   menu/settings должны обновляться без restart; после Apply язык должен пережить scene transition.
+3. В gameplay открыть несколько одновременно существующих систем: Inventory/equipment, crafting,
+   Station Services/dialogue, Base, Discovery, Galaxy Map, Ecology, Mission Journal, NPC dialogue,
+   Planet Map и Pause; смена языка должна обновлять уже открытые панели.
+4. Проверить, что custom POI name остаётся пользовательским именем, а data-driven content names
+   меняют язык через localization key; save-slot/revision не меняются только из-за смены языка.
+5. Один `F5`; ключевая строка:
+
+```text
+TASK-132 localization acceptance PASS: locales=2; keys=1316; parity=1; missingValues=0; requiredKeys=...; missingKeys=0; keyOnlyContent=1; sceneKeys=1; liveSwitch=1; settingsLanguage=1; active=...; result=section-31.3-localization-runtime.
+```
+
+**Граница закрытия:** после `TASK-133 → VERIFIED` §31 UI/application shell + controls +
+localization/accessibility baseline считается закрытым целиком для shipping vertical slice.
+Development prototype/acceptance diagnostic strings не являются player-facing UI и остаются
+диагностическими. §32 Sound этой итерацией не закрывается.
+
+**Следующий рекомендуемый mega-шаг после TASK-133:** новый gap-analysis; наиболее крупный
+очевидный кандидат — §32 Sound/audio architecture, поскольку UI уже имеет независимые
+Music/SFX/Voice buses, но полноценный игровой sound runtime ещё не реализован.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
 
 ### Закрытие star-system итерации по решению владельца продукта
 
@@ -135,7 +231,7 @@ accessibility baseline, переиспользуя ранее созданные
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0B. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -265,7 +361,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0C. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -392,7 +488,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0C. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0D. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -503,7 +599,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0D. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0E. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -652,7 +748,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0E. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0F. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -748,7 +844,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0F. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0G. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -880,7 +976,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0G. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0H. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 

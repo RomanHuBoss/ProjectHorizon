@@ -5,8 +5,7 @@ using System.Text.Json;
 
 public sealed record EcologyBiomeDefinition(
     string BiomeId,
-    string DisplayNameEn,
-    string DisplayNameRu,
+    string LocalizationKey,
     double TemperatureMin,
     double TemperatureMax,
     double MoistureMin,
@@ -15,8 +14,7 @@ public sealed record EcologyBiomeDefinition(
 
 public sealed record EcologyFloraDefinition(
     string FloraId,
-    string DisplayNameEn,
-    string DisplayNameRu,
+    string LocalizationKey,
     string Shape,
     IReadOnlyList<string> BiomeIds,
     double Density,
@@ -32,8 +30,7 @@ public sealed record EcologyFloraDefinition(
 
 public sealed record EcologyFaunaDefinition(
     string FaunaId,
-    string DisplayNameEn,
-    string DisplayNameRu,
+    string LocalizationKey,
     string MovementMode,
     string BodyPlan,
     string Diet,
@@ -200,8 +197,7 @@ public sealed class EcologyCatalog
             if (!GameContentCatalog.IsStableId(biome.BiomeId) ||
                 !biome.BiomeId.StartsWith("biome.", StringComparison.Ordinal) ||
                 !biomeIds.Add(biome.BiomeId) ||
-                string.IsNullOrWhiteSpace(biome.DisplayNameEn) ||
-                string.IsNullOrWhiteSpace(biome.DisplayNameRu) ||
+                !GameContentCatalog.IsStableId(biome.LocalizationKey) ||
                 !double.IsFinite(biome.TemperatureMin) ||
                 !double.IsFinite(biome.TemperatureMax) ||
                 biome.TemperatureMin >= biome.TemperatureMax ||
@@ -220,8 +216,7 @@ public sealed class EcologyCatalog
             if (!GameContentCatalog.IsStableId(flora.FloraId) ||
                 !flora.FloraId.StartsWith("flora.", StringComparison.Ordinal) ||
                 !floraIds.Add(flora.FloraId) ||
-                string.IsNullOrWhiteSpace(flora.DisplayNameEn) ||
-                string.IsNullOrWhiteSpace(flora.DisplayNameRu) ||
+                !GameContentCatalog.IsStableId(flora.LocalizationKey) ||
                 !AllowedShapes.Contains(flora.Shape) ||
                 flora.BiomeIds is null ||
                 flora.BiomeIds.Count is < 1 or > 8 ||
@@ -251,8 +246,7 @@ public sealed class EcologyCatalog
             if (!GameContentCatalog.IsStableId(fauna.FaunaId) ||
                 !fauna.FaunaId.StartsWith("fauna.", StringComparison.Ordinal) ||
                 !faunaIds.Add(fauna.FaunaId) ||
-                string.IsNullOrWhiteSpace(fauna.DisplayNameEn) ||
-                string.IsNullOrWhiteSpace(fauna.DisplayNameRu) ||
+                !GameContentCatalog.IsStableId(fauna.LocalizationKey) ||
                 !AllowedMovementModes.Contains(fauna.MovementMode) ||
                 !AllowedBodyPlans.Contains(fauna.BodyPlan) ||
                 fauna.BiomeIds is null ||

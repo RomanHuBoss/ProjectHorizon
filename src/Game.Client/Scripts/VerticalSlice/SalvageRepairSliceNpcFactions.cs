@@ -120,7 +120,7 @@ public partial class SalvageRepairSlice
         }
         if (Matches(physical, logical, Key.Escape))
         {
-            CloseNpcInteraction("NPC dialogue closed");
+            CloseNpcInteraction(L("ui.npc.closed"));
         }
         else if (Matches(physical, logical, Key.Up))
         {
@@ -145,13 +145,13 @@ public partial class SalvageRepairSlice
         if (_state != SalvageRepairSliceState.Ready &&
             _state != SalvageRepairSliceState.Passed)
         {
-            _status = "wait until persistence completes before NPC interaction";
+            _status = L("ui.npc.persistence_wait");
             return;
         }
         NpcFactionAgentView view = NpcFactions.GetAgent(agent.NpcId);
         if (view.Defeated)
         {
-            _status = $"NPC {agent.NpcId} is unavailable";
+            _status = LF("ui.npc.unavailable", ("npc", agent.NpcId));
             return;
         }
 
@@ -173,7 +173,7 @@ public partial class SalvageRepairSlice
             _npcInteractionPanel.Visible = true;
         }
         UpdateNpcInteractionPanel();
-        _status = $"NPC dialogue opened: {agent.NpcId}";
+        _status = LF("ui.npc.opened", ("npc", agent.NpcId));
         _lastDomainEvent = $"NpcFactionInteraction({agent.NpcId})";
         GD.Print(
             "TASK-122 player NPC interaction PASS: " +
@@ -229,7 +229,7 @@ public partial class SalvageRepairSlice
         var options = NpcFactions.GetAvailableDialogueOptions(_selectedNpcId);
         if (options.Count == 0)
         {
-            _npcInteractionFeedback = "No dialogue options are currently available.";
+            _npcInteractionFeedback = GameLocalizationService.Text("ui.game.no_dialogue_options");
             UpdateNpcInteractionPanel();
             return;
         }
@@ -241,10 +241,9 @@ public partial class SalvageRepairSlice
         NpcDialogueOutcome outcome = NpcFactions.ChooseDialogueOption(
             _selectedNpcId,
             option.OptionId);
-        bool russian = IsRussianLocale();
-        _npcInteractionFeedback = russian
-            ? outcome.ConsequenceRu
-            : outcome.ConsequenceEn;
+        _npcInteractionFeedback = outcome.Applied
+            ? GameLocalizationService.Text(outcome.ConsequenceKey)
+            : GameLocalizationService.Format("ui.game.require_reputation", ("value", option.MinimumReputation));
         if (!outcome.Applied)
         {
             UpdateNpcInteractionPanel();
@@ -283,7 +282,7 @@ public partial class SalvageRepairSlice
             case "Close":
                 NpcDialogueDefinition dialogue = NpcFactionCatalog.GetDialogue(
                     view.Definition.DialogueId);
-                CloseNpcInteraction(dialogue.Farewell(russian));
+                CloseNpcInteraction(GameLocalizationService.Text(dialogue.FarewellKey));
                 break;
             default:
                 UpdateNpcInteractionPanel();
@@ -302,7 +301,6 @@ public partial class SalvageRepairSlice
         {
             return;
         }
-        bool russian = IsRussianLocale();
         NpcFactionAgentView view = NpcFactions.GetAgent(_selectedNpcId);
         NpcDialogueDefinition dialogue = NpcFactionCatalog.GetDialogue(
             view.Definition.DialogueId);
@@ -311,25 +309,32 @@ public partial class SalvageRepairSlice
             ? 0
             : Math.Clamp(_npcInteractionSelection, 0, options.Count - 1);
         string faction = string.IsNullOrEmpty(view.Definition.FactionId)
-            ? (russian ? "вне фракции" : "unaffiliated")
-            : view.Definition.FactionId;
+            ? L("ui.game.unaffiliated")
+            : L(NpcFactionCatalog.Factions[view.Definition.FactionId].LocalizationKey);
         int reputation = NpcFactions.GetFactionReputation(view.Definition.FactionId);
         string optionLines = options.Count == 0
-            ? (russian ? "Нет доступных ответов." : "No available responses.")
+            ? L("ui.game.no_dialogue_options")
             : string.Join("\n", options.Select((option, index) =>
                 $"{(index == _npcInteractionSelection ? ">" : " ")} " +
-                $"{option.Text(russian)}  [{option.Condition}]"));
+                LF("ui.npc.option_row", ("text", L(option.TextKey)))));
+        string identity = LF(
+            "ui.npc.identity",
+            ("name", L(view.Definition.DisplayNameKey)),
+            ("archetype", L(NpcFactionCatalog.Archetypes[view.Definition.Archetype].LocalizationKey)));
+        string stats = LF(
+            "ui.npc.stats",
+            ("faction", faction),
+            ("reputation", reputation),
+            ("health", view.Health.ToString("0.#", CultureInfo.InvariantCulture)),
+            ("maxHealth", view.Definition.Health.ToString("0.#", CultureInfo.InvariantCulture)));
         _npcInteractionLabel.Text =
-            $"{view.Definition.DisplayName(russian)} • {view.Definition.Archetype}\n" +
-            $"{faction} • reputation={reputation} • health={view.Health:0.#}/{view.Definition.Health:0.#}\n\n" +
-            dialogue.Greeting(russian) + "\n\n" +
+            identity + "\n" + stats + "\n\n" +
+            L(dialogue.GreetingKey) + "\n\n" +
             optionLines + "\n\n" +
-            (russian
-                ? "Управление: ↑/↓ выбор • Enter/E действие • Esc закрыть"
-                : "Controls: Up/Down select • Enter/E action • Esc close") +
+            L("ui.game.dialogue_controls") +
             (string.IsNullOrWhiteSpace(_npcInteractionFeedback)
                 ? ""
-                : $"\nStatus: {_npcInteractionFeedback}");
+                : "\n" + LF("ui.npc.status", ("status", _npcInteractionFeedback)));
     }
 
     private void OnNpcCombatResolved(
@@ -357,7 +362,7 @@ public partial class SalvageRepairSlice
         {
             if (NpcFactions.GetAgent(outcome.NpcId).Defeated)
             {
-                CloseNpcInteraction("NPC became unavailable");
+                CloseNpcInteraction(L("ui.npc.became_unavailable"));
             }
             else
             {
@@ -375,16 +380,19 @@ public partial class SalvageRepairSlice
     {
         if (_npcFactionRuntime is null)
         {
-            return "NPC/Factions: unavailable";
+            return L("ui.hud.npc_factions.unavailable");
         }
         string reps = string.Join(", ", NpcFactions.FactionReputation
             .OrderBy(pair => pair.Key, StringComparer.Ordinal)
             .Select(pair => $"{ShortFactionName(pair.Key)}={pair.Value}"));
-        return
-            $"NPC/Factions: agents={NpcFactions.AliveCount}/{NpcFactions.AgentCount} • " +
-            $"combatTargets={NpcFactionCatalog.DefeatTargetIds.Count} • " +
-            $"protected={NpcFactionCatalog.ProtectTargetIds.Count} • " +
-            $"defeats={NpcFactions.TotalOpponentDefeats} • rep[{reps}]";
+        return LF(
+            "ui.hud.npc_factions.summary",
+            ("alive", NpcFactions.AliveCount),
+            ("agents", NpcFactions.AgentCount),
+            ("combat", NpcFactionCatalog.DefeatTargetIds.Count),
+            ("protected", NpcFactionCatalog.ProtectTargetIds.Count),
+            ("defeats", NpcFactions.TotalOpponentDefeats),
+            ("reputation", reps));
     }
 
     private void BeginNpcFactionAcceptance(string directory)

@@ -489,7 +489,7 @@ public partial class SalvageRepairSlice
     {
         if (_aerialSteeringRuntime is null)
         {
-            return "Aerial navigation: unavailable";
+            return L("ui.hud.aerial.unavailable");
         }
         AerialSteeringSnapshot snapshot = AerialSteering.CreateSnapshot();
         int flying = _ecologyFaunaNodes.Count(node => string.Equals(
@@ -500,9 +500,14 @@ public partial class SalvageRepairSlice
             _npcShipNavigationNodes
                 .OrderBy(node => node.ShipId, StringComparer.Ordinal)
                 .Select(node => node.NavigationState.ToString()));
-        return
-            $"Aerial navigation: fauna={flying}/4 • ships={_npcShipNavigationNodes.Count}/4 • " +
-            $"grid={snapshot.OccupiedCells} cells • obstacles={snapshot.ObstacleCount} • poi={snapshot.PointOfInterestCount} • " +
-            $"avoid={snapshot.ObstacleAvoidanceActivations} • states={states}";
+        return LF(
+            "ui.hud.aerial.summary",
+            ("fauna", flying),
+            ("ships", _npcShipNavigationNodes.Count),
+            ("cells", snapshot.OccupiedCells),
+            ("obstacles", snapshot.ObstacleCount),
+            ("poi", snapshot.PointOfInterestCount),
+            ("avoidance", snapshot.ObstacleAvoidanceActivations),
+            ("states", states));
     }
 }

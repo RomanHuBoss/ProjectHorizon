@@ -134,7 +134,7 @@ public static class ItemPropertyRuntime
         {
             return new DismantleExecutionReport(
                 false,
-                $"recipe {recipe.RecipeId} has no dismantle returns",
+                GameLocalizationService.Format("ui.item.no_dismantle_returns", ("recipe", recipe.RecipeId)),
                 recipe.RecipeId,
                 source.DefinitionId,
                 sourceQuantity,
@@ -154,9 +154,11 @@ public static class ItemPropertyRuntime
                     stack.Quantity * sourceQuantity * efficiency + 0.000001))))
             .Where(stack => stack.Quantity > 0)
             .ToArray();
-        string result = $"dismantled {sourceQuantity} x {source.DefinitionId}: " +
-            $"efficiency={efficiency.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"returns={returns.Sum(stack => stack.Quantity)}";
+        string result = GameLocalizationService.Format(
+            "ui.industry.dismantled",
+            ("quantity", sourceQuantity), ("item", source.DefinitionId),
+            ("efficiency", efficiency.ToString("0.###", CultureInfo.InvariantCulture)),
+            ("returns", returns.Sum(stack => stack.Quantity)));
         return new DismantleExecutionReport(
             true,
             result,

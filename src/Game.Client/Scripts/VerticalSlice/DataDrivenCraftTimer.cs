@@ -37,7 +37,7 @@ public sealed class DataDrivenCraftTimer
         ArgumentNullException.ThrowIfNull(recipe);
         if (IsRunning)
         {
-            result = $"recipe {RecipeId} is already processing at {StationId}";
+            result = GameLocalizationService.Format("ui.timer.already", ("recipe", RecipeId), ("station", StationId));
             return false;
         }
 
@@ -53,15 +53,14 @@ public sealed class DataDrivenCraftTimer
             recipe.RequiredStation,
             StringComparison.Ordinal))
         {
-            result = $"recipe {recipe.RecipeId} requires station " +
-                recipe.RequiredStation;
+            result = GameLocalizationService.Format("ui.timer.station", ("recipe", recipe.RecipeId), ("station", recipe.RequiredStation));
             return false;
         }
 
         if (!double.IsFinite(recipe.CraftTimeSeconds) ||
             recipe.CraftTimeSeconds <= 0.0)
         {
-            result = $"recipe {recipe.RecipeId} has no positive craft time";
+            result = GameLocalizationService.Format("ui.timer.invalid_time", ("recipe", recipe.RecipeId));
             return false;
         }
 
@@ -70,7 +69,7 @@ public sealed class DataDrivenCraftTimer
         DurationSeconds = recipe.CraftTimeSeconds;
         ElapsedSeconds = 0.0;
         IsRunning = true;
-        result = $"recipe {RecipeId} started for {DurationSeconds:0.###} s";
+        result = GameLocalizationService.Format("ui.timer.started", ("recipe", RecipeId), ("seconds", DurationSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
         return true;
     }
 
@@ -87,7 +86,7 @@ public sealed class DataDrivenCraftTimer
 
         if (!IsRunning)
         {
-            result = "no timed craft is running";
+            result = GameLocalizationService.Text("ui.timer.none");
             return CraftTimerAdvanceResult.NotRunning;
         }
 
@@ -96,14 +95,17 @@ public sealed class DataDrivenCraftTimer
             ElapsedSeconds + deltaSeconds);
         if (ElapsedSeconds + CompletionToleranceSeconds < DurationSeconds)
         {
-            result = $"recipe {RecipeId} processing; " +
-                $"remaining={RemainingSeconds:0.###} s";
+            result = GameLocalizationService.Format(
+                "ui.timer.processing",
+                ("recipe", RecipeId),
+                ("elapsed", ElapsedSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)),
+                ("remaining", RemainingSeconds.ToString("0.###", System.Globalization.CultureInfo.InvariantCulture)));
             return CraftTimerAdvanceResult.Running;
         }
 
         ElapsedSeconds = DurationSeconds;
         IsRunning = false;
-        result = $"recipe {RecipeId} timer completed";
+        result = GameLocalizationService.Format("ui.timer.completed", ("recipe", RecipeId));
         return CraftTimerAdvanceResult.Completed;
     }
 

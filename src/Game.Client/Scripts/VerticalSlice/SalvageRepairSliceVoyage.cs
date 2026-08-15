@@ -292,8 +292,7 @@ public partial class SalvageRepairSlice
                 StageOneVoyageLocation.InboundFlight)
             {
                 _voyageNavigationAssist = !_voyageNavigationAssist;
-                _status = "voyage navigation assist " +
-                    (_voyageNavigationAssist ? "enabled" : "disabled");
+                _status = LF("ui.voyage.nav_assist", ("state", L(_voyageNavigationAssist ? "ui.common.on" : "ui.common.off")));
                 if (!_voyageNavigationAssist)
                 {
                     _voyageShip?.ClearExternalCommand();
@@ -301,7 +300,7 @@ public partial class SalvageRepairSlice
             }
             else
             {
-                _status = "navigation assist is available only in flight";
+                _status = L("ui.voyage.nav_only_flight");
             }
 
             return true;
@@ -321,7 +320,7 @@ public partial class SalvageRepairSlice
             }
             else
             {
-                _status = "T is available on the landing pad or while docked";
+                _status = L("ui.voyage.travel_key_location");
             }
 
             return true;
@@ -329,7 +328,7 @@ public partial class SalvageRepairSlice
 
         if (Matches(physical, logical, Key.U))
         {
-            _status = "land and disembark before opening Ship Management";
+            _status = L("ui.voyage.land_for_management");
             return true;
         }
 
@@ -339,8 +338,7 @@ public partial class SalvageRepairSlice
             {
                 bool enabled = !_voyageShip.AutoStabilizationEnabled;
                 _voyageShip.SetAutoStabilization(enabled);
-                _status = "ship auto stabilization " +
-                    (enabled ? "enabled" : "disabled");
+                _status = LF("ui.voyage.stabilization", ("state", L(enabled ? "ui.common.on" : "ui.common.off")));
             }
 
             return true;
@@ -349,7 +347,7 @@ public partial class SalvageRepairSlice
         if (Matches(physical, logical, Key.J) ||
             Matches(physical, logical, Key.P))
         {
-            _status = "planetary exploration controls are unavailable while piloting";
+            _status = L("ui.voyage.exploration_unavailable");
             return true;
         }
 
@@ -500,7 +498,7 @@ public partial class SalvageRepairSlice
 
         _stationServicesOpenedFromVoyage = true;
         _lastDomainEvent = "StageOneOrbitalStationVisited";
-        _status = "orbital station services open; Esc closes, T undocks";
+        _status = L("ui.voyage.station_open");
         GD.Print(
             "TASK-112 player station visit PASS: " +
             $"stationVisited={(StageOneVoyage.StationVisited ? 1 : 0)}; " +
@@ -609,10 +607,10 @@ public partial class SalvageRepairSlice
     {
         if (_stageOneVoyageRuntime is null)
         {
-            return "Stage 1 voyage: unavailable";
+            return L("ui.hud.voyage.unavailable");
         }
 
-        string approach = "n/a";
+        string approach = L("ui.common.not_available");
         if (_voyageShip is not null && StageOneVoyage.Piloted)
         {
             Vector3 target = StageOneVoyage.Location ==
@@ -629,9 +627,23 @@ public partial class SalvageRepairSlice
                 .ToString("0.0", CultureInfo.InvariantCulture) + "m";
         }
 
-        return "Stage 1 voyage: " + StageOneVoyage.BuildSummary() +
-            $"; assist={(_voyageNavigationAssist ? 1 : 0)}; " +
-            $"approach={approach}; controls=T/Enter/K/F2";
+        string locationKey = StageOneVoyage.Location switch
+        {
+            StageOneVoyageLocation.PlanetSurface => "ui.voyage.location.planet_surface",
+            StageOneVoyageLocation.OutboundFlight => "ui.voyage.location.outbound_flight",
+            StageOneVoyageLocation.OrbitalStation => "ui.voyage.location.orbital_station",
+            StageOneVoyageLocation.InboundFlight => "ui.voyage.location.inbound_flight",
+            _ => "ui.voyage.location.unknown"
+        };
+        return LF(
+            "ui.hud.voyage.summary",
+            ("location", L(locationKey)),
+            ("piloted", StageOneVoyage.Piloted ? 1 : 0),
+            ("checkpoint", StageOneVoyage.LastCheckpoint),
+            ("loops", StageOneVoyage.CompletedLoops),
+            ("visited", StageOneVoyage.StationVisited ? 1 : 0),
+            ("assist", _voyageNavigationAssist ? 1 : 0),
+            ("approach", approach));
     }
 
     private void BeginStageOneVoyageAcceptance(string directory)
