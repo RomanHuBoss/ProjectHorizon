@@ -410,6 +410,7 @@ public partial class SalvageRepairSlice : Node3D
         BindPlayerSurvivalSceneNodes();
         BindPlanetMapSceneNodes();
         BindApplicationShellSceneNodes();
+        BindAudioRuntime();
         BindLocalizationRuntime();
         _status = L("ui.game.status.initializing");
 
@@ -501,6 +502,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
         InitializePlayerSurvivalRuntime(saveData: null);
+        InitializeAudioGameplayRuntime();
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
 
@@ -711,6 +713,13 @@ public partial class SalvageRepairSlice : Node3D
             "sharedGrid=local-3D; obstacles=spherical; altitude=bounded; poi=enabled; " +
             "shipModes=arrive+formation+pursuit+evade+combat; F5=acceptance.");
         GD.Print(
+            "TASK-134 audio runtime READY: " +
+            $"buses={AudioDirector.RequiredBuses.Length}; " +
+            $"pool2d={AudioDirector.TwoDPoolSize}; pool3d={AudioDirector.ThreeDPoolSize}; " +
+            $"maxTransient={AudioDirector.MaximumTransientVoices}; maxConcurrent={AudioDirector.MaximumConcurrentVoices}; " +
+            "layers=Music/Ambient/SFX/UI/Voice/Vehicle/Weather; " +
+            "environments=atmosphere/vacuum/interior/water; F5=acceptance.");
+        GD.Print(
             "TASK-104 coordinate HUD READY: source=Player.GlobalPosition/Ship.GlobalPosition; " +
             "axes=XYZ; precision=0.1; corner=top-right; " +
             "visibleInModes=Detailed/Compact/Hidden.");
@@ -774,6 +783,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdateEcology(delta);
         UpdateAerialNavigation(delta);
         UpdatePlayerSurvival(delta);
+        UpdateAudioRuntime(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
@@ -1251,6 +1261,7 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         UpdateStationServicesPanel();
+        PlayDialogueVoiceAudio();
         _status = LF("ui.station.opened", ("npc", npc.Name));
         _lastDomainEvent = $"NpcInteraction({npc.NpcId})";
         RecordProceduralQuestReturnAtCurrentNpc();
@@ -2557,6 +2568,7 @@ public partial class SalvageRepairSlice : Node3D
             $"quantity={quantity})";
         _status = result;
         source.SetCollected(true);
+        PlayResourceCollectAudio(source.GlobalPosition);
         RefreshNpcNavigationObstacles();
         RefreshAerialNavigationEnvironment();
         GD.Print(
@@ -2832,6 +2844,7 @@ public partial class SalvageRepairSlice : Node3D
             recipeId,
             "Crafted");
         QueueCurrentSnapshot(AutosaveTrigger.QuestCompleted);
+        PlayCraftCompletionAudio(source.GlobalPosition);
         int outputQuantity = recipe.Outputs.Sum(output => output.Quantity);
         if (timed)
         {
@@ -3536,6 +3549,12 @@ public partial class SalvageRepairSlice : Node3D
                     $"energyRemaining={queue.EnergyRemaining.ToString("0.###", CultureInfo.InvariantCulture)}; " +
                     $"running={queue.RunningCount}; queued={queue.QueuedCount}; " +
                     $"paused={queue.PausedCount}.");
+                PortableCraftingStation? completedStation = _craftingStations.FirstOrDefault(
+                    station => string.Equals(station.StationId, queue.StationId, StringComparison.Ordinal));
+                if (completedStation is not null)
+                {
+                    PlayCraftCompletionAudio(completedStation.GlobalPosition);
+                }
             }
         }
 
@@ -5434,8 +5453,9 @@ public partial class SalvageRepairSlice : Node3D
         BeginStarSystemSimulationAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
+        RunAudioArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132 runtime, ship systems, voyage, galaxy navigation, ecology, quests, survival, NPC/factions, navigation, star-system, application-shell and localization acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-130/TASK-132/TASK-134 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5690,6 +5710,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeNpcFactionRuntime(snapshot?.NpcFactions);
             InitializeProceduralQuestRuntime(snapshot?.ProceduralQuests);
             InitializePlayerSurvivalRuntime(snapshot?.PlayerSurvival);
+            InitializeAudioGameplayRuntime();
             _revision = snapshot?.Revision ?? 0;
             if (snapshot is not null && _player is not null &&
                 !StageOneVoyage.Piloted)
@@ -5892,6 +5913,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeNpcFactionRuntime(saveData: null);
             InitializeProceduralQuestRuntime(saveData: null);
             InitializePlayerSurvivalRuntime(saveData: null);
+            InitializeAudioGameplayRuntime();
             _revision = 0;
             _autosaveElapsedSeconds = 0.0;
             CloseRecipeSelector();
@@ -7464,6 +7486,7 @@ public partial class SalvageRepairSlice : Node3D
         string npcNavigationLine = BuildNpcNavigationHudLine();
         string aerialNavigationLine = BuildAerialNavigationHudLine();
         string missionLine = BuildProceduralQuestHudLine();
+        string audioLine = BuildAudioHudLine();
 
         string acceptanceCompact = string.Join("\n", new[]
         {
@@ -7490,7 +7513,8 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-124 (F5): {_npcNavigationAcceptanceHud}",
             $"TASK-126 (F5): {_aerialNavigationAcceptanceHud}",
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
-            $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}" 
+            $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
+            $"TASK-134 (F5): {_task134AcceptanceHud}"
         });
 
         if (_hudMode == SalvageRepairHudMode.Compact)
@@ -7510,6 +7534,7 @@ public partial class SalvageRepairSlice : Node3D
                 voyageLine,
                 galaxyLine,
                 starSystemLine,
+                audioLine,
                 ecologyLine,
                 npcFactionLine,
                 npcNavigationLine,
@@ -7550,6 +7575,7 @@ public partial class SalvageRepairSlice : Node3D
             voyageLine,
             galaxyLine,
             starSystemLine,
+            audioLine,
             ecologyLine,
             npcFactionLine,
             npcNavigationLine,

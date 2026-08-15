@@ -173,6 +173,7 @@ public partial class SalvageRepairSlice
             _npcInteractionPanel.Visible = true;
         }
         UpdateNpcInteractionPanel();
+        PlayDialogueVoiceAudio();
         _status = LF("ui.npc.opened", ("npc", agent.NpcId));
         _lastDomainEvent = $"NpcFactionInteraction({agent.NpcId})";
         GD.Print(

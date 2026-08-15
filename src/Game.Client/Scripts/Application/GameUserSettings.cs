@@ -369,9 +369,13 @@ public static class GameUserSettingsService
 
     private static void ApplyAudio(GameUserSettings settings)
     {
+        AudioDirector.EnsureBusLayout();
         SetBusVolume("Music", settings.MusicVolume);
-        SetBusVolume("SFX", settings.EffectsVolume);
         SetBusVolume("Voice", settings.SpeechVolume);
+        foreach (string bus in new[] { "Ambient", "SFX", "UI", "Vehicle", "Weather" })
+        {
+            SetBusVolume(bus, settings.EffectsVolume);
+        }
     }
 
     private static void SetBusVolume(string busName, float linear)

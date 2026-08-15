@@ -9,6 +9,7 @@ public partial class GamePauseOverlay : CanvasLayer
     private Label? _title;
     private Label? _description;
     private Button? _resume;
+    private AudioDirector? _audio;
     private bool _deathMode;
     private string _deathReasonKey = "ui.death.default";
 
@@ -30,6 +31,8 @@ public partial class GamePauseOverlay : CanvasLayer
         }
         GameLocalizationService.LocaleChanged += OnLocaleChanged;
         BuildUi();
+        _audio = AudioDirector.EnsureInstalled(GetTree());
+        _audio.AttachUiSounds(this);
         GameLocalizationService.LocalizeControlTree(this);
     }
 
@@ -80,6 +83,7 @@ public partial class GamePauseOverlay : CanvasLayer
         GetTree().Paused = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         _resume.GrabFocus();
+        _audio?.PlayUiConfirm();
         GD.Print("TASK-130 pause PASS: treePaused=1; overlayProcess=Always; mouse=visible.");
     }
 
@@ -100,6 +104,7 @@ public partial class GamePauseOverlay : CanvasLayer
         _backdrop.Visible = true;
         GetTree().Paused = true;
         Input.MouseMode = Input.MouseModeEnum.Visible;
+        _audio?.PlayUiError();
         GD.Print("TASK-130 death screen PASS: visible=1; treePaused=1; status=text+iconToken.");
     }
 
@@ -214,6 +219,7 @@ public partial class GamePauseOverlay : CanvasLayer
         if (_settings is not null) _settings.Visible = false;
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Captured;
+        _audio?.PlayUiConfirm();
         GD.Print("TASK-130 resume PASS: treePaused=0; gameplay=active.");
     }
 

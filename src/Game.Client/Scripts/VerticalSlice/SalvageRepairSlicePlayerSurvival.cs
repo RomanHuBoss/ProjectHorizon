@@ -94,9 +94,16 @@ public partial class SalvageRepairSlice
         }
         _player.MovementResources = _playerSurvivalRuntime;
         _player.ExternalDamageHandler = HandlePlayerDamage;
-        _player.WeaponFired = () => RecordPlayerMultitoolUse(
+        _player.WeaponFired = HandlePlayerWeaponFired;
+    }
+
+
+    private void HandlePlayerWeaponFired()
+    {
+        RecordPlayerMultitoolUse(
             PlayerMultitoolFunction.Weapon,
             "hitscan");
+        PlayPlayerWeaponAudio();
     }
 
     private void HandlePlayerDamage(double amount, string source)
@@ -108,6 +115,7 @@ public partial class SalvageRepairSlice
         double healthBefore = PlayerSurvival.Health;
         double shieldBefore = PlayerSurvival.Shield;
         PlayerSurvival.ApplyDamage(amount);
+        PlayPlayerDamageAudio();
         _lastDomainEvent = $"PlayerDamaged({source},{amount:0.0})";
         _playerEquipmentFeedback =
             $"damage {amount:0.0} from {source}; H={PlayerSurvival.Health:0.#} S={PlayerSurvival.Shield:0.#}";

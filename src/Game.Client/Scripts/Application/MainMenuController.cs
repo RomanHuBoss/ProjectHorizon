@@ -28,8 +28,12 @@ public partial class MainMenuController : Control
         GetTree().Paused = false;
         Input.MouseMode = Input.MouseModeEnum.Visible;
         GameUserSettingsService.ReloadAndApply();
+        AudioDirector audio = AudioDirector.EnsureInstalled(GetTree());
+        audio.SetEnvironment(GameAudioEnvironment.Vacuum, force: true);
+        audio.SetMusicState(GameMusicState.Menu);
         GameLocalizationService.LocaleChanged += OnLocaleChanged;
         BuildUi();
+        audio.AttachUiSounds(this);
         GameLocalizationService.LocalizeControlTree(this);
         ShowMain();
         _status!.Text = GameLocalizationService.Text("ui.main.status.inspecting");

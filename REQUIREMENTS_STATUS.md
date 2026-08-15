@@ -2,13 +2,152 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-localization-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-audio-architecture-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
+## 0. Текущая mega-итерация 2026-08-15 — Sound/audio architecture / §32 closure
+
+### Закрытие localization-итерации по решению владельца продукта
+
+Владелец продукта прямо распорядился считать предыдущую mega-итерацию успешно
+завершённой и начать следующую. Поэтому до начала TASK-134 журнал синхронизирован:
+
+- `TASK-132` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-133` — `IN_PROGRESS` → `VERIFIED`;
+- основание — явный `acceptance waiver by product owner`; clean build/Godot runtime
+  предыдущего снимка не приписываются среде подготовки задним числом.
+
+### TASK-134 — unified sound runtime, environments, 3D audio and bounded playback
+
+**Исходный снимок:** `ProjectHorizon-main-localization-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-audio-architecture-closure.zip`.  
+**Связанные требования ТЗ v2.0:** §32 «Sound»: нормативные audio buses `Master`,
+`Music`, `Ambient`, `SFX`, `UI`, `Voice`, `Vehicle`, `Weather`; 3D positioning и
+distance attenuation; ограничение одновременно воспроизводимых transient sounds и
+pooling; различные audio environments для atmosphere/vacuum/interior/water; отсутствие
+обычного внешнего физического звука в вакууме при сохранении внутренних ship/UI/Voice
+signals. Интеграция с §31.4 Settings и уже реализованными survival/voyage/combat systems.
+
+**Реализовано:**
+
+- добавлен единый persistent `AudioDirector` на root `SceneTree`; при переходах
+  Main Menu ↔ gameplay создаётся ровно один director, повторный вызов безопасно
+  переиспользует существующий runtime;
+- `AudioDirector.EnsureBusLayout()` создаёт точный нормативный bus graph:
+  `Master + Music/Ambient/SFX/UI/Voice/Vehicle/Weather`, все дочерние buses направлены
+  в `Master`; существующие три пользовательских sliders сохранены: Music → `Music`,
+  Speech → `Voice`, Effects → `Ambient/SFX/UI/Vehicle/Weather`;
+- transient playback ограничен двумя фиксированными pools: `8 × AudioStreamPlayer` и
+  `16 × AudioStreamPlayer3D`, итого максимум `24` transient voices; пять dedicated loop players дают жёсткий общий ceiling **29 simultaneous voices**; при переполнении
+  применяется priority-aware oldest-voice stealing вместо создания неограниченных Nodes;
+- world SFX используют `AudioStreamPlayer3D`, `GlobalPosition`, `UnitSize` и
+  `MaxDistance`; resource collect, station craft completion и multitool weapon реально
+  идут через positional pool; UI/Voice остаются non-positional;
+- реализованы четыре audio environment profiles: `Atmosphere`, `Vacuum`, `Interior`,
+  `Water`; atmosphere включает ambient + weather, interior имеет собственный ambient и
+  low-pass на Ambient/Vehicle, water — отдельный ambient и low-pass на
+  SFX/Ambient/Weather/Vehicle, vacuum останавливает внешние ambient/weather layers;
+- vacuum rule исполняется централизованно внутри `PlayWorldCue`: physical cue с
+  `externalInVacuum=true` подавляется до выделения voice; внутренний `Vehicle`, UI и Voice
+  сохраняются. Мультитул на безвоздушной поверхности поэтому не издаёт обычный внешний
+  выстрел, а cockpit/ship/UI feedback остаётся слышимым;
+- добавлена music state machine `None/Menu/Surface/Space/Interior/Combat`; пять
+  функциональных music loops переключаются dual-player crossfade за `1.25 s`; combat
+  определяется существующим hostile-raider ship state и proximity, а не отдельным
+  дублированным combat model;
+- `Vehicle` loop связан с существующим piloted ship и фактической скоростью: pitch/volume
+  меняются по отношению `Velocity / BoostMaxSpeed`;
+- в реальный gameplay подключены UI click/confirm/error, NPC/station radio voice,
+  multitool weapon, resource collection, craft/production completion, player-damage
+  feedback и periodic life-support alarm при Oxygen ≤ 18%; alarm имеет cooldown и не
+  создаёт unbounded voice spam;
+- динамически создаваемые gameplay buttons повторно обнаруживаются director-ом через
+  безопасный idempotent hook; Pause/Resume/Death и Main Menu используют тот же UI layer;
+- добавлен детерминированный `ProceduralAudioBank`: 19 функциональных cue создаются как
+  16-bit mono PCM `AudioStreamWav` при `44100 Hz`; это shipping-safe functional baseline
+  без внешних raw WAV/AIFF authoring sources и без новой файловой зависимости. Финальные
+  authored OGG/импортированные assets впоследствии могут заменить cue streams по stable
+  cue IDs без изменения gameplay API/pools/buses;
+- HUD получил локализованную audio diagnostics line: environment, music state, active
+  transient voices, positional request count и vacuum-suppression count; добавлено 12
+  RU/EN keys, поэтому текущий localization catalog = **1328 keys/locale**, exact parity;
+- `tools/validate-audio-contract.py` является статическим TASK-134 gate: exact buses,
+  cue registration, bounded pools, environment/music coverage, 3D attenuation, vacuum
+  rule, Settings routing, gameplay hooks, localization и отсутствие raw WAV/AIFF sources;
+- `F5` дополнен `TASK-134` runtime acceptance, который фактически переключает все четыре
+  environment profiles, проверяет внешнее подавление/внутренний звук в vacuum, 2D/3D
+  pool overflow/stealing, positional requests, UI/Voice layers, music state transitions и
+  finite bus volumes, после чего возвращает исходные environment/music state. Gameplay
+  save-slot эта проверка не изменяет.
+
+**Добавленные/изменённые ключевые файлы:**
+
+- `src/Game.Client/Scripts/Application/AudioDirector.cs` + `.uid`;
+- `src/Game.Client/Scripts/Application/ProceduralAudioBank.cs` + `.uid`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAudio.cs` + `.uid`;
+- `tools/validate-audio-contract.py`;
+- `src/Game.Client/Scripts/Application/GameUserSettings.cs`;
+- `src/Game.Client/Scripts/Application/MainMenuController.cs`;
+- `src/Game.Client/Scripts/Application/GamePauseOverlay.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceNpcFactions.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlayerSurvival.cs`;
+- `src/Game.Client/Content/localization.en.json`;
+- `src/Game.Client/Content/localization.ru.json`;
+- `README.md`; `REQUIREMENTS_STATUS.md`.
+
+**Статусы:**
+
+- `TASK-132`: `IMPLEMENTED` → `VERIFIED` — acceptance waiver владельца продукта;
+- `TASK-133`: `IN_PROGRESS` → `VERIFIED` — тот же waiver;
+- `TASK-134`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-135`: `NOT_STARTED` → `IN_PROGRESS` — clean build + audible environment/F5 smoke;
+- `TASK-006`: остаётся `BLOCKED` из-за отсутствия `.git` в поставленном архиве.
+
+**Статическая приёмка TASK-134:**
+
+```text
+python tools/validate-localization-contract.py
+TASK-132 LOCALIZATION CONTRACT PASS: locales=2; keys=1328; parity=1; blanks=0; contentKeys=486; dynamicKeys=60; sourceUiKeys=573; sceneKeys=14; keyOnlyContent=1; sourceSinks=0; legacyLiterals=0.
+
+python tools/validate-audio-contract.py
+TASK-134 AUDIO CONTRACT PASS: buses=8/8; cues=19; pool2d=8; pool3d=16; maxTransient=24; maxConcurrent=29; environments=4; musicStates=6; positional=1; attenuation=1; pooling=1; vacuumRule=1; gameplayHooks=6; settingsRouting=1; localization=1; sourceAudioAssets=0.
+```
+
+**Минимальная runtime-приёмка TASK-135:**
+
+1. `tools\clean-build-windows10.cmd` → реальный `CoreCompile`, `0 errors`.
+2. Main Menu: слышна menu music; кнопки дают UI click, Settings Music/Effects/Speech
+   действительно независимо меняют соответствующие buses.
+3. Поверхность с атмосферой: слышны Ambient + Weather; сбор ресурса, мультитул и
+   завершение craft дают world SFX. Под водой среда должна стать приглушённой и сменить
+   ambient; на orbital station — interior profile.
+4. В пилотируемом корабле `Vehicle` loop должен менять pitch/volume со скоростью; рядом
+   с hostile raider music переходит в Combat, после выхода из контекста возвращается.
+5. В vacuum обычный внешний weapon/world cue должен быть подавлен, но internal Vehicle,
+   UI и Voice остаются слышимы.
+6. Один `F5`; ключевая строка:
+
+```text
+TASK-134 audio architecture acceptance PASS: buses=8/8; cues=19/19; pool2d=8; pool3d=16; activeTransient=.../24; maxConcurrent=29; poolSteals=>0; positional=1; attenuation=1; atmosphere=1; water=1; interior=1; vacuum=1; externalVacuumSuppressed=1; internalVacuumAllowed=1; musicCrossfade=1; ui=1; voice=1; settingsRouting=1; ... sampleRate=44100; proceduralBank=1; result=section-32-audio-runtime.
+```
+
+**Граница закрытия:** после `TASK-135 → VERIFIED` технический runtime §32 считается
+закрытым для shipping vertical slice: buses/routing, bounded playback, environment model,
+3D attenuation, vacuum semantics, vehicle/UI/voice/world layers и music transitions
+исполняются централизованно. `ProceduralAudioBank` — функциональный baseline, а не попытка
+заменить будущий production sound-design; финальный художественный набор OGG может
+обновляться отдельно без изменения архитектуры или требований persistence.
+
+**Следующий mega-шаг после TASK-135:** повторный gap-analysis всего PDF-ТЗ; не продолжать
+§32 мелкими cue-патчами, если runtime acceptance зелёный.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-15 — полное RU/EN localization runtime / §31.3 closure
 
 ### Закрытие UI/application-shell итерации по решению владельца продукта
 
@@ -104,7 +243,7 @@ Music/SFX/Voice buses, но полноценный игровой sound runtime 
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
+## 0B. Предыдущая mega-итерация 2026-08-15 — UI/application shell / §31.1 + §31.2 + §31.4 baseline
 
 ### Закрытие star-system итерации по решению владельца продукта
 
@@ -231,7 +370,7 @@ accessibility baseline, переиспользуя ранее созданные
 
 ---
 
-## 0B. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
+## 0C. Предыдущая mega-итерация 2026-08-15 — star-system simulation / §15 vertical-slice closure
 
 ### Закрытие aerial-navigation итерации по решению владельца продукта
 
@@ -361,7 +500,7 @@ scene coordinator §5 остаются отдельной будущей арх�
 
 ---
 
-## 0C. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
+## 0D. Предыдущая mega-итерация 2026-08-15 — aerial fauna + NPC ship navigation / §30 closure
 
 ### Закрытие предыдущей ground-navigation итерации по решению владельца продукта
 
@@ -488,7 +627,7 @@ TASK-126 aerial navigation acceptance PASS: flyingFauna=4; npcShips=4; gridCells
 
 ---
 
-## 0D. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
+## 0E. Предыдущая mega-итерация 2026-08-15 — ground NPC navigation / bounded nav streaming
 
 ### Закрытие предыдущей NPC/faction итерации по решению владельца продукта
 
@@ -599,7 +738,7 @@ TASK-124 NPC navigation acceptance PASS: regions=<1..25>/25; walkableCells=>0; o
 
 ---
 
-## 0E. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
+## 0F. Предыдущая синхронизация и mega-итерация 2026-08-15 — NPC / factions / dialogues
 
 ### Закрытие player survival по решению владельца продукта
 
@@ -748,7 +887,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0F. Предыдущая синхронизация и mega-итерация 2026-08-15
+## 0G. Предыдущая синхронизация и mega-итерация 2026-08-15
 
 ### Закрытие procedural quests по прямому решению владельца продукта
 
@@ -844,7 +983,7 @@ TASK-122 NPC/factions acceptance PASS: factions=3; archetypes=8; agents=8; dialo
 
 ---
 
-## 0G. Предыдущая синхронизация и mega-итерация 2026-08-14
+## 0H. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -976,7 +1115,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0H. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0I. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 
