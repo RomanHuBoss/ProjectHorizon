@@ -85,10 +85,16 @@ public partial class SalvageRepairSlice
         }
 
         bool shouldActivateSurface = ResolveSurfaceRuntimeActive();
+        if (_worldSceneCoordinatorRuntime is not null &&
+            WorldScenes.Current.Kind == WorldSceneKind.InterplanetaryTransit)
+        {
+            shouldActivateSurface = false;
+        }
         ApplySurfaceRuntimeActivation(shouldActivateSurface, force: false);
         bool renderSystemProxies = !shouldActivateSurface &&
             (_worldSceneCoordinatorRuntime is null ||
-             WorldScenes.Current.Kind == WorldSceneKind.Orbit);
+             WorldScenes.Current.Kind is WorldSceneKind.Orbit or
+                 WorldSceneKind.InterplanetaryTransit);
         _starSystemSimulationNode.UpdateSimulation(
             delta,
             GetActiveDeveloperPlanetId(),

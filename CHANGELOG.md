@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-alpha.152] - 2026-08-15
+
+### Added
+
+- TASK-152 same-system interplanetary travel subsystem: System Map planetary target selection, persisted target/counters, fuel-backed assisted physical cruise, live proxy targeting and local destination approach.
+- `InterplanetaryTransit` world-shell context and transactional `Orbit(source) -> InterplanetaryTransit -> Orbit(destination)` planet handoff.
+- TASK-152 F5 acceptance, three xUnit regression checks, static contract gate and `docs/INTERPLANETARY_TRAVEL.md`.
+
+### Changed
+
+- Existing `K` navigation assist now prioritizes a selected planetary destination while in flight; disabling assist cancels cruise without refunding consumed transfer fuel.
+- Star-system proxies remain active during interplanetary transit while detailed surface residency is suspended.
+- Galaxy navigation save state now carries backward-compatible selected-planet and transfer diagnostics without a SQLite schema bump.
+- TASK-150/TASK-151 are marked accepted after the product owner reported that the delivered `alpha.150.1` works.
+
 All notable changes to Project Horizon are recorded in this file.
 
 The project uses Semantic Versioning for application releases. Content schema,

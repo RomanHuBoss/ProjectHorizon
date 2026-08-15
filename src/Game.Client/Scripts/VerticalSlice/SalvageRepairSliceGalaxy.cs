@@ -47,6 +47,7 @@ public partial class SalvageRepairSlice
         _galaxyMapSelection = 0;
         _galaxyMapFeedback = L(saveData is null ? "ui.galaxy.fresh" : "ui.galaxy.restored");
         RefreshGalaxyMapSystems();
+        InitializeInterplanetaryTravelRuntime();
         if (_galaxyMapPanel is not null)
         {
             _galaxyMapPanel.Visible = false;
@@ -76,10 +77,16 @@ public partial class SalvageRepairSlice
             {
                 MoveGalaxyMapSelection(1);
             }
-            else if (Matches(physical, logical, Key.Enter) &&
-                !_galaxyMapSystemTab)
+            else if (Matches(physical, logical, Key.Enter))
             {
-                ConfirmGalaxyMapDestination();
+                if (_galaxyMapSystemTab)
+                {
+                    ConfirmPlanetaryDestination();
+                }
+                else
+                {
+                    ConfirmGalaxyMapDestination();
+                }
             }
 
             return true;
@@ -194,6 +201,25 @@ public partial class SalvageRepairSlice
         UpdateGalaxyMapPanel();
     }
 
+
+    private void ConfirmPlanetaryDestination()
+    {
+        IReadOnlyList<GalaxyPlanetDefinition> planets =
+            GalaxyNavigation.CurrentSystem.Planets;
+        if (planets.Count == 0)
+        {
+            _galaxyMapFeedback = L("ui.galaxy.no_destination");
+            UpdateGalaxyMapPanel();
+            return;
+        }
+
+        int index = Math.Clamp(_galaxyMapSelection, 0, planets.Count - 1);
+        GalaxyPlanetDefinition planet = planets[index];
+        SelectInterplanetaryPlanetTarget(planet, out string result);
+        _galaxyMapFeedback = result;
+        UpdateGalaxyMapPanel();
+    }
+
     private void ConfirmGalaxyMapDestination()
     {
         if (_galaxyMapSystems.Count == 0)
@@ -275,12 +301,24 @@ public partial class SalvageRepairSlice
             string planets = string.Join("\n", current.Planets.Select((planet, index) =>
             {
                 string marker = index == _galaxyMapSelection ? ">" : " ";
+                string state = string.Equals(
+                        planet.PlanetId,
+                        GalaxyNavigation.CurrentPlanetId,
+                        StringComparison.Ordinal)
+                    ? L("ui.galaxy.planet_current")
+                    : string.Equals(
+                        planet.PlanetId,
+                        GalaxyNavigation.SelectedPlanetId,
+                        StringComparison.Ordinal)
+                        ? L("ui.galaxy.planet_target")
+                        : string.Empty;
                 string header = $"{marker} " + LF("ui.galaxy.planet_row",
                     ("index", planet.OrbitIndex.ToString("00", CultureInfo.InvariantCulture)),
                     ("archetype", LocalizeGalaxyPlanetArchetype(planet.Archetype)),
                     ("moons", planet.MoonCount),
                     ("atmosphere", planet.HasAtmosphere ? 1 : 0),
-                    ("water", planet.HasWater ? 1 : 0));
+                    ("water", planet.HasWater ? 1 : 0)) +
+                    (string.IsNullOrWhiteSpace(state) ? string.Empty : $" [{state}]");
                 return header + "\n  " +
                     BuildPlanetEnvironmentMapDetail(planet, current.StarType);
             }));

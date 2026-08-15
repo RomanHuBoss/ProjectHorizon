@@ -267,4 +267,50 @@ public sealed class WorldGenTests
             0.0));
     }
 
+    [Fact]
+    public void PlanetDestinationSelection_PersistsWithoutChangingCurrentPlanet()
+    {
+        GalaxyNavigationRuntime runtime = new(GalaxyNavigationRuntime.DefaultUniverseSeed);
+        string source = runtime.CurrentPlanetId;
+        GalaxyPlanetDefinition target = runtime.CurrentSystem.Planets[1];
+
+        Assert.True(runtime.TrySelectPlanetDestination(target.PlanetId, out _));
+        GalaxyNavigationRuntime restored = new(runtime.CreateSaveData());
+
+        Assert.Equal(source, restored.CurrentPlanetId);
+        Assert.Equal(target.PlanetId, restored.SelectedPlanetId);
+        Assert.Equal(0, restored.InterplanetaryTransferCount);
+    }
+
+    [Fact]
+    public void InterplanetaryTransfer_UpdatesPlanetCountersFuelAndRoundTrips()
+    {
+        GalaxyNavigationRuntime galaxy = new(GalaxyNavigationRuntime.DefaultUniverseSeed);
+        GalaxyPlanetDefinition target = galaxy.CurrentSystem.Planets[1];
+        Assert.True(galaxy.TrySelectPlanetDestination(target.PlanetId, out _));
+        ShipSystemsRuntime ship = new(RepositoryFixture.Ships, commissioned: true);
+        StageOneVoyageRuntime voyage = new();
+        Assert.Equal(StageOneVoyageActionResult.Applied, voyage.TryBoard(ship, out _));
+        Assert.Equal(StageOneVoyageActionResult.Applied, voyage.TryLaunch(ship, out _));
+        double fuelBefore = ship.Fuel;
+        InterplanetaryTravelRuntime travel = new();
+        travel.SynchronizeSelection(galaxy);
+
+        Assert.Equal(
+            InterplanetaryTravelActionResult.Applied,
+            travel.TryBeginCruise(galaxy, voyage, ship, 192.0, out _));
+        Assert.True(ship.Fuel < fuelBefore);
+        Assert.True(travel.BuildGuidance(8.0, 5.0).ArrivalReady);
+        Assert.True(travel.TryCompleteArrival(galaxy, 192.0, out _));
+        voyage.ArriveAtPlanetaryApproach();
+
+        GalaxyNavigationRuntime restored = new(galaxy.CreateSaveData());
+        Assert.Equal(target.PlanetId, restored.CurrentPlanetId);
+        Assert.Equal(string.Empty, restored.SelectedPlanetId);
+        Assert.Equal(1, restored.InterplanetaryTransferCount);
+        Assert.True(restored.TotalInterplanetaryDistanceMeters >= 192.0);
+        Assert.Equal(StageOneVoyageLocation.InboundFlight, voyage.Location);
+        Assert.Equal("planet.approach", voyage.LastCheckpoint);
+    }
+
 }

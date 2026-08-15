@@ -219,7 +219,10 @@ public sealed record GalaxyNavigationSaveData(
     int JumpCount,
     double TotalDistanceLightYears,
     IReadOnlyList<string> VisitedSystemIds,
-    string CurrentPlanetId = "");
+    string CurrentPlanetId = "",
+    string SelectedPlanetId = "",
+    int InterplanetaryTransferCount = 0,
+    double TotalInterplanetaryDistanceMeters = 0.0);
 
 public sealed record EcologySaveData(
     long WorldSeed,

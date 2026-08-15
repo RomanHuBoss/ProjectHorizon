@@ -106,6 +106,7 @@ public sealed class GalaxyNavigationRuntime
     private readonly HashSet<string> _visitedSystemIds = new(
         StringComparer.Ordinal);
     private string _currentPlanetId = string.Empty;
+    private string _selectedPlanetId = string.Empty;
 
     public GalaxyNavigationRuntime(long universeSeed)
     {
@@ -155,6 +156,10 @@ public sealed class GalaxyNavigationRuntime
         _currentPlanetId = ResolveSavedPlanetId(
             CurrentSystem,
             saveData.CurrentPlanetId);
+        _selectedPlanetId = ResolveSavedSelectedPlanetId(
+            CurrentSystem,
+            _currentPlanetId,
+            saveData.SelectedPlanetId);
 
         SelectedDestination = string.IsNullOrWhiteSpace(
             saveData.SelectedDestinationSystemId)
@@ -174,6 +179,9 @@ public sealed class GalaxyNavigationRuntime
 
         JumpCount = saveData.JumpCount;
         TotalDistanceLightYears = saveData.TotalDistanceLightYears;
+        InterplanetaryTransferCount = saveData.InterplanetaryTransferCount;
+        TotalInterplanetaryDistanceMeters =
+            saveData.TotalInterplanetaryDistanceMeters;
         foreach (string systemId in saveData.VisitedSystemIds)
         {
             _visitedSystemIds.Add(systemId);
@@ -192,15 +200,29 @@ public sealed class GalaxyNavigationRuntime
 
     public double TotalDistanceLightYears { get; private set; }
 
+    public int InterplanetaryTransferCount { get; private set; }
+
+    public double TotalInterplanetaryDistanceMeters { get; private set; }
+
     public IReadOnlyCollection<string> VisitedSystemIds =>
         _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
 
     public string CurrentPlanetId => _currentPlanetId;
 
+    public string SelectedPlanetId => _selectedPlanetId;
+
     public GalaxyPlanetDefinition CurrentPlanet => CurrentSystem.Planets
         .First(planet => string.Equals(
             planet.PlanetId,
             _currentPlanetId,
+            StringComparison.Ordinal));
+
+    public GalaxyPlanetDefinition? SelectedPlanet => string.IsNullOrWhiteSpace(
+            _selectedPlanetId)
+        ? null
+        : CurrentSystem.Planets.FirstOrDefault(planet => string.Equals(
+            planet.PlanetId,
+            _selectedPlanetId,
             StringComparison.Ordinal));
 
     public GalaxySystemDefinition LoadSystemForDeveloper(
@@ -210,6 +232,7 @@ public sealed class GalaxyNavigationRuntime
     {
         CurrentSystem = GenerateSystem(sectorX, sectorY, sectorZ);
         _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
+        _selectedPlanetId = string.Empty;
         SelectedDestination = null;
         _visitedSystemIds.Add(CurrentSystem.SystemId);
         return CurrentSystem;
@@ -331,7 +354,81 @@ public sealed class GalaxyNavigationRuntime
         }
 
         _currentPlanetId = planet.PlanetId;
+        if (string.Equals(_selectedPlanetId, _currentPlanetId, StringComparison.Ordinal))
+        {
+            _selectedPlanetId = string.Empty;
+        }
         result = $"current planet selected: {planet.PlanetId}";
+        return true;
+    }
+
+    public bool TrySelectPlanetDestination(
+        string planetId,
+        out string result)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(planetId);
+        GalaxyPlanetDefinition? planet = CurrentSystem.Planets.FirstOrDefault(
+            candidate => string.Equals(
+                candidate.PlanetId,
+                planetId,
+                StringComparison.Ordinal));
+        if (planet is null)
+        {
+            result = $"planet {planetId} does not belong to the current system";
+            return false;
+        }
+
+        if (string.Equals(planet.PlanetId, CurrentPlanetId, StringComparison.Ordinal))
+        {
+            _selectedPlanetId = string.Empty;
+            result = $"planetary destination cleared: {planet.PlanetId} is current";
+            return true;
+        }
+
+        if (string.Equals(planet.Archetype, "gas_giant", StringComparison.Ordinal))
+        {
+            result = $"planet {planetId} is a non-landable gas giant";
+            return false;
+        }
+
+        _selectedPlanetId = planet.PlanetId;
+        result = $"planetary destination selected: {planet.PlanetId}";
+        return true;
+    }
+
+    public void ClearPlanetDestination()
+    {
+        _selectedPlanetId = string.Empty;
+    }
+
+    public bool TryCompletePlanetTransfer(
+        string planetId,
+        double distanceMeters,
+        out string result)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedPlanetId) ||
+            !string.Equals(_selectedPlanetId, planetId, StringComparison.Ordinal))
+        {
+            result = GameLocalizationService.Text("ui.interplanetary.runtime.transfer_mismatch");
+            return false;
+        }
+
+        if (!double.IsFinite(distanceMeters) || distanceMeters < 0.0)
+        {
+            result = GameLocalizationService.Text("ui.interplanetary.runtime.transfer_invalid_distance");
+            return false;
+        }
+
+        if (!TrySelectCurrentPlanet(planetId, out string selectionResult))
+        {
+            result = selectionResult;
+            return false;
+        }
+
+        _selectedPlanetId = string.Empty;
+        InterplanetaryTransferCount++;
+        TotalInterplanetaryDistanceMeters += distanceMeters;
+        result = $"planetary transfer complete: {planetId}; transfers={InterplanetaryTransferCount}";
         return true;
     }
 
@@ -549,6 +646,7 @@ public sealed class GalaxyNavigationRuntime
 
         CurrentSystem = next;
         _currentPlanetId = SelectDefaultPlanetId(CurrentSystem);
+        _selectedPlanetId = string.Empty;
         JumpCount++;
         TotalDistanceLightYears += distance;
         _visitedSystemIds.Add(CurrentSystem.SystemId);
@@ -577,7 +675,10 @@ public sealed class GalaxyNavigationRuntime
             JumpCount,
             TotalDistanceLightYears,
             _visitedSystemIds.OrderBy(id => id, StringComparer.Ordinal).ToArray(),
-            CurrentPlanetId);
+            CurrentPlanetId,
+            SelectedPlanetId,
+            InterplanetaryTransferCount,
+            TotalInterplanetaryDistanceMeters);
     }
 
     public string BuildSummary()
@@ -585,8 +686,10 @@ public sealed class GalaxyNavigationRuntime
         return $"galaxy={CurrentSystem.GalaxyId}; system={CurrentSystem.SystemId}; " +
             $"sector={CurrentSystem.SectorX},{CurrentSystem.SectorY},{CurrentSystem.SectorZ}; " +
             $"star={CurrentSystem.StarType}; planets={CurrentSystem.Planets.Count}; " +
-            $"planet={CurrentPlanetId}; visited={_visitedSystemIds.Count}; " +
-            $"jumps={JumpCount}; " +
+            $"planet={CurrentPlanetId}; planetTarget={SelectedPlanetId}; " +
+            $"visited={_visitedSystemIds.Count}; jumps={JumpCount}; " +
+            $"transfers={InterplanetaryTransferCount}; " +
+            $"transferDistance={TotalInterplanetaryDistanceMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
             $"distance={TotalDistanceLightYears.ToString("0.0", CultureInfo.InvariantCulture)}ly";
     }
 
@@ -619,6 +722,29 @@ public sealed class GalaxyNavigationRuntime
                 "gas_giant",
                 StringComparison.Ordinal));
         return (landable ?? system.Planets.First()).PlanetId;
+    }
+
+    private static string ResolveSavedSelectedPlanetId(
+        GalaxySystemDefinition system,
+        string currentPlanetId,
+        string savedPlanetId)
+    {
+        if (string.IsNullOrWhiteSpace(savedPlanetId))
+        {
+            return string.Empty;
+        }
+
+        GalaxyPlanetDefinition? selected = system.Planets.FirstOrDefault(planet =>
+            string.Equals(planet.PlanetId, savedPlanetId, StringComparison.Ordinal));
+        if (selected is null ||
+            string.Equals(selected.PlanetId, currentPlanetId, StringComparison.Ordinal) ||
+            string.Equals(selected.Archetype, "gas_giant", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                "Saved planetary destination is invalid for the current system.");
+        }
+
+        return selected.PlanetId;
     }
 
     private static string ResolveSavedPlanetId(
@@ -660,6 +786,9 @@ public sealed class GalaxyNavigationRuntime
               saveData.SelectedSectorY != 0 ||
               saveData.SelectedSectorZ != 0)) ||
             saveData.JumpCount < 0 ||
+            saveData.InterplanetaryTransferCount < 0 ||
+            !double.IsFinite(saveData.TotalInterplanetaryDistanceMeters) ||
+            saveData.TotalInterplanetaryDistanceMeters < 0.0 ||
             !double.IsFinite(saveData.TotalDistanceLightYears) ||
             saveData.TotalDistanceLightYears < 0.0 ||
             saveData.VisitedSystemIds is null ||

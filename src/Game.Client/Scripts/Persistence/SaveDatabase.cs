@@ -2281,6 +2281,8 @@ public sealed partial class SaveDatabase : IDisposable
         {
             TotalDistanceLightYears = NormalizeSignedZero(
                 navigation.TotalDistanceLightYears),
+            TotalInterplanetaryDistanceMeters = NormalizeSignedZero(
+                navigation.TotalInterplanetaryDistanceMeters),
             VisitedSystemIds = navigation.VisitedSystemIds
                 .OrderBy(id => id, StringComparer.Ordinal)
                 .ToArray()
@@ -2303,6 +2305,11 @@ public sealed partial class SaveDatabase : IDisposable
               !navigation.CurrentPlanetId.StartsWith(
                   "planet.",
                   StringComparison.Ordinal))) ||
+            (!string.IsNullOrEmpty(navigation.SelectedPlanetId) &&
+             (!GameContentCatalog.IsStableId(navigation.SelectedPlanetId) ||
+              !navigation.SelectedPlanetId.StartsWith(
+                  "planet.",
+                  StringComparison.Ordinal))) ||
             (!string.IsNullOrEmpty(navigation.SelectedDestinationSystemId) &&
              !GameContentCatalog.IsStableId(
                  navigation.SelectedDestinationSystemId)) ||
@@ -2311,6 +2318,9 @@ public sealed partial class SaveDatabase : IDisposable
               navigation.SelectedSectorY != 0 ||
               navigation.SelectedSectorZ != 0)) ||
             navigation.JumpCount < 0 ||
+            navigation.InterplanetaryTransferCount < 0 ||
+            !double.IsFinite(navigation.TotalInterplanetaryDistanceMeters) ||
+            navigation.TotalInterplanetaryDistanceMeters < 0.0 ||
             !double.IsFinite(navigation.TotalDistanceLightYears) ||
             navigation.TotalDistanceLightYears < 0.0 ||
             navigation.VisitedSystemIds is null ||

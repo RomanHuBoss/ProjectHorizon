@@ -86,6 +86,23 @@ public partial class StarSystemSimulationNode : Node3D
         RenderSnapshot(_snapshot);
     }
 
+    public bool TryGetBodyDisplayPosition(
+        string bodyId,
+        out Vector3 globalPosition)
+    {
+        if (!string.IsNullOrWhiteSpace(bodyId) &&
+            _visuals.TryGetValue(bodyId, out MeshInstance3D? visual) &&
+            GodotObject.IsInstanceValid(visual) &&
+            visual.IsInsideTree())
+        {
+            globalPosition = visual.GlobalPosition;
+            return true;
+        }
+
+        globalPosition = Vector3.Zero;
+        return false;
+    }
+
     public StarSystemSimulationDiagnostics CreateDiagnostics()
     {
         StarSystemSimulationRuntime? runtime = _runtime;

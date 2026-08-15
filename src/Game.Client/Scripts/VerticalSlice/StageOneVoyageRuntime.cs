@@ -54,6 +54,8 @@ public sealed class StageOneVoyageRuntime
     public const double StationDockPositionY = 35.0;
     public const double StationDockPositionZ = -124.0;
     public const double StationUndockPositionZ = -112.0;
+    public const double PlanetApproachPositionY = 42.0;
+    public const double PlanetApproachPositionZ = -38.0;
 
     public StageOneVoyageRuntime(StageOneVoyageSaveData? saveData = null)
     {
@@ -302,6 +304,35 @@ public sealed class StageOneVoyageRuntime
             0.0,
             0.0);
         LastCheckpoint = "hyperspace.arrival";
+    }
+
+    public void ArriveAtPlanetaryApproach()
+    {
+        if (!Piloted)
+        {
+            throw new InvalidOperationException(
+                "Planetary approach requires a piloted ship.");
+        }
+
+        if (Location is not StageOneVoyageLocation.OutboundFlight and
+            not StageOneVoyageLocation.InboundFlight)
+        {
+            throw new InvalidOperationException(
+                "Planetary approach requires orbital flight.");
+        }
+
+        Location = StageOneVoyageLocation.InboundFlight;
+        SetPose(
+            SurfacePositionX,
+            PlanetApproachPositionY,
+            PlanetApproachPositionZ,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0);
+        LastCheckpoint = "planet.approach";
     }
 
     public StageOneVoyageActionResult TryUndock(

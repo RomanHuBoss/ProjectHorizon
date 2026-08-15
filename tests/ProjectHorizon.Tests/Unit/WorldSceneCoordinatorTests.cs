@@ -125,4 +125,41 @@ public sealed class WorldSceneCoordinatorTests
         Assert.Equal(0, runtime.HyperspaceTransitions);
     }
 
+    [Fact]
+    public void InterplanetaryOrbitHandoff_ChangesPlanetOnlyThroughTransit()
+    {
+        WorldSceneCoordinatorRuntime runtime = new(
+            WorldSceneContext.Create(
+                WorldSceneKind.Orbit,
+                "system.alpha",
+                "planet.alpha.0"));
+
+        Assert.Equal(
+            WorldSceneTransitionResult.Rejected,
+            runtime.TryTransition(
+                WorldSceneContext.Create(
+                    WorldSceneKind.Orbit,
+                    "system.alpha",
+                    "planet.alpha.1"),
+                out _));
+        Assert.Equal(
+            WorldSceneTransitionResult.Applied,
+            runtime.TryTransition(
+                WorldSceneContext.Create(
+                    WorldSceneKind.InterplanetaryTransit,
+                    "system.alpha",
+                    "planet.alpha.0"),
+                out _));
+        Assert.Equal(
+            WorldSceneTransitionResult.Applied,
+            runtime.TryTransition(
+                WorldSceneContext.Create(
+                    WorldSceneKind.Orbit,
+                    "system.alpha",
+                    "planet.alpha.1"),
+                out _));
+        Assert.Equal("planet.alpha.1", runtime.Current.PlanetId);
+        Assert.Equal(WorldSceneKind.Orbit, runtime.Current.Kind);
+    }
+
 }

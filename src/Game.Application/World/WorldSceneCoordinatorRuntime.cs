@@ -5,7 +5,8 @@ public enum WorldSceneKind
     Surface = 0,
     Orbit = 1,
     StationInterior = 2,
-    HyperspaceTransit = 3
+    HyperspaceTransit = 3,
+    InterplanetaryTransit = 4
 }
 
 public enum WorldSceneTransitionResult
@@ -187,6 +188,10 @@ public sealed class WorldSceneCoordinatorRuntime
                 sameSystem && samePlanet,
             (WorldSceneKind.HyperspaceTransit, WorldSceneKind.StationInterior) =>
                 true,
+            (WorldSceneKind.Orbit, WorldSceneKind.InterplanetaryTransit) =>
+                sameSystem && samePlanet,
+            (WorldSceneKind.InterplanetaryTransit, WorldSceneKind.Orbit) =>
+                sameSystem,
             _ => false
         };
     }

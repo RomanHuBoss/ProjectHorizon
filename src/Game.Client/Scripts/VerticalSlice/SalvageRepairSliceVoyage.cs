@@ -176,6 +176,13 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        if (_interplanetaryTravelRuntime is not null &&
+            _galaxyNavigationRuntime is not null &&
+            !_interplanetaryTravelRuntime.IsCruising)
+        {
+            _interplanetaryTravelRuntime.SynchronizeSelection(GalaxyNavigation);
+        }
+
         ConfigureVoyageShipFromDerivedStats();
         if (_orbitRuntimeActive && _orbitalDockMarker is not null)
         {
@@ -203,43 +210,46 @@ public partial class SalvageRepairSlice
         }
         else if (_voyageNavigationAssist)
         {
-            Vector3 target = StageOneVoyage.Location ==
-                    StageOneVoyageLocation.OutboundFlight
-                ? new Vector3(
-                    (float)StageOneVoyageRuntime.StationDockPositionX,
-                    (float)StageOneVoyageRuntime.StationDockPositionY,
-                    (float)StageOneVoyageRuntime.StationDockPositionZ)
-                : new Vector3(
-                    (float)StageOneVoyageRuntime.SurfacePositionX,
-                    (float)StageOneVoyageRuntime.LaunchPositionY,
-                    (float)StageOneVoyageRuntime.SurfacePositionZ);
-            Vector3 offset = target - _voyageShip.GlobalPosition;
-            float distance = offset.Length();
-            if (distance > 0.25f)
+            if (!TryApplyInterplanetaryNavigationAssist())
             {
-                _voyageShip.LookAt(target, Vector3.Up);
-            }
+                Vector3 target = StageOneVoyage.Location ==
+                        StageOneVoyageLocation.OutboundFlight
+                    ? new Vector3(
+                        (float)StageOneVoyageRuntime.StationDockPositionX,
+                        (float)StageOneVoyageRuntime.StationDockPositionY,
+                        (float)StageOneVoyageRuntime.StationDockPositionZ)
+                    : new Vector3(
+                        (float)StageOneVoyageRuntime.SurfacePositionX,
+                        (float)StageOneVoyageRuntime.LaunchPositionY,
+                        (float)StageOneVoyageRuntime.SurfacePositionZ);
+                Vector3 offset = target - _voyageShip.GlobalPosition;
+                float distance = offset.Length();
+                if (distance > 0.25f)
+                {
+                    _voyageShip.LookAt(target, Vector3.Up);
+                }
 
-            float approachRange = StageOneVoyage.Location ==
-                    StageOneVoyageLocation.OutboundFlight
-                ? (float)StageOneVoyageRuntime.DockingRangeMeters
-                : (float)StageOneVoyageRuntime.LandingRangeMeters;
-            float speedLimit = StageOneVoyage.Location ==
-                    StageOneVoyageLocation.OutboundFlight
-                ? (float)StageOneVoyageRuntime.MaximumDockingSpeed
-                : (float)StageOneVoyageRuntime.MaximumLandingSpeed;
-            bool braking = distance <= approachRange + 8.0f ||
-                _voyageShip.Speed > speedLimit * 0.88f;
-            float forward = braking ? 0.0f : 0.78f;
-            _voyageShip.SetExternalCommand(new ShipControlCommand(
-                forward,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                0.0f,
-                distance > 45.0f,
-                braking));
+                float approachRange = StageOneVoyage.Location ==
+                        StageOneVoyageLocation.OutboundFlight
+                    ? (float)StageOneVoyageRuntime.DockingRangeMeters
+                    : (float)StageOneVoyageRuntime.LandingRangeMeters;
+                float speedLimit = StageOneVoyage.Location ==
+                        StageOneVoyageLocation.OutboundFlight
+                    ? (float)StageOneVoyageRuntime.MaximumDockingSpeed
+                    : (float)StageOneVoyageRuntime.MaximumLandingSpeed;
+                bool braking = distance <= approachRange + 8.0f ||
+                    _voyageShip.Speed > speedLimit * 0.88f;
+                float forward = braking ? 0.0f : 0.78f;
+                _voyageShip.SetExternalCommand(new ShipControlCommand(
+                    forward,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    0.0f,
+                    distance > 45.0f,
+                    braking));
+            }
         }
         else
         {
@@ -267,6 +277,7 @@ public partial class SalvageRepairSlice
         if (_orbitalDockMarker is not null)
         {
             _orbitalDockMarker.Visible =
+                _interplanetaryTravelRuntime?.IsCruising != true &&
                 _stageOneVoyageRuntime?.Location ==
                     StageOneVoyageLocation.OutboundFlight;
         }
@@ -274,6 +285,7 @@ public partial class SalvageRepairSlice
         if (_planetApproachMarker is not null)
         {
             _planetApproachMarker.Visible =
+                _interplanetaryTravelRuntime?.IsCruising != true &&
                 _stageOneVoyageRuntime?.Location ==
                     StageOneVoyageLocation.InboundFlight;
         }
@@ -296,6 +308,7 @@ public partial class SalvageRepairSlice
                 _status = LF("ui.voyage.nav_assist", ("state", L(_voyageNavigationAssist ? "ui.common.on" : "ui.common.off")));
                 if (!_voyageNavigationAssist)
                 {
+                    CancelInterplanetaryCruiseForManualControl();
                     _voyageShip?.ClearExternalCommand();
                 }
             }

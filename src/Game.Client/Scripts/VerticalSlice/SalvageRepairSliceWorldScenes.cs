@@ -69,23 +69,25 @@ public partial class SalvageRepairSlice
             $"planet={diagnostics.PlanetId}; shell={diagnostics.ScenePath}; " +
             $"hostChildren={diagnostics.HostChildren}; surfaceActive={(_surfaceRuntimeActive ? 1 : 0)}; " +
             $"orbitActive={(_orbitRuntimeActive ? 1 : 0)}; " +
-            "contexts=Surface/Orbit/StationInterior/HyperspaceTransit; " +
+            "contexts=Surface/Orbit/StationInterior/HyperspaceTransit/InterplanetaryTransit; " +
             "persistence=derived-from-voyage+galaxy; wholeGalaxyResident=0; F5=acceptance.");
     }
 
     private WorldSceneContext ResolveWorldSceneContext()
     {
-        WorldSceneKind kind = StageOneVoyage.Location switch
-        {
-            StageOneVoyageLocation.PlanetSurface => WorldSceneKind.Surface,
-            StageOneVoyageLocation.OutboundFlight => WorldSceneKind.Orbit,
-            StageOneVoyageLocation.OrbitalStation => WorldSceneKind.StationInterior,
-            StageOneVoyageLocation.InboundFlight => WorldSceneKind.Orbit,
-            _ => throw new ArgumentOutOfRangeException(
-                nameof(StageOneVoyage.Location),
-                StageOneVoyage.Location,
-                "Unknown voyage location.")
-        };
+        WorldSceneKind kind = _interplanetaryTravelRuntime?.IsCruising == true
+            ? WorldSceneKind.InterplanetaryTransit
+            : StageOneVoyage.Location switch
+            {
+                StageOneVoyageLocation.PlanetSurface => WorldSceneKind.Surface,
+                StageOneVoyageLocation.OutboundFlight => WorldSceneKind.Orbit,
+                StageOneVoyageLocation.OrbitalStation => WorldSceneKind.StationInterior,
+                StageOneVoyageLocation.InboundFlight => WorldSceneKind.Orbit,
+                _ => throw new ArgumentOutOfRangeException(
+                    nameof(StageOneVoyage.Location),
+                    StageOneVoyage.Location,
+                    "Unknown voyage location.")
+            };
 
         return WorldSceneContext.Create(
             kind,
@@ -150,9 +152,11 @@ public partial class SalvageRepairSlice
             WorldSceneKind.Orbit => ResolveSurfaceRuntimeActive(),
             WorldSceneKind.StationInterior => false,
             WorldSceneKind.HyperspaceTransit => false,
+            WorldSceneKind.InterplanetaryTransit => false,
             _ => false
         };
-        bool orbitActive = kind == WorldSceneKind.Orbit;
+        bool orbitActive = kind is WorldSceneKind.Orbit or
+            WorldSceneKind.InterplanetaryTransit;
 
         ApplySurfaceRuntimeActivation(surfaceActive, force);
         ApplyOrbitRuntimeActivation(orbitActive, force);
@@ -349,7 +353,8 @@ public partial class SalvageRepairSlice
             WorldSceneKind.Orbit => ResolveSurfaceRuntimeActive(),
             _ => false
         };
-        bool expectedOrbit = kind == WorldSceneKind.Orbit;
+        bool expectedOrbit = kind is WorldSceneKind.Orbit or
+            WorldSceneKind.InterplanetaryTransit;
         WorldSceneCoordinatorDiagnostics diagnostics =
             _worldSceneCoordinatorNode.CreateDiagnostics();
         return _surfaceRuntimeActive == expectedSurface &&

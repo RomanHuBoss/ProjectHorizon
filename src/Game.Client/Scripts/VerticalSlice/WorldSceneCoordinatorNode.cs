@@ -35,6 +35,8 @@ public partial class WorldSceneCoordinatorNode : Node3D
         "res://Scenes/World/StationInteriorShell.tscn";
     public const string HyperspaceScenePath =
         "res://Scenes/World/HyperspaceTransitShell.tscn";
+    public const string InterplanetaryScenePath =
+        "res://Scenes/World/InterplanetaryTransitShell.tscn";
 
     private static readonly IReadOnlyDictionary<WorldSceneKind, string>
         ScenePaths = new Dictionary<WorldSceneKind, string>
@@ -42,7 +44,8 @@ public partial class WorldSceneCoordinatorNode : Node3D
             [WorldSceneKind.Surface] = SurfaceScenePath,
             [WorldSceneKind.Orbit] = OrbitScenePath,
             [WorldSceneKind.StationInterior] = StationScenePath,
-            [WorldSceneKind.HyperspaceTransit] = HyperspaceScenePath
+            [WorldSceneKind.HyperspaceTransit] = HyperspaceScenePath,
+            [WorldSceneKind.InterplanetaryTransit] = InterplanetaryScenePath
         };
 
     private WorldSceneCoordinatorRuntime? _runtime;

@@ -5488,6 +5488,7 @@ public partial class SalvageRepairSlice : Node3D
         BeginAerialNavigationAcceptance();
         BeginStarSystemSimulationAcceptance();
         RunPlanetEnvironmentAcceptance();
+        RunInterplanetaryTravelAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5497,7 +5498,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7553,6 +7554,7 @@ public partial class SalvageRepairSlice : Node3D
             ("hyper", L(ShipSystems.HyperspaceReady ? "ui.common.ready" : "ui.common.blocked")));
         string voyageLine = BuildStageOneVoyageHudLine();
         string galaxyLine = BuildGalaxyNavigationHudLine();
+        string interplanetaryLine = BuildInterplanetaryTravelHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
         string planetEnvironmentLine = BuildPlanetEnvironmentHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
@@ -7589,6 +7591,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-126 (F5): {_aerialNavigationAcceptanceHud}",
             $"TASK-128 (F5): {_starSystemSimulationAcceptanceHud}",
             $"TASK-150 (F5): {_planetEnvironmentAcceptanceHud}",
+            $"TASK-152 (F5): {_interplanetaryTravelAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7613,6 +7616,7 @@ public partial class SalvageRepairSlice : Node3D
                 shipSystemsLine,
                 voyageLine,
                 galaxyLine,
+                interplanetaryLine,
                 starSystemLine,
                 planetEnvironmentLine,
                 worldSceneLine,
@@ -7656,6 +7660,7 @@ public partial class SalvageRepairSlice : Node3D
             shipSystemsLine,
             voyageLine,
             galaxyLine,
+            interplanetaryLine,
             starSystemLine,
             planetEnvironmentLine,
             worldSceneLine,

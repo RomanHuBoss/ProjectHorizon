@@ -2,13 +2,56 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task150-multi-planet-environments.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task152-interplanetary-travel.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — TASK-150 Multi-Planet Environment subsystem
+## 0. Текущая mega-итерация 2026-08-15 — TASK-152 Interplanetary Travel & Planet Activation Handoff
+
+**Исходный снимок:** `ProjectHorizon-main-task150.1-build-graceful-exit-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task152-interplanetary-travel.zip`.  
+**Версия:** `0.1.0-alpha.152`.  
+**Статус:** TASK-152 `IMPLEMENTED`; TASK-153 runtime acceptance `IN_PROGRESS`.
+
+### Синхронизация TASK-150/TASK-151
+
+Владелец продукта после TASK-150.1 прямо сообщил: **«всё работает»**. Это фиксируется как qualitative product-owner acceptance: TASK-150 и TASK-151 переводятся в `VERIFIED`. Отсутствующие численные build/F5/manual показатели не реконструируются и не приписываются задним числом.
+
+### Граница mega-итерации
+
+TASK-152 закрывает единую подсистему same-system planetary travel, предусмотренную концепцией полёта внутри звёздной системы, §15 космической симуляции и Stage 2 с 3–5 планетами: **System Map target → persisted target → physical assisted cruise → fuel debit → InterplanetaryTransit world residency → destination planet commit → local PlanetRuntime approach → save/restore**. Это не teleport selector и не новая параллельная flight physics. Используется существующий `ArcadeShipController` и его external command path.
+
+### Реализовано
+
+- System Map: Up/Down выбирают planet row; `Enter` выбирает landable `TARGET`; текущая планета помечается `CURRENT`; gas giant отклоняется;
+- `GalaxyNavigationRuntime` хранит `SelectedPlanetId`, `InterplanetaryTransferCount`, `TotalInterplanetaryDistanceMeters`; поля backward-compatible и не требуют SQLite schema bump;
+- новый Godot-independent `InterplanetaryTravelRuntime` валидирует piloted/flight-ready state, рассчитывает bounded fuel cost, braking/arrival thresholds и exact source/target transaction;
+- существующий `K` navigation assist при наличии planetary target использует live proxy position из `StarSystemSimulationNode` и управляет кораблём через `SetExternalCommand`; ручное отключение `K` прекращает assisted cruise, цель сохраняется, топливо не возвращается;
+- world graph расширен `InterplanetaryTransit`: разрешён `Orbit(source) -> InterplanetaryTransit(source) -> Orbit(destination)` в той же системе; прямой cross-planet Orbit→Orbit остаётся запрещён;
+- во время transit system proxies остаются активны, тяжёлая surface residency выключена; после arrival `CurrentPlanetId` коммитится, transfer counters обновляются, ship rebased в локальный `planet.approach`, после чего действует существующий inbound/landing flow;
+- добавлены `InterplanetaryTransitShell.tscn`, `InterplanetaryTravelAcceptance.cs`, `SalvageRepairSliceInterplanetaryTravel.cs`, `docs/INTERPLANETARY_TRAVEL.md`;
+- F5 расширен TASK-152 acceptance; добавлены 3 xUnit regression checks и `tools/validate-task152-interplanetary-travel.py`, включённый в section-37 local quality scripts;
+- RU/EN localization parity сохранена.
+
+### Статическая проверка в среде подготовки
+
+Все 15 доступных repository static gates после финальных изменений проходят, включая JSON/Godot/localization/audio/developer diagnostics, §36/§37/§38, platform architecture, TASK-146/TASK-148/TASK-149.4/TASK-150 и новый `TASK-152 INTERPLANETARY TRAVEL CONTRACT PASS: starterPlanets=4/4; targetSelection=1; targetPersistence=1; fuel=1; physicalGuidance=1; proxyTarget=1; worldHandoff=1; singlePlanetResidency=1; localApproach=1; transferCounters=1; persistence=1; systemMap=1; manualCancel=1; f5=1; xunit=3/3; localization=1.` Изменённые C# sources дополнительно проходят lexical/bracket balance. `dotnet`, `csc`, `msbuild` и Godot в среде подготовки отсутствуют, поэтому real compile/xUnit/Godot runtime для alpha.152 не заявляются.
+
+### Приёмка TASK-153
+
+1. `tools\clean-build-windows10.cmd` → `0 warnings / 0 errors`.
+2. F5 → `TASK-152 interplanetary travel acceptance PASS` с targetSelection/targetPersistence/fuelDebited/guidance/worldHandoff/arrival/transferPersistence/sameSystem = 1.
+3. Manual: `M → System → выбрать другую landable planet → Enter`, затем полёт/`K`; должен появиться BEGIN, физическое сближение с proxy и `TASK-152 interplanetary transfer PASS`.
+4. После arrival System Map показывает destination как `CURRENT`, target пуст; последующая посадка использует обычный inbound flow.
+5. Graceful exit → Continue сохраняет destination `CurrentPlanetId` и transfer counters.
+
+**Сознательная граница:** TASK-152 не вводит реальные астрономические масштабы/небесную механику, не грузит несколько detailed PlanetRuntime одновременно и не добавляет новый hotkey/flight controller.
+
+---
+
+## История предыдущей mega-итерации 2026-08-15 — TASK-150 Multi-Planet Environment subsystem
 
 ## 0.1. Hotfix 2026-08-15 — TASK-150.1 build + graceful-exit closure
 
@@ -5220,13 +5263,13 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `WORLD-100` | Четыре явных world contexts Surface/Orbit/StationInterior/HyperspaceTransit | `VERIFIED` | `WorldSceneKind`; application runtime |
+| `WORLD-100` | Явные world contexts Surface/Orbit/StationInterior/HyperspaceTransit/InterplanetaryTransit | `VERIFIED` | `WorldSceneKind`; application runtime |
 | `WORLD-101` | Разрешён только связный transition graph без произвольных телепортов | `VERIFIED` | `WorldSceneCoordinatorRuntime.IsAllowedTransition`; rejected counter |
-| `WORLD-102` | System/planet могут смениться только на завершении hyperspace | `VERIFIED` | same-system/same-planet guards; Hyper→Station destination edge |
-| `WORLD-103` | Одновременно активен ровно один PackedScene context shell | `VERIFIED` | `WorldSceneCoordinatorNode`; `HostChildren==1`; four shell scenes |
+| `WORLD-102` | System меняется только через hyperspace; planet — только через interplanetary transit | `VERIFIED` | same-system/same-planet guards; Hyper→Station destination edge |
+| `WORLD-103` | Одновременно активен ровно один PackedScene context shell | `VERIFIED` | `WorldSceneCoordinatorNode`; `HostChildren==1`; five shell scenes |
 | `WORLD-104` | Surface/Orbit heavy runtime управляется bounded residency policy | `VERIFIED` | surface suspension from TASK-128 + orbit save/suspend/restore |
-| `WORLD-105` | StationInterior и HyperspaceTransit не держат Surface/Orbit runtime | `VERIFIED` | both residency flags false; collision/process/visibility suspended |
-| `WORLD-106` | Star-system proxies видимы только в Orbit | `VERIFIED` | `renderSystemProxies` gated by current world kind |
+| `WORLD-105` | StationInterior/HyperspaceTransit не держат Surface/Orbit runtime; InterplanetaryTransit держит только system/orbit representation | `VERIFIED` | both residency flags false; collision/process/visibility suspended |
+| `WORLD-106` | Star-system proxies видимы в Orbit и InterplanetaryTransit | `VERIFIED` | `renderSystemProxies` gated by orbital/system-transit world kinds |
 | `WORLD-107` | Hyperspace scene transition транзакционен с galaxy jump | `VERIFIED` | begin transit; success destination completion; failed-jump rollback |
 | `WORLD-108` | Scene state не дублирует persistence location | `VERIFIED` | context derived from existing voyage+galaxy; no `world_scene` save key/schema bump |
 | `WORLD-109` | Player-facing diagnostics локализованы и F5 проверяет live residency | `VERIFIED` | RU/EN world-scene HUD + TASK-148 acceptance |
@@ -5239,23 +5282,42 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---|---|
-| `ENV-100` | Каталог содержит ровно 9 нормативных archetypes | `IMPLEMENTED` | `planet_environments.json`; TASK-150 static gate `archetypes=9/9` |
-| `ENV-101` | Starter system содержит 3–5 планет; TASK-150 baseline — 4 разных landable archetypes | `IMPLEMENTED` | `StarterPlanetArchetypes`; `starterPlanets=4/4`, `starterArchetypes=4/4` static contract |
-| `ENV-102` | Radius каждой планеты детерминирован и лежит в 20–80 км | `IMPLEMENTED` | `PlanetEnvironmentRuntime`; static range validation |
-| `ENV-103` | Landable planet имеет 1–8 active biomes и climate-factor selection | `IMPLEMENTED` | ecology cross-reference + latitude/elevation/water/noise sampler |
-| `ENV-104` | Water — spherical fixed-level presentation без fluid simulation | `IMPLEMENTED` | `planet_water_shell.gdshader`; no fluid solver |
-| `ENV-105` | Atmosphere — simplified spherical shell | `IMPLEMENTED` | `planet_atmosphere_shell.gdshader`; density/horizon/sunset parameters |
-| `ENV-106` | Clouds — 0–2 scrolling shell layers | `IMPLEMENTED` | `planet_cloud_shell.gdshader`; catalog bounds 0..2 |
-| `ENV-107` | Gas giant non-landable и не имеет surface biome set | `IMPLEMENTED` | catalog validation + runtime + xUnit contract |
-| `ENV-108` | Environment отражён в System Map и gameplay HUD | `IMPLEMENTED` | localized map row + HUD summary |
-| `ENV-109` | Developer Planet Preview визуализирует environment profile | `IMPLEMENTED` | cube-sphere preview + water/atmosphere/cloud shells |
-| `ENV-110` | Current planet сохраняется backward-compatible без SQLite schema bump | `IMPLEMENTED` | optional `GalaxyNavigationSaveData.CurrentPlanetId`; legacy fallback |
-| `ENV-111` | Environment детерминирован от stable planet seed, без global sequential RNG | `IMPLEMENTED` | stable hash/mix; repeated-profile acceptance |
-| `ENV-112` | Existing cube-sphere/quadtree terrain остаётся source geometry | `IMPLEMENTED` | presentation shells layered over `CubeSpherePrototype`; terrain pipeline unchanged |
-| `ENV-ACC-100` | Clean build новой редакции `0/0` | `IN_PROGRESS` | выполнить TASK-151 на Windows/Godot .NET |
-| `ENV-ACC-101` | Section-37 quality + xUnit environment tests green | `IN_PROGRESS` | static gates PASS; actual `dotnet test` unavailable in preparation environment |
-| `ENV-ACC-102` | F5 выдаёт TASK-150 PASS с exact 4/4, 9/9 и samples=16 | `IN_PROGRESS` | выполнить TASK-151 runtime acceptance |
-| `ENV-ACC-103` | Manual System Map + Planet Preview + cold current-planet restore | `IN_PROGRESS` | выполнить visual/manual smoke TASK-151 |
+| `ENV-100` | Каталог содержит ровно 9 нормативных archetypes | `VERIFIED` | `planet_environments.json`; TASK-150 static gate `archetypes=9/9` |
+| `ENV-101` | Starter system содержит 3–5 планет; TASK-150 baseline — 4 разных landable archetypes | `VERIFIED` | `StarterPlanetArchetypes`; `starterPlanets=4/4`, `starterArchetypes=4/4` static contract |
+| `ENV-102` | Radius каждой планеты детерминирован и лежит в 20–80 км | `VERIFIED` | `PlanetEnvironmentRuntime`; static range validation |
+| `ENV-103` | Landable planet имеет 1–8 active biomes и climate-factor selection | `VERIFIED` | ecology cross-reference + latitude/elevation/water/noise sampler |
+| `ENV-104` | Water — spherical fixed-level presentation без fluid simulation | `VERIFIED` | `planet_water_shell.gdshader`; no fluid solver |
+| `ENV-105` | Atmosphere — simplified spherical shell | `VERIFIED` | `planet_atmosphere_shell.gdshader`; density/horizon/sunset parameters |
+| `ENV-106` | Clouds — 0–2 scrolling shell layers | `VERIFIED` | `planet_cloud_shell.gdshader`; catalog bounds 0..2 |
+| `ENV-107` | Gas giant non-landable и не имеет surface biome set | `VERIFIED` | catalog validation + runtime + xUnit contract |
+| `ENV-108` | Environment отражён в System Map и gameplay HUD | `VERIFIED` | localized map row + HUD summary |
+| `ENV-109` | Developer Planet Preview визуализирует environment profile | `VERIFIED` | cube-sphere preview + water/atmosphere/cloud shells |
+| `ENV-110` | Current planet сохраняется backward-compatible без SQLite schema bump | `VERIFIED` | optional `GalaxyNavigationSaveData.CurrentPlanetId`; legacy fallback |
+| `ENV-111` | Environment детерминирован от stable planet seed, без global sequential RNG | `VERIFIED` | stable hash/mix; repeated-profile acceptance |
+| `ENV-112` | Existing cube-sphere/quadtree terrain остаётся source geometry | `VERIFIED` | presentation shells layered over `CubeSpherePrototype`; terrain pipeline unchanged |
+| `ENV-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | выполнить TASK-151 на Windows/Godot .NET  + product-owner «всё работает» acceptance 2026-08-15 |
+| `ENV-ACC-101` | Section-37 quality + xUnit environment tests green | `VERIFIED` | static gates PASS; actual `dotnet test` unavailable in preparation environment |
+| `ENV-ACC-102` | F5 выдаёт TASK-150 PASS с exact 4/4, 9/9 и samples=16 | `VERIFIED` | выполнить TASK-151 runtime acceptance  + product-owner «всё работает» acceptance 2026-08-15 |
+| `ENV-ACC-103` | Manual System Map + Planet Preview + cold current-planet restore | `VERIFIED` | выполнить visual/manual smoke TASK-151  + product-owner «всё работает» acceptance 2026-08-15 |
+
+### 8.25. Interplanetary Travel & Planet Activation Handoff
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `TRAVEL-100` | System Map выбирает landable planetary TARGET, не меняя current planet | `IMPLEMENTED` | `ConfirmPlanetaryDestination`; `TrySelectPlanetDestination`; CURRENT/TARGET markers |
+| `TRAVEL-101` | Target сохраняется backward-compatible отдельно от current planet | `IMPLEMENTED` | `SelectedPlanetId`; restore validation; no SQLite migration |
+| `TRAVEL-102` | Перелёт использует live system proxy и existing ship physics command path | `IMPLEMENTED` | `TryGetBodyDisplayPosition`; `SetExternalCommand`; no teleport during cruise |
+| `TRAVEL-103` | Начало перелёта требует piloted + FlightReady и расходует fuel | `IMPLEMENTED` | `InterplanetaryTravelRuntime.TryBeginCruise` |
+| `TRAVEL-104` | Arrival требует bounded distance + speed и braking policy | `IMPLEMENTED` | ArrivalRadius/MaximumArrivalSpeed/BrakingDistance |
+| `TRAVEL-105` | Planet identity меняется только через transactional InterplanetaryTransit | `IMPLEMENTED` | Orbit→InterplanetaryTransit→Orbit; direct cross-planet Orbit rejected |
+| `TRAVEL-106` | Во время transit surface suspended, system proxies остаются resident | `IMPLEMENTED` | world residency + star-system proxy gates |
+| `TRAVEL-107` | Arrival включает local planet approach и существующий landing flow | `IMPLEMENTED` | `ArriveAtPlanetaryApproach`; `ApplyStageOneVoyageToScene` |
+| `TRAVEL-108` | Transfer count/distance/current planet сохраняются точно | `IMPLEMENTED` | galaxy save tail + boundary validation + acceptance |
+| `TRAVEL-109` | F5/static/xUnit проверяют целую подсистему | `IMPLEMENTED` | TASK-152 acceptance; validator; xUnit 3/3 |
+| `TRAVEL-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-153 Windows/Godot .NET acceptance |
+| `TRAVEL-ACC-101` | Section-37 + xUnit green | `IN_PROGRESS` | static gates available; actual dotnet unavailable in preparation environment |
+| `TRAVEL-ACC-102` | F5 TASK-152 PASS | `IN_PROGRESS` | выполнить runtime acceptance |
+| `TRAVEL-ACC-103` | Manual target→cruise→arrival→landing→cold restore | `IN_PROGRESS` | выполнить gameplay smoke |
 
 ## 9. Очередь ближайших задач
 
@@ -5263,14 +5325,13 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-151` | Runtime acceptance Multi-Planet Environment | Clean build `0/0`; xUnit/quality; F5 TASK-150 `PASS`; System Map/Planet Preview/cold-restore smoke |
-| 2 | `TASK-152` | Stage 2 interplanetary travel / active-planet handoff | Player-selected orbital target, deterministic travel, Orbit→Planet world-shell transition, landing on another starter planet |
-| 3 | `TASK-153` | Stage 2 multi-planet content expansion | Water/atmosphere/ecology/exploration variation across the 4-planet starter system after travel is real |
-| 4 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | Clean build `0/0`; quality/xUnit; F5 TASK-152 PASS; manual target→cruise→landing→cold restore |
+| 2 | `TASK-154` | Stage 2 multi-planet content expansion | Water/atmosphere/ecology/exploration variation across the 4-planet starter system after travel is real |
+| 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Принято владельцем продукта:** TASK-149 World Scene Coordinator/runtime-regression closure и оставшийся TASK-143/TASK-145 technical acceptance-tail.  
-**Текущая реализация:** TASK-150 Multi-Planet Environment.  
-**Текущая приёмочная задача:** TASK-151.
+**Принято владельцем продукта:** TASK-149 technical foundation и TASK-150/TASK-151 Multi-Planet Environment acceptance.  
+**Текущая реализация:** TASK-152 Interplanetary Travel & Planet Activation Handoff.  
+**Текущая приёмочная задача:** TASK-153.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
