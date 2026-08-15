@@ -632,6 +632,24 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        PlayerSurvivalSaveData? expectedPlayerSurvival = expected.PlayerSurvival;
+        PlayerSurvivalSaveData? actualPlayerSurvival = actual.PlayerSurvival;
+        if ((expectedPlayerSurvival is null) != (actualPlayerSurvival is null))
+        {
+            mismatch = "player_survival presence differs";
+            return false;
+        }
+
+        if (expectedPlayerSurvival is not null && actualPlayerSurvival is not null &&
+            !string.Equals(
+                JsonSerializer.Serialize(CanonicalizePlayerSurvival(expectedPlayerSurvival)),
+                JsonSerializer.Serialize(CanonicalizePlayerSurvival(actualPlayerSurvival)),
+                StringComparison.Ordinal))
+        {
+            mismatch = "player_survival differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -1053,7 +1071,8 @@ public sealed partial class SaveDatabase : IDisposable
             "'production_queue', 'production_queue_network', " +
             "'inventory_properties', 'station_services', " +
             "'base_construction', 'planetary_exploration', 'ship_systems', " +
-            "'stage_one_voyage', 'galaxy_navigation', 'ecology');",
+            "'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
+            "'procedural_quests', 'player_survival');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1243,6 +1262,19 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeProceduralQuests(snapshot.ProceduralQuests))));
+        }
+
+        if (snapshot.PlayerSurvival is not null)
+        {
+            ValidatePlayerSurvival(snapshot.PlayerSurvival);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'player_survival', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(
+                    CanonicalizePlayerSurvival(snapshot.PlayerSurvival))));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1490,6 +1522,7 @@ public sealed partial class SaveDatabase : IDisposable
         GalaxyNavigationSaveData? galaxyNavigation = null;
         EcologySaveData? ecology = null;
         ProceduralQuestSaveData? proceduralQuests = null;
+        PlayerSurvivalSaveData? playerSurvival = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1502,7 +1535,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
                 "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
-                "'procedural_quests') ORDER BY setting_key;";
+                "'procedural_quests', 'player_survival') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1824,6 +1857,31 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "player_survival",
+            out string? playerSurvivalJson))
+        {
+            if (string.IsNullOrWhiteSpace(playerSurvivalJson))
+            {
+                throw new InvalidDataException(
+                    "player_survival setting is empty.");
+            }
+
+            try
+            {
+                playerSurvival = JsonSerializer.Deserialize<PlayerSurvivalSaveData>(
+                    playerSurvivalJson) ?? throw new InvalidDataException(
+                        "player_survival setting deserialized to null.");
+                ValidatePlayerSurvival(playerSurvival);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "player_survival setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -1930,7 +1988,8 @@ public sealed partial class SaveDatabase : IDisposable
             stageOneVoyage,
             galaxyNavigation,
             ecology,
-            proceduralQuests);
+            proceduralQuests,
+            playerSurvival);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -2312,6 +2371,58 @@ public sealed partial class SaveDatabase : IDisposable
                 throw new InvalidDataException(
                     "procedural_quests contains an invalid or duplicate quest state.");
             }
+        }
+    }
+
+    private static PlayerSurvivalSaveData CanonicalizePlayerSurvival(
+        PlayerSurvivalSaveData survival)
+    {
+        ArgumentNullException.ThrowIfNull(survival);
+        return survival with
+        {
+            InstalledSuitModuleIds = survival.InstalledSuitModuleIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray(),
+            InstalledMultitoolModuleIds = survival.InstalledMultitoolModuleIds
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .ToArray()
+        };
+    }
+
+    private static void ValidatePlayerSurvival(PlayerSurvivalSaveData survival)
+    {
+        ArgumentNullException.ThrowIfNull(survival);
+        double[] values =
+        {
+            survival.Health, survival.Shield, survival.Stamina,
+            survival.LifeSupport, survival.HazardProtection, survival.Oxygen,
+            survival.JetpackEnergy, survival.MultitoolEnergy
+        };
+        if (values.Any(value => !double.IsFinite(value) || value < 0.0) ||
+            survival.InstalledSuitModuleIds is null ||
+            survival.InstalledMultitoolModuleIds is null ||
+            survival.InstalledSuitModuleIds.Count > PlayerSurvivalCatalog.ExpectedSuitModuleCount ||
+            survival.InstalledMultitoolModuleIds.Count > PlayerSurvivalCatalog.ExpectedMultitoolModuleCount ||
+            !Enum.TryParse(
+                survival.ActiveMultitoolFunction,
+                ignoreCase: false,
+                out PlayerMultitoolFunction activeFunction) ||
+            !Enum.IsDefined(activeFunction))
+        {
+            throw new InvalidDataException(
+                "player_survival contains invalid vitals, equipment sizes or multitool mode.");
+        }
+
+        static bool ValidUnique(IReadOnlyList<string> ids, string prefix) =>
+            ids.All(id => GameContentCatalog.IsStableId(id) &&
+                id.StartsWith(prefix, StringComparison.Ordinal)) &&
+            ids.Distinct(StringComparer.Ordinal).Count() == ids.Count;
+
+        if (!ValidUnique(survival.InstalledSuitModuleIds, "module.suit.") ||
+            !ValidUnique(survival.InstalledMultitoolModuleIds, "tool."))
+        {
+            throw new InvalidDataException(
+                "player_survival contains invalid or duplicate equipment IDs.");
         }
     }
 

@@ -9,6 +9,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private double _decisionAccumulator;
     private double _ageSeconds;
     private double _lastHitAge = -100.0;
+    private double _nextAttackAtAge;
     private Vector3 _wanderDirection = Vector3.Forward;
 
     public string InstanceId { get; private set; } = string.Empty;
@@ -283,6 +284,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
         Velocity = Velocity.Lerp(targetVelocity, Math.Clamp(delta * 3.2f, 0.0f, 1.0f));
         MoveAndSlide();
+        if (string.Equals(BehaviorState, "Attack", StringComparison.Ordinal) &&
+            _player is PlayerController player &&
+            GlobalPosition.DistanceTo(player.GlobalPosition) <= 1.75f &&
+            _ageSeconds >= _nextAttackAtAge)
+        {
+            double damage = 6.0 + _definition.Aggression * 5.0;
+            player.ReceiveExternalDamage(damage, $"fauna:{_definition.FaunaId}");
+            _nextAttackAtAge = _ageSeconds + 1.25;
+            GD.Print(
+                "TASK-120 fauna damage PASS: " +
+                $"species={_definition.FaunaId}; damage={damage:0.0}; cooldown=1.25s.");
+        }
         if (!string.Equals(
             _definition.MovementMode,
             "Flying",

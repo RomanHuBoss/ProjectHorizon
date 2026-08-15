@@ -1,14 +1,110 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-14
-> **Подготовленный снимок:** `ProjectHorizon-main-procedural-quests-closure.zip`
+> **Последняя актуализация:** 2026-08-15
+> **Подготовленный снимок:** `ProjectHorizon-main-player-survival-multitool-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0A. Текущая синхронизация и mega-итерация 2026-08-14
+## 0A. Текущая синхронизация и mega-итерация 2026-08-15
+
+### Закрытие procedural quests по прямому решению владельца продукта
+
+Пользователь 2026-08-15 прямо распорядился считать `TASK-118/119` отработанными и
+перейти к следующей mega-итерации без сложной ручной проверки. Поэтому:
+
+- `TASK-118` — `IMPLEMENTED` → `VERIFIED`;
+- `TASK-119` — `IN_PROGRESS` → `VERIFIED`;
+- procedural repeatable mission core, Mission Journal, feasibility/state graph и
+  delta-only persistence считаются закрытыми для обычной разработки;
+- clean build/F5/runtime smoke `TASK-118` **не выполнялись и не заявляются как
+  выполненные**; статус повышен как явный `acceptance waiver by product owner`;
+- обнаруженный при интеграции дефект повторной записи optional setting
+  `procedural_quests` исправляется в `TASK-120`: ключ теперь входит в DELETE/replace
+  transaction перед повторным INSERT, а acceptance использует фактический путь
+  `SaveAutosaveCoordinator.AutosaveLogPath`.
+
+### TASK-120 — player survival / exosuit / multitool mega-iteration
+
+**Исходный снимок:** `ProjectHorizon-main-procedural-quests-closure.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-player-survival-multitool-closure.zip`.  
+**Git SHA:** архив не содержит `.git`; `TASK-006` остаётся `BLOCKED`.  
+**Связанные требования PDF v2.0:** §13 «Персонаж», §3.3 planetary environments,
+§22 persistence; нормативный Industry Content baseline §45–57 не изменяется.
+
+**Реализовано:**
+
+- добавлен строгий `player_survival.json` schema `1`: 11 базовых параметров
+  персонажа, `3` suit modules, `3` multitool modules, `6` survival consumables и
+  `8` landable environment archetypes; используются уже существующие IDs из
+  Industry Content v2, поэтому baseline `174 items / 42 resources / 128 recipes /
+  15 stations / 32 technologies` остаётся неизменным;
+- `PlayerSurvivalRuntime` исполняет Health, Shield, Stamina, LifeSupport,
+  HazardProtection, Temperature/Radiation/Toxic protection, Oxygen,
+  JetpackEnergy и MultitoolEnergy; suit modules изменяют protection/capacity,
+  consumables восстанавливают реальные runtime pools;
+- environmental tick для temperate/desert/frozen/volcanic/toxic/radioactive/
+  barren/oceanic учитывает temperature/radiation/toxic exposure, life support,
+  breathable/non-breathable oxygen, water swimming и health damage после
+  исчерпания protection; shield и энергии восстанавливаются по определённым
+  правилам без offline progress;
+- `PlayerController` расширен sprint, crouch, jetpack и swimming без создания
+  второго character controller; Shift расходует Stamina, удержание Space в воздухе
+  расходует JetpackEnergy, Ctrl приседает, в water volume Space/Ctrl управляют
+  всплытием/погружением;
+- multitool объединяет Scanner/Mining/Weapon/Analyzer/Repair на одном energy pool;
+  три существующих Tool outputs уменьшают расход и повышают effectiveness
+  соответствующих функций; mining подключён к resource collection, scanners — к
+  POI/ecology, weapon — к hitscan callback, repair — к starter/system repair;
+- активная fauna теперь при `Attack` действительно наносит shield/health damage
+  игроку с cooldown, а не только меняет AI state;
+- `I` открывает `EXOSUIT & MULTITOOL` с вкладками Overview/Suit/Multitool/
+  Consumables; install/uninstall/use проходят через существующий shared inventory
+  и production mirrors; `Z` переключает multitool mode;
+- в surface scene добавлен небольшой `WaterPool` (`Area3D`) для реального swim/
+  oxygen smoke без отдельной water subsystem;
+- persistence хранит vitals, active multitool mode и installed equipment в optional
+  `save_settings.player_survival`; SQLite schema остаётся `2`; поддержаны cold
+  restore, legacy fallback, graceful exit, periodic/autosave snapshots и `F8` reset;
+- `AutosaveTrigger.PlayerChanged` добавлен без изменения схемы БД; repeated-save
+  acceptance специально делает две последовательные записи, чтобы ловить
+  регрессию optional-setting replace semantics;
+- `F5` расширен изолированной `TASK-120` acceptance в
+  `save_1.player-survival-test.db`; она проверяет catalog coverage, protection,
+  hazards, oxygen, movement resources, multitool energy/effectiveness, damage,
+  consumables, slot rules, two-write persistence, cold restore, legacy fallback,
+  exact round-trip, autosave log, one-writer discipline и SQLite integrity.
+
+**Статусы:**
+
+- `TASK-118`: `IMPLEMENTED` → `VERIFIED` — прямой acceptance waiver пользователя;
+- `TASK-119`: `IN_PROGRESS` → `VERIFIED` — прямой acceptance waiver пользователя;
+- `TASK-120`: `NOT_STARTED` → `IMPLEMENTED`;
+- `TASK-121`: `NOT_STARTED` → `IN_PROGRESS` — local clean build + единый F5;
+- `TASK-006`: остаётся `BLOCKED`.
+
+**Минимальная runtime-приёмка TASK-121:**
+
+1. `tools\clean-build-windows10.cmd`: реальный `CoreCompile`, `0` errors.
+2. Запустить `SalvageRepairSlice`; startup должен содержать `TASK-120 player
+   survival catalog READY: schema=1; suit=3; multitool=3; consumables=6;
+   environments=8` и `TASK-120 player survival READY`.
+3. Если save восстановился в полёте — `F8`; затем один раз `F5`. Достаточный
+   критерий — `TASK-120 player survival acceptance PASS` с `coverage=1;
+   protection=1; hazards=1; oxygen=1; movement=1; multitoolRuntime=1; damage=1;
+   consumablesRuntime=1; slots=1; coldRestore=1; legacyFallback=1; roundTrip=1;
+   repeatedSave=1; logWritten=1; maxWriters=1; integrity=ok`.
+4. Необязательный smoke: `I` открывает equipment panel; Shift/Ctrl меняют режим
+   движения; WaterPool около `X=22,Z=22` переключает swimming.
+
+Длинная ручная цепочка не требуется. В среде подготовки .NET SDK/Godot не
+обнаружены, поэтому compilation/runtime нового C# здесь не заявляются.
+
+---
+
+## 0B. Предыдущая синхронизация и mega-итерация 2026-08-14
 
 ### Закрытие procedural ecology по прямому решению владельца продукта
 
@@ -140,7 +236,7 @@ objective APIs, а не требуют второй quest subsystem.
 
 ---
 
-## 0B. Предыдущая синхронизация и mega-итерация 2026-08-11
+## 0C. Предыдущая синхронизация и mega-итерация 2026-08-11
 
 ### Закрытие предыдущей galaxy/hyperspace итерации
 
@@ -328,7 +424,7 @@ C# lexical/bracket integrity и точная change-boundary относител�
 | D. Корабль | `VERIFIED` | Полёт, атмосфера, посадка, взлёт и 100 последовательных физических посадок подтверждены runtime; Прототип D закрыт |
 | E. Сохранение | `VERIFIED` | SQLite foundation, backup/recovery и copy migration schema `1→2` подтверждены чистой сборкой и runtime-проверками `C/X/Z`; все требования Прототипа E приняты |
 
-**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. Galaxy/hyperspace и procedural ecology дополнительно закрыты прямыми acceptance-waiver решениями владельца продукта, что явно отделено от runtime-доказательств. Текущая mega-итерация `TASK-118` реализует повторяемые procedural missions по §19: все 15 objective types в домене, deterministic board из 20 заданий, feasibility/state graph, Mission Journal, интеграцию с существующими gameplay events и delta-only SQLite persistence. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance — `IN_PROGRESS`.
+**Вывод:** ранее подтверждённые технические прототипы и core-подсистемы сохраняют принятые статусы. `TASK-118/119` дополнительно закрыты прямым acceptance-waiver решением владельца продукта, явно отделённым от runtime-доказательств. Текущая mega-итерация `TASK-120` закрывает core персонажа §13: survival pools, hazard protection, sprint/crouch/jetpack/swim, exosuit equipment, unified multitool energy, fauna damage и optional SQLite persistence. До пользовательского clean build + F5 статус новой подсистемы остаётся `IMPLEMENTED`, acceptance `TASK-121` — `IN_PROGRESS`.
 
 ## 3. Результат текущей итерации от 2026-08-03
 

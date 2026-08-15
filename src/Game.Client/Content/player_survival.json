@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "suitSlotLimit": 3,
+  "multitoolSlotLimit": 3,
+  "baseStats": {
+    "health": 100.0,
+    "shield": 60.0,
+    "stamina": 100.0,
+    "lifeSupport": 100.0,
+    "hazardProtection": 100.0,
+    "temperatureProtection": 18.0,
+    "radiationProtection": 12.0,
+    "toxicProtection": 12.0,
+    "oxygen": 100.0,
+    "jetpackEnergy": 100.0,
+    "multitoolEnergy": 100.0
+  },
+  "suitModules": [
+    {
+      "moduleId": "module.suit.thermal_liner",
+      "temperatureProtectionBonus": 52.0,
+      "radiationProtectionBonus": 0.0,
+      "toxicProtectionBonus": 0.0,
+      "hazardCapacityBonus": 20.0,
+      "lifeSupportCapacityBonus": 0.0,
+      "oxygenCapacityBonus": 0.0
+    },
+    {
+      "moduleId": "module.suit.radiation_mesh",
+      "temperatureProtectionBonus": 0.0,
+      "radiationProtectionBonus": 58.0,
+      "toxicProtectionBonus": 0.0,
+      "hazardCapacityBonus": 25.0,
+      "lifeSupportCapacityBonus": 0.0,
+      "oxygenCapacityBonus": 0.0
+    },
+    {
+      "moduleId": "module.suit.toxic_filter",
+      "temperatureProtectionBonus": 0.0,
+      "radiationProtectionBonus": 0.0,
+      "toxicProtectionBonus": 60.0,
+      "hazardCapacityBonus": 25.0,
+      "lifeSupportCapacityBonus": 25.0,
+      "oxygenCapacityBonus": 15.0
+    }
+  ],
+  "multitoolModules": [
+    {
+      "moduleId": "tool.mining_drill_bit",
+      "function": "Mining",
+      "energyCostMultiplier": 0.72,
+      "effectivenessBonus": 0.35
+    },
+    {
+      "moduleId": "tool.scanner_upgrade",
+      "function": "Scanner",
+      "energyCostMultiplier": 0.68,
+      "effectivenessBonus": 0.45
+    },
+    {
+      "moduleId": "tool.survey_beacon",
+      "function": "Analyzer",
+      "energyCostMultiplier": 0.75,
+      "effectivenessBonus": 0.30
+    }
+  ],
+  "consumables": [
+    {
+      "definitionId": "consumable.oxygen_canister",
+      "healthRestore": 0.0,
+      "shieldRestore": 0.0,
+      "lifeSupportRestore": 12.0,
+      "hazardRestore": 0.0,
+      "oxygenRestore": 45.0,
+      "jetpackRestore": 0.0,
+      "multitoolEnergyRestore": 0.0
+    },
+    {
+      "definitionId": "consumable.chemical_oxygen_generator",
+      "healthRestore": 0.0,
+      "shieldRestore": 0.0,
+      "lifeSupportRestore": 25.0,
+      "hazardRestore": 0.0,
+      "oxygenRestore": 100.0,
+      "jetpackRestore": 0.0,
+      "multitoolEnergyRestore": 0.0
+    },
+    {
+      "definitionId": "consumable.med_gel",
+      "healthRestore": 50.0,
+      "shieldRestore": 0.0,
+      "lifeSupportRestore": 0.0,
+      "hazardRestore": 0.0,
+      "oxygenRestore": 0.0,
+      "jetpackRestore": 0.0,
+      "multitoolEnergyRestore": 0.0
+    },
+    {
+      "definitionId": "consumable.repair_foam",
+      "healthRestore": 0.0,
+      "shieldRestore": 35.0,
+      "lifeSupportRestore": 0.0,
+      "hazardRestore": 25.0,
+      "oxygenRestore": 0.0,
+      "jetpackRestore": 0.0,
+      "multitoolEnergyRestore": 0.0
+    },
+    {
+      "definitionId": "consumable.emergency_heater",
+      "healthRestore": 0.0,
+      "shieldRestore": 0.0,
+      "lifeSupportRestore": 15.0,
+      "hazardRestore": 35.0,
+      "oxygenRestore": 0.0,
+      "jetpackRestore": 30.0,
+      "multitoolEnergyRestore": 0.0
+    },
+    {
+      "definitionId": "consumable.multitool_battery",
+      "healthRestore": 0.0,
+      "shieldRestore": 0.0,
+      "lifeSupportRestore": 0.0,
+      "hazardRestore": 0.0,
+      "oxygenRestore": 0.0,
+      "jetpackRestore": 0.0,
+      "multitoolEnergyRestore": 70.0
+    }
+  ],
+  "environments": [
+    {
+      "archetype": "temperate",
+      "temperatureHazard": 0.0,
+      "radiationHazard": 0.0,
+      "toxicHazard": 0.0,
+      "lifeSupportDrainPerSecond": 0.02,
+      "oxygenDrainPerSecond": 0.0,
+      "breathable": true
+    },
+    {
+      "archetype": "desert",
+      "temperatureHazard": 0.55,
+      "radiationHazard": 0.10,
+      "toxicHazard": 0.0,
+      "lifeSupportDrainPerSecond": 0.08,
+      "oxygenDrainPerSecond": 0.0,
+      "breathable": true
+    },
+    {
+      "archetype": "frozen",
+      "temperatureHazard": 0.75,
+      "radiationHazard": 0.05,
+      "toxicHazard": 0.0,
+      "lifeSupportDrainPerSecond": 0.10,
+      "oxygenDrainPerSecond": 0.0,
+      "breathable": true
+    },
+    {
+      "archetype": "volcanic",
+      "temperatureHazard": 1.0,
+      "radiationHazard": 0.20,
+      "toxicHazard": 0.15,
+      "lifeSupportDrainPerSecond": 0.15,
+      "oxygenDrainPerSecond": 0.05,
+      "breathable": false
+    },
+    {
+      "archetype": "toxic",
+      "temperatureHazard": 0.15,
+      "radiationHazard": 0.10,
+      "toxicHazard": 1.0,
+      "lifeSupportDrainPerSecond": 0.18,
+      "oxygenDrainPerSecond": 0.10,
+      "breathable": false
+    },
+    {
+      "archetype": "radioactive",
+      "temperatureHazard": 0.10,
+      "radiationHazard": 1.0,
+      "toxicHazard": 0.05,
+      "lifeSupportDrainPerSecond": 0.16,
+      "oxygenDrainPerSecond": 0.0,
+      "breathable": true
+    },
+    {
+      "archetype": "barren",
+      "temperatureHazard": 0.40,
+      "radiationHazard": 0.45,
+      "toxicHazard": 0.0,
+      "lifeSupportDrainPerSecond": 0.22,
+      "oxygenDrainPerSecond": 1.20,
+      "breathable": false
+    },
+    {
+      "archetype": "oceanic",
+      "temperatureHazard": 0.08,
+      "radiationHazard": 0.0,
+      "toxicHazard": 0.0,
+      "lifeSupportDrainPerSecond": 0.05,
+      "oxygenDrainPerSecond": 0.0,
+      "breathable": true
+    }
+  ]
+}

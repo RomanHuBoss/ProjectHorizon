@@ -28,9 +28,9 @@
 
 ## Текущее состояние
 
-Текущий Stage 1 vertical slice закрыт runtime-приёмкой. Проект перешёл к foundation следующего уровня: procedural galaxy, maps, route planning и hyperspace, без преждевременной генерации всей галактики в памяти.
+Текущий Stage 1 vertical slice и подсистемы through TASK-119 закрыты принятой приёмкой. Текущая mega-итерация TASK-120 добавляет core персонажа: survival pools, exosuit, unified multitool, hazards, sprint/crouch/jetpack/swim и persistent equipment без изменения нормативного Industry Content baseline.
 
-### Stage 1 voyage и все предшествующие подсистемы — `VERIFIED`; procedural galaxy/navigation/hyperspace — `IMPLEMENTED`
+### Подсистемы through TASK-119 — `VERIFIED`; player survival / exosuit / multitool — `IMPLEMENTED`
 
 Редакция 2.0 технического задания расширяет промышленную подсистему Project Horizon до полноценного data-driven каталога:
 
@@ -70,6 +70,7 @@ src/Game.Client/Content/station_services.json
 src/Game.Client/Content/base_construction.json
 src/Game.Client/Content/planetary_pois.json
 src/Game.Client/Content/procedural_quests.json
+src/Game.Client/Content/player_survival.json
 src/Game.Client/Content/ships.json
 src/Game.Client/Content/localization.ru.json
 src/Game.Client/Content/localization.en.json
@@ -89,6 +90,8 @@ src/Game.Client/Content/catalog_manifest.json
 `TASK-114` добавляет следующий целостный subsystem block: procedural galaxy, обязательные system/galaxy maps, route planning и hyperspace. `GalaxyNavigationRuntime` генерирует systems только по запросу из immutable universe seed, `GalaxyId`, integer sector coordinates и double system positions; whole galaxy никогда не помещается в один `Vector3` и не создаётся целиком в памяти. Каждый system имеет deterministic star type, 1–8 planets, archetypes, moons, atmosphere/water flags, economy, danger и planet seeds. `M` открывает Galaxy/System terminal; route planning использует A* по соседним sectors и фактический `HyperdriveRange` установленного ship loadout. Jump разрешён только commissioned/flight-ready кораблю с исправным hyperdrive и активным hyperspace module, только из orbital station; топливо списывается по длине waypoint. Current system, destination, counters и visited systems сохраняются в optional SQLite setting `galaxy_navigation` без повышения schema 2 и согласуются с `visited_planets`. После jump существующие voyage и station-services API переиспользуются в destination system. `F5` запускает отдельную `TASK-114` acceptance, включая 1000 deterministic samples и 100 последовательных hyperjumps.
 
 `TASK-118` закрывает процедурную mission/quest подсистему PDF v2.0 §19 и Stage 2 baseline на 20 заданий. `procedural_quests.json` задаёт баланс всех 15 objective types (`VisitLocation`, `ScanObject`, `ScanSpecies`, `CollectResource`, `CraftItem`, `DeliverItem`, `RepairObject`, `DefeatTarget`, `ProtectTarget`, `BuildModule`, `TradeItem`, `FindSignal`, `ExplorePlanet`, `ExploreSystem`, `ReturnToNpc`). `ProceduralQuestGenerator` строит deterministic 20-quest board из world seed и только из реально доступных capability pools; невозможные combat objectives не выдаются gameplay-board до появления реальных combat/protect targets, но движок и acceptance покрывают оба типа. Каждый generated `QuestDefinition` содержит линейный state graph из `QuestNode`/`QuestCondition`/`QuestAction` и `QuestReward`: objective → optional return-to-giver → claim. Feasibility проверяет существование target, NPC, equipment tier, landing/inventory capability и отсутствие циклов. `Q` на поверхности открывает отдельный mission journal; в Station Services `Q` по-прежнему переключает legacy Quests tab, а в полёте остаётся roll input. Progress подключён к существующим resource/craft/trade/repair/build/POI/ecology/voyage/galaxy events. Rewards зачисляются в реальную station-services economy; faction reputation остальных фракций вычисляется из completed mission state. Сохраняются только delta-state миссий в optional SQLite setting `procedural_quests`, schema остаётся `2`. `F5` включает изолированную `TASK-118` acceptance в `save_1.procedural-quests-test.db`.
+
+`TASK-120` закрывает core персонажа PDF v2.0 §13: Health, Shield, Stamina, LifeSupport, HazardProtection, Temperature/Radiation/Toxic protection, Oxygen, JetpackEnergy и MultitoolEnergy. `player_survival.json` связывает три существующих suit-модуля, три существующих Tool outputs и шесть consumables с runtime, не меняя нормативный baseline 174/42/128/15/32. На поверхности работают sprint, crouch, jetpack и water swimming; environmental archetype текущей планеты расходует hazard/life-support/oxygen с учётом protection. `I` открывает Exosuit & Multitool, `Z` переключает функцию multitool. Scanner/mining/weapon/analyzer/repair используют единый энергетический budget, fauna может наносить реальный shield/health damage. Состояние персонажа и equipment сохраняется в optional `save_settings.player_survival`, schema остаётся 2. Одновременно исправлен repeat-save defect: `procedural_quests` теперь удаляется/перезаписывается вместе с прочими optional settings, а TASK-116/TASK-118 acceptance читает фактический `SaveAutosaveCoordinator.AutosaveLogPath`. `F5` включает изолированную TASK-120 acceptance в `save_1.player-survival-test.db`.
 
 В состав v2 входят:
 
@@ -115,6 +118,11 @@ src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn
 
 ```text
 WASD / Space   движение и прыжок
+Shift          бег (расход Stamina)
+Ctrl           присесть; в воде — погружение
+Space hold     в воздухе — jetpack; в воде — всплытие
+I              Exosuit & Multitool
+Z              переключить функцию мультитула
 E              собрать ресурс / ремонтировать / открыть station или trader / подтвердить выбор
 Q              на поверхности вне UI открыть/закрыть procedural mission journal
 Up / Down      выбрать recipe, technology, queue job, market item или quest
@@ -157,7 +165,7 @@ F1             TASK-090/092/093/096/098: queue, properties, multi-station indust
 F2             TASK-083: chemical process runtime
 F3             TASK-082 + TASK-102: research и station services mega-acceptance
 F4             TASK-080 + TASK-108: Industry Content v2 и planetary exploration acceptance
-F5             TASK-076 + TASK-110 + TASK-112 + TASK-114 + TASK-116 + TASK-118 mega-acceptance
+F5             TASK-076 + TASK-110 + TASK-112 + TASK-114 + TASK-116 + TASK-118 + TASK-120 mega-acceptance
 F6             TASK-106: base construction mega-acceptance + legacy coolant regression
 F7             TASK-062 + TASK-100: salvage/repair и полный lifecycle всех 42 ресурсов
 F8             очистить gameplay-slot, включая ship systems, voyage и galaxy state
@@ -325,9 +333,10 @@ TASK-112 Stage 1 voyage (F5): PASS derived=1, preRepair=1, takeoff=1, fuel=1, do
 TASK-114 galaxy navigation (F5): PASS deterministic=1, stars=1, route=1, jump=1, stress100=1, restore=1
 TASK-116 ecology (F5): PASS biomes=16, flora=60, fauna=20, deterministic=1, populations=1, discovery=1, restore=1
 TASK-118 procedural quests (F5): PASS objectiveTypes=15, generated=20, deterministic=1, feasibility=1, lifecycle=1, gameplayBoard=1, restore=1
+TASK-120 player survival (F5): PASS suit=3, multitool=3, consumables=6, environments=8, hazards=1, oxygen=1, movement=1, damage=1, restore=1, repeatedSave=1
 ```
 
-`F5` прогоняет шесть независимых проверок. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива, docking/station/return/landing lifecycle, disembark, active-flight restore и exact persistence. `TASK-114` использует `save_1.galaxy-navigation-test.db`: проверяет 1000 deterministic systems, GalaxyId/Sector/Double3 hierarchy, все шесть star types, planet bounds, range-aware A*, strict preconditions, fuel debit, visited discovery, cold restore, legacy fallback, exact round-trip и 100 последовательных hyperjumps. `TASK-116` проверяет deterministic ecology baseline и delta-only persistence. `TASK-118` использует `save_1.procedural-quests-test.db` и проверяет все 15 objective types, deterministic 20-offer board, feasibility rejection, active limit, state-graph lifecycle, rewards, current gameplay board, cold restore, legacy fallback, exact round-trip, autosave log, one-writer discipline и SQLite integrity. Gameplay-slot ни одна acceptance не изменяет.
+`F5` прогоняет семь независимых проверок. `TASK-076` сохраняет полную runtime crafting matrix. `TASK-110` проверяет точные counts `6 classes / 7 systems / 18 modules`, module coverage, class stats, блокировку операций до starter repair, commissioning transition, slot limits, derived stats, damage/repair/readiness/fuel lifecycle, cold restore, legacy fallback и exact SQLite round-trip в `save_1.ship-systems-test.db`. `TASK-112` использует отдельную `save_1.stage-one-voyage-test.db`: подтверждает применение effective ship stats к flight profile, запрет посадки в неотремонтированный корабль, расход топлива, docking/station/return/landing lifecycle, disembark, active-flight restore и exact persistence. `TASK-114` использует `save_1.galaxy-navigation-test.db`: проверяет 1000 deterministic systems, GalaxyId/Sector/Double3 hierarchy, все шесть star types, planet bounds, range-aware A*, strict preconditions, fuel debit, visited discovery, cold restore, legacy fallback, exact round-trip и 100 последовательных hyperjumps. `TASK-116` проверяет deterministic ecology baseline и delta-only persistence. `TASK-118` использует `save_1.procedural-quests-test.db` и проверяет все 15 objective types, deterministic 20-offer board, feasibility rejection, active limit, state-graph lifecycle, rewards, current gameplay board, cold restore, legacy fallback, exact round-trip, autosave log, one-writer discipline и SQLite integrity. Gameplay-slot ни одна acceptance не изменяет.
 
 После замены файлов поверх собранной рабочей копии необходимо выполнить чистую сборку через `tools\clean-build-windows10.cmd` либо удалить `src\Game.Client\.godot\mono\temp`. В полном build log должен реально выполняться `CoreCompile`.
 

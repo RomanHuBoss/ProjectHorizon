@@ -19,7 +19,8 @@ public enum AutosaveTrigger
     BaseChanged = 6,
     GracefulExit = 7,
     DiscoveryChanged = 8,
-    ShipChanged = 9
+    ShipChanged = 9,
+    PlayerChanged = 10
 }
 
 public sealed record PlayerSaveData(
@@ -236,6 +237,19 @@ public sealed record ProceduralQuestSaveData(
     int BoardRevision,
     IReadOnlyList<ProceduralQuestStateSaveData> States);
 
+public sealed record PlayerSurvivalSaveData(
+    double Health,
+    double Shield,
+    double Stamina,
+    double LifeSupport,
+    double HazardProtection,
+    double Oxygen,
+    double JetpackEnergy,
+    double MultitoolEnergy,
+    string ActiveMultitoolFunction,
+    IReadOnlyList<string> InstalledSuitModuleIds,
+    IReadOnlyList<string> InstalledMultitoolModuleIds);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -256,7 +270,8 @@ public sealed record SaveGameSnapshot(
     StageOneVoyageSaveData? StageOneVoyage = null,
     GalaxyNavigationSaveData? GalaxyNavigation = null,
     EcologySaveData? Ecology = null,
-    ProceduralQuestSaveData? ProceduralQuests = null);
+    ProceduralQuestSaveData? ProceduralQuests = null,
+    PlayerSurvivalSaveData? PlayerSurvival = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

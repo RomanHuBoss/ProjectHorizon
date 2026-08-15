@@ -246,10 +246,7 @@ public static class EcologyAcceptanceRunner
                 await database.ReadDiagnosticsAsync(
                     slotId,
                     cancellationToken).ConfigureAwait(false);
-            string autosaveLog = Path.Combine(
-                Path.GetDirectoryName(databasePath) ?? ".",
-                Path.GetFileNameWithoutExtension(databasePath) +
-                    ".autosave.log");
+            string autosaveLog = autosave.AutosaveLogPath;
             bool logWritten = File.Exists(autosaveLog) &&
                 File.ReadAllText(autosaveLog).Contains(
                     "DiscoveryChanged",
@@ -328,6 +325,7 @@ public static class EcologyAcceptanceRunner
             databasePath + "-shm",
             databasePath + ".bak",
             Path.Combine(directory, baseName + ".autosave.log"),
+            Path.Combine(directory, "logs", baseName + ".autosave.log"),
             Path.Combine(directory, baseName + ".recovery.log")
         };
         foreach (string path in paths)

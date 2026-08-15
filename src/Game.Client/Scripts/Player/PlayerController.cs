@@ -1,3 +1,4 @@
+using System;
 using Godot;
 
 public partial class PlayerController : CharacterBody3D
@@ -6,7 +7,19 @@ public partial class PlayerController : CharacterBody3D
     public float MoveSpeed { get; set; } = 5.0f;
 
     [Export]
+    public float SprintMultiplier { get; set; } = 1.65f;
+
+    [Export]
+    public float CrouchMultiplier { get; set; } = 0.52f;
+
+    [Export]
     public float JumpVelocity { get; set; } = 5.0f;
+
+    [Export]
+    public float JetpackAcceleration { get; set; } = 9.0f;
+
+    [Export]
+    public float SwimSpeed { get; set; } = 3.2f;
 
     [Export]
     public float MouseSensitivity { get; set; } = 0.0025f;
@@ -20,15 +33,35 @@ public partial class PlayerController : CharacterBody3D
     private Node3D _head = null!;
     private Camera3D _camera = null!;
     private RayCast3D _interactionRay = null!;
+    private CollisionShape3D _collisionShape = null!;
+    private CapsuleShape3D _capsuleShape = null!;
+    private HitscanWeapon _weapon = null!;
     private float _gravity;
+    private float _standingCapsuleHeight;
+    private float _standingHeadY;
+
+    public IPlayerMovementResourceProvider? MovementResources { get; set; }
+    public Action<double, string>? ExternalDamageHandler { get; set; }
+    public Action? WeaponFired { get; set; }
+
+    public bool IsSprinting { get; private set; }
+    public bool IsCrouching { get; private set; }
+    public bool IsJetpacking { get; private set; }
+    public bool IsSwimming { get; private set; }
 
     public override void _Ready()
     {
         _head = GetNode<Node3D>("Head");
         _camera = GetNode<Camera3D>("Head/Camera3D");
-        _interactionRay = GetNode<RayCast3D>(
-            "Head/Camera3D/InteractionRay");
+        _interactionRay = GetNode<RayCast3D>("Head/Camera3D/InteractionRay");
+        _collisionShape = GetNode<CollisionShape3D>("CollisionShape3D");
+        _capsuleShape = _collisionShape.Shape as CapsuleShape3D ??
+            throw new InvalidOperationException("Player collision must use CapsuleShape3D.");
+        _weapon = GetNode<HitscanWeapon>("Head/Camera3D/HitscanWeapon");
+        _weapon.FireCommitted = () => WeaponFired?.Invoke();
         _interactionRay.AddException(this);
+        _standingCapsuleHeight = _capsuleShape.Height;
+        _standingHeadY = _head.Position.Y;
 
         _gravity = ProjectSettings
             .GetSetting("physics/3d/default_gravity")
@@ -42,10 +75,7 @@ public partial class PlayerController : CharacterBody3D
         if (inputEvent is InputEventMouseMotion mouseMotion &&
             Input.MouseMode == Input.MouseModeEnum.Captured)
         {
-            // Поворот всего персонажа по горизонтали.
             RotateY(-mouseMotion.Relative.X * MouseSensitivity);
-
-            // Поворот головы с камерой по вертикали.
             _head.RotateX(-mouseMotion.Relative.Y * MouseSensitivity);
 
             Vector3 headRotation = _head.Rotation;
@@ -53,7 +83,6 @@ public partial class PlayerController : CharacterBody3D
                 headRotation.X,
                 Mathf.DegToRad(-89.0f),
                 Mathf.DegToRad(89.0f));
-
             _head.Rotation = headRotation;
         }
 
@@ -63,14 +92,11 @@ public partial class PlayerController : CharacterBody3D
             GetViewport().SetInputAsHandled();
         }
 
-        // Escape освобождает курсор.
         if (inputEvent.IsActionPressed("ui_cancel"))
         {
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
 
-        // Щелчок, выполненный при свободном курсоре, только возвращает захват
-        // и не должен одновременно считаться выстрелом.
         if (inputEvent is InputEventMouseButton mouseButton &&
             mouseButton.Pressed &&
             mouseButton.ButtonIndex == MouseButton.Left &&
@@ -83,9 +109,7 @@ public partial class PlayerController : CharacterBody3D
 
     public bool TryInteract()
     {
-        if (TryGetRayInteractable(
-            out IInteractable rayInteractable,
-            out Node3D rayNode))
+        if (TryGetRayInteractable(out IInteractable rayInteractable, out Node3D rayNode))
         {
             rayInteractable.Interact(this);
             GD.Print($"Interaction ray: target={rayNode.Name}.");
@@ -112,17 +136,12 @@ public partial class PlayerController : CharacterBody3D
 
     public string GetInteractionPrompt()
     {
-        if (TryGetRayInteractable(
-            out _,
-            out Node3D rayNode))
+        if (TryGetRayInteractable(out _, out Node3D rayNode))
         {
             return $"aimed at {rayNode.Name} — press E";
         }
 
-        if (TryGetFallbackInteractable(
-            out _,
-            out Node3D fallbackNode,
-            out float distance))
+        if (TryGetFallbackInteractable(out _, out Node3D fallbackNode, out float distance))
         {
             return $"near {fallbackNode.Name} ({distance:0.0} m) — press E";
         }
@@ -130,44 +149,107 @@ public partial class PlayerController : CharacterBody3D
         return "no target in interaction range";
     }
 
+    public void ReceiveExternalDamage(double damage, string source)
+    {
+        if (damage <= 0.0 || !double.IsFinite(damage))
+        {
+            return;
+        }
+        ExternalDamageHandler?.Invoke(damage, source);
+    }
+
+    public void SetSwimming(bool swimming)
+    {
+        IsSwimming = swimming;
+        MovementResources?.SetSwimming(swimming);
+    }
+
     public override void _PhysicsProcess(double delta)
     {
+        float dt = (float)Math.Max(0.0, delta);
         Vector3 velocity = Velocity;
-
-        // Гравитация.
-        if (!IsOnFloor())
-        {
-            velocity.Y -= _gravity * (float)delta;
-        }
-
-        // Прыжок разрешён только с поверхности.
-        if (Input.IsActionJustPressed("jump") && IsOnFloor())
-        {
-            velocity.Y = JumpVelocity;
-        }
-
+        bool jumpHeld = Input.IsActionPressed("jump");
+        bool sprintRequested = Input.IsPhysicalKeyPressed(Key.Shift);
+        bool crouchRequested = Input.IsPhysicalKeyPressed(Key.Ctrl);
         Vector2 input = Input.GetVector(
             "move_left",
             "move_right",
             "move_forward",
             "move_backward");
 
+        IsCrouching = !IsSwimming && crouchRequested;
+        UpdateCrouchGeometry(IsCrouching);
+
+        bool hasMoveInput = input.LengthSquared() > 0.0001f;
+        IsSprinting = !IsSwimming && !IsCrouching && sprintRequested && hasMoveInput &&
+            (MovementResources?.TryConsumeStamina(delta) ?? true);
+
+        IsJetpacking = !IsSwimming && !IsOnFloor() && jumpHeld &&
+            (MovementResources?.TryConsumeJetpackEnergy(delta) ?? true);
+
+        if (IsSwimming)
+        {
+            velocity.Y = Mathf.MoveToward(velocity.Y, 0.0f, SwimSpeed * dt * 3.0f);
+            if (jumpHeld)
+            {
+                velocity.Y = SwimSpeed;
+            }
+            else if (crouchRequested)
+            {
+                velocity.Y = -SwimSpeed;
+            }
+        }
+        else if (IsJetpacking)
+        {
+            velocity.Y = Mathf.MoveToward(
+                velocity.Y,
+                JumpVelocity,
+                JetpackAcceleration * dt);
+        }
+        else if (!IsOnFloor())
+        {
+            velocity.Y -= _gravity * dt;
+        }
+
+        if (!IsSwimming && Input.IsActionJustPressed("jump") && IsOnFloor())
+        {
+            velocity.Y = JumpVelocity;
+        }
+
         Vector3 direction = new Vector3(input.X, 0.0f, input.Y);
         direction = (Transform.Basis * direction).Normalized();
+        float speed = IsSwimming
+            ? SwimSpeed
+            : MoveSpeed * (IsSprinting ? SprintMultiplier : IsCrouching ? CrouchMultiplier : 1.0f);
 
         if (direction != Vector3.Zero)
         {
-            velocity.X = direction.X * MoveSpeed;
-            velocity.Z = direction.Z * MoveSpeed;
+            velocity.X = direction.X * speed;
+            velocity.Z = direction.Z * speed;
         }
         else
         {
-            velocity.X = Mathf.MoveToward(velocity.X, 0.0f, MoveSpeed);
-            velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, MoveSpeed);
+            velocity.X = Mathf.MoveToward(velocity.X, 0.0f, speed);
+            velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, speed);
         }
 
         Velocity = velocity;
         MoveAndSlide();
+        MovementResources?.RecoverMovementResources(
+            delta,
+            IsSprinting,
+            IsJetpacking);
+    }
+
+    private void UpdateCrouchGeometry(bool crouching)
+    {
+        float targetHeight = crouching
+            ? Math.Max(_capsuleShape.Radius * 2.0f, _standingCapsuleHeight * 0.66f)
+            : _standingCapsuleHeight;
+        _capsuleShape.Height = targetHeight;
+        Vector3 headPosition = _head.Position;
+        headPosition.Y = crouching ? _standingHeadY * 0.62f : _standingHeadY;
+        _head.Position = headPosition;
     }
 
     private bool TryGetRayInteractable(
@@ -183,10 +265,7 @@ public partial class PlayerController : CharacterBody3D
             return false;
         }
 
-        return TryResolveInteractable(
-            collider,
-            out interactable,
-            out interactableNode);
+        return TryResolveInteractable(collider, out interactable, out interactableNode);
     }
 
     private bool TryGetFallbackInteractable(
@@ -205,8 +284,7 @@ public partial class PlayerController : CharacterBody3D
         foreach (Node groupedNode in GetTree().GetNodesInGroup("interactable"))
         {
             if (groupedNode is not Node3D candidate ||
-                (candidate is CollisionObject3D collisionObject &&
-                 collisionObject.CollisionLayer == 0u) ||
+                (candidate is CollisionObject3D collisionObject && collisionObject.CollisionLayer == 0u) ||
                 !TryResolveInteractable(
                     candidate,
                     out IInteractable candidateInteractable,
@@ -217,8 +295,7 @@ public partial class PlayerController : CharacterBody3D
 
             Vector3 offset = candidateNode.GlobalPosition - origin;
             float candidateDistance = offset.Length();
-            if (candidateDistance <= 0.001f ||
-                candidateDistance > InteractionFallbackRadius)
+            if (candidateDistance <= 0.001f || candidateDistance > InteractionFallbackRadius)
             {
                 continue;
             }
@@ -255,17 +332,14 @@ public partial class PlayerController : CharacterBody3D
         Node? current = source;
         for (int depth = 0; depth < 5 && current is not null; depth++)
         {
-            if (current is IInteractable resolved &&
-                current is Node3D resolvedNode)
+            if (current is IInteractable resolved && current is Node3D resolvedNode)
             {
                 interactable = resolved;
                 interactableNode = resolvedNode;
                 return true;
             }
-
             current = current.GetParent();
         }
-
         return false;
     }
 }

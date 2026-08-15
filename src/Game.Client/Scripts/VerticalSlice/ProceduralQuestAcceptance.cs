@@ -199,12 +199,12 @@ public static class ProceduralQuestAcceptanceRunner
             {
                 File.Delete(databasePath);
             }
-            string autosaveLog = Path.Combine(
+            string legacyAutosaveLog = Path.Combine(
                 directory ?? ".",
                 Path.GetFileNameWithoutExtension(databasePath) + ".autosave.log");
-            if (File.Exists(autosaveLog))
+            if (File.Exists(legacyAutosaveLog))
             {
-                File.Delete(autosaveLog);
+                File.Delete(legacyAutosaveLog);
             }
 
             StarterRepairSession session = new(
@@ -259,6 +259,7 @@ public static class ProceduralQuestAcceptanceRunner
             SaveDatabaseDiagnostics diagnostics = await database.ReadDiagnosticsAsync(
                 slotId,
                 cancellationToken).ConfigureAwait(false);
+            string autosaveLog = autosave.AutosaveLogPath;
             bool logWritten = File.Exists(autosaveLog) &&
                 File.ReadAllText(autosaveLog).Contains(
                     "QuestCompleted",

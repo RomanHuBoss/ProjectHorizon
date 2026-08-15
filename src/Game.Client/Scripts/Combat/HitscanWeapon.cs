@@ -13,6 +13,8 @@ public partial class HitscanWeapon : Node3D
     private Node3D _shotSource = null!;
     private ulong _nextAllowedShotAtMilliseconds;
 
+    public Action? FireCommitted { get; set; }
+
     public override void _Ready()
     {
         _fireRay = GetNode<RayCast3D>("FireRay");
@@ -57,6 +59,7 @@ public partial class HitscanWeapon : Node3D
             Math.Ceiling(CooldownSeconds * 1000.0));
 
         _nextAllowedShotAtMilliseconds = now + cooldownMilliseconds;
+        FireCommitted?.Invoke();
 
         _fireRay.ForceRaycastUpdate();
 

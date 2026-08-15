@@ -465,6 +465,7 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        RecordPlayerMultitoolUse(PlayerMultitoolFunction.Analyzer, "ecology-scan");
         bool changed;
         string kind;
         string species;

@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://g66craftstation1" path="res://Scripts/VerticalSlice/PortableCraftingStation.cs" id="5_crafting_station"]
 [ext_resource type="Script" uid="uid://e5a25ca5e3f210e8" path="res://Scripts/VerticalSlice/StationServicesNpc.cs" id="6_station_services_npc"]
 [ext_resource type="PackedScene" path="res://Scenes/Ship/ArcadeShip.tscn" id="7_voyage_ship"]
+[ext_resource type="Script" uid="uid://dps120watervol01" path="res://Scripts/Player/PlayerEnvironmentVolume.cs" id="8_player_environment"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -144,10 +145,36 @@ shape = SubResource("GroundShape")
 [node name="Player" parent="." instance=ExtResource("2_player")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.05, 5.5)
 
+[sub_resource type="StandardMaterial3D" id="PlayerWaterMaterial"]
+albedo_color = Color(0.05, 0.38, 0.62, 0.55)
+transparency = 1
+roughness = 0.22
+
+[sub_resource type="BoxMesh" id="PlayerWaterMesh"]
+material = SubResource("PlayerWaterMaterial")
+size = Vector3(8, 0.35, 6)
+
+[sub_resource type="BoxShape3D" id="PlayerWaterShape"]
+size = Vector3(8, 2.4, 6)
+
 [node name="Gameplay" type="Node3D" parent="."]
 
 [node name="AtmospherePlanet" type="Node3D" parent="Gameplay"]
 position = Vector3(0, -120, 0)
+
+[node name="WaterPool" type="Area3D" parent="Gameplay"]
+position = Vector3(22, 0.55, 22)
+collision_layer = 0
+collision_mask = 1
+monitoring = true
+monitorable = true
+script = ExtResource("8_player_environment")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/WaterPool"]
+mesh = SubResource("PlayerWaterMesh")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/WaterPool"]
+shape = SubResource("PlayerWaterShape")
 
 [node name="Ecology" type="Node3D" parent="Gameplay"]
 
@@ -822,6 +849,23 @@ custom_minimum_size = Vector2(990, 595)
 theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
 theme_override_font_sizes/font_size = 14
 text = "PROCEDURAL MISSION JOURNAL"
+autowrap_mode = 2
+
+[node name="PlayerEquipment" type="PanelContainer" parent="Hud"]
+visible = false
+mouse_filter = 2
+offset_left = 185.0
+offset_top = 30.0
+offset_right = 1195.0
+offset_bottom = 660.0
+theme_override_styles/panel = SubResource("HudPanel")
+
+[node name="Label" type="Label" parent="Hud/PlayerEquipment"]
+mouse_filter = 2
+custom_minimum_size = Vector2(970, 585)
+theme_override_colors/font_color = Color(0.92, 0.97, 1, 1)
+theme_override_font_sizes/font_size = 14
+text = "EXOSUIT & MULTITOOL"
 autowrap_mode = 2
 
 [node name="PlayerCoordinates" type="PanelContainer" parent="Hud"]
