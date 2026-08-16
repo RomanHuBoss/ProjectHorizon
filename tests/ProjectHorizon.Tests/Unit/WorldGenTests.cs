@@ -1340,4 +1340,41 @@ public sealed class WorldGenTests
             100.0f);
     }
 
+    [Fact]
+    public void PlanetarySurfaceSubsystem_AllNormativeContractsCloseTogether()
+    {
+        GameContentCatalog content = RepositoryFixture.Content;
+        CraftingRecipeDefinition repair = content.GetRecipe(
+            StarterRepairContentIds.RecipeId);
+        CraftingRecipeDefinition[] stationRecipes = content.Recipes.Values
+            .Where(recipe =>
+                recipe.RuntimeEnabled &&
+                string.Equals(
+                    recipe.Application.Type,
+                    "StoreOutputs",
+                    StringComparison.Ordinal))
+            .OrderBy(recipe => recipe.RecipeId, StringComparer.Ordinal)
+            .ToArray();
+
+        PlanetarySurfaceSubsystemModelAcceptanceReport report =
+            PlanetarySurfaceSubsystemAcceptanceRunner.Run(
+                content,
+                RepositoryFixture.PlanetEnvironments,
+                RepositoryFixture.Ecology,
+                RepositoryFixture.Pois,
+                RepositoryFixture.Ships,
+                repair,
+                stationRecipes);
+
+        Assert.True(report.Passed, report.Result);
+        Assert.Equal(4, report.StarterPlanets);
+        Assert.Equal(
+            PlanetarySurfaceSubsystemAcceptanceRunner.ExpectedContractCount,
+            report.ContractsPassed);
+        Assert.True(report.PersistenceChain);
+        Assert.True(report.TraversalChain);
+        Assert.True(report.BoundedResidency);
+        Assert.True(report.CrossPlanetIdentity);
+    }
+
 }

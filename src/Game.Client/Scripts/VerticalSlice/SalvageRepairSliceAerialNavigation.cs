@@ -15,6 +15,7 @@ public partial class SalvageRepairSlice
     private AerialSteeringSnapshot? _aerialNavigationAcceptanceBaseline;
     private bool _aerialGridProbe;
     private bool _aerialObstacleProbe;
+    private bool _aerialAltitudeProbe;
     private bool _aerialPoiProbe;
     private bool _aerialAcceptanceForceLeaderTarget;
     private int _aerialAcceptanceFaunaProbeSamples;
@@ -359,6 +360,7 @@ public partial class SalvageRepairSlice
         _aerialNavigationAcceptanceElapsed = 0.0;
         _aerialGridProbe = false;
         _aerialObstacleProbe = false;
+        _aerialAltitudeProbe = false;
         _aerialPoiProbe = false;
         _aerialAcceptanceFaunaProbeSamples = 0;
         if (_aerialSteeringRuntime is null || _npcShipNavigationNodes.Count != 4)
@@ -437,6 +439,20 @@ public partial class SalvageRepairSlice
             _aerialObstacleProbe = correction.LengthSquared() > 0.0001f;
         }
 
+        // TASK-174.2: exercise the altitude controller independently of fauna
+        // lifecycle. Dead fauna legitimately keeps its frozen transform and is
+        // excluded from the live altitude envelope, but the controller itself
+        // must still be proven on every TASK-126 run.
+        Vector3 altitudeCorrection = AerialSteering.ApplyAltitudeEnvelope(
+            Vector3.Zero,
+            0.0f,
+            1.6f,
+            3.4f,
+            7.2f,
+            1.65f,
+            3.0f);
+        _aerialAltitudeProbe = altitudeCorrection.Y > 0.01f;
+
         AerialPointOfInterest? poi = AerialSteering.PointsOfInterest.FirstOrDefault();
         _aerialPoiProbe = poi is not null &&
             AerialSteering.FindClosestPointOfInterest(
@@ -466,6 +482,7 @@ public partial class SalvageRepairSlice
                 _npcShipNavigationNodes,
                 _aerialGridProbe,
                 _aerialObstacleProbe,
+                _aerialAltitudeProbe,
                 _aerialPoiProbe,
                 shipTrafficExpectedActive:
                     _worldSceneCoordinatorRuntime?.Current.Kind == WorldSceneKind.Orbit);
@@ -531,9 +548,10 @@ public partial class SalvageRepairSlice
             (report.Passed ? "PASS" : "FAIL") + ": " +
             $"flyingFauna={report.FlyingFauna}; npcShips={report.NpcShips}; " +
             $"gridCells={report.OccupiedGridCells}; obstacles={report.Obstacles}; poi={report.PointsOfInterest}; " +
-            $"faunaCoverage={(report.FlyingFaunaCoverage ? 1 : 0)}; sharedRuntime={(report.SharedSteeringRuntime ? 1 : 0)}; " +
+            $"faunaCoverage={(report.FlyingFaunaCoverage ? 1 : 0)}; activeFlying={_ecologyFaunaNodes.Count(node => node.IsActiveFlyingNavigationParticipant)}; " +
+            $"sharedRuntime={(report.SharedSteeringRuntime ? 1 : 0)}; " +
             $"localGrid={(report.LocalSpatialGrid ? 1 : 0)}; sphericalAvoidance={(report.SphericalObstacleAvoidance ? 1 : 0)}; " +
-            $"altitude={(report.AltitudeEnvelope ? 1 : 0)}; poiSteering={(report.PointOfInterestSteering ? 1 : 0)}; " +
+            $"altitude={(report.AltitudeEnvelope ? 1 : 0)}; altitudeProbe={(_aerialAltitudeProbe ? 1 : 0)}; poiSteering={(report.PointOfInterestSteering ? 1 : 0)}; " +
             $"shipSteering={(report.ShipSteering ? 1 : 0)}; pursuit={(report.Pursuit ? 1 : 0)}; " +
             $"evade={(report.Evade ? 1 : 0)}; arrive={(report.Arrive ? 1 : 0)}; formation={(report.Formation ? 1 : 0)}; " +
             $"combatStates={(report.CombatStates ? 1 : 0)}; clearance={(report.ShipObstacleClearance ? 1 : 0)}; " +

@@ -1,4 +1,5 @@
 using System;
+using Godot;
 using Xunit;
 
 namespace ProjectHorizon.Tests.Architecture;
@@ -69,6 +70,28 @@ public sealed class Section38ArchitectureTests
         Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(160.0), 6);
         Assert.NotNull(typeof(EcologyFaunaNode).GetMethod(
             nameof(EcologyFaunaNode.StepAerialForAcceptance)));
+    }
+
+    [Fact]
+    public void AerialAltitudeAcceptanceIgnoresDeadFaunaButStillExercisesController()
+    {
+        Assert.NotNull(typeof(EcologyFaunaNode).GetProperty(
+            nameof(EcologyFaunaNode.IsActiveFlyingNavigationParticipant)));
+
+        AerialSteeringRuntime steering = new();
+        AerialSteeringSnapshot before = steering.CreateSnapshot();
+        Vector3 correction = steering.ApplyAltitudeEnvelope(
+            Vector3.Zero,
+            0.0f,
+            1.6f,
+            3.4f,
+            7.2f,
+            1.65f,
+            3.0f);
+        AerialSteeringSnapshot after = steering.CreateSnapshot();
+
+        Assert.True(correction.Y > 0.01f);
+        Assert.True(after.AltitudeCorrections > before.AltitudeCorrections);
     }
 
     [Fact]

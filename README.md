@@ -15,6 +15,14 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-176 — Planetary Surface Subsystem Closure
+
+Alpha.176 turns the already implemented TASK-150…174 planet stack into one integration boundary instead of treating environment, interplanetary handoff, surface content, terrain, streaming, presentation, weather, floating origin, radial/physical frames and curved collision as unrelated green checks. F5 now runs a model-level aggregate over **11 existing normative acceptance runners**, then verifies eight live Godot invariants: settled 25/9 curved residency, curved TASK-124 navigation, arbitrary-up player alignment, radial atmosphere/world presentation, active ecology/POIs, cold-start guard, weather runtime and radial/physical alignment. PASS additionally requires end-to-end persistence, traversal, bounded-residency and cross-planet-identity chains. See `docs/PLANETARY_SURFACE_SUBSYSTEM.md`.
+
+## TASK-174.2 — Aerial Altitude Lifecycle Acceptance Hotfix
+
+The TASK-126 altitude acceptance now distinguishes live flying participants from killed/hidden fauna. Dead fauna retain their frozen transform for persistence/interaction history but no longer poison the live altitude envelope. F5 still cannot pass vacuously: an independent `ApplyAltitudeEnvelope` probe must produce a vertical correction and increment the shared altitude-controller counter. TASK-126 output now reports `activeFlying=<n>` and `altitudeProbe=<0/1>`, so the regression can be reproduced by killing flying fauna before F5.
+
 ## TASK-174.1 — Curved Surface Cold-Start Safety
 
 Alpha.174.1 closes the first-run regression where the authored player spawn could be below the newly curved terrain before the async streamer settled. The synchronous curved fallback collider is now backface-safe, the player is lifted to at least 1.02 m body-center clearance over semantic terrain during terrain bootstrap, and the same idempotent guard remains active through the short fallback→25/9 streamer handoff. F5 exposes `TASK-174.1 curved surface cold-start safety acceptance`.

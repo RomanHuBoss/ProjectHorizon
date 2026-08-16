@@ -83,6 +83,8 @@ jobs:
           python3 tools/validate-task1721-radial-hotfix.py
           python3 tools/validate-task174-curved-surface.py
           python3 tools/validate-task1741-cold-start-safety.py
+          python3 tools/validate-task1742-aerial-altitude-lifecycle-hotfix.py
+          python3 tools/validate-task176-planetary-surface-subsystem.py
 
       - name: Unit tests and coverage
         run: >-

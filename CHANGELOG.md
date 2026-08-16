@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.176] - 2026-08-16
+
+### Fixed — TASK-174.2 Aerial Altitude Lifecycle Acceptance
+- Fixed TASK-126 false FAIL after flying fauna had been killed before F5: dead/hidden fauna are no longer treated as live altitude-envelope participants.
+- Added an independent altitude-controller probe so an empty live-flying set cannot make the acceptance pass vacuously; diagnostics now expose `activeFlying` and `altitudeProbe`.
+- Added xUnit and section-37/CI/release regression gates for the lifecycle/controller contract.
+
+### Added — TASK-176 Planetary Surface Subsystem Closure
+- Added a single model-level acceptance boundary that composes the 11 existing normative TASK-150/152/154/156/158/160/166/162/170/172/174 runners.
+- Added cross-contract persistence, traversal, bounded-residency and four-planet identity chains so individually green components cannot hide an integration break.
+- Added live Godot checks for settled curved 25/9 streaming, TASK-124 navigation, arbitrary-up player alignment, radial presentation, ecology/POIs, cold-start safety, weather and radial/physical alignment.
+- Added `TASK-176 ... READY`, F5 HUD/Output acceptance, aggregate xUnit coverage and static/CI/release gating.
+
+### External evidence synchronized
+- The supplied Godot 4.7.1 run verifies TASK-174 and TASK-174.1 (`curvature/normals/faces/collision/navigation/playerUp/skyRadial/bounded25x9=1`; cold-start `fallbackBackface=1`, `minGuardClearance=1.020m`).
+- The same run exposed the TASK-126 lifecycle-specific `altitude=0` regression after flying-fauna deaths; all other aerial invariants remained green.
+
 ## [0.1.0-alpha.174.1] - 2026-08-16
 
 ### Fixed — TASK-174.1 Curved Surface Cold-Start Safety

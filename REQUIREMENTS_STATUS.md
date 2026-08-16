@@ -2,9 +2,80 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task176-planetary-surface-subsystem.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-174.2 + TASK-176 Planetary Surface Subsystem Closure
+
+**Исходный снимок:** `ProjectHorizon-main(20260816-081808).zip` (последняя приложенная GitHub-редакция).  
+**Подготовленный снимок:** `ProjectHorizon-main-task176-planetary-surface-subsystem.zip`.  
+**Версия:** `0.1.0-alpha.176`.  
+**Статус:** TASK-174 и TASK-174.1 синхронизированы как `VERIFIED` по внешнему Godot 4.7.1 evidence пользователя; TASK-174.2 и TASK-176 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.
+
+### Синхронизация внешнего evidence
+
+Предоставленный пользователем свежий runtime-прогон подтверждает:
+
+- `TASK-174 curved cube-sphere surface acceptance PASS`: `curvature=1`, `normals=1`, `rebaseContinuity=1`, `faces=6/6`, `collision=1`, `navigation=1`, `playerUp=1`, `skyRadial=1`, `bounded25x9=1`;
+- `TASK-174.1 curved surface cold-start safety acceptance PASS`: `fallbackBackface=1`, `guardSamples=34`, `minGuardClearance=1.020m`, `currentClearance=1.020m`, `streamer=25/9`;
+- TASK-128/150/152/154/156/158/160/162/162.2/164/166/168/170/172/148 и основной Stage-1 acceptance stack также завершились PASS;
+- единственный новый красный runtime-инвариант — `TASK-126 ... altitude=0`, при этом `faunaCoverage=1`, `sharedRuntime=1`, `localGrid=1`, `sphericalAvoidance=1`, `poiSteering=1`, все ship modes и clearance/runtime sampling равны `1`.
+
+### TASK-174.2 — исправление false-negative высотного инварианта TASK-126
+
+В том же пользовательском прогоне **до F5 были уничтожены летающие fauna instances** (`health=0`). Dead/hidden fauna больше не участвуют в live steering, но старый acceptance продолжал проверять их замороженный transform на соответствие текущему terrain-relative altitude envelope. Из-за этого TASK-126 мог падать с `altitude=0`, хотя высотный controller и все остальные aerial-navigation инварианты были исправны.
+
+Исправлено:
+
+- введён явный lifecycle-предикат `IsActiveFlyingNavigationParticipant = Flying && Visible && Health>0`;
+- live altitude envelope применяется только к активным летающим участникам; corpse/hidden transform остаётся persistence evidence и не отравляет live-nav acceptance;
+- чтобы исключение dead fauna не превратило проверку в vacuous PASS, F5 всегда отдельно вызывает `AerialSteeringRuntime.ApplyAltitudeEnvelope` на искусственно нарушенной высоте и требует реальную коррекцию плюс рост счётчика `AltitudeCorrections`;
+- diagnostics дополнены `activeFlying=<n>` и `altitudeProbe=0/1`; acceptance по-прежнему выполняет 4 независимых fauna probe samples, даже если игровые flying fauna были убиты до F5;
+- добавлен xUnit regression и отдельный section-37/CI/release static gate TASK-174.2.
+
+### TASK-176 — закрытие планетарной поверхности как одной подсистемы
+
+Вместо добавления ещё одной изолированной механики TASK-176 объединяет уже реализованный Stage-2 planetary-surface stack в один проверяемый subsystem contract. Модельный acceptance **композирует, а не дублирует** 11 существующих нормативных runner-ов:
+
+`TASK-150 environment → 152 travel → 154 content → 156 terrain → 158 streaming → 160 world composition → 166 weather → 162 global frame → 170 radial frame → 172 physical frame → 174 curved collision`.
+
+Дополнительно TASK-176 требует четыре сквозных инварианта:
+
+- `persistenceChain=1`: current/target planet, transfer, planet-scoped deltas, resource depletion, weather time и floating-origin state согласованно round-trip;
+- `traversalChain=1`: streaming addressing, rebases, six-face/seam traversal, physical handoff и curved rebase образуют непрерывную цепочку;
+- `bounded=1`: resident surface остаётся ограниченной `25 active / 9 collision`;
+- `planetIdentity=1`: четыре starter planets сохраняют независимые climate/content/terrain/world identities.
+
+Live Godot-layer поверх model contract проверяет 8 инвариантов: settled curved streamer, TASK-124 curved NavigationServer residency, arbitrary-up player, radial atmosphere/world presentation, ecology/POI content, cold-start guard, weather runtime и radial/physical alignment. Добавлены `TASK-176 ... READY`, F5 HUD/Output PASS и xUnit `PlanetarySurfaceSubsystem_AllNormativeContractsCloseTogether`.
+
+### Изменённые файлы
+
+- runtime hotfix: `EcologyFaunaNode.cs`, `AerialNavigationAcceptance.cs`, `SalvageRepairSliceAerialNavigation.cs`;
+- subsystem closure: `PlanetarySurfaceSubsystemAcceptance.cs`, `SalvageRepairSlicePlanetSurfaceSubsystem.cs`, F5/runtime wiring в `SalvageRepairSlice.cs`;
+- regressions: `Section38ArchitectureTests.cs`, `WorldGenTests.cs`;
+- quality gates: `validate-task1742-aerial-altitude-lifecycle-hotfix.py`, `validate-task176-planetary-surface-subsystem.py`, section-37 scripts, CI/release workflows и forward-compatible version gates TASK-170/172/172.1/174/174.1;
+- документация/версия: `VERSION`, `CHANGELOG.md`, `README.md`, `docs/PLANETARY_SURFACE_SUBSYSTEM.md`, этот журнал.
+
+### Проверки в среде подготовки
+
+Полностью пройден доступный статический quality contour: version/changelog, JSON, Godot text resources, localization, audio, diagnostics, §36/§37/§38, platform architecture, TASK-146/148/149.4/150/152/154/154.1/156/158/158.1/160/160.1/162/162.1/162.2/164/166/168/170/172/172.1/174/174.1, а также новые TASK-174.2 и TASK-176 gates — все `PASS`. В среде отсутствуют `dotnet`, `csc/msbuild` и Godot executable, поэтому компиляция, xUnit execution и runtime alpha.176 здесь **не заявляются**; они остаются частью TASK-177 external acceptance.
+
+### Ограничение нормативного PDF
+
+В текущем исходном ZIP файлы PDF-ТЗ снова представлены Git LFS pointer-файлами (v2.0 — 132 bytes), а не payload PDF. Поэтому эта итерация не реконструирует отсутствующий текст ТЗ и не вводит новых требований сверх уже зафиксированной в журнале Stage-2 mapping; TASK-176 является интеграционным закрытием уже существующих TASK-150…174.
+
+### Acceptance TASK-174.2 / TASK-176
+
+1. Windows clean build / `tools\run-section37-quality.cmd`: `0 errors / 0 warnings`; static gates TASK-174.2 и TASK-176 должны быть PASS.
+2. **New Game**: дождаться `TASK-176 planetary surface subsystem READY` с `chunks=25/25`, `collisions=9/9`, `navRegions=25/25`.
+3. Для регрессии можно намеренно убить 1–4 flying fauna **до F5**.
+4. Нажать F5 и дождаться окончания acceptance (TASK-126 содержит fixed runtime window ~4.5 s; завершение определяется итоговой строкой, а не таймером).
+5. `TASK-126 ... PASS`: обязательно `altitude=1; altitudeProbe=1`; `activeFlying` допускается `0..4`; `faunaProbeSamples=4`; остальные прежние aerial invariants остаются `1`.
+6. `TASK-176 ... PASS`: `starterPlanets=4/4; contracts=11/11; environment=1; travel=1; content=1; terrain=1; streaming=1; world=1; weather=1; frame=1; radial=1; physical=1; curved=1; persistenceChain=1; traversalChain=1; bounded=1; planetIdentity=1; globe=1; liveStreamer=1; liveNav=1; livePlayer=1; livePresentation=1; liveContent=1; coldStart=1; liveWeather=1; liveRadial=1; chunks=25/25; collisions=9/9; navRegions=25/25`.
+7. Для внешней приёмки прислать build summary, screenshot F5 HUD с TASK-126/TASK-176 PASS и полные две строки Output. При FAIL — последние 250 строк Output и точную FAIL-строку.
 
 ---
 
@@ -13,7 +84,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task174.1-curved-surface-cold-start-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.174.1`.  
-**Статус:** TASK-174.1 `IMPLEMENTED / PENDING EXTERNAL BUILD+NEW-GAME+F5`; дальнейшая mega-итерация заблокирована до reacceptance cold start.
+**Статус:** TASK-174.1 `VERIFIED` по внешнему Godot 4.7.1 evidence (`fallbackBackface=1; guardSamples=34; minGuardClearance=1.020m; streamer=25/9`).
 
 ### Внешнее evidence
 
@@ -40,7 +111,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task174.1-curved-surface-cold-start-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.174`.  
-**Статус:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-174 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-163 остаётся acceptance-хвостом.
+**Статус:** TASK-172/TASK-172.1 и TASK-174 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-163 остаётся manual acceptance-хвостом.
 
 ### Внешнее evidence перед TASK-174
 
@@ -6211,24 +6282,44 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PHYSRAD-HF-ACC-101` | A/D no-roll + F5 TASK-162.2/TASK-172 PASS + seam smoke | `VERIFIED` | external alpha.172.1: TASK-162.2 PASS, TASK-172 PASS/upright=1, normal gameplay/navigation smoke passed |
 
 
+### 8.37. Aerial Altitude Lifecycle Hotfix + Planetary Surface Subsystem Closure — TASK-174.2 / TASK-176
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `AERIAL-HF-1742-0` | Dead/hidden flying fauna не участвуют в live altitude invariant | `IMPLEMENTED` | lifecycle predicate `Flying && Visible && Health>0`; static gate PASS |
+| `AERIAL-HF-1742-1` | Altitude acceptance не может пройти vacuously при 0 active flying fauna | `IMPLEMENTED` | independent `ApplyAltitudeEnvelope` probe + `AltitudeCorrections` counter |
+| `AERIAL-HF-1742-2` | TASK-126 diagnostics отражают lifecycle и controller probe | `IMPLEMENTED` | `activeFlying=<n>; altitudeProbe=<0/1>` |
+| `AERIAL-HF-ACC-100` | TASK-126 повторно PASS после уничтожения flying fauna | `IN_PROGRESS` | external Godot: F5 должен дать `altitude=1; altitudeProbe=1; faunaProbeSamples=4` |
+| `SURFACE-1760` | 11 нормативных planetary-surface acceptance runners образуют единый contract | `IMPLEMENTED` | model runner `contracts=11`; static gate PASS |
+| `SURFACE-1761` | Persistence chain согласована across planet/travel/content/weather/frame | `IMPLEMENTED` | `persistenceChain` + xUnit aggregate |
+| `SURFACE-1762` | Traversal chain согласована across streamer/rebase/seams/physical/curved | `IMPLEMENTED` | `traversalChain` + xUnit aggregate |
+| `SURFACE-1763` | Bounded residency остаётся 25 active / 9 collision | `IMPLEMENTED` | model + live streamer invariant |
+| `SURFACE-1764` | Cross-planet identity сохраняется для 4 starter planets | `IMPLEMENTED` | environment/content/terrain/world scoped identity chain |
+| `SURFACE-1765` | Live Godot stack проверяется как единая подсистема | `IMPLEMENTED` | 8 live invariants: streamer/nav/player/presentation/content/cold-start/weather/radial |
+| `SURFACE-1766` | Runtime READY/HUD/Output diagnostics | `IMPLEMENTED` | `TASK-176 ... READY`, `TASK-176 (F5)`, final PASS/FAIL line |
+| `SURFACE-1767` | Section-37, CI, release и xUnit regression | `IMPLEMENTED` | `validate-task176-planetary-surface-subsystem.py`; aggregate WorldGen test |
+| `SURFACE-ACC-176` | Clean build + F5 TASK-176 PASS | `IN_PROGRESS` | external Windows/Godot required; expected `contracts=11/11`, live 8/8, globe=1 |
+
+
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-174` | True Curved Cube-Sphere Collision & Face-Aware Navigation acceptance | clean build; radial sky seam removed; F5 TASK-174 PASS; face warp + >2048m rebase smoke |
+| 1 | `TASK-177` | External acceptance TASK-174.2 + TASK-176 | clean build/section-37; New Game; optional flying-fauna kills; F5 TASK-126 + TASK-176 PASS |
 | 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
-| 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
-| 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 ранее PASS; остаются manual variation/cold restore after current regression closure |
-| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 ранее PASS; manual visual/NPC/base/water smoke |
+| 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
+| 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
+| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
+| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-174 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-162 manual long-traversal tail остаётся открытым.  
-**Формально ближайший шаг:** Windows/Godot clean build + TASK-174 F5/runtime acceptance: radial sky without half-screen seam, curved collision/navigation 25/9, seam warp and >2048 m rebase continuity; затем перевод TASK-174 в VERIFIED и выбор следующей mega-подсистемы.
+**Текущая разрабатываемая реализация:** TASK-174/TASK-174.1 `VERIFIED`; TASK-174.2 и TASK-176 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.  
+**Формально ближайший шаг:** TASK-177 — один внешний reacceptance-прогон должен одновременно подтвердить исправление TASK-126 после dead fauna и интеграционное закрытие planetary-surface subsystem. После его PASS следующий функциональный шаг выбирается уже за пределами TASK-150…174, а оставшиеся строки 153/155/157/159/161/163/166 остаются manual acceptance tails, а не поводом повторно реализовывать подсистемы.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

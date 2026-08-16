@@ -50,6 +50,7 @@ public static class AerialNavigationAcceptanceEvaluator
         IReadOnlyList<NpcShipNavigationNode> ships,
         bool gridProbe,
         bool obstacleProbe,
+        bool altitudeProbe,
         bool poiProbe,
         bool shipTrafficExpectedActive)
     {
@@ -80,7 +81,11 @@ public static class AerialNavigationAcceptanceEvaluator
             obstacleProbe &&
             after.ObstacleCount > 0 &&
             after.ObstacleAvoidanceActivations > before.ObstacleAvoidanceActivations;
-        bool altitude = flying.All(node => node.InsideFlyingAltitudeEnvelope) &&
+        EcologyFaunaNode[] activeFlying = flying
+            .Where(node => node.IsActiveFlyingNavigationParticipant)
+            .ToArray();
+        bool altitude = altitudeProbe &&
+            activeFlying.All(node => node.InsideFlyingAltitudeEnvelope) &&
             after.AltitudeCorrections > before.AltitudeCorrections;
         bool poi = poiProbe &&
             after.PointOfInterestCount >= 4 &&

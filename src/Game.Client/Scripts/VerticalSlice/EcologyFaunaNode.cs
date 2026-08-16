@@ -34,13 +34,22 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     public bool AerialSteeringBound => _aerialSteering is not null &&
         string.Equals(MovementMode, "Flying", StringComparison.Ordinal);
 
+    public bool IsActiveFlyingNavigationParticipant =>
+        string.Equals(MovementMode, "Flying", StringComparison.Ordinal) &&
+        Visible &&
+        Health > 0.0;
+
     public bool InsideFlyingAltitudeEnvelope
     {
         get
         {
             if (_definition is null ||
-                !string.Equals(MovementMode, "Flying", StringComparison.Ordinal))
+                !string.Equals(MovementMode, "Flying", StringComparison.Ordinal) ||
+                !IsActiveFlyingNavigationParticipant)
             {
+                // Dead/hidden fauna is intentionally removed from the live aerial
+                // steering set. Its frozen transform is persistence evidence, not
+                // a live altitude invariant and must not make TASK-126 fail.
                 return true;
             }
 
