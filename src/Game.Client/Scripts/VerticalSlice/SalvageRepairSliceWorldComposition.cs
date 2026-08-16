@@ -543,7 +543,8 @@ public partial class SalvageRepairSlice
         if (_planetSurfaceResourceRoot is null ||
             !ContentCatalog.Resources.TryGetValue(
                 placement.ResourceDefinitionId,
-                out GameResourceDefinition definition))
+                out GameResourceDefinition? definition) ||
+            definition is null)
         {
             return;
         }

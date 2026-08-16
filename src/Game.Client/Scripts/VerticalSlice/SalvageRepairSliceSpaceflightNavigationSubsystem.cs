@@ -93,9 +93,9 @@ public partial class SalvageRepairSlice
 
         SpaceflightNavigationSubsystemModelAcceptanceReport model =
             SpaceflightNavigationSubsystemAcceptanceRunner.Run(
-                _shipSystemsAcceptanceReport,
-                _stageOneVoyageAcceptanceReport,
-                _galaxyNavigationAcceptanceReport,
+                _shipSystemsAcceptanceReport!,
+                _stageOneVoyageAcceptanceReport!,
+                _galaxyNavigationAcceptanceReport!,
                 _starSystemSimulationAcceptanceReport,
                 _interplanetaryTravelAcceptanceReport,
                 _worldSceneCoordinatorAcceptanceReport);

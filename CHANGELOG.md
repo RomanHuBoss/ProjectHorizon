@@ -2,6 +2,10 @@
 
 ## [0.1.0-alpha.178.4] - 2026-08-16
 
+### Fixed — external build hotfix
+- Fixed three CS0165 definite-assignment errors in `SalvageRepairSlicePlanetaryLandingRecovery.cs` (`entry`, `center`, `radius`) found by the first external Godot/.NET build.
+- Cleaned the five nullable warnings reported by that same build in the touched acceptance/runtime paths.
+
 ### Fixed — planetary approach, landing and restore safety
 - Added an authoritative persistence-restore path for the world-scene coordinator. A save made inside `OrbitalStation` now restores directly to `StationInterior` without pretending that the load is a live `Surface -> StationInterior` gameplay transition; the strict live transition graph remains unchanged.
 - Rebuilt orbital planet presentation scale: starter-system planets now use kilometre-class visual radii/spacing in the compressed flight scene, with the focused planet size derived from its actual `PlanetEnvironment` radius; moons are separated far outside the parent visual surface instead of reading as tightly packed props.

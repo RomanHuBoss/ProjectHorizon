@@ -12,15 +12,18 @@ public partial class SalvageRepairSlice
         PlanetaryLandingRecoveryAcceptanceReport report =
             PlanetaryLandingRecoveryAcceptanceRunner.Run();
 
+        Vector3 entry = Vector3.Zero;
+        Vector3 center = Vector3.Zero;
+        float radius = 0.0f;
         bool liveGlobe = _starSystemSimulationNode is not null &&
             _voyageShip is not null &&
             _starSystemSimulationNode.TryGetBodyApproachPoint(
                 GalaxyNavigation.CurrentPlanetId,
                 _voyageShip.GlobalPosition,
                 PlanetaryApproachRuntime.OrbitalEntryClearanceMeters,
-                out Vector3 entry,
-                out Vector3 center,
-                out float radius);
+                out entry,
+                out center,
+                out radius);
         // Acceptance must be independent of where the player happens to press
         // F5. Measure orbital readability from the star-system presentation
         // origin, not from the current free-flight ship position.

@@ -137,7 +137,8 @@ public static class PlanetSurfaceWorldCompositionAcceptanceRunner
             if (sample is not null &&
                 contentCatalog.Resources.TryGetValue(
                     sample.ResourceDefinitionId,
-                    out GameResourceDefinition definition))
+                    out GameResourceDefinition? definition) &&
+                definition is not null)
             {
                 StarterRepairSession mined = new(
                     repairRecipe,

@@ -2,7 +2,7 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.4-planetary-landing-lighting.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.4-build-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -11,7 +11,7 @@
 ## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.4 Planetary Approach, Landing & Orbital Lighting Recovery
 
 **Исходный снимок:** `ProjectHorizon-main-task178.3-orbital-handoff-recovery.zip`.  
-**Подготовленный снимок:** `ProjectHorizon-main-task178.4-planetary-landing-lighting.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.4-build-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.178.4`.  
 **Статус:** `IMPLEMENTED / PENDING EXTERNAL BUILD+RESTORE+PLANET-LANDING+F5`; TASK-178.1 остаётся `VERIFIED`; TASK-178.2/178.3 имеют положительный external manual smoke, но не повышаются до `VERIFIED` без clean build/F5.
 
@@ -49,6 +49,9 @@
 - отдельные regressions TASK-174/174.1 адаптированы к alpha.178.4 version gate без изменения их семантики;
 - YAML parse, shell syntax, C# structural checks и ZIP integrity выполняются перед передачей;
 - `dotnet build/test` и Godot runtime в рабочей среде недоступны (нет `dotnet`/Godot executable), поэтому не заявляются как PASS.
+
+### External build hotfix
+Первый внешний build alpha.178.4 (16.08.2026 13:40) восстановил все проекты, но завершился с 3× CS0165 в `SalvageRepairSlicePlanetaryLandingRecovery.cs` (`entry/center/radius`) и 5 nullable warnings. Исправлено без изменения runtime-семантики TASK-178.4: `out`-переменные получают безопасные значения до short-circuit probe; nullable flow в затронутых lookup/report paths сделан явным. Повторная внешняя сборка обязательна.
 
 ### Acceptance TASK-178.4
 
