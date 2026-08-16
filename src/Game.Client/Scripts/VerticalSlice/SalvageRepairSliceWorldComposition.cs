@@ -138,9 +138,9 @@ public partial class SalvageRepairSlice
         sun.Set("light_angular_distance", (float)profile.SunAngularDiameterDegrees);
         sun.Set("directional_shadow_max_distance", 320.0f);
         sun.Set("directional_shadow_fade_start", 0.82f);
-        Vector3 lightRay = -towardSun;
+        Vector3 lightRay = -SurfaceLocalDirectionToWorld(towardSun).Normalized();
         sun.Position = Vector3.Zero;
-        sun.LookAt(lightRay, Vector3.Up);
+        sun.LookAt(lightRay, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
     }
 
     private void EnsurePlanetSurfaceSunVisual(
@@ -236,7 +236,8 @@ public partial class SalvageRepairSlice
         // cannot erase it, while its ~1.3 degree angular size still reads as a
         // celestial object rather than nearby scenery.
         _planetSurfaceSunVisual.GlobalPosition =
-            _player.GlobalPosition + _planetSurfaceSunDirection * 180.0f;
+            _player.GlobalPosition +
+            SurfaceLocalDirectionToWorld(_planetSurfaceSunDirection).Normalized() * 180.0f;
     }
 
     private void RebuildPlanetSurfaceClouds(PlanetSurfaceSkyProfile profile)
@@ -353,11 +354,13 @@ public partial class SalvageRepairSlice
                 _surfaceRuntimeActive && _player is not null)
             {
                 _planetSurfaceCloudDrift += delta * 0.55;
-                _planetSurfaceCloudRoot.GlobalPosition = new Vector3(
-                    _player.GlobalPosition.X +
+                PlanetSurfaceLogicalPosition logicalPlayer =
+                    GetPlanetSurfaceLogicalPlayerPosition();
+                _planetSurfaceCloudRoot.Position = new Vector3(
+                    (float)logicalPlayer.EastMeters +
                         (float)Math.Sin(_planetSurfaceCloudDrift * 0.007) * 8.0f,
                     0.0f,
-                    _player.GlobalPosition.Z +
+                    (float)logicalPlayer.NorthMeters +
                         (float)Math.Cos(_planetSurfaceCloudDrift * 0.006) * 6.0f);
             }
         }
@@ -605,7 +608,7 @@ public partial class SalvageRepairSlice
             terrain,
             logical.EastMeters,
             logical.NorthMeters);
-        double clearance = _player.GlobalPosition.Y - surfaceY;
+        double clearance = logical.HeightMeters - surfaceY;
         bool relief = terrain.HeightAmplitude >= 5.0 &&
             terrain.BaseFrequency <= 0.030;
         bool distantTerrain = _planetSurfaceDistantTerrain is not null &&

@@ -46,6 +46,8 @@ public partial class PlayerController : CharacterBody3D
     private float _defaultGravity;
     private float _standingCapsuleHeight;
     private float _standingHeadY;
+    private Vector3 _surfaceUp = Vector3.Up;
+    private bool _surfaceFrameActive;
 
     public IPlayerMovementResourceProvider? MovementResources { get; set; }
     public Action<double, string>? ExternalDamageHandler { get; set; }
@@ -57,6 +59,9 @@ public partial class PlayerController : CharacterBody3D
     public bool IsSwimming { get; private set; }
     public float ActiveGravityAcceleration => _gravity;
     public double ActivePlanetGravityG { get; private set; } = 1.0;
+    public Vector3 ActiveSurfaceUp => _surfaceUp;
+    public bool SurfaceFrameActive => _surfaceFrameActive;
+    public float SurfaceUpAlignment => GlobalTransform.Basis.Y.Normalized().Dot(_surfaceUp);
 
     public override void _Ready()
     {
@@ -179,20 +184,41 @@ public partial class PlayerController : CharacterBody3D
 
     public void SetPlanetSurfaceGravity(double surfaceGravityG)
     {
+        SetPlanetSurfaceFrame(Vector3.Up, surfaceGravityG, snapOrientation: false);
+    }
+
+    public void SetPlanetSurfaceFrame(
+        Vector3 worldUp,
+        double surfaceGravityG,
+        bool snapOrientation = true)
+    {
         if (!double.IsFinite(surfaceGravityG) || surfaceGravityG <= 0.0)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(surfaceGravityG),
                 "Planet gravity must be finite and positive.");
         }
+        if (worldUp.LengthSquared() <= 0.000001f)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(worldUp),
+                "Planet surface up vector must be non-zero.");
+        }
 
         ActivePlanetGravityG = surfaceGravityG;
         _gravity = (float)(
             surfaceGravityG *
             PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared);
-        // The live surface is a moving tangent frame. In local physics space
-        // +Y is, by definition, the current planet-radial up direction.
-        UpDirection = Vector3.Up;
+        _surfaceUp = worldUp.Normalized();
+        _surfaceFrameActive = true;
+        UpDirection = _surfaceUp;
+        MotionMode = CharacterBody3D.MotionModeEnum.Grounded;
+        FloorStopOnSlope = true;
+        FloorConstantSpeed = true;
+        if (snapOrientation)
+        {
+            AlignBodyToSurfaceUp();
+        }
     }
 
     public void RestoreDefaultGravity()
@@ -200,7 +226,32 @@ public partial class PlayerController : CharacterBody3D
         ActivePlanetGravityG = _defaultGravity /
             PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared;
         _gravity = _defaultGravity;
+        _surfaceUp = Vector3.Up;
+        _surfaceFrameActive = false;
         UpDirection = Vector3.Up;
+    }
+
+    public void ApplySurfaceFrameTransition(
+        Transform3D previousFrame,
+        Transform3D nextFrame,
+        double surfaceGravityG)
+    {
+        Basis previousBasis = previousFrame.Basis.Orthonormalized();
+        Basis nextBasis = nextFrame.Basis.Orthonormalized();
+        GlobalPosition = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            previousFrame,
+            nextFrame,
+            GlobalPosition);
+        Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
+            previousBasis,
+            nextBasis,
+            Velocity);
+        Basis mappedBody = PlanetSurfacePhysicalFrameRuntime.MapBasis(
+            previousBasis,
+            nextBasis,
+            GlobalTransform.Basis);
+        GlobalTransform = new Transform3D(mappedBody, GlobalPosition);
+        SetPlanetSurfaceFrame(nextBasis.Y, surfaceGravityG, snapOrientation: true);
     }
 
     public void SetFieldOfView(float degrees)
@@ -214,7 +265,13 @@ public partial class PlayerController : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)Math.Max(0.0, delta);
+        Vector3 up = _surfaceFrameActive ? _surfaceUp : Vector3.Up;
+        UpDirection = up;
+
         Vector3 velocity = Velocity;
+        float verticalSpeed = velocity.Dot(up);
+        Vector3 verticalVelocity = up * verticalSpeed;
+        Vector3 tangentialVelocity = velocity - verticalVelocity;
         bool jumpHeld = Input.IsActionPressed("jump");
         bool sprintRequested = Input.IsActionPressed("player_sprint");
         bool crouchRequested = Input.IsActionPressed("player_crouch");
@@ -236,56 +293,84 @@ public partial class PlayerController : CharacterBody3D
 
         if (IsSwimming)
         {
-            velocity.Y = Mathf.MoveToward(velocity.Y, 0.0f, SwimSpeed * dt * 3.0f);
+            verticalSpeed = Mathf.MoveToward(
+                verticalSpeed,
+                0.0f,
+                SwimSpeed * dt * 3.0f);
             if (jumpHeld)
             {
-                velocity.Y = SwimSpeed;
+                verticalSpeed = SwimSpeed;
             }
             else if (crouchRequested)
             {
-                velocity.Y = -SwimSpeed;
+                verticalSpeed = -SwimSpeed;
             }
         }
         else if (IsJetpacking)
         {
-            velocity.Y = Mathf.MoveToward(
-                velocity.Y,
+            verticalSpeed = Mathf.MoveToward(
+                verticalSpeed,
                 JumpVelocity,
                 JetpackAcceleration * dt);
         }
         else if (!IsOnFloor())
         {
-            velocity.Y -= _gravity * dt;
+            verticalSpeed -= _gravity * dt;
         }
 
         if (!IsSwimming && Input.IsActionJustPressed("jump") && IsOnFloor())
         {
-            velocity.Y = JumpVelocity;
+            verticalSpeed = JumpVelocity;
         }
 
-        Vector3 direction = new Vector3(input.X, 0.0f, input.Y);
-        direction = (Transform.Basis * direction).Normalized();
+        Vector3 direction =
+            GlobalTransform.Basis.X * input.X +
+            GlobalTransform.Basis.Z * input.Y;
+        direction = direction.Slide(up);
+        if (direction.LengthSquared() > 0.000001f)
+        {
+            direction = direction.Normalized();
+        }
         float speed = IsSwimming
             ? SwimSpeed
             : MoveSpeed * (IsSprinting ? SprintMultiplier : IsCrouching ? CrouchMultiplier : 1.0f);
 
         if (direction != Vector3.Zero)
         {
-            velocity.X = direction.X * speed;
-            velocity.Z = direction.Z * speed;
+            tangentialVelocity = direction * speed;
         }
         else
         {
-            velocity.X = Mathf.MoveToward(velocity.X, 0.0f, speed);
-            velocity.Z = Mathf.MoveToward(velocity.Z, 0.0f, speed);
+            tangentialVelocity = tangentialVelocity.MoveToward(
+                Vector3.Zero,
+                speed);
         }
 
-        Velocity = velocity;
+        Velocity = tangentialVelocity + up * verticalSpeed;
         MoveAndSlide();
         MovementResources?.RecoverMovementResources(
             delta,
             IsSprinting,
             IsJetpacking);
+    }
+
+    private void AlignBodyToSurfaceUp()
+    {
+        Vector3 forward = -GlobalTransform.Basis.Z;
+        forward = forward.Slide(_surfaceUp);
+        if (forward.LengthSquared() <= 0.000001f)
+        {
+            Vector3 reference = Math.Abs(_surfaceUp.Dot(Vector3.Forward)) > 0.95f
+                ? Vector3.Right
+                : Vector3.Forward;
+            forward = reference.Slide(_surfaceUp);
+        }
+        forward = forward.Normalized();
+        Vector3 right = forward.Cross(_surfaceUp).Normalized();
+        Vector3 back = right.Cross(_surfaceUp).Normalized();
+        GlobalTransform = new Transform3D(
+            new Basis(right, _surfaceUp, back).Orthonormalized(),
+            GlobalPosition);
     }
 
     private void UpdateCrouchGeometry(bool crouching)

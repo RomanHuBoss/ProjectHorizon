@@ -21,6 +21,10 @@ public partial class SalvageRepairSlice
             PlanetSurfaceContentProfile.Environment);
         _planetRadialSurfaceState = null;
         _planetRadialSurfaceReadyPrinted = false;
+        // TASK-172: once the planet profile exists, promote the historical
+        // translation-only surface frame into the rotating East/Up/North
+        // physical tangent frame before publishing radial state.
+        ApplyPlanetSurfaceFrameTransforms();
         RefreshPlanetRadialSurfaceState(forceAnnouncement: true);
     }
 
@@ -60,17 +64,18 @@ public partial class SalvageRepairSlice
         }
 
         EnsurePlanetSurfaceFrameForCurrentPlanet();
-        PlanetSurfaceLogicalPosition logical = PlanetSurfaceFrame.ToLogical(
-            _player.GlobalPosition.X,
-            _player.GlobalPosition.Y,
-            _player.GlobalPosition.Z);
+        PlanetSurfaceLogicalPosition logical =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceRadialFrameState next = _planetRadialSurfaceRuntime.Build(
             logical.EastMeters,
             logical.NorthMeters);
         PlanetSurfaceRadialFrameState? previous = _planetRadialSurfaceState;
         _planetRadialSurfaceState = next;
-        _player.SetPlanetSurfaceGravity(
-            _planetRadialSurfaceRuntime.Environment.SurfaceGravityG);
+        Vector3 worldUp = _planetSurfacePhysicalFrameState?.WorldUp ?? Vector3.Up;
+        _player.SetPlanetSurfaceFrame(
+            worldUp,
+            _planetRadialSurfaceRuntime.Environment.SurfaceGravityG,
+            snapOrientation: false);
 
         if (previous is { } prior &&
             prior.CubeFace.Face != next.CubeFace.Face)
@@ -164,10 +169,10 @@ public partial class SalvageRepairSlice
             CurrentTerrainProfile,
             target.EastMeters,
             target.NorthMeters);
-        _player.GlobalPosition = new Vector3(
-            0.0f,
-            (float)terrainHeight + 1.25f,
-            0.0f);
+        _player.GlobalPosition = SurfaceLogicalToLocalPosition(
+            target.EastMeters,
+            terrainHeight + 1.25,
+            target.NorthMeters);
         _player.Velocity = Vector3.Zero;
         _planetSurfaceStreamingReadyPrinted = false;
         _planetSurfaceDistantTerrainCenter = null;

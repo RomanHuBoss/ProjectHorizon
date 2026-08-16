@@ -76,6 +76,7 @@ jobs:
           python3 tools/validate-task166-planetary-weather.py
           python3 tools/validate-task168-planetary-globe-geodesy.py
           python3 tools/validate-task170-radial-surface-frame.py
+          python3 tools/validate-task172-physical-radial-surface.py
 
       - name: Unit tests and coverage
         run: >-

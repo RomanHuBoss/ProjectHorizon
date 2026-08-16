@@ -41,6 +41,15 @@ public partial class SalvageRepairSlice
         }
 
         EnsurePlanetSurfaceFrameForCurrentPlanet();
+        Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
+        if (gameplay is not null)
+        {
+            Vector3 logical = gameplay.ToLocal(_player.GlobalPosition);
+            return new PlanetSurfaceLogicalPosition(
+                logical.X,
+                logical.Y,
+                logical.Z);
+        }
         return PlanetSurfaceFrame.ToLogical(
             _player.GlobalPosition.X,
             _player.GlobalPosition.Y,
@@ -68,6 +77,14 @@ public partial class SalvageRepairSlice
         double northMeters)
     {
         EnsurePlanetSurfaceFrameForCurrentPlanet();
+        Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
+        if (gameplay is not null)
+        {
+            return gameplay.ToGlobal(new Vector3(
+                (float)eastMeters,
+                (float)heightMeters,
+                (float)northMeters));
+        }
         (double east, double north) = PlanetSurfaceFrame.ToLocal(
             eastMeters,
             northMeters);
@@ -103,9 +120,14 @@ public partial class SalvageRepairSlice
         }
 
         EnsurePlanetSurfaceFrameForCurrentPlanet();
+        PlanetSurfaceLogicalPosition currentLogical =
+            GetPlanetSurfaceLogicalPlayerPosition();
+        (double localEast, double localNorth) = PlanetSurfaceFrame.ToLocal(
+            currentLogical.EastMeters,
+            currentLogical.NorthMeters);
         PlanetSurfaceFrameRebase rebase = PlanetSurfaceFrame.PlanRebase(
-            _player.GlobalPosition.X,
-            _player.GlobalPosition.Z);
+            localEast,
+            localNorth);
         if (!rebase.Required)
         {
             if (!_planetSurfaceFrameReadyPrinted)
@@ -128,13 +150,7 @@ public partial class SalvageRepairSlice
         PlanetSurfaceLogicalPosition logicalBefore =
             GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceFrame.Apply(rebase);
-        Vector3 worldShift = new(
-            (float)rebase.ShiftEastMeters,
-            0.0f,
-            (float)rebase.ShiftNorthMeters);
-        _player.GlobalPosition -= worldShift;
         ApplyPlanetSurfaceFrameTransforms();
-        ApplyPlanetSurfaceOriginShiftToRuntimeCaches(worldShift);
 
         PlanetSurfaceLogicalPosition logicalAfter =
             GetPlanetSurfaceLogicalPlayerPosition();
@@ -146,59 +162,18 @@ public partial class SalvageRepairSlice
             $"planet={PlanetSurfaceFrame.PlanetId}; " +
             $"shift={rebase.ShiftEastMeters:0}/{rebase.ShiftNorthMeters:0}m; " +
             $"origin={PlanetSurfaceFrame.OriginEastMeters:0}/{PlanetSurfaceFrame.OriginNorthMeters:0}m; " +
-            $"local={_player.GlobalPosition.X:0.0}/{_player.GlobalPosition.Z:0.0}m; " +
+            $"local={PlanetSurfaceFrame.ToLocal(logicalAfter.EastMeters, logicalAfter.NorthMeters).EastMeters:0.0}/" +
+            $"{PlanetSurfaceFrame.ToLocal(logicalAfter.EastMeters, logicalAfter.NorthMeters).NorthMeters:0.0}m; " +
             $"logical={logicalAfter.EastMeters:0.0}/{logicalAfter.NorthMeters:0.0}m; " +
             $"continuityError={continuityError:0.000000}m; " +
             $"rebases={PlanetSurfaceFrame.RebaseCount}.");
-    }
-
-    private void ApplyPlanetSurfaceOriginShiftToRuntimeCaches(Vector3 worldShift)
-    {
-        foreach (NpcFactionAgentNode agent in
-                 GetTree().GetNodesInGroup("npc_faction_agent"))
-        {
-            agent.ApplyWorldOriginShift(worldShift);
-        }
-        foreach (NpcShipNavigationNode ship in _npcShipNavigationNodes)
-        {
-            if (GodotObject.IsInstanceValid(ship))
-            {
-                ship.ApplyWorldOriginShift(worldShift);
-            }
-        }
-        foreach (EcologyFaunaNode fauna in _ecologyFaunaNodes)
-        {
-            if (GodotObject.IsInstanceValid(fauna))
-            {
-                fauna.ApplyWorldOriginShift();
-            }
-        }
-        if (_aerialSteeringRuntime is not null)
-        {
-            RefreshAerialNavigationEnvironment();
-        }
     }
 
     private void ApplyPlanetSurfaceFrameTransforms()
     {
         double east = _planetSurfaceFrame?.OriginEastMeters ?? 0.0;
         double north = _planetSurfaceFrame?.OriginNorthMeters ?? 0.0;
-
-        Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
-        if (gameplay is not null)
-        {
-            gameplay.Position = new Vector3((float)-east, 0.0f, (float)-north);
-        }
-
-        Node3D? ground = GetNodeOrNull<Node3D>("GroundBody");
-        if (ground is not null)
-        {
-            // GroundBody is a short-lived fallback patch generated around the
-            // current logical frame origin; keep its vertices in local space.
-            ground.Position = Vector3.Zero;
-        }
-
-        _planetSurfaceStreamer?.SetLogicalSurfaceOrigin(east, north);
+        ApplyPlanetSurfacePhysicalTransforms(east, north);
     }
 
     private string BuildPlanetSurfaceFrameHudLine()
@@ -210,12 +185,15 @@ public partial class SalvageRepairSlice
 
         PlanetSurfaceLogicalPosition logical =
             GetPlanetSurfaceLogicalPlayerPosition();
+        (double localEast, double localNorth) = PlanetSurfaceFrame.ToLocal(
+            logical.EastMeters,
+            logical.NorthMeters);
         return
             "surface frame: " +
             $"logical={logical.EastMeters.ToString("0.0", CultureInfo.InvariantCulture)}/" +
             $"{logical.NorthMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
-            $"local={_player.GlobalPosition.X.ToString("0.0", CultureInfo.InvariantCulture)}/" +
-            $"{_player.GlobalPosition.Z.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
+            $"local={localEast.ToString("0.0", CultureInfo.InvariantCulture)}/" +
+            $"{localNorth.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
             $"origin={PlanetSurfaceFrame.OriginEastMeters.ToString("0", CultureInfo.InvariantCulture)}/" +
             $"{PlanetSurfaceFrame.OriginNorthMeters.ToString("0", CultureInfo.InvariantCulture)}m; " +
             $"rebases={PlanetSurfaceFrame.RebaseCount}";

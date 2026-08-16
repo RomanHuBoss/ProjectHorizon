@@ -2,9 +2,47 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task170-radial-surface-frame.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task172-physical-radial-surface.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-172 Physical Radial Surface Frame & Navigation Migration
+
+**Исходный снимок:** `ProjectHorizon-main-task170-radial-surface-frame.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task172-physical-radial-surface.zip`.  
+**Версия:** `0.1.0-alpha.172`.  
+**Статус:** TASK-170 `VERIFIED` по внешнему Godot 4.7.1 F5 evidence; TASK-172 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-163 остаётся `IN_PROGRESS`.
+
+### Внешнее evidence, синхронизированное перед итерацией
+
+Пользовательский alpha.170 runtime-log подтверждает `TASK-170 radial surface frame acceptance PASS` со всеми ключевыми инвариантами: `gravity=1`, `tangentFrames=1`, `faces=6/6`, `faceUv=1`, `seamContinuity=1`, `geodesicStep=1`, `warpRoundTrip=1`, `localGravity=1`, `boundedStreamer=1`, `transitions=16`, `basisErr=0`, `stepErr=0`, `seamUp=0.002deg`. Одновременно повторно PASS TASK-124, TASK-126 (`altitude=1`), TASK-154/156/158/160/162/164/166/168, gameplay mining/flora/NPC combat и graceful-exit autosave. TASK-170 поэтому переводится в `VERIFIED`.
+
+### TASK-172 — закрываемая подсистема
+
+- `PlanetSurfacePhysicalFrameRuntime` превращает planet-radial `East/Up/North` в live Godot `Basis` и единый `GameplayTransform`;
+- `Gameplay`, fallback ground и `TerrainChunkManager` физически вращаются в текущий radial tangent frame, а logical East/North остаются абсолютным persistence/chunk identity space;
+- `PlayerController` получает arbitrary-up CharacterBody motion: radial gravity, `UpDirection`, floor/jump/jetpack/swim и tangent movement;
+- player world position, velocity и orientation remap-ятся при смене tangent frame/cube face;
+- TASK-124 navigation остаётся bounded 25-region window, но recovery/probes и NavigationServer sync становятся frame-aware;
+- absolute world caches ground NPC / flying fauna / NPC ships remap-ятся при frame handoff; flying altitude/weather drift и ship formation/altitude используют local radial Up;
+- terrain streamer сохраняет 25 active / 9 collision budget и переводит world probe через собственный rotated local frame до logical chunk addressing;
+- F5 TASK-172 проверяет rotating frames, point/vector round-trip, six faces, seam handoff, live player/gameplay/streamer alignment, navigation frame and bounded 25/9;
+- 3 xUnit regression groups + section-37/CI/release static gate добавлены; save schema не меняется.
+
+### Граница итерации
+
+TASK-172 делает физически вращаемый tangent patch, но не заявляет полностью curved cube-sphere collision. Resident terrain chunks остаются локальными heightfield-патчами; global continuously curved collision и routing NavigationServer между нерезидентными faces остаются следующим physics layer.
+
+### Acceptance TASK-172
+
+1. Clean Windows/Godot build: `0 errors / 0 warnings`.
+2. New Game: `TASK-172 physical radial surface READY` с `player=arbitrary-up`, `collision=rotating-tangent`, `navigation=rotating-local-regions`, `streamer=25/9`.
+3. F5: `TASK-172 physical radial surface acceptance PASS` с `frames=1`, `roundTrip=1`, `velocity=1`, `faces=6/6`, `seams=1`, `player=1`, `gameplay=1`, `streamer=1`, `nav=1`, `bounded25x9=1`.
+4. `surface_warp 0 44.9` → `surface_warp 0 45.1`: кроме TASK-170 logical transition должен появиться `TASK-172 physical cube-face handoff PASS`; игрок остаётся выровнен относительно terrain, без провала/скачка identity.
+5. Warp в центры 6 faces; после каждого streamer settles `25/25`, collision `9/9`, TASK-124 pathing продолжает работать.
+6. Старые TASK-124/126/154/158/160/162/164/166/168/170 остаются PASS.
 
 ---
 
@@ -13,7 +51,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task170-radial-surface-frame.zip`.  
 **Версия:** `0.1.0-alpha.170`.  
-**Статус:** TASK-170 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-164/TASK-166/TASK-168 синхронизированы как `VERIFIED` по внешнему Godot 4.7.1 F5 evidence; TASK-163 остаётся `IN_PROGRESS`.
+**Статус (синхронизирован после внешнего alpha.170 F5):** TASK-170 `VERIFIED`; TASK-164/TASK-166/TASK-168 `VERIFIED`; TASK-163 остаётся `IN_PROGRESS`.
 
 ### Внешнее evidence, синхронизированное перед итерацией
 
@@ -6011,7 +6049,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WEATHER-1668` | Existing developer controls operate the live runtime | `IMPLEMENTED` | `set_time`; `set_weather` |
 | `WEATHER-1669` | RU/EN HUD and F5/static/xUnit acceptance | `IMPLEMENTED` | localized weather line; TASK-166 F5; validator; tests |
 | `WEATHER-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required; current environment has no dotnet/Godot |
-| `WEATHER-ACC-101` | F5 TASK-166 PASS with all invariants =1 | `IN_PROGRESS` | user runtime evidence required |
+| `WEATHER-ACC-101` | F5 TASK-166 PASS with all invariants =1 | `VERIFIED` | external alpha.170 Godot log: deterministic/dayNight/weatherVariation/hazards/saveRestore/planetPhase/override all =1 |
 
 ### 8.33. Planetary Globe & Geodesic Surface Topology — TASK-168
 
@@ -6025,9 +6063,35 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `GLOBE-1685` | Local gameplay streamer remains bounded and physics-compatible | `IMPLEMENTED` | 25 active / 9 collision unchanged |
 | `GLOBE-1686` | Persistence remains logical X/Z without schema migration | `IMPLEMENTED` | TASK-162 save contract reused |
 | `GLOBE-1687` | F5/static/xUnit regression contract | `IMPLEMENTED` | TASK-168 acceptance + validator + 3 unit groups |
-| `GLOBE-ACC-101` | F5 TASK-168 PASS and orbit visual smoke | `IN_PROGRESS` | user runtime evidence required |
+| `GLOBE-ACC-101` | F5 TASK-168 PASS | `VERIFIED` | external alpha.170 Godot log: sphericalAddressing/circumnavigation/poles/seams/detailedGlobe/boundedStreamer all =1 |
 | `WEATHER-ACC-102` | Manual midnight/noon/storm/toxic presentation smoke | `IN_PROGRESS` | developer console scenario |
 | `WEATHER-ACC-103` | Save/restart preserves local time | `IN_PROGRESS` | manual persistence smoke |
+
+
+### 8.34. Radial Surface Frame Foundation — TASK-170
+
+| ID | Требование | Статус | Доказательство |
+|---|---|---:|---|
+| `RADIAL-1700` | Planet gravity and radial tangent basis | `VERIFIED` | external alpha.170 F5: gravity=1; tangentFrames=1 |
+| `RADIAL-1701` | Six cube faces and bounded face UV | `VERIFIED` | faces=6/6; faceUv=1 |
+| `RADIAL-1702` | Seam continuity and geodesic step | `VERIFIED` | seamContinuity=1; geodesicStep=1; seamUp=0.002deg |
+| `RADIAL-1703` | Geographic warp round-trip | `VERIFIED` | warpRoundTrip=1; stepErr=0 |
+| `RADIAL-1704` | Bounded gameplay streamer preserved | `VERIFIED` | boundedStreamer=1; TASK-158 25/25 + 9/9 PASS |
+
+### 8.35. Physical Radial Surface Frame & Navigation Migration — TASK-172
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `PHYSRAD-1720` | Rotating Gameplay East/Up/North tangent transform | `IMPLEMENTED` | `PlanetSurfacePhysicalFrameRuntime`; live `GameplayTransform` |
+| `PHYSRAD-1721` | Arbitrary-up player gravity/movement/floor/jump/jetpack/swim | `IMPLEMENTED` | `PlayerController.SetPlanetSurfaceFrame`; radial `UpDirection` |
+| `PHYSRAD-1722` | Terrain/fallback collision patch rotates with frame | `IMPLEMENTED` | GroundBody + TerrainChunkManager basis; 25/9 budget unchanged |
+| `PHYSRAD-1723` | Terrain world→logical addressing is rotation-aware | `IMPLEMENTED` | `TerrainChunkManager.ToLocal(worldPosition)` before logical origin |
+| `PHYSRAD-1724` | TASK-124 navigation frame handoff/recovery/probes | `IMPLEMENTED` | parent-frame sync + local recovery/probes |
+| `PHYSRAD-1725` | NPC/fauna/ship absolute caches and velocities remap | `IMPLEMENTED` | `ApplyWorldFrameTransform` integrations |
+| `PHYSRAD-1726` | Weather/flying altitude/surface ship steering follow radial Up | `IMPLEMENTED` | tangent-vector conversions and local altitude envelope |
+| `PHYSRAD-1727` | F5/static/xUnit regression contract | `IMPLEMENTED` | TASK-172 acceptance + validator + 3 unit groups |
+| `PHYSRAD-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required |
+| `PHYSRAD-ACC-101` | F5 TASK-172 PASS + seam physical smoke | `IN_PROGRESS` | external Godot evidence required |
 
 
 ## 9. Очередь ближайших задач
@@ -6036,9 +6100,9 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-166` | Planetary Weather runtime/manual acceptance | clean build; F5 TASK-166 PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
-| 2 | `TASK-164` | Surface Visual Language F5 closure | manual visual smoke принят product owner; остаются clean build + TASK-154/TASK-126/TASK-164 F5 |
-| 3 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 1 | `TASK-172` | Physical Radial Surface runtime/manual acceptance | clean build; F5 PASS; six-face warp; physical seam handoff; TASK-124/126 no regression |
+| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
 | 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
 | 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
@@ -6046,8 +6110,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 ранее PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-166 Planetary Weather `IMPLEMENTED`; TASK-164 manual visual smoke принят, но F5/build closure остаётся открытым; TASK-162 остаётся `IMPLEMENTED`.  
-**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-154/TASK-126/TASK-164/TASK-166; затем manual weather smoke/persistence и TASK-163 live >2048m traversal.
+**Текущая разрабатываемая реализация:** TASK-172 Physical Radial Surface `IMPLEMENTED`; TASK-170/TASK-168/TASK-166/TASK-164 F5 externally PASS; TASK-162 manual long-traversal tail остаётся открытым.  
+**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-172; затем six-face/seam `surface_warp` smoke и TASK-163 live >2048m traversal.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

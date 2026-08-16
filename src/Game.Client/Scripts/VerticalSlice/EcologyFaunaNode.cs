@@ -44,8 +44,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             }
 
             float floorY = CurrentTerrainFloorY();
-            return GlobalPosition.Y >= floorY + 1.25f &&
-                GlobalPosition.Y <= floorY + 7.55f;
+            return Position.Y >= floorY + 1.25f &&
+                Position.Y <= floorY + 7.55f;
         }
     }
 
@@ -332,7 +332,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             return;
         }
 
-        Vector3 desiredDirection = _wanderDirection;
+        Vector3 desiredDirection = SurfaceLocalVectorToWorld(_wanderDirection);
         float speedFactor = 0.34f;
         switch (BehaviorState)
         {
@@ -372,7 +372,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             "Flying",
             StringComparison.Ordinal))
         {
-            targetVelocity = ApplyFlyingSteering(targetVelocity, speed) + _weatherWindVelocity;
+            targetVelocity = ApplyFlyingSteering(targetVelocity, speed) +
+                SurfaceLocalVectorToWorld(_weatherWindVelocity);
         }
         else if (string.Equals(
             _definition.MovementMode,
@@ -381,16 +382,19 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         {
             float targetY = _territoryCenter.Y +
                 (float)(0.18 * Math.Sin(_ageSeconds * 0.51));
-            targetVelocity.Y = Mathf.Clamp(
+            Vector3 localVelocity = SurfaceWorldVectorToLocal(targetVelocity);
+            localVelocity.Y = Mathf.Clamp(
                 (targetY - Position.Y) * 2.0f,
                 -0.8f,
                 0.8f);
+            targetVelocity = SurfaceLocalVectorToWorld(localVelocity);
         }
         else
         {
-            targetVelocity.Y = 0.0f;
+            targetVelocity = ProjectToSurfaceTangent(targetVelocity);
         }
 
+        UpDirection = SurfaceWorldUp();
         Velocity = Velocity.Lerp(targetVelocity, Math.Clamp(delta * 3.2f, 0.0f, 1.0f));
         MoveAndSlide();
         if (string.Equals(BehaviorState, "Attack", StringComparison.Ordinal) &&
@@ -423,10 +427,10 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             Position = new Vector3(Position.X, terrainY + 0.75f, Position.Z);
         }
 
-        Vector3 horizontal = new(Velocity.X, 0.0f, Velocity.Z);
+        Vector3 horizontal = ProjectToSurfaceTangent(Velocity);
         if (horizontal.LengthSquared() > 0.03f)
         {
-            LookAt(GlobalPosition + horizontal, Vector3.Up);
+            LookAt(GlobalPosition + horizontal.Normalized(), SurfaceWorldUp());
         }
     }
 
@@ -438,11 +442,12 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             float fallbackY = CurrentTerrainFloorY() +
                 3.4f +
                 (float)(1.2 * Math.Sin(_ageSeconds * 0.33));
-            targetVelocity.Y = Mathf.Clamp(
+            Vector3 localVelocity = SurfaceWorldVectorToLocal(targetVelocity);
+            localVelocity.Y = Mathf.Clamp(
                 (fallbackY - Position.Y) * 1.8f,
                 -2.5f,
                 2.5f);
-            return targetVelocity;
+            return SurfaceLocalVectorToWorld(localVelocity);
         }
 
         float radius = (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15);
@@ -495,14 +500,16 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         float terrainFloorY = CurrentTerrainFloorY();
         float preferredY = terrainFloorY + 3.4f +
             (float)Math.Sin(phase) * 1.15f;
-        desired = _aerialSteering.ApplyAltitudeEnvelope(
-            desired,
-            GlobalPosition.Y,
+        Vector3 desiredLocal = SurfaceWorldVectorToLocal(desired);
+        desiredLocal = _aerialSteering.ApplyAltitudeEnvelope(
+            desiredLocal,
+            Position.Y,
             terrainFloorY + 1.6f,
             preferredY,
             terrainFloorY + 7.2f,
             1.65f,
             3.0f);
+        desired = SurfaceLocalVectorToWorld(desiredLocal);
 
         float maximumSpeed = Math.Max(0.5f, speed * 1.35f);
         if (desired.Length() > maximumSpeed)
@@ -528,6 +535,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15));
     }
 
+    public void ApplyWorldFrameTransform(
+        Transform3D previousFrame,
+        Transform3D nextFrame)
+    {
+        Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
+            previousFrame.Basis.Orthonormalized(),
+            nextFrame.Basis.Orthonormalized(),
+            Velocity);
+        UpDirection = nextFrame.Basis.Y.Normalized();
+        ApplyWorldOriginShift();
+    }
+
     private float CurrentTerrainFloorY()
     {
         if (_terrainProfile is null)
@@ -549,18 +568,41 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private Vector3 DirectionTo(Vector3 target)
     {
         Vector3 delta = target - GlobalPosition;
-        if (_definition is null ||
-            !string.Equals(
+        bool flying = _definition is not null &&
+            string.Equals(
                 _definition.MovementMode,
                 "Flying",
-                StringComparison.Ordinal))
+                StringComparison.Ordinal);
+        if (!flying)
         {
-            delta.Y = 0.0f;
+            delta = ProjectToSurfaceTangent(delta);
         }
 
         return delta.LengthSquared() <= 0.0001f
-            ? _wanderDirection
+            ? SurfaceLocalVectorToWorld(_wanderDirection)
             : delta.Normalized();
+    }
+
+    private Vector3 SurfaceWorldUp() =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Y.Normalized()
+            : Vector3.Up;
+
+    private Vector3 SurfaceLocalVectorToWorld(Vector3 localVector) =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Orthonormalized() * localVector
+            : localVector;
+
+    private Vector3 SurfaceWorldVectorToLocal(Vector3 worldVector) =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Orthonormalized().Inverse() * worldVector
+            : worldVector;
+
+    private Vector3 ProjectToSurfaceTangent(Vector3 worldVector)
+    {
+        Vector3 local = SurfaceWorldVectorToLocal(worldVector);
+        local.Y = 0.0f;
+        return SurfaceLocalVectorToWorld(local);
     }
 
     private bool IsAtWater()

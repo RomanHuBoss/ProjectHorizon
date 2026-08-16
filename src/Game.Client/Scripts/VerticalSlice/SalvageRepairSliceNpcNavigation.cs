@@ -275,27 +275,31 @@ public partial class SalvageRepairSlice
         return true;
     }
 
-    private static (Vector3 Start, Vector3 Target)[]
-        BuildNavigationAcceptancePathProbes(Vector3 center)
+    private (Vector3 Start, Vector3 Target)[]
+        BuildNavigationAcceptancePathProbes(Vector3 centerWorld)
     {
+        Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
+        Vector3 center = gameplay is null ? centerWorld : gameplay.ToLocal(centerWorld);
         float y = NpcNavigationSurfaceNode.NavigationSurfaceY;
         float[] offsets = { -18.0f, -12.0f, -6.0f, 0.0f, 6.0f, 12.0f, 18.0f };
         var probes = new System.Collections.Generic.List<(Vector3, Vector3)>();
+
+        Vector3 World(Vector3 local) => gameplay is null ? local : gameplay.ToGlobal(local);
         foreach (float offset in offsets)
         {
             probes.Add((
-                new Vector3(center.X - 20.0f, y, center.Z + offset),
-                new Vector3(center.X + 20.0f, y, center.Z + offset)));
+                World(new Vector3(center.X - 20.0f, y, center.Z + offset)),
+                World(new Vector3(center.X + 20.0f, y, center.Z + offset))));
             probes.Add((
-                new Vector3(center.X + offset, y, center.Z - 20.0f),
-                new Vector3(center.X + offset, y, center.Z + 20.0f)));
+                World(new Vector3(center.X + offset, y, center.Z - 20.0f)),
+                World(new Vector3(center.X + offset, y, center.Z + 20.0f))));
         }
         probes.Add((
-            new Vector3(center.X - 18.0f, y, center.Z - 18.0f),
-            new Vector3(center.X + 18.0f, y, center.Z + 18.0f)));
+            World(new Vector3(center.X - 18.0f, y, center.Z - 18.0f)),
+            World(new Vector3(center.X + 18.0f, y, center.Z + 18.0f))));
         probes.Add((
-            new Vector3(center.X - 18.0f, y, center.Z + 18.0f),
-            new Vector3(center.X + 18.0f, y, center.Z - 18.0f)));
+            World(new Vector3(center.X - 18.0f, y, center.Z + 18.0f)),
+            World(new Vector3(center.X + 18.0f, y, center.Z - 18.0f))));
         return probes.ToArray();
     }
 

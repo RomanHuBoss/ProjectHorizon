@@ -464,18 +464,19 @@ public partial class SalvageRepairSlice
             logical.NorthMeters);
         const double minimumBodyCenterClearance = 1.02;
         double minimumY = terrainHeight + minimumBodyCenterClearance;
-        if (_player.GlobalPosition.Y < minimumY)
+        if (logical.HeightMeters < minimumY)
         {
-            Vector3 position = _player.GlobalPosition;
-            position.Y = (float)minimumY;
-            _player.GlobalPosition = position;
-            _player.Velocity = new Vector3(
-                _player.Velocity.X,
-                Math.Max(0.0f, _player.Velocity.Y),
-                _player.Velocity.Z);
+            _player.GlobalPosition = SurfaceLogicalToLocalPosition(
+                logical.EastMeters,
+                minimumY,
+                logical.NorthMeters);
+            Vector3 localVelocity = SurfaceWorldDirectionToLocal(_player.Velocity);
+            localVelocity.Y = Math.Max(0.0f, localVelocity.Y);
+            _player.Velocity = SurfaceLocalDirectionToWorld(localVelocity);
+            logical = logical with { HeightMeters = minimumY };
         }
 
-        return _player.GlobalPosition.Y - terrainHeight;
+        return logical.HeightMeters - terrainHeight;
     }
 
     private double SamplePlanetSurfaceHeight(double x, double z)

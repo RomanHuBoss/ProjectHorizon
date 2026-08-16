@@ -136,7 +136,7 @@ public partial class SalvageRepairSlice
         }
         _audioDirector.PlayWorldCue(
             AudioCue.WeaponMultitool,
-            _player.GlobalPosition + (Vector3.Up * 1.2f),
+            _player.GlobalPosition + SurfaceLocalDirectionToWorld(Vector3.Up * 1.2f),
             externalInVacuum: true,
             priority: GameAudioPriority.High,
             maxDistance: 80.0f,
@@ -304,7 +304,7 @@ public partial class SalvageRepairSlice
             atmosphere.WeatherPlaying &&
             director.IsEnvironmentFilterActive(GameAudioEnvironment.Atmosphere);
 
-        Vector3 testPosition = _player.GlobalPosition + (Vector3.Right * 4.0f) + Vector3.Up;
+        Vector3 testPosition = _player.GlobalPosition + SurfaceLocalDirectionToWorld((Vector3.Right * 4.0f) + Vector3.Up);
         bool atmosphereExternal = director.PlayWorldCue(
             AudioCue.WeaponMultitool,
             testPosition,

@@ -137,7 +137,7 @@ public partial class SalvageRepairSlice
 
         if (distance > 0.25)
         {
-            _voyageShip.LookAt(target, Vector3.Up);
+            _voyageShip.LookAt(target, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
         }
 
         InterplanetaryGuidance guidance = InterplanetaryTravel.BuildGuidance(

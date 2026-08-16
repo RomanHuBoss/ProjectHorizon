@@ -91,6 +91,24 @@ public partial class NpcNavigationSurfaceNode : Node3D
         _syncFramesRemaining <= 0 &&
         HasNavigationMapSynchronized();
 
+    public bool ParentFrameAligned
+    {
+        get
+        {
+            if (GetParent() is not Node3D parent)
+            {
+                return false;
+            }
+            Basis basis = parent.GlobalTransform.Basis.Orthonormalized();
+            return Math.Abs(basis.X.Length() - 1.0f) <= 0.001f &&
+                Math.Abs(basis.Y.Length() - 1.0f) <= 0.001f &&
+                Math.Abs(basis.Z.Length() - 1.0f) <= 0.001f &&
+                Math.Abs(basis.X.Dot(basis.Y)) <= 0.001f &&
+                Math.Abs(basis.X.Dot(basis.Z)) <= 0.001f &&
+                Math.Abs(basis.Y.Dot(basis.Z)) <= 0.001f;
+        }
+    }
+
     public int ActiveRegionCount => _regions.Count;
 
     public int MaximumRegionCount => (ActiveTileRadius * 2 + 1) *
@@ -150,6 +168,22 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             _syncFramesRemaining--;
         }
+    }
+
+    public void NotifySurfaceFrameChanged()
+    {
+        if (!IsConfigured)
+        {
+            return;
+        }
+
+        // Navigation regions are children of the rotating Gameplay surface root,
+        // so Godot propagates their transforms automatically. Force the server
+        // synchronization gate and recenter the bounded tile window from the
+        // player's new physical frame before accepting path queries again.
+        MarkNavigationSynchronizationPending(GetNavigationMapIteration());
+        _hasCenterTile = false;
+        RefreshStreaming(force: true);
     }
 
     public void SetTerrainProfile(PlanetSurfaceTerrainProfile? terrainProfile)
@@ -249,21 +283,27 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             return false;
         }
-        Vector3 toward = target - current;
-        toward.Y = 0.0f;
-        if (toward.LengthSquared() < 0.25f)
+        Vector3 currentLocal = ToSurfaceLogical(current);
+        Vector3 targetLocal = ToSurfaceLogical(target);
+        Vector3 towardLocal = targetLocal - currentLocal;
+        towardLocal.Y = 0.0f;
+        if (towardLocal.LengthSquared() < 0.25f)
         {
             return false;
         }
-        toward = toward.Normalized();
-        Vector3 lateral = new(-toward.Z, 0.0f, toward.X);
+        towardLocal = towardLocal.Normalized();
+        Vector3 lateralLocal = new(-towardLocal.Z, 0.0f, towardLocal.X);
         float sign = (sideSeed & 1) == 0 ? 1.0f : -1.0f;
-        Vector3 candidate = current + toward * 1.4f + lateral * sign * 2.6f;
+        Vector3 candidateLocal = currentLocal + towardLocal * 1.4f +
+            lateralLocal * sign * 2.6f;
+        Vector3 candidate = SurfaceLogicalToWorld(candidateLocal);
         Vector3 snapped = GetClosestNavigationPoint(candidate);
         Vector3[] path = QueryPath(current, snapped);
         if (path.Length < 2 || current.DistanceTo(snapped) < 0.75f)
         {
-            candidate = current + toward * 0.8f - lateral * sign * 2.6f;
+            candidateLocal = currentLocal + towardLocal * 0.8f -
+                lateralLocal * sign * 2.6f;
+            candidate = SurfaceLogicalToWorld(candidateLocal);
             snapped = GetClosestNavigationPoint(candidate);
             path = QueryPath(current, snapped);
         }
@@ -811,6 +851,13 @@ public partial class NpcNavigationSurfaceNode : Node3D
         return GetParent() is Node3D surfaceRoot
             ? surfaceRoot.ToLocal(worldPosition)
             : worldPosition;
+    }
+
+    private Vector3 SurfaceLogicalToWorld(Vector3 logicalPosition)
+    {
+        return GetParent() is Node3D surfaceRoot
+            ? surfaceRoot.ToGlobal(logicalPosition)
+            : logicalPosition;
     }
 
     private static NpcNavigationTileKey ToTileKey(Vector3 position)

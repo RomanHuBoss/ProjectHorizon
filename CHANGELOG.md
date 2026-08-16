@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.172] - 2026-08-16
+
+### Added — TASK-172 Physical Radial Surface Frame & Navigation Migration
+- Promoted the TASK-170 mathematical radial frame into the live Godot physics presentation: `Gameplay`, fallback ground and the 25/9 terrain streamer now rotate into the current planet East/Up/North tangent basis while persistent logical East/North coordinates remain unchanged.
+- Upgraded `PlayerController` to arbitrary-up CharacterBody motion: gravity, floor detection, jump, jetpack, swimming, movement projection and body orientation follow the active planet radial Up vector.
+- Made TASK-124 navigation recovery/probes frame-aware and remapped absolute NPC, flying-fauna and NPC-ship runtime caches/velocities during tangent-frame handoff.
+- Made flying-fauna and surface NPC steering terrain/tangent-relative under a rotated physical frame; surface ship formations/altitude and weather wind now use the current tangent basis.
+- Added TASK-172 live seam handoff diagnostics, HUD physical-frame alignment, F5 acceptance, three xUnit regression groups and section-37/CI/release gating.
+
+### Preserved boundaries
+- Gameplay remains a bounded **rotating tangent collision patch**, not yet a globally curved cube-sphere collision mesh. The proven `25 active / 9 collision` terrain budget, logical-X/Z persistence and existing save schema remain unchanged.
+- TASK-170 is synchronized as `VERIFIED` from external Godot 4.7.1 evidence (`faces=6/6`, seam continuity, geodesic warp, local gravity and bounded streamer all PASS).
+
 ## [0.1.0-alpha.170] - 2026-08-16
 
 ### Added — TASK-170 Radial Planetary Physics & Cube-Face Surface Traversal Foundation

@@ -62,34 +62,36 @@ public partial class SalvageRepairSlice
         _npcShipNavigationNodes.Clear();
 
         Vector3 station = GetNodeOrNull<Node3D>("Gameplay/OrbitalStation")?.GlobalPosition ??
-            new Vector3(0.0f, 35.0f, -145.0f);
+            (GetNodeOrNull<Node3D>("Gameplay")?.ToGlobal(new Vector3(0.0f, 35.0f, -145.0f)) ??
+                new Vector3(0.0f, 35.0f, -145.0f));
+        Vector3 Offset(Vector3 local) => SurfaceLocalDirectionToWorld(local);
         Vector3[] patrolRoute =
         {
-            station + new Vector3(-38.0f, 3.0f, 0.0f),
-            station + new Vector3(0.0f, 7.0f, -38.0f),
-            station + new Vector3(38.0f, 3.0f, 0.0f),
-            station + new Vector3(0.0f, 1.0f, 38.0f)
+            station + Offset(new Vector3(-38.0f, 3.0f, 0.0f)),
+            station + Offset(new Vector3(0.0f, 7.0f, -38.0f)),
+            station + Offset(new Vector3(38.0f, 3.0f, 0.0f)),
+            station + Offset(new Vector3(0.0f, 1.0f, 38.0f))
         };
         Vector3[] traderRoute =
         {
-            station + new Vector3(48.0f, 0.0f, 18.0f),
-            station + new Vector3(25.0f, 0.0f, 18.0f),
-            station + new Vector3(0.0f, 0.0f, 27.0f),
-            station + new Vector3(-30.0f, 4.0f, 30.0f)
+            station + Offset(new Vector3(48.0f, 0.0f, 18.0f)),
+            station + Offset(new Vector3(25.0f, 0.0f, 18.0f)),
+            station + Offset(new Vector3(0.0f, 0.0f, 27.0f)),
+            station + Offset(new Vector3(-30.0f, 4.0f, 30.0f))
         };
 
         NpcShipNavigationNode leader = CreateNpcShip(
             "npc.ship.aegis_leader",
             "ship.class.fighter",
             NpcShipNavigationRole.PatrolLeader,
-            station + new Vector3(-30.0f, 3.0f, 12.0f),
+            station + Offset(new Vector3(-30.0f, 3.0f, 12.0f)),
             new Color(0.18f, 0.46f, 0.78f, 1.0f),
             patrolRoute);
         NpcShipNavigationNode wing = CreateNpcShip(
             "npc.ship.aegis_wing",
             "ship.class.explorer",
             NpcShipNavigationRole.FormationWing,
-            station + new Vector3(-24.0f, 5.0f, 14.0f),
+            station + Offset(new Vector3(-24.0f, 5.0f, 14.0f)),
             new Color(0.22f, 0.58f, 0.86f, 1.0f),
             patrolRoute);
         wing.SetFormationLeader(leader, new Vector3(5.5f, 1.7f, -6.0f));
@@ -105,7 +107,7 @@ public partial class SalvageRepairSlice
             "npc.ship.raider_interceptor",
             "ship.class.exotic",
             NpcShipNavigationRole.HostileRaider,
-            leader.GlobalPosition + new Vector3(8.5f, 1.8f, 0.0f),
+            leader.GlobalPosition + Offset(new Vector3(8.5f, 1.8f, 0.0f)),
             new Color(0.72f, 0.16f, 0.18f, 1.0f),
             patrolRoute);
         raider.SetPrimaryTarget(leader);
@@ -281,7 +283,7 @@ public partial class SalvageRepairSlice
             points.Add(new AerialPointOfInterest(
                 "poi.fauna.water",
                 "fauna",
-                water.GlobalPosition + Vector3.Up * 4.2f,
+                water.GlobalPosition + SurfaceLocalDirectionToWorld(Vector3.Up * 4.2f),
                 2.5f));
         }
         if (landingPad is not null)
@@ -289,7 +291,7 @@ public partial class SalvageRepairSlice
             points.Add(new AerialPointOfInterest(
                 "poi.fauna.landing_pad",
                 "fauna",
-                landingPad.GlobalPosition + Vector3.Up * 5.0f,
+                landingPad.GlobalPosition + SurfaceLocalDirectionToWorld(Vector3.Up * 5.0f),
                 2.0f));
         }
         Vector3 ridgeWest = gameplay?.ToGlobal(
@@ -314,22 +316,22 @@ public partial class SalvageRepairSlice
         points.Add(new AerialPointOfInterest(
             "poi.ship.dock_approach",
             "ship",
-            stationPosition + new Vector3(0.0f, 0.0f, 27.0f),
+            stationPosition + SurfaceLocalDirectionToWorld(new Vector3(0.0f, 0.0f, 27.0f)),
             3.0f));
         points.Add(new AerialPointOfInterest(
             "poi.ship.west_lane",
             "ship",
-            stationPosition + new Vector3(-38.0f, 3.0f, 0.0f),
+            stationPosition + SurfaceLocalDirectionToWorld(new Vector3(-38.0f, 3.0f, 0.0f)),
             4.0f));
         points.Add(new AerialPointOfInterest(
             "poi.ship.east_lane",
             "ship",
-            stationPosition + new Vector3(38.0f, 3.0f, 0.0f),
+            stationPosition + SurfaceLocalDirectionToWorld(new Vector3(38.0f, 3.0f, 0.0f)),
             4.0f));
         points.Add(new AerialPointOfInterest(
             "poi.ship.outer_lane",
             "ship",
-            stationPosition + new Vector3(0.0f, 7.0f, -42.0f),
+            stationPosition + SurfaceLocalDirectionToWorld(new Vector3(0.0f, 7.0f, -42.0f)),
             4.0f));
         return points;
     }

@@ -183,8 +183,9 @@ public partial class SalvageRepairSlice
             sun.LightColor = state.Kind == PlanetWeatherKind.Toxic
                 ? ToColor(baseSky.SunColor).Lerp(new Color(0.68f, 0.90f, 0.38f), 0.24f)
                 : ToColor(baseSky.SunColor);
-            Vector3 ray = -_planetSurfaceSunDirection;
-            sun.LookAt(ray, Vector3.Up);
+            Vector3 ray = -SurfaceLocalDirectionToWorld(
+                _planetSurfaceSunDirection).Normalized();
+            sun.LookAt(ray, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
         }
 
         if (_planetSurfaceCloudRoot is not null)
@@ -194,11 +195,13 @@ public partial class SalvageRepairSlice
             float windAngle = Mathf.DegToRad((float)state.WindDirectionDegrees);
             if (_player is not null)
             {
-                _planetSurfaceCloudRoot.GlobalPosition = new Vector3(
-                    _player.GlobalPosition.X +
+                PlanetSurfaceLogicalPosition logicalPlayer =
+                    GetPlanetSurfaceLogicalPlayerPosition();
+                _planetSurfaceCloudRoot.Position = new Vector3(
+                    (float)logicalPlayer.EastMeters +
                         Mathf.Sin(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18),
                     0.0f,
-                    _player.GlobalPosition.Z +
+                    (float)logicalPlayer.NorthMeters +
                         Mathf.Cos(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18));
             }
         }
@@ -372,10 +375,12 @@ public partial class SalvageRepairSlice
         Vector3 anchor = StageOneVoyage.Piloted && _voyageShip is not null
             ? _voyageShip.GlobalPosition
             : _player.GlobalPosition;
-        _planetWeatherFxRoot.GlobalPosition = anchor + new Vector3(
+        Vector3 localOffset = new(
             Mathf.Sin(angle) * (float)(time % 8.0) * 0.22f,
             13.0f + vertical,
             Mathf.Cos(angle) * (float)(time % 8.0) * 0.22f);
+        _planetWeatherFxRoot.GlobalPosition = anchor +
+            SurfaceLocalDirectionToWorld(localOffset);
     }
 
     private void ApplyPlanetWeatherToFauna(PlanetWeatherState state)

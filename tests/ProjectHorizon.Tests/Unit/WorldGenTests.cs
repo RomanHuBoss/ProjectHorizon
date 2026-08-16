@@ -1115,4 +1115,102 @@ public sealed class WorldGenTests
         Assert.Equal(6, report.FacesCovered);
     }
 
+
+    [Fact]
+    public void PlanetPhysicalRadialFrame_MapsLogicalPointsAndVectorsThroughRotatingTangentBasis()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfacePhysicalFrameRuntime physical = new(
+            new PlanetSurfaceRadialFrameRuntime(profile));
+        PlanetSurfacePhysicalFrameState frame = physical.Build(25000.0, -17000.0);
+        Godot.Vector3 logical = new(25012.5f, 3.25f, -17008.75f);
+
+        Godot.Vector3 world = frame.LogicalToWorld(logical);
+        Godot.Vector3 restored = frame.WorldToLogical(world);
+        Godot.Vector3 localVelocity = new(4.0f, -1.25f, 2.5f);
+        Godot.Vector3 worldVelocity = frame.SurfaceBasis * localVelocity;
+        Godot.Vector3 restoredVelocity = frame.SurfaceBasis.Inverse() * worldVelocity;
+
+        Assert.InRange(restored.DistanceTo(logical), 0.0f, 0.001f);
+        Assert.InRange(restoredVelocity.DistanceTo(localVelocity), 0.0f, 0.0001f);
+        Assert.InRange(frame.WorldUp.Dot(new Godot.Vector3((float)frame.Radial.GlobalFrame.Up.X, (float)frame.Radial.GlobalFrame.Up.Y, (float)frame.Radial.GlobalFrame.Up.Z).Normalized()), 0.9999f, 1.0001f);
+    }
+
+    [Fact]
+    public void PlanetPhysicalRadialFrame_CubeFaceHandoffPreservesLogicalIdentity()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfaceRadialFrameRuntime radial = new(profile);
+        PlanetSurfacePhysicalFrameRuntime physical = new(radial);
+        PlanetSurfaceCanonicalLogicalAddress leftAddress = radial.WarpTarget(0.0, 44.999);
+        PlanetSurfaceCanonicalLogicalAddress rightAddress = radial.WarpTarget(0.0, 45.001);
+        PlanetSurfacePhysicalFrameState left = physical.Build(
+            leftAddress.EastMeters,
+            leftAddress.NorthMeters);
+        PlanetSurfacePhysicalFrameState right = physical.Build(
+            rightAddress.EastMeters,
+            rightAddress.NorthMeters);
+        Godot.Vector3 logical = new(
+            (float)leftAddress.EastMeters,
+            2.0f,
+            (float)leftAddress.NorthMeters);
+        Godot.Vector3 remapped = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            left.GameplayTransform,
+            right.GameplayTransform,
+            left.LogicalToWorld(logical));
+
+        Assert.NotEqual(left.Radial.CubeFace.Face, right.Radial.CubeFace.Face);
+        Assert.InRange(
+            right.WorldToLogical(remapped).DistanceTo(logical),
+            0.0f,
+            0.001f);
+        Assert.InRange(
+            PlanetSurfacePhysicalFrameRuntime.MaximumAxisErrorDegrees(
+                left.SurfaceBasis,
+                right.SurfaceBasis),
+            0.0,
+            0.01);
+    }
+
+    [Fact]
+    public void PlanetPhysicalRadialFrame_AcceptanceCoversSixFacesAndSeamHandoff()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .Where(profile => profile.Landable)
+            .ToArray();
+
+        PlanetSurfacePhysicalFrameAcceptanceReport report =
+            PlanetSurfacePhysicalFrameAcceptanceRunner.Run(profiles);
+
+        Assert.True(report.Passed);
+        Assert.True(report.FrameTransforms);
+        Assert.True(report.WorldLogicalRoundTrip);
+        Assert.True(report.VectorRemap);
+        Assert.True(report.SeamHandoff);
+        Assert.Equal(6, report.FacesCovered);
+    }
+
 }

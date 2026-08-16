@@ -1176,10 +1176,18 @@ public partial class TerrainChunkManager : Node3D
         }
     }
 
-    private Vector3 ToLogicalPosition(Vector3 localWorldPosition) => new(
-        localWorldPosition.X + (float)_logicalOriginEastMeters,
-        localWorldPosition.Y,
-        localWorldPosition.Z + (float)_logicalOriginNorthMeters);
+    private Vector3 ToLogicalPosition(Vector3 worldPosition)
+    {
+        // TASK-172: the bounded terrain patch can be physically rotated into
+        // the planet radial tangent frame. Convert the player/world probe into
+        // the manager's local East/Up/North axes before applying the persistent
+        // logical origin.
+        Vector3 local = IsInsideTree() ? ToLocal(worldPosition) : worldPosition;
+        return new Vector3(
+            local.X + (float)_logicalOriginEastMeters,
+            local.Y,
+            local.Z + (float)_logicalOriginNorthMeters);
+    }
 
     private Vector3 BuildLocalChunkPosition(Vector2I coordinate) => new(
         (float)(coordinate.X * (double)ChunkSize - _logicalOriginEastMeters),

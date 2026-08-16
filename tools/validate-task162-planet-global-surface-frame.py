@@ -17,6 +17,7 @@ failures: list[str] = []
 runtime = text('src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceFrameRuntime.cs')
 acceptance = text('src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceFrameAcceptance.cs')
 slice_frame = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetSurfaceFrame.cs')
+physical_frame = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePhysicalSurface.cs')
 main = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs')
 terrain_manager = text('src/Game.Client/Scripts/Terrain/TerrainChunkManager.cs')
 terrain_slice = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetTerrain.cs')
@@ -55,8 +56,9 @@ need('SetLogicalSurfaceOrigin' in terrain_slice and
      'logicalCenterEastMeters' in terrain_slice and
      'logicalCenterNorthMeters' in terrain_slice,
      'terrain/geodesic/fallback integration does not use logical coordinates', failures)
-need('ground.Position = Vector3.Zero' in slice_frame,
-     'fallback GroundBody is not kept in bounded local frame', failures)
+need(('ground.Position = Vector3.Zero' in slice_frame) or
+     ('ground.GlobalTransform = new Transform3D(nextBasis, Vector3.Zero)' in physical_frame),
+     'fallback GroundBody is not kept in bounded/rotating local frame', failures)
 need('GetPlanetSurfaceLogicalPlayerPosition' in world and
      'WorldToPlanetSurfaceLogicalPosition' in world and
      '(GetNodeOrNull<Node3D>("Gameplay") ?? this).AddChild' in world,
@@ -67,9 +69,12 @@ need('ToSurfaceLogical' in nav and
      'NPC navigation is not frame-aware across long traversal', failures)
 need(ecology.count('logicalObserver = WorldToPlanetSurfaceLogicalPosition(observer)') >= 2,
      'ecology flora promotion/scanner still mixes physical and logical coordinates', failures)
-need('ApplyPlanetSurfaceOriginShiftToRuntimeCaches' in slice_frame and
-     'ApplyWorldOriginShift(worldShift)' in slice_frame and
-     'RefreshAerialNavigationEnvironment();' in slice_frame,
+need((('ApplyPlanetSurfaceOriginShiftToRuntimeCaches' in slice_frame and
+       'ApplyWorldOriginShift(worldShift)' in slice_frame and
+       'RefreshAerialNavigationEnvironment();' in slice_frame) or
+      ('ApplyPlanetSurfaceFrameTransformToRuntimeCaches' in physical_frame and
+       'ApplyWorldFrameTransform(previousFrame, nextFrame)' in physical_frame and
+       'RefreshAerialNavigationEnvironment();' in physical_frame)),
      'live rebase does not update absolute runtime caches', failures)
 need('SurfaceGlobalToLocal' in npc_agent and
      'SurfaceLocalToGlobal' in npc_agent and

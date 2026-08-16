@@ -226,7 +226,7 @@ public partial class SalvageRepairSlice
                 float distance = offset.Length();
                 if (distance > 0.25f)
                 {
-                    _voyageShip.LookAt(target, Vector3.Up);
+                    _voyageShip.LookAt(target, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
                 }
 
                 float approachRange = StageOneVoyage.Location ==

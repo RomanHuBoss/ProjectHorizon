@@ -4436,7 +4436,8 @@ public partial class SalvageRepairSlice : Node3D
     {
         PlayerController player = _player ??
             throw new InvalidOperationException("Player is unavailable.");
-        Vector3 forward = -player.GlobalTransform.Basis.Z;
+        Vector3 forward = SurfaceWorldDirectionToLocal(
+            -player.GlobalTransform.Basis.Z);
         forward.Y = 0.0f;
         if (forward.LengthSquared() < 0.0001f)
         {
@@ -4451,7 +4452,7 @@ public partial class SalvageRepairSlice : Node3D
             GetPlanetSurfaceLogicalPlayerPosition();
         Vector3 target = new(
             (float)logicalPlayer.EastMeters,
-            player.GlobalPosition.Y,
+            (float)logicalPlayer.HeightMeters,
             (float)logicalPlayer.NorthMeters);
         target += forward * 4.5f;
         double gridSize = BaseConstructionCatalog.GridSizeMeters;
@@ -5519,6 +5520,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetWeatherAcceptance();
         RunPlanetaryGlobeAcceptance();
         RunPlanetRadialSurfaceAcceptance();
+        RunPlanetSurfacePhysicalFrameAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5529,7 +5531,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6044,7 +6046,10 @@ public partial class SalvageRepairSlice : Node3D
             _lastDomainEvent = "GameplaySlotReset";
             if (_player is not null)
             {
-                _player.GlobalPosition = new Vector3(0.0f, 1.05f, 5.5f);
+                _player.GlobalPosition = SurfaceLogicalToLocalPosition(
+                    0.0,
+                    1.05,
+                    5.5);
                 _player.Rotation = Vector3.Zero;
                 _player.Velocity = Vector3.Zero;
                 EnsurePlayerAbovePlanetSurfaceFloor();
@@ -7623,6 +7628,7 @@ public partial class SalvageRepairSlice : Node3D
         string surfaceFrameLine = BuildPlanetSurfaceFrameHudLine();
         string planetaryGlobeLine = BuildPlanetaryGlobeHudLine();
         string planetRadialSurfaceLine = BuildPlanetRadialSurfaceHudLine();
+        string planetPhysicalSurfaceLine = BuildPlanetSurfacePhysicalFrameHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7667,6 +7673,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-166 (F5): {_planetWeatherAcceptanceHud}",
             $"TASK-168 (F5): {_planetaryGlobeAcceptanceHud}",
             $"TASK-170 (F5): {_planetRadialSurfaceAcceptanceHud}",
+            $"TASK-172 (F5): {_planetSurfacePhysicalFrameAcceptanceHud}",
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
@@ -7703,6 +7710,7 @@ public partial class SalvageRepairSlice : Node3D
                 surfaceFrameLine,
                 planetaryGlobeLine,
                 planetRadialSurfaceLine,
+                planetPhysicalSurfaceLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7755,6 +7763,7 @@ public partial class SalvageRepairSlice : Node3D
             surfaceFrameLine,
             planetaryGlobeLine,
             planetRadialSurfaceLine,
+            planetPhysicalSurfaceLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

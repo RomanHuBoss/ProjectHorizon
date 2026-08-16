@@ -328,8 +328,7 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         Vector3 next = _navigationAgent.IsNavigationFinished()
             ? GlobalPosition
             : _navigationAgent.GetNextPathPosition();
-        Vector3 offset = next - GlobalPosition;
-        offset.Y = 0.0f;
+        Vector3 offset = ProjectToSurfaceTangent(next - GlobalPosition);
         Vector3 direction = offset.LengthSquared() > 0.015f
             ? offset.Normalized()
             : Vector3.Zero;
@@ -376,8 +375,8 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             speedScale = 0.0;
             return GlobalPosition;
         }
-        Vector3 offsetToPlayer = _player.GlobalPosition - GlobalPosition;
-        offsetToPlayer.Y = 0.0f;
+        Vector3 offsetToPlayer = ProjectToSurfaceTangent(
+            _player.GlobalPosition - GlobalPosition);
         double distance = offsetToPlayer.Length();
         speedScale = 1.0;
         if (_definition.Hostile && distance <= _definition.DetectionRange)
@@ -414,11 +413,12 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             return;
         }
         _avoidanceSamples++;
-        Velocity = new Vector3(safeVelocity.X, 0.0f, safeVelocity.Z);
+        Velocity = ProjectToSurfaceTangent(safeVelocity);
+        UpDirection = SurfaceWorldUp();
         if (Velocity.LengthSquared() > 0.03f)
         {
-            Vector3 look = GlobalPosition + new Vector3(Velocity.X, 0.0f, Velocity.Z);
-            LookAt(look, Vector3.Up, true);
+            Vector3 look = GlobalPosition + Velocity.Normalized();
+            LookAt(look, SurfaceWorldUp(), true);
         }
         MoveAndSlide();
         Position = new Vector3(
@@ -443,21 +443,22 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             _behaviorDecisionCount++;
         }
 
-        Vector3 offset = _cachedBehaviorTarget - GlobalPosition;
-        offset.Y = 0.0f;
+        Vector3 offset = ProjectToSurfaceTangent(
+            _cachedBehaviorTarget - GlobalPosition);
         Vector3 direction = offset.LengthSquared() > 0.04f
             ? offset.Normalized()
             : Vector3.Zero;
         Vector3 desired = direction *
             (float)(_definition.WalkSpeed * _cachedBehaviorSpeedScale);
-        Velocity = new Vector3(
-            Mathf.MoveToward(Velocity.X, desired.X, (float)(delta * 5.0)),
-            0.0f,
-            Mathf.MoveToward(Velocity.Z, desired.Z, (float)(delta * 5.0)));
+        Vector3 currentTangent = ProjectToSurfaceTangent(Velocity);
+        Velocity = currentTangent.MoveToward(
+            desired,
+            (float)(delta * 5.0));
+        UpDirection = SurfaceWorldUp();
         if (Velocity.LengthSquared() > 0.03f)
         {
-            Vector3 look = GlobalPosition + new Vector3(Velocity.X, 0.0f, Velocity.Z);
-            LookAt(look, Vector3.Up, true);
+            Vector3 look = GlobalPosition + Velocity.Normalized();
+            LookAt(look, SurfaceWorldUp(), true);
         }
         MoveAndSlide();
         float surfaceY = _navigationSurface is null
@@ -547,6 +548,32 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         _nextProgressCheckAt = 0.0;
     }
 
+    public void ApplyWorldFrameTransform(
+        Transform3D previousFrame,
+        Transform3D nextFrame)
+    {
+        _lastRequestedTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            previousFrame, nextFrame, _lastRequestedTarget);
+        _progressAnchor = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            previousFrame, nextFrame, _progressAnchor);
+        _recoveryTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            previousFrame, nextFrame, _recoveryTarget);
+        _cachedBehaviorTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+            previousFrame, nextFrame, _cachedBehaviorTarget);
+        Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
+            previousFrame.Basis.Orthonormalized(),
+            nextFrame.Basis.Orthonormalized(),
+            Velocity);
+        UpDirection = nextFrame.Basis.Y.Normalized();
+        if (_navigationAgent is not null)
+        {
+            _navigationAgent.TargetPosition = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+                previousFrame, nextFrame, _navigationAgent.TargetPosition);
+        }
+        _nextNavigationTargetRefreshAt = 0.0;
+        _nextProgressCheckAt = 0.0;
+    }
+
     private Vector3 SurfaceLocalToGlobal(Vector3 localPosition) =>
         GetParent() is Node3D parent
             ? parent.ToGlobal(localPosition)
@@ -557,12 +584,26 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             ? parent.ToLocal(globalPosition)
             : globalPosition;
 
-    private static float HorizontalDistance(Vector3 left, Vector3 right)
+    private float HorizontalDistance(Vector3 left, Vector3 right) =>
+        ProjectToSurfaceTangent(right - left).Length();
+
+    private Vector3 ProjectToSurfaceTangent(Vector3 worldVector)
     {
-        Vector3 offset = right - left;
-        offset.Y = 0.0f;
-        return offset.Length();
+        if (GetParent() is not Node3D parent)
+        {
+            worldVector.Y = 0.0f;
+            return worldVector;
+        }
+        Basis basis = parent.GlobalTransform.Basis.Orthonormalized();
+        Vector3 local = basis.Inverse() * worldVector;
+        local.Y = 0.0f;
+        return basis * local;
     }
+
+    private Vector3 SurfaceWorldUp() =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Y.Normalized()
+            : Vector3.Up;
 
     private static int StableSeed(string value)
     {

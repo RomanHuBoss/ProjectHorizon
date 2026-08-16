@@ -131,6 +131,31 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             _radius);
     }
 
+    public void ApplyWorldFrameTransform(
+        Transform3D previousFrame,
+        Transform3D nextFrame)
+    {
+        for (int index = 0; index < _route.Length; index++)
+        {
+            _route[index] = PlanetSurfacePhysicalFrameRuntime.MapPoint(
+                previousFrame, nextFrame, _route[index]);
+        }
+        Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
+            previousFrame.Basis.Orthonormalized(),
+            nextFrame.Basis.Orthonormalized(),
+            Velocity);
+        _cachedDesiredVelocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
+            previousFrame.Basis.Orthonormalized(),
+            nextFrame.Basis.Orthonormalized(),
+            _cachedDesiredVelocity);
+        _steering?.UpsertEntity(
+            ShipId,
+            "npc_ship",
+            GlobalPosition,
+            Velocity,
+            _radius);
+    }
+
     public void PrimeAcceptanceCombatCycle()
     {
         if (Role != NpcShipNavigationRole.HostileRaider)
@@ -221,14 +246,16 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             }
 
             desiredVelocity += separation + obstacleAvoidance;
-            desiredVelocity = _steering.ApplyAltitudeEnvelope(
-                desiredVelocity,
-                GlobalPosition.Y,
+            Vector3 desiredLocal = SurfaceWorldVectorToLocal(desiredVelocity);
+            desiredLocal = _steering.ApplyAltitudeEnvelope(
+                desiredLocal,
+                Position.Y,
                 14.0f,
                 PreferredAltitude(),
                 62.0f,
                 0.65f,
                 10.0f);
+            desiredVelocity = SurfaceLocalVectorToWorld(desiredLocal);
             if (desiredVelocity.Length() > _maximumSpeed * 1.2f)
             {
                 desiredVelocity = desiredVelocity.Normalized() * (_maximumSpeed * 1.2f);
@@ -405,11 +432,12 @@ public partial class NpcShipNavigationNode : CharacterBody3D
         Vector3 leaderVelocity = _formationLeader.Velocity;
         Vector3 forward = leaderVelocity.LengthSquared() > 0.1f
             ? leaderVelocity.Normalized()
-            : Vector3.Forward;
-        Vector3 right = forward.Cross(Vector3.Up);
+            : SurfaceLocalVectorToWorld(Vector3.Forward).Normalized();
+        Vector3 up = SurfaceWorldUp();
+        Vector3 right = forward.Cross(up);
         if (right.LengthSquared() <= 0.001f)
         {
-            right = Vector3.Right;
+            right = SurfaceLocalVectorToWorld(Vector3.Right).Normalized();
         }
         else
         {
@@ -417,7 +445,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
         }
         Vector3 target = _formationLeader.GlobalPosition +
             right * _formationOffset.X +
-            Vector3.Up * _formationOffset.Y +
+            up * _formationOffset.Y +
             forward * _formationOffset.Z;
         return _steering.Formation(
             GlobalPosition,
@@ -463,7 +491,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             ResolveVelocity(target),
             _maximumSpeed * 1.12f,
             0.8f);
-        Vector3 lateral = away.Cross(Vector3.Up);
+        Vector3 lateral = away.Cross(SurfaceWorldUp());
         if (lateral.LengthSquared() > 0.01f)
         {
             away = (away + lateral.Normalized() * (_maximumSpeed * 0.45f)).Normalized() *
@@ -560,12 +588,28 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             return;
         }
         Vector3 direction = Velocity.Normalized();
-        if (Math.Abs(direction.Dot(Vector3.Up)) > 0.96f)
+        Vector3 up = SurfaceWorldUp();
+        if (Math.Abs(direction.Dot(up)) > 0.96f)
         {
             return;
         }
-        LookAt(GlobalPosition + direction, Vector3.Up);
+        LookAt(GlobalPosition + direction, up);
     }
+
+    private Vector3 SurfaceWorldUp() =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Y.Normalized()
+            : Vector3.Up;
+
+    private Vector3 SurfaceLocalVectorToWorld(Vector3 localVector) =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Orthonormalized() * localVector
+            : localVector;
+
+    private Vector3 SurfaceWorldVectorToLocal(Vector3 worldVector) =>
+        GetParent() is Node3D parent
+            ? parent.GlobalTransform.Basis.Orthonormalized().Inverse() * worldVector
+            : worldVector;
 
     private void BuildVisual(Color bodyColor)
     {
