@@ -52,10 +52,11 @@ public partial class SalvageRepairSlice
                 PlanetEnvironmentProfile profile = PlanetEnvironment.BuildProfile(
                     planet,
                     GalaxyNavigation.CurrentSystem.StarType);
-                // Compressed visual kilometres: preserve the catalog radius
-                // ordering while fitting a 20..80 km world into an arcade-scale
-                // star system. The focused globe gets a further detail factor.
-                return Math.Clamp(profile.RadiusKm * 24.0, 520.0, 1900.0);
+                // TASK-178.6: preserve catalog radius ordering but stop presenting planets
+                // as ship-sized props. A 44.3 km starter world is now roughly
+                // 5.8 km in display radius (6.45 km detailed), while the system
+                // keeps tens of kilometres of navigable separation.
+                return Math.Clamp(profile.RadiusKm * 360.0, 9000.0, 28000.0);
             });
         _starSystemSimulationNode!.Configure(StarSystemSimulation);
         _planetActivationPipelineMask = 0;

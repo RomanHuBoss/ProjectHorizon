@@ -72,53 +72,48 @@ public partial class SalvageRepairSlice
     private bool TryCaptureFreeFlightPlanetEntry(Vector3 previous, Vector3 current)
     {
         if (_voyageShip is null || _starSystemSimulationNode is null ||
-            StageOneVoyage.Location != StageOneVoyageLocation.InboundFlight ||
+            _galaxyNavigationRuntime is null ||
+            StageOneVoyage.Location is not (
+                StageOneVoyageLocation.OutboundFlight or
+                StageOneVoyageLocation.InboundFlight) ||
             StageOneVoyage.IsPlanetarySurfaceApproach ||
-            !_starSystemSimulationNode.TryGetBodyDisplaySphere(
-                GalaxyNavigation.CurrentPlanetId,
-                out StarSystemBodyDefinition definition,
-                out Vector3 center,
-                out float displayRadius) ||
-            definition.Kind != StarSystemBodyKind.Planet)
+            !_starSystemSimulationNode.TryGetFirstPlanetEntryShellHit(
+                previous,
+                current,
+                OrbitalBodyCollisionRuntime.ShipCollisionRadiusMeters,
+                PlanetaryApproachRuntime.OrbitalEntryClearanceMeters,
+                out OrbitalBodyCollisionHit shellHit))
         {
             return false;
         }
 
-        float entryRadius = displayRadius +
-            (float)PlanetaryApproachRuntime.OrbitalEntryClearanceMeters;
-        bool crossed = OrbitalBodyCollisionRuntime.CrossedOuterShell(
-            previous,
-            current,
-            center,
-            entryRadius);
-        bool alreadyInside = current.DistanceTo(center) <= entryRadius;
-        if (!crossed && !alreadyInside)
+        if (_voyageShip.Speed > PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed)
+        {
+            // Safe-entry shell is deliberately ignored at excessive speed. The
+            // inner swept solid-body collision below will then stop/death the
+            // ship instead of silently teleporting through the planet.
+            return false;
+        }
+
+        GalaxyPlanetDefinition? targetPlanet = ResolveLandablePlanet(shellHit.BodyId);
+        if (targetPlanet is null)
         {
             return false;
         }
 
-        if (_voyageShip.Speed >
-            PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed)
-        {
-            return false;
-        }
-
-        Vector3 radial = current - center;
-        if (radial.LengthSquared() <= 0.000001f)
-        {
-            radial = previous - center;
-        }
-        if (radial.LengthSquared() <= 0.000001f)
-        {
-            radial = Vector3.Back;
-        }
-        radial = radial.Normalized();
-
-        // Snap only to the continuously crossed entry shell, never to the
-        // planet surface. This closes frame-rate gaps while preserving the
-        // existing two-stage surface handoff contract.
-        _voyageShip.GlobalPosition = center + radial * entryRadius;
         double speed = _voyageShip.Speed;
+        if (!string.Equals(
+                targetPlanet.PlanetId,
+                GalaxyNavigation.CurrentPlanetId,
+                StringComparison.Ordinal))
+        {
+            return TryCommitManualCrossPlanetEntry(
+                targetPlanet,
+                shellHit,
+                speed);
+        }
+
+        _voyageShip.GlobalPosition = shellHit.ShipCenterAtImpact;
         if (!TryCommitPlanetaryEntryHandoff(automatic: false))
         {
             return false;
@@ -127,10 +122,10 @@ public partial class SalvageRepairSlice
         _freeFlightPlanetEntryCount++;
         GD.Print(
             "TASK-178.5 free-flight planetary entry PASS: " +
-            $"planet={definition.BodyId}; mode=manual-flight; swept=1; " +
+            $"planet={targetPlanet.PlanetId}; mode=manual-flight; swept=1; " +
             $"speed={speed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
-            $"displayRadius={displayRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
-            $"entryRadius={entryRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
+            $"displayRadius={shellHit.DisplayRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
+            $"entryRadius={shellHit.CollisionRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
             "surfaceHandoff=1.");
         return true;
     }

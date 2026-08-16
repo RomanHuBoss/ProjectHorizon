@@ -15,20 +15,39 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.6 — Orbital Scale, Mouse Flight & Multi-Planet Surface Activation
+
+Alpha.178.6 addresses three defects exposed by the first alpha.178.5 flight. The orbital scene is widened by another order of magnitude: planet centres use ~100 km-class compressed spacing, moons keep tens of kilometres of clear space beyond the parent visual surface, and landable planet radii are derived from the catalogued 20–80 km bodies at a much larger compressed display scale. The focused planet is no longer moved farther away when its radius grows; it is kept at a fixed ~9 km surface clearance, so its angular size genuinely reads as a planet. Cameras retain the scene to ~1,200 km.
+
+Mouse pitch/yaw is now sampled in Godot `_Input` before HUD `Control` nodes can consume motion. A normal mouse delta is accumulated with the configured ship sensitivity and an explicit flight gain, then decays in **seconds**, not by a fixed amount per physics tick. While manual ship ownership is active, the motion is marked handled and the first live sample prints `TASK-178.6 ship mouse steering INPUT PASS`. `G` still toggles heading-coupled arcade flight vs explicit inertial drift.
+
+Planet approach is also generalized. Every landable planet has a physical entry shell. Entering a different planet at normal ship speed performs the required `Orbit -> InterplanetaryTransit -> Orbit` transaction, changes planet identity only inside that transaction, synchronously builds the destination terrain/ecology/POI/resource state, and then enters the verified 220 m curved-surface approach. Moons and stars remain non-landable solid bodies. Normal orbital entry is allowed up to 110 m/s; this prevents the old situation where a normal 85 m/s ship hit the proxy before surface flora/fauna/resources could ever appear.
+
+Because the enlarged system would otherwise turn the new 100 km-class spacing into an hour-long flight, `K` interplanetary cruise now has a separate scale-aware speed envelope. Far from the destination it may raise the external ship speed limit up to **600 m/s**; target speed is reduced continuously from remaining stopping distance using the ship's 38 m/s² braking capability, and the ordinary <=11 m/s arrival gate is preserved. Manual flight keeps its normal ship limits—high-speed cruise is navigation-assist authority, not a permanent physics cheat.
+
+### Acceptance TASK-178.6
+
+1. Run `tools\run-section37-quality.cmd`: expected clean build `0 errors / 0 warnings`, tests green and `TASK-178.6 ORBITAL SCALE/MOUSE/MULTI-PLANET CONTRACT PASS`.
+2. In manual flight, move the mouse immediately after `T`/undock. The first motion must log `TASK-178.6 ship mouse steering INPUT PASS`; pitch/yaw must be plainly visible without keyboard arrows.
+3. Compare Orbit visually: the focused planet should dominate the view and neighbouring planet centres should no longer read as objects in the same small local cluster. Moons must remain well outside the parent surface. Select another planet and use `K`: long-range cruise should accelerate toward the ~600 m/s envelope and then decelerate automatically instead of crawling for tens of minutes.
+4. Approach a **landable planet**, not a moon, at <=110 m/s. For the current planet expect `TASK-178.5 free-flight planetary entry PASS`; for another landable planet expect `TASK-178.6 manual planet transfer PASS ... world=Orbit->InterplanetaryTransit->Orbit ... flora=...; fauna=...; pois=...; resources=...; surfaceHandoff=1`.
+5. After the handoff, the destination surface must visibly contain its own terrain, flora/fauna, POIs and mineable resource nodes. F5 must report `TASK-178.6 orbital scale/mouse/multi-planet acceptance PASS` with `playableCruise=1`, `landableContent=1` and `planets=N/N`.
+6. A deliberate collision with a moon/star still must be blocked by TASK-178.5 swept collision; those bodies are not expected to spawn landable ecology.
+
 ## TASK-178.5 — Arcade Flight Kinematics & Continuous Orbital Collision
 
 Alpha.178.5 closes two gameplay gaps exposed by the first real return flight from the station. The default `ArcadeShipController` now behaves as an arcade spacecraft rather than as an unintentionally Newtonian rigid body: with flight assist enabled, turning the ship continuously bends the velocity vector toward the ship's local forward/translation axes while preserving speed. `G` deliberately disables that coupling and exposes inertial-drift mode; this is an explicit opt-out rather than the default.
 
 Orbital stars, planets and moons are no longer visual-only spheres. `StarSystemSimulationNode` exposes the live display centre/radius of each solid body and performs continuous swept-sphere intersection against the ship trajectory, so even a frame that jumps from one side of a planet to the other is caught. A physical impact clamps the ship to the boundary, zeroes velocity and opens the localized death screen instead of allowing tunnelling.
 
-The current landable planet additionally exposes a physical outer entry shell at the existing TASK-178.4 clearance. Manual flight can cross that shell at `<=28 m/s` and transition into the verified 220 m curved-surface approach without requiring `K` or `Enter`; navigation assist and manual capture continue to use the same contract.
+The current landable planet additionally exposes a physical outer entry shell at the existing TASK-178.4 clearance. TASK-178.6 permits normal manual flight to cross that shell at `<=110 m/s` and transition into the verified 220 m curved-surface approach without requiring `K` or `Enter`; navigation assist and manual capture continue to use the same contract.
 
 ### Acceptance TASK-178.5
 
 1. `tools\run-section37-quality.cmd`: clean build `0 errors / 0 warnings`, tests green, `TASK-178.5 ... CONTRACT PASS`.
 2. Undock with `T`, leave `G` enabled and accelerate to a visible velocity. Rotate the nose by roughly 90–180 degrees without pressing `K`: the actual trajectory must curve toward the new heading instead of continuing indefinitely along the old world-space vector.
 3. Toggle `G` once: Output must show `mode=inertial-drift`; now rotation is allowed to leave the velocity vector uncoupled. Toggle `G` again before the collision/landing tests.
-4. Approach the current landable planet manually. At `<=28 m/s`, crossing the outer entry shell must log `TASK-178.5 free-flight planetary entry PASS` and hand off to the surface approach even with navigation assist off.
+4. Approach the current landable planet manually. At a safe entry speed (TASK-178.6 raises the normal limit to `<=110 m/s`), crossing the outer entry shell must log `TASK-178.5 free-flight planetary entry PASS` and hand off to the surface approach even with navigation assist off.
 5. Repeat at unsafe/high speed (or aim at another planet/moon): the ship must not pass through the sphere. Expected Output is `TASK-178.5 orbital body collision PASS ... swept=1; blocked=1; death=1` and the death overlay.
 6. F5 must contain `TASK-178.5 spaceflight kinematics/collision acceptance PASS` with `headingCoupling=1; sweptPlanetCollision=1; highSpeedTunnelingBlocked=1; liveAssist=1; currentPlanetSphere=1; liveSweep=1`.
 

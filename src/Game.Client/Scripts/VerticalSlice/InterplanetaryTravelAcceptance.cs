@@ -78,7 +78,8 @@ public static class InterplanetaryTravelAcceptanceRunner
             bool boarded = voyage.TryBoard(ship, out _) == StageOneVoyageActionResult.Applied;
             bool launched = voyage.TryLaunch(ship, out _) == StageOneVoyageActionResult.Applied;
             double fuelBefore = ship.Fuel;
-            double plannedDistance = 120.0 + Math.Abs(target.OrbitIndex - source.OrbitIndex) * 72.0;
+            double plannedDistance = 120000.0 +
+                Math.Abs(target.OrbitIndex - source.OrbitIndex) * 100000.0;
             InterplanetaryTravelRuntime travel = new();
             travel.SynchronizeSelection(galaxy);
             bool began = travel.TryBeginCruise(
@@ -92,9 +93,16 @@ public static class InterplanetaryTravelAcceptanceRunner
                 ship.Fuel < fuelBefore && fuelCost > 0.0;
 
             InterplanetaryGuidance far = travel.BuildGuidance(plannedDistance, 6.0);
+            InterplanetaryGuidance cruise = travel.BuildGuidance(80000.0, 590.0);
+            InterplanetaryGuidance brake = travel.BuildGuidance(1200.0, 280.0);
             InterplanetaryGuidance near = travel.BuildGuidance(8.0, 5.0);
-            bool guidance = far.Forward > 0.0f && !far.Brake &&
-                near.Brake && near.ArrivalReady;
+            bool guidance =
+                far.Forward > 0.0f && far.Boost && !far.Brake &&
+                far.SpeedLimit >= 500.0f &&
+                cruise.SpeedLimit >= 500.0f && !cruise.Brake &&
+                brake.SpeedLimit < 280.0f && brake.Brake &&
+                near.Brake && near.ArrivalReady &&
+                near.SpeedLimit <= InterplanetaryTravelRuntime.MaximumArrivalSpeed + 0.01;
 
             string systemId = galaxy.CurrentSystem.SystemId;
             WorldSceneCoordinatorRuntime world = new(

@@ -10,7 +10,7 @@ public static class PlanetaryApproachRuntime
 {
     public const double OrbitalEntryClearanceMeters = 220.0;
     public const double OrbitalEntryCaptureRadiusMeters = 95.0;
-    public const double MaximumOrbitalEntrySpeed = 28.0;
+    public const double MaximumOrbitalEntrySpeed = 110.0;
     public const double SurfaceApproachAltitudeMeters = 220.0;
     public const double MinimumFocusedPlanetAngularRadiusDegrees = 12.0;
 

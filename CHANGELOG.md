@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.178.6] - 2026-08-16
+
+### Fixed — TASK-178.6 orbital scale, mouse flight and multi-planet surface activation
+
+- Reworked orbital presentation again after external alpha.178.5 feedback: planet centres are now separated by roughly 100 km-class compressed gameplay gaps instead of ~5 km, moon surface clearance is tens of kilometres, and live planet visual radii are derived from `PlanetEnvironment.RadiusKm * 360` with a 9..28 km clamp. The focused detailed planet is positioned by a fixed 9 km **surface clearance**, so increasing its radius now actually increases angular size instead of moving it proportionally farther away.
+- Expanded camera/starfield ranges to 1,200 km / 900 km so the larger system remains visible without clipping.
+- Fixed ship mouse steering at the input-ownership layer: mouse motion is sampled in `_Input` before HUD controls, retained with time-based exponential decay, amplified by an explicit flight gain, marked handled while the pilot owns the ship, and exposes a real runtime input diagnostic/counter.
+- Raised normal landable-planet entry tolerance to 110 m/s so the starter ship can enter a planet at normal cruise speed instead of dying before the surface runtime can become visible; solid CCD remains active for moons/stars and genuinely unsafe impacts.
+- Added physical entry shells for **every** landable planet. Crossing a different planet's shell performs the strict `Orbit -> InterplanetaryTransit -> Orbit` identity transaction, synchronously activates the destination terrain/ecology/POI/resource plans, then hands the ship to the existing 220 m curved-surface approach.
+- Added aggregate TASK-178.6 acceptance that generates ecology, POIs and streamed resource windows for every landable starter-system planet, plus mouse response and orbital-scale model checks. Added xUnit/static/section-37/CI/release/F5 gates.
+- Added scale-aware interplanetary navigation-assist cruise: up to 600 m/s on long legs with stopping-distance speed control and the existing low-speed arrival gate, so the widened 100 km-class system remains playable.
+
+### External evidence that triggered the repair
+
+- Alpha.178.5 external Godot evidence confirmed swept collision by recording an impact against `planet.vertical_slice.moon.02` at 51.5 m/s; that object was a **moon**, so the absence of flora/fauna before impact was expected for that specific collision.
+- The same owner feedback reported that the enlarged planets/distances were still visually too small and that mouse flight steering was still effectively unavailable, so both are reopened and addressed by TASK-178.6 rather than treated as accepted.
+
 ## [0.1.0-alpha.178.5] - 2026-08-16
 
 ### Fixed — TASK-178.5

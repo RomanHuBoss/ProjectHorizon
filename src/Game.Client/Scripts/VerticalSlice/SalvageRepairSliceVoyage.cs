@@ -408,7 +408,9 @@ public partial class SalvageRepairSlice
     private bool TryCommitPlanetaryEntryHandoff(bool automatic)
     {
         if (_voyageShip is null ||
-            StageOneVoyage.Location != StageOneVoyageLocation.InboundFlight ||
+            StageOneVoyage.Location is not (
+                StageOneVoyageLocation.OutboundFlight or
+                StageOneVoyageLocation.InboundFlight) ||
             StageOneVoyage.IsPlanetarySurfaceApproach ||
             !TryResolvePlanetaryEntryTarget(
                 out Vector3 target,

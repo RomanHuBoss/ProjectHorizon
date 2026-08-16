@@ -39,7 +39,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5"},
+need(version in {"0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6"},
      "VERSION must be alpha.178.2 or later", f)
 need(number(sim, "OrbitTimeScale") == 1.0 and
      number(sim, "MinimumPlanetOrbitRadius") >= 1800.0 and
@@ -83,7 +83,7 @@ need("RunOrbitalNavigationPresentationAcceptance();" in slice_cs and
      "_orbitalNavigationPresentationAcceptancePassed == true" in slice_cs and
      "TASK-178.2 (F5)" in slice_cs,
      "TASK-178.2 is not wired into F5/HUD/final gate", f)
-need(ship_scene.count("far = 60000.0") >= 2,
+need(number(ship_scene, "far") >= 500000.0 and ship_scene.count("far = ") >= 2,
      "ship cameras do not retain the expanded orbital presentation range", f)
 need(station_scene.count('parent="Gameplay/OrbitalStation"') >= 7 and
      "OrbitalStationGuideMesh" in station_scene and "DockLight" in station_scene,

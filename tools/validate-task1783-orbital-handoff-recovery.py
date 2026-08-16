@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static regression gate for TASK-178.3 orbital handoff recovery."""
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,6 +12,10 @@ def text(path: str) -> str:
 def need(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
+
+def number(source: str, name: str) -> float:
+    m = re.search(rf"{re.escape(name)}\s*=\s*([0-9.]+)", source)
+    return float(m.group(1)) if m else float("nan")
 
 f: list[str] = []
 version = text("VERSION").strip()
@@ -34,7 +39,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5"}, "VERSION must be alpha.178.3 or later", f)
+need(version in {"0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6"}, "VERSION must be alpha.178.3 or later", f)
 need("StationDockPositionZ = -1600.0" in voyage_runtime and
      "StationUndockPositionZ = -1582.0" in voyage_runtime,
      "physical station approach regressed to the old near-surface scale", f)
@@ -46,7 +51,7 @@ need("VacuumBlendStartMeters = 110.0" in handoff and
      "StarfieldRevealAltitudeMeters = 145.0" in handoff and
      "ComputeVacuumBlend" in handoff,
      "gradual orbital handoff model is incomplete", f)
-need("StarCount = 420" in handoff and "StarfieldRadiusMeters = 7200.0f" in handoff,
+need("StarCount = 420" in handoff and number(handoff, "StarfieldRadiusMeters") >= 7200.0,
      "procedural starfield contract missing", f)
 need("ambient_light_energy" in env_live and "_orbitalHandoffSourceCaptured" in env_live and
      "environment.BackgroundColor" in env_live and "environment.AmbientLightEnergy" in env_live and

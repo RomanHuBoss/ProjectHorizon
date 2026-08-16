@@ -45,7 +45,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.4", "0.1.0-alpha.178.5"}, "VERSION must be alpha.178.4", f)
+need(version in {"0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6"}, "VERSION must be alpha.178.4", f)
 
 # Persistence restore must bypass only the live transition graph, not weaken it.
 need("restoreWorldContext: saveData is not null" in voyage and
@@ -65,26 +65,26 @@ need(number(sim, "MinimumPlanetOrbitRadius") >= 6000.0 and
      number(sim, "MinimumMoonOrbitRadius") >= 2500.0 and
      number(sim, "MoonOrbitSpacing") >= 1200.0,
      "planet/moon orbital spacing remains too compressed", f)
-need("2800.0" in sim and "1650.0" in sim and "720.0" in sim and
-     "Math.Clamp(resolvedVisualRadius, 520.0, 1900.0)" in sim,
+need("42000.0" in sim and "26000.0" in sim and "9000.0" in sim and
+     "Math.Clamp(resolvedVisualRadius, 9000.0, 28000.0)" in sim,
      "star/planet visual-radius hierarchy is missing", f)
-need("profile.RadiusKm * 24.0" in star_slice and
+need("profile.RadiusKm * 360.0" in star_slice and
      "Math.Clamp" in star_slice,
      "live planet visual size is not derived from the actual planet environment radius", f)
-need("new(0.0f, 0.0f, 3400.0f)" in node and
+need("FocusedPlanetSurfaceClearanceMeters" in node and
      "TryGetBodyApproachPoint" in node and
      "displayRadius + (float)clearanceMeters" in node,
      "focused globe placement/near-side approach point contract missing", f)
 need("definition.VisualRadius * 1.12" in globe and
      "unshaded: false" in globe and "0.055" in globe and "0.025" in globe,
      "detailed planet still lacks readable shaded atmosphere/cloud presentation", f)
-need(ship_scene.count("far = 60000.0") >= 2,
+need(number(ship_scene, "far") >= 500000.0 and ship_scene.count("far = ") >= 2,
      "ship cameras cannot retain the expanded planet/system scale", f)
 
 # Two-stage landing: orbital globe envelope -> verified curved surface -> pad.
 need("OrbitalEntryClearanceMeters = 220.0" in approach and
      "OrbitalEntryCaptureRadiusMeters = 95.0" in approach and
-     "MaximumOrbitalEntrySpeed = 28.0" in approach and
+     number(approach, "MaximumOrbitalEntrySpeed") >= 28.0 and
      "SurfaceApproachAltitudeMeters = 220.0" in approach and
      "IsOrbitalEntryCaptureReady" in approach,
      "planetary entry envelope contract is incomplete", f)

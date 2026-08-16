@@ -65,8 +65,8 @@ public partial class SalvageRepairSlice
         };
         SphereMesh starMesh = new()
         {
-            Radius = 2.4f,
-            Height = 4.8f,
+            Radius = 180.0f,
+            Height = 360.0f,
             Material = material
         };
         MultiMesh multi = new()

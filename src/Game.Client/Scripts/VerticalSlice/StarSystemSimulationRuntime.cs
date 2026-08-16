@@ -77,16 +77,17 @@ public sealed class StarSystemSimulationRuntime
     // at real time; authored orbital periods provide the deliberate gameplay
     // compression without turning the system into a centrifuge.
     public const double OrbitTimeScale = 1.0;
-    public const double ProxyDistance = 26000.0;
-    public const double MarkerDistance = 52000.0;
+    public const double ProxyDistance = 520000.0;
+    public const double MarkerDistance = 980000.0;
     // TASK-178.4: the old 1.8 km planetary system made bodies read like
     // props next to the ship. Keep the simulation compressed enough for an
     // arcade flight loop, but reserve kilometres of clear space between
     // planet surfaces and their moons/neighboring planets.
-    public const double MinimumPlanetOrbitRadius = 6200.0;
-    public const double PlanetOrbitSpacing = 5200.0;
-    public const double MinimumMoonOrbitRadius = 2700.0;
-    public const double MoonOrbitSpacing = 1400.0;
+    public const double MinimumPlanetOrbitRadius = 120000.0;
+    public const double PlanetOrbitSpacing = 100000.0;
+    public const double MinimumMoonOrbitRadius = 52000.0;
+    public const double MoonOrbitSpacing = 18000.0;
+    public const double MinimumMoonSurfaceClearance = 32000.0;
     public const double MinimumMoonOrbitPeriodSeconds = 1800.0;
     public const int MaximumShipContacts = 16;
 
@@ -304,7 +305,7 @@ public sealed class StarSystemSimulationRuntime
             0.0,
             0.0,
             0.0,
-            2800.0,
+            42000.0,
             starSeed);
 
         foreach (GalaxyPlanetDefinition planet in system.Planets
@@ -322,11 +323,11 @@ public sealed class StarSystemSimulationRuntime
                     planet.Archetype,
                     "gas_giant",
                     StringComparison.Ordinal)
-                ? 1650.0
-                : 720.0 + ((hash >> 32) % 281UL);
+                ? 26000.0
+                : 9000.0 + ((hash >> 32) % 7001UL);
             double resolvedVisualRadius = planetVisualRadiusResolver?.Invoke(planet)
                 ?? fallbackVisualRadius;
-            double visualRadius = Math.Clamp(resolvedVisualRadius, 520.0, 1900.0);
+            double visualRadius = Math.Clamp(resolvedVisualRadius, 9000.0, 28000.0);
             yield return new StarSystemBodyDefinition(
                 planet.PlanetId,
                 starId,
@@ -349,13 +350,16 @@ public sealed class StarSystemSimulationRuntime
                     planet.PlanetId,
                     StarSystemBodyKind.Moon,
                     "moon",
-                    MinimumMoonOrbitRadius + (moonIndex * MoonOrbitSpacing) +
-                        ((moonHash & 0x3UL) * 8.0),
+                    Math.Max(
+                        MinimumMoonOrbitRadius,
+                        visualRadius + MinimumMoonSurfaceClearance) +
+                        (moonIndex * MoonOrbitSpacing) +
+                        ((moonHash & 0x3UL) * 32.0),
                     MinimumMoonOrbitPeriodSeconds + (moonIndex * 900.0) +
                         ((moonHash >> 9) % 420UL),
                     ToUnit(moonHash >> 17) * Math.PI * 2.0,
                     (ToUnit(moonHash >> 25) - 0.5) * 0.20,
-                    150.0 + ((moonHash >> 31) % 91UL),
+                    2400.0 + ((moonHash >> 31) % 2601UL),
                     (long)(moonHash & 0x7FFF_FFFF_FFFF_FFFFUL));
             }
         }

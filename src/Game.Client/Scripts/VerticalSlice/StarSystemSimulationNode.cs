@@ -36,8 +36,10 @@ public partial class StarSystemSimulationNode : Node3D
     // TASK-178.2: keep the focused world visually dominant and far enough from
     // the third-person ship camera that the player never reads a 6 m ship as a
     // planet-scale object. Local station/traffic have separate physical nodes.
+    public const float FocusedPlanetSurfaceClearanceMeters = 9000.0f;
+
     public Vector3 DisplayAnchor { get; set; } =
-        new(0.0f, 0.0f, 3400.0f);
+        new(0.0f, 0.0f, 26000.0f);
 
     public const bool LocalTrafficProxiesSuppressed = true;
 
@@ -208,6 +210,69 @@ public partial class StarSystemSimulationNode : Node3D
             displayRadius > 0.0f;
     }
 
+    public bool TryGetFirstPlanetEntryShellHit(
+        Vector3 segmentStart,
+        Vector3 segmentEnd,
+        float shipRadius,
+        double entryClearanceMeters,
+        out OrbitalBodyCollisionHit hit)
+    {
+        hit = default;
+        if (_runtime is null || !segmentStart.IsFinite() ||
+            !segmentEnd.IsFinite() || !float.IsFinite(shipRadius) ||
+            shipRadius < 0.0f || !double.IsFinite(entryClearanceMeters) ||
+            entryClearanceMeters < 0.0)
+        {
+            return false;
+        }
+
+        bool found = false;
+        float bestFraction = float.PositiveInfinity;
+        foreach (StarSystemBodyDefinition candidate in _runtime.Definitions)
+        {
+            if (candidate.Kind != StarSystemBodyKind.Planet ||
+                !TryGetBodyDisplaySphere(
+                    candidate.BodyId,
+                    out StarSystemBodyDefinition resolved,
+                    out Vector3 center,
+                    out float radius))
+            {
+                continue;
+            }
+
+            float shellRadius = radius + shipRadius +
+                (float)entryClearanceMeters;
+            if (!OrbitalBodyCollisionRuntime.TrySweepSphere(
+                    segmentStart,
+                    segmentEnd,
+                    center,
+                    shellRadius,
+                    out float fraction,
+                    out Vector3 impact,
+                    out Vector3 normal) ||
+                fraction >= bestFraction)
+            {
+                continue;
+            }
+
+            // A shell hit is a navigation/activation boundary. Solid collision
+            // remains a separate inner sphere evaluated after this method.
+            bestFraction = fraction;
+            hit = new OrbitalBodyCollisionHit(
+                resolved.BodyId,
+                resolved.Kind,
+                center,
+                radius,
+                shellRadius,
+                fraction,
+                impact,
+                normal);
+            found = true;
+        }
+
+        return found;
+    }
+
     public bool TryGetFirstSolidBodyHit(
         Vector3 segmentStart,
         Vector3 segmentEnd,
@@ -348,6 +413,21 @@ public partial class StarSystemSimulationNode : Node3D
                 snapshot.FocusBodyId,
                 StringComparison.Ordinal));
         SystemDouble3 focus = focusState.Position;
+        if (focusState.Definition.Kind == StarSystemBodyKind.Planet)
+        {
+            // TASK-178.6: keep the focused planet visually dominant by
+            // positioning the observer a fixed surface clearance above the
+            // detailed globe, rather than scaling the anchor and radius in
+            // lock-step (which preserved the old small angular size).
+            float detailedRadius = (float)Math.Max(
+                420.0,
+                focusState.Definition.VisualRadius * 1.12);
+            DisplayAnchor = new Vector3(
+                0.0f,
+                0.0f,
+                detailedRadius + FocusedPlanetSurfaceClearanceMeters);
+        }
+
         foreach (StarSystemBodyState state in snapshot.Bodies)
         {
             if (!_visuals.TryGetValue(

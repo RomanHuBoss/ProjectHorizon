@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.178.5", "VERSION must be alpha.178.5", f)
+need(version in {"0.1.0-alpha.178.5", "0.1.0-alpha.178.6"}, "VERSION must be alpha.178.5 or later", f)
 
 # Default arcade flight must couple translation direction to the ship heading.
 need("DefaultVelocityAlignmentRate = 3.2f" in assist and
@@ -71,7 +71,7 @@ need("UpdateOrbitalCollisionRecovery" in live_collision and
      "ShowApplicationDeathScreen" in live_collision,
      "live orbital collision recovery is missing", f)
 need("TryCaptureFreeFlightPlanetEntry" in live_collision and
-     "CrossedOuterShell" in live_collision and
+     "TryGetFirstPlanetEntryShellHit" in live_collision and
      "TryCommitPlanetaryEntryHandoff(automatic: false)" in live_collision and
      "TASK-178.5 free-flight planetary entry PASS" in live_collision,
      "manual free-flight planet approach is not physically connected to surface handoff", f)

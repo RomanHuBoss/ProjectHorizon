@@ -62,4 +62,50 @@ public static class ArcadeFlightAssistRuntime
         float dot = Mathf.Clamp(velocity.Normalized().Dot(forward), -1.0f, 1.0f);
         return Mathf.RadToDeg(Mathf.Acos(dot));
     }
+    public static Vector2 AccumulateMouseSteering(
+        Vector2 current,
+        Vector2 relative,
+        float sensitivity,
+        float gain,
+        bool invertPitch,
+        bool invertYaw)
+    {
+        if (!current.IsFinite() || !relative.IsFinite() ||
+            !float.IsFinite(sensitivity) || !float.IsFinite(gain) ||
+            sensitivity < 0.0f || gain < 0.0f)
+        {
+            return Vector2.Zero;
+        }
+
+        float pitchSign = invertPitch ? 1.0f : -1.0f;
+        float yawSign = invertYaw ? 1.0f : -1.0f;
+        Vector2 accumulated = current + new Vector2(
+            relative.Y * sensitivity * gain * pitchSign,
+            relative.X * sensitivity * gain * yawSign);
+        return accumulated.Clamp(
+            new Vector2(-1.0f, -1.0f),
+            new Vector2(1.0f, 1.0f));
+    }
+
+    public static Vector2 DecayMouseSteering(
+        Vector2 current,
+        float decayRatePerSecond,
+        float deltaSeconds)
+    {
+        if (!current.IsFinite() || !float.IsFinite(decayRatePerSecond) ||
+            !float.IsFinite(deltaSeconds) || deltaSeconds <= 0.0f)
+        {
+            return current.IsFinite() ? current : Vector2.Zero;
+        }
+
+        float rate = Math.Max(0.1f, decayRatePerSecond);
+        float blend = 1.0f - MathF.Exp(-rate * deltaSeconds);
+        Vector2 decayed = current.Lerp(
+            Vector2.Zero,
+            Mathf.Clamp(blend, 0.0f, 1.0f));
+        return decayed.LengthSquared() < 0.000004f
+            ? Vector2.Zero
+            : decayed;
+    }
+
 }

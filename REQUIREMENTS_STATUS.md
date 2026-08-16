@@ -2,11 +2,55 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.5-spaceflight-kinematics-collision.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.6 Orbital Scale, Mouse Flight & Multi-Planet Surface Activation
+
+**Исходный снимок:** `ProjectHorizon-main-task178.5-spaceflight-kinematics-collision.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`.  
+**Версия:** `0.1.0-alpha.178.6`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MOUSE+MULTI-PLANET LANDING+F5`.
+
+### Внешнее evidence / обнаруженные дефекты
+
+В owner-run alpha.178.5 swept collision действительно сработал: после station undock Output зафиксировал `TASK-178.5 orbital body collision PASS: body=planet.vertical_slice.moon.02; kind=Moon; ... speed=51.5m/s; death=1`. Следовательно, конкретный объект, возле которого пользователь не увидел флору/фауну, был **спутником**, а не landable planet; для луны отсутствие surface ecology ожидаемо. Однако обратная связь выявила три реальные проблемы: orbital planets/spacing всё ещё воспринимались слишком маленькими, мышь не давала практически полезного pitch/yaw, а cross-planet physical approach не имел отдельного доказательства, что destination ecology/resources активированы до surface handoff.
+
+### Реализация
+
+- orbital scale увеличен: planet orbit min `120 km`, nominal planet spacing `100 km`, moon orbit min `52 km`, moon surface clearance `32 km`, moon spacing `18 km`; planet visual radius derives from `PlanetEnvironment.RadiusKm * 360`, clamp `9..28 km`; star visual radius `42 km`; camera far `1200 km`; starfield `900 km`;
+- focused planet presentation больше не сохраняет прежний angular size при увеличении radius: `DisplayAnchor` динамически вычисляется как detailed globe radius + `9 km` fixed surface clearance;
+- mouse flight переведён на `_Input`: событие снимается до HUD, используется `MouseFlightGain=2.25`, decay `7.5/s`, motion помечается handled, добавлены `MouseSteeringSampleCount` и `TASK-178.6 ship mouse steering INPUT PASS`;
+- safe landable entry поднят с `28` до `110 m/s`, то есть normal starter max-speed (~85 m/s) больше не обязан закончиться collision до surface activation;
+- `TryGetFirstPlanetEntryShellHit` проверяет все planet bodies. Для другой landable planet новый `TryCommitManualCrossPlanetEntry` выполняет строгий `Orbit -> InterplanetaryTransit -> Orbit` transaction, меняет `CurrentPlanetId`, синхронно вызывает `ActivateCurrentPlanetSurfaceContent()`, затем только допускает 220 m surface approach;
+- TASK-178.6 model acceptance строит `PlanetSurfaceContentProfile`, ecology, POI и streamed resource window для **каждой landable planet** starter system и требует ненулевые flora/fauna/POI/resources; добавлены xUnit/static/section-37/CI/release/final-F5 gates.
+- чтобы расширенный orbital scale не превратил перелёты в десятки минут, `K` interplanetary assist получил scale-aware cruise до `600 m/s`: `CalculateSafeCruiseSpeed` выводит допустимую скорость из оставшейся дистанции/38 m/s² торможения, `ArcadeShipController` принимает external speed-limit override только на время assist, а arrival gate остаётся <=11 m/s.
+
+### Затронутые требования и ключевые файлы
+
+Затронуты уже зеркалированные в этом журнале требования PDF-ТЗ по radius 20–80 km / multi-planet system (`TASK-150`), transactional interplanetary identity (`TASK-152`), planet-scoped ecology/POI/resources (`TASK-154/160`) и единственному активному detailed world (`TASK-148/168`). Сам PDF в исходном GitHub ZIP представлен Git-LFS pointer, поэтому текстовые требования не переинтерпретировались; использованы ранее извлечённые требования журнала и фактический owner runtime evidence.
+
+Ключевые изменения: `ArcadeShipController.cs`, `ArcadeFlightAssistRuntime.cs`, `ArcadeShip.tscn`, `StarSystemSimulationRuntime.cs`, `StarSystemSimulationNode.cs`, `SalvageRepairSliceStarSystem.cs`, `PlanetaryApproachRuntime.cs`, `SalvageRepairSliceOrbitalCollisionRecovery.cs`, новый `SalvageRepairSliceManualPlanetTransfer.cs`, `InterplanetaryTravelRuntime.cs`, `SalvageRepairSliceInterplanetaryTravel.cs`, `InterplanetaryTravelAcceptance.cs`, новый `OrbitalScaleMouseSurfaceAcceptance.cs`, новый `SalvageRepairSliceOrbitalScaleMouseSurface.cs`, `SalvageRepairSlice.cs`, xUnit/tests, section-37 validators, CI/release, README/CHANGELOG/VERSION.
+
+### Фактически выполненные проверки
+
+- все доступные `tools/validate-*.py` — PASS, включая TASK-148/150/152/154/168/176/178…178.6;
+- JSON/localization/Godot text-resource structure — PASS;
+- `tools/ci/verify-version.py` — PASS для `0.1.0-alpha.178.6`;
+- `bash -n tools/run-section37-quality.sh` и YAML parse CI/release — PASS;
+- .NET build/test и Godot runtime **не выполнялись**: в рабочем контейнере отсутствуют `dotnet` и Godot executable. Статус остаётся `IMPLEMENTED`, не `VERIFIED`.
+
+### Acceptance TASK-178.6
+
+1. `tools\run-section37-quality.cmd`: clean `0 errors / 0 warnings`, tests PASS, `TASK-178.6 ... CONTRACT PASS`.
+2. Manual flight: после `T` подвигать мышью; ожидается `TASK-178.6 ship mouse steering INPUT PASS`, корабль заметно pitch/yaw без стрелок.
+3. Orbit visual smoke: focused landable planet должен занимать большую часть направления обзора; соседние planet centres разделены десятками/сотнями километров compressed scale; moon surface clearance очевидно больше прежнего. Выбрать другую planet и включить `K`: дальний cruise должен разгоняться по scale-aware envelope вплоть до ~600 m/s и заранее тормозить к arrival gate.
+4. Подлететь к landable **другой планете** при `<=110 m/s`. Ожидается `TASK-178.6 manual planet transfer PASS ... world=Orbit->InterplanetaryTransit->Orbit; flora>0; fauna=A/S; pois>0; resources>0; surfaceHandoff=1`.
+5. После handoff визуально проверить destination terrain/flora/fauna/resource nodes. Moon collision остаётся death boundary и не является проверкой planetary ecology.
+6. F5: `TASK-178.6 orbital scale/mouse/multi-planet acceptance PASS` с `planetScale=1; planetSpacing=1; moonClearance=1; mouseSteering=1; mouseRetention=1; playableCruise=1; physicalTransfer=1; landableContent=1; planets=N/N`.
 
 ## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.5 Arcade Flight Kinematics & Continuous Orbital Collision
 
@@ -6664,6 +6708,21 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-HF-17856` | F5/xUnit/section-37/CI/release защищают flight/collision semantics | `IMPLEMENTED` | TASK-178.5 aggregate/static gate |
 | `FLIGHT-HF-ACC-1785` | Clean build + heading/manual-entry/high-speed-collision + F5 | `IN_PROGRESS` | external Windows/Godot required |
 
+### 8.42. Orbital Scale, Mouse Flight & Multi-Planet Surface Activation — TASK-178.6
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-HF-17860` | Orbital planet angular size и межпланетные расстояния читаются как космический масштаб | `IMPLEMENTED` | 9..28 km base radii; fixed 9 km focused surface clearance; 120/100 km orbit/gap scale |
+| `FLIGHT-HF-17861` | Mouse motion реально управляет pitch/yaw и не теряется HUD/physics decay | `IMPLEMENTED` | `_Input`, handled ownership, gain 2.25, exponential 7.5/s decay, live sample diagnostic |
+| `FLIGHT-HF-17862` | Все landable planets имеют физическую entry shell | `IMPLEMENTED` | `TryGetFirstPlanetEntryShellHit` across all planet bodies |
+| `FLIGHT-HF-17863` | Cross-planet manual entry меняет planet identity только через InterplanetaryTransit | `IMPLEMENTED` | `Orbit -> InterplanetaryTransit -> Orbit` transaction |
+| `FLIGHT-HF-17864` | Destination terrain/ecology/POI/resources активируются до surface handoff | `IMPLEMENTED` | synchronous `ActivateCurrentPlanetSurfaceContent`; Output counts |
+| `FLIGHT-HF-17865` | Normal starter cruise может войти в landable atmosphere без искусственного crash threshold | `IMPLEMENTED` | safe entry <=110 m/s; moons/stars remain solid non-landable boundaries |
+| `FLIGHT-HF-17866` | Каждая landable starter planet имеет flora/fauna/POI/resources model coverage | `IMPLEMENTED` | TASK-178.6 aggregate builds all landable surface plans |
+| `FLIGHT-HF-17867` | F5/xUnit/section-37/CI/release защищают scale/mouse/content contract | `IMPLEMENTED` | TASK-178.6 aggregate/static gates |
+| `FLIGHT-HF-17868` | 100 km-class compressed distances остаются игровыми по времени | `IMPLEMENTED` | K cruise <=600 m/s + stopping-distance speed envelope + external-only speed override |
+| `FLIGHT-HF-ACC-1786` | Clean build + live mouse + cross-planet landing/content + F5 | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -6680,8 +6739,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED` с external build/runtime smoke; TASK-178.5 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MANUAL FLIGHT/COLLISION+F5`.  
-**Формально ближайший шаг:** внешний clean build + manual heading-coupling/free-flight planet-entry/high-speed collision smoke для TASK-178.5, затем общий F5 reacceptance TASK-178.5/178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED` с external build/runtime smoke; TASK-178.5 имеет external proof swept-moon collision, но mouse/scale acceptance переоткрыт; TASK-178.6 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MOUSE+MULTI-PLANET LANDING+F5`.  
+**Формально ближайший шаг:** внешний clean build alpha.178.6 + mouse steering smoke + safe entry на другую landable planet с non-zero content diagnostics + общий F5 TASK-178.6/178.5/178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

@@ -28,7 +28,8 @@ public readonly record struct InterplanetaryGuidance(
     float Forward,
     bool Boost,
     bool Brake,
-    bool ArrivalReady);
+    bool ArrivalReady,
+    float SpeedLimit);
 
 public sealed record InterplanetaryTravelSnapshot(
     InterplanetaryTravelPhase Phase,
@@ -47,6 +48,11 @@ public sealed class InterplanetaryTravelRuntime
     public const double ArrivalRadiusMeters = 16.0;
     public const double MaximumArrivalSpeed = 11.0;
     public const double BrakingDistanceMeters = 48.0;
+    public const double CruiseSpeedMetersPerSecond = 600.0;
+    public const double AssumedBrakeDecelerationMetersPerSecondSquared = 38.0;
+    public const double BrakingSafetyFactor = 0.72;
+    public const double CruiseSpeedTolerance = 1.03;
+    public const double CruiseAccelerationThreshold = 0.96;
     public const double MinimumFuelCost = 0.75;
     public const double MaximumFuelCost = 4.5;
 
@@ -255,21 +261,47 @@ public sealed class InterplanetaryTravelRuntime
             !double.IsFinite(distanceMeters) || distanceMeters < 0.0 ||
             !double.IsFinite(speedMetersPerSecond) || speedMetersPerSecond < 0.0)
         {
-            return new InterplanetaryGuidance(0.0f, false, true, false);
+            return new InterplanetaryGuidance(
+                0.0f, false, true, false, (float)MaximumArrivalSpeed);
         }
 
         bool arrivalReady = distanceMeters <= ArrivalRadiusMeters &&
             speedMetersPerSecond <= MaximumArrivalSpeed;
+        double targetSpeed = CalculateSafeCruiseSpeed(distanceMeters);
         bool braking = arrivalReady ||
             distanceMeters <= BrakingDistanceMeters ||
-            speedMetersPerSecond > MaximumArrivalSpeed * 2.8;
-        float forward = braking ? 0.0f : 0.92f;
-        bool boost = !braking && distanceMeters > 95.0;
+            speedMetersPerSecond > targetSpeed * CruiseSpeedTolerance;
+        bool accelerate = !braking &&
+            speedMetersPerSecond < targetSpeed * CruiseAccelerationThreshold;
+        float forward = accelerate ? 0.92f : 0.0f;
+        bool boost = accelerate && targetSpeed > 120.0;
         return new InterplanetaryGuidance(
             forward,
             boost,
             braking,
-            arrivalReady);
+            arrivalReady,
+            (float)targetSpeed);
+    }
+
+    public static double CalculateSafeCruiseSpeed(double distanceMeters)
+    {
+        if (!double.IsFinite(distanceMeters) || distanceMeters < 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(distanceMeters));
+        }
+
+        double availableBrakingDistance = Math.Max(
+            0.0,
+            distanceMeters - ArrivalRadiusMeters);
+        double safeSpeedSquared =
+            MaximumArrivalSpeed * MaximumArrivalSpeed +
+            2.0 * AssumedBrakeDecelerationMetersPerSecondSquared *
+            availableBrakingDistance * BrakingSafetyFactor;
+        double safeSpeed = Math.Sqrt(Math.Max(0.0, safeSpeedSquared));
+        return Math.Clamp(
+            safeSpeed,
+            MaximumArrivalSpeed,
+            CruiseSpeedMetersPerSecond);
     }
 
     public bool TryCompleteArrival(

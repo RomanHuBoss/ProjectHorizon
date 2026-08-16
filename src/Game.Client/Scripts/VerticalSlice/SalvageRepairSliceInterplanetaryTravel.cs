@@ -137,6 +137,7 @@ public partial class SalvageRepairSlice
                 $"distance={InterplanetaryTravel.PlannedDistanceMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
                 $"planetRadius={targetDisplayRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
                 $"entryClearance={PlanetaryApproachRuntime.OrbitalEntryClearanceMeters.ToString("0", CultureInfo.InvariantCulture)}m; " +
+                $"cruiseSpeed={InterplanetaryTravelRuntime.CruiseSpeedMetersPerSecond.ToString("0", CultureInfo.InvariantCulture)}m/s; " +
                 $"fuelCost={InterplanetaryTravel.FuelCost.ToString("0.00", CultureInfo.InvariantCulture)}; " +
                 $"fuelRemaining={ShipSystems.Fuel.ToString("0.00", CultureInfo.InvariantCulture)}.");
         }
@@ -149,6 +150,7 @@ public partial class SalvageRepairSlice
         InterplanetaryGuidance guidance = InterplanetaryTravel.BuildGuidance(
             distance,
             _voyageShip.Speed);
+        _voyageShip.SetExternalSpeedLimit(guidance.SpeedLimit);
         _voyageShip.SetExternalCommand(new ShipControlCommand(
             guidance.Forward,
             0.0f,
@@ -182,6 +184,7 @@ public partial class SalvageRepairSlice
             return true;
         }
 
+        _voyageShip.ClearExternalCommand();
         StageOneVoyage.ArriveAtPlanetaryApproach();
         _voyageNavigationAssist = true;
         ActivateCurrentPlanetSurfaceContent();

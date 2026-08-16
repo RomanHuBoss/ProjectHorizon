@@ -85,15 +85,15 @@ public static class OrbitalNavigationPresentationAcceptanceRunner
             StarSystemSimulationRuntime.OrbitTimeScale <= 2.0;
         bool planetSpacing = planets.Length == system.Planets.Count &&
             minPlanetOrbit >= StarSystemSimulationRuntime.MinimumPlanetOrbitRadius &&
-            minPlanetSpacing >= 4400.0;
+            minPlanetSpacing >= 90000.0;
         bool moonCadence = moons.All(body =>
                 body.OrbitRadius >= StarSystemSimulationRuntime.MinimumMoonOrbitRadius &&
                 body.OrbitPeriodSeconds / StarSystemSimulationRuntime.OrbitTimeScale >= 1200.0) &&
             minMoonOrbit >= StarSystemSimulationRuntime.MinimumMoonOrbitRadius;
-        bool visualHierarchy = planets.All(body => body.VisualRadius >= 520.0) &&
-            moons.All(body => body.VisualRadius is >= 150.0 and <= 240.0) &&
-            minPlanetVisual >= Math.Max(520.0, maxMoonVisual * 2.8) &&
-            starVisual >= Math.Max(2400.0, maxPlanetVisual * 1.35);
+        bool visualHierarchy = planets.All(body => body.VisualRadius >= 9000.0) &&
+            moons.All(body => body.VisualRadius is >= 2400.0 and <= 5000.0) &&
+            minPlanetVisual >= Math.Max(9000.0, maxMoonVisual * 2.0) &&
+            starVisual >= Math.Max(40000.0, maxPlanetVisual * 1.45);
         bool assistDockCapture =
             StageOneVoyageRuntime.IsDockingCaptureReady(
                 StageOneVoyageRuntime.DockingRangeMeters,
