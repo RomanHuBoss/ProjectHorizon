@@ -32,6 +32,7 @@ python3 tools/validate-task156-planet-surface-terrain.py
 python3 tools/validate-task158-planet-surface-streaming.py
 python3 tools/validate-task1581-runtime-acceptance-hotfix.py
 python3 tools/validate-task160-surface-world-composition.py
+python3 tools/validate-task1601-aerial-acceptance-hotfix.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

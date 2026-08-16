@@ -2,11 +2,45 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task158.1-runtime-acceptance-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task160.1-aerial-acceptance-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая hotfix-итерация 2026-08-16 — TASK-160.1 Traversal-Safe Aerial Acceptance
+
+**Исходный снимок:** `ProjectHorizon-main-task160-surface-world-composition.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task160.1-aerial-acceptance-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.160.1`.  
+**Статус:** TASK-160.1 `IMPLEMENTED`; повторный runtime F5 требуется. TASK-160 F5 contract подтверждён внешним Godot evidence; visual/persistence manual tail TASK-161 остаётся `IN_PROGRESS`.
+
+### Внешнее evidence пользователя
+
+- Live TASK-160 runtime поднялся корректно: `sky=1; sun=1; clouds=13; resourceWindow=20; activeResources=20; starterReserve=28m; persistence=seed+deltas; legacyFixtures=hidden`.
+- После реального traversal streamer дошёл до `center=(5,-4)` и продолжал держать bounded `25` chunks.
+- F5 подтвердил `TASK-160 ... PASS` (`starterPlanets=4/4; skyProfiles=4/4; resourcePlacements=89; visibleStar=1; atmosphereProfiles=1; cloudPolicy=1; resourceDeterministic=1; starterReserveClear=1; planetScopedIdentity=1; coldRestoreDepletion=1; untouchedDeltaEmpty=1`).
+- TASK-138/TASK-158/TASK-124 в том же запуске остались `PASS`.
+- Единственный новый FAIL: `TASK-126 aerial navigation acceptance`: `sharedRuntime=0; runtimeSamples=0`, при этом `faunaCoverage/localGrid/sphericalAvoidance/altitude/poiSteering/shipSteering/pursuit/evade/arrive/formation/combatStates/clearance = 1`; итоговые counters `faunaSamples=6929; shipSamples=1200`.
+
+### Диагноз
+
+TASK-126 acceptance зависел от текущего положения игрока. `EcologyRuntime.GetUpdateFrequencyHz` намеренно возвращает `0` дальше `50 m`. После TASK-158/TASK-160 игрок может штатно находиться в сотнях метров от authored ecology population; поэтому четыре flying-fauna остаются корректно bound к shared runtime, но за 4.5 s acceptance window не создают **новых** samples после baseline. NPC ships при этом получают deterministic acceptance steps во время TASK-148 Orbit legs, поэтому ship primitives остаются PASS. Это location-dependent дефект acceptance, а не отказ aerial navigation runtime.
+
+### Исправлено
+
+- `EcologyFaunaNode.StepAerialForAcceptance()` выполняет тот же `ApplyFlyingSteering`/shared `AerialSteeringRuntime` path независимо от player distance, без `MoveAndSlide`, без смены позиции/velocity и без воскрешения погибшей fauna.
+- `BeginAerialNavigationAcceptance()` после baseline выполняет ровно один deterministic probe на каждый configured flying-fauna node; затем существующие строгие delta-инварианты `sharedRuntime` и `runtimeSamples` остаются неизменными.
+- Output TASK-126 дополнен `faunaProbeSamples=<N>` для диагностики; ожидается `4`.
+- Добавлены xUnit reflection/distance regression и `validate-task1601-aerial-acceptance-hotfix.py`; section-37 Windows/Linux runners включают новый gate.
+
+### Acceptance TASK-160.1
+
+1. Clean build: `0 warnings / 0 errors`.
+2. Уйти минимум на `>160 m` (либо оставить игрока в секторе около `(5,-4)`), затем нажать `F5`.
+3. Ожидается `TASK-126 ... PASS` с `sharedRuntime=1; runtimeSamples=1; faunaProbeSamples=4`.
+4. TASK-160/TASK-158/TASK-138/TASK-124 должны остаться PASS.
+5. После F5 положение игрока и состояние убитой/добытой fauna не должны измениться.
 
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-160 Planet Surface World Composition & Persistence
 
@@ -5632,7 +5666,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WORLD-169` | Existing POI live presentation не сконцентрирован у landing pad | `IMPLEMENTED` | stable IDs retained; deterministic 78–420 m presentation annulus |
 | `WORLD-170` | F5/static/xUnit проверяют composition+persistence contract | `IMPLEMENTED` | TASK-160 acceptance; validator; xUnit 3 tests |
 | `WORLD-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-161 external Windows/Godot verification |
-| `WORLD-ACC-101` | F5 TASK-160 PASS и старые TASK-138/158 остаются PASS | `IN_PROGRESS` | TASK-161 |
+| `WORLD-ACC-101` | F5 TASK-160 PASS и старые TASK-138/158 остаются PASS | `VERIFIED` | external Godot: TASK-160/TASK-138/TASK-158 PASS; TASK-160.1 addresses unrelated TASK-126 far-traversal acceptance regression |
 | `WORLD-ACC-102` | Manual visual sky/terrain/declutter smoke | `IN_PROGRESS` | TASK-161 screenshot/runtime evidence |
 | `WORLD-ACC-103` | Mine → chunk unload → save/restart → planet return preserves depletion | `IN_PROGRESS` | TASK-161 persistence scenario |
 
@@ -5642,15 +5676,16 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | clean build/section-37; TASK-160 F5; visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
-| 2 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke (F5 already PASS) |
-| 3 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 4 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
-| 5 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke where not covered by owner acceptance |
-| 6 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | clean build; F5 from >160 m; `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
+| 2 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return; F5 contract already PASS |
+| 3 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke (F5 already PASS) |
+| 4 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
+| 5 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
+| 6 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke where not covered by owner acceptance |
+| 7 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-160 Planet Surface World Composition & Persistence поверх runtime-подтверждённого TASK-158/158.1.  
-**Формально ближайший шаг:** TASK-161 — clean build/F5/visual/persistence acceptance TASK-160; TASK-159 manual long-traversal tail остаётся отдельным незакрытым доказательством.
+**Текущая разрабатываемая реализация:** TASK-160.1 Traversal-Safe Aerial Acceptance hotfix поверх runtime-подтверждённого TASK-160 F5 contract.  
+**Формально ближайший шаг:** повторный far-traversal F5 для TASK-160.1, затем TASK-161 visual/persistence acceptance TASK-160; TASK-159 manual planet-switch tail остаётся отдельным незакрытым доказательством.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 

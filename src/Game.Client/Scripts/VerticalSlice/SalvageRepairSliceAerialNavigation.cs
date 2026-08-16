@@ -17,6 +17,7 @@ public partial class SalvageRepairSlice
     private bool _aerialObstacleProbe;
     private bool _aerialPoiProbe;
     private bool _aerialAcceptanceForceLeaderTarget;
+    private int _aerialAcceptanceFaunaProbeSamples;
 
     private AerialSteeringRuntime AerialSteering =>
         _aerialSteeringRuntime ??
@@ -350,6 +351,7 @@ public partial class SalvageRepairSlice
         _aerialGridProbe = false;
         _aerialObstacleProbe = false;
         _aerialPoiProbe = false;
+        _aerialAcceptanceFaunaProbeSamples = 0;
         if (_aerialSteeringRuntime is null || _npcShipNavigationNodes.Count != 4)
         {
             CompleteAerialNavigationAcceptanceFailure(
@@ -364,7 +366,26 @@ public partial class SalvageRepairSlice
                 node.Role == NpcShipNavigationRole.HostileRaider);
         acceptanceRaider?.PrimeAcceptanceCombatCycle();
         RunAerialNavigationStaticProbes();
+        _aerialAcceptanceFaunaProbeSamples =
+            ExerciseFlyingFaunaForAerialAcceptance();
         _aerialNavigationAcceptanceRunning = true;
+    }
+
+    private int ExerciseFlyingFaunaForAerialAcceptance()
+    {
+        int samples = 0;
+        foreach (EcologyFaunaNode fauna in _ecologyFaunaNodes
+            .Where(node => string.Equals(
+                node.MovementMode,
+                "Flying",
+                StringComparison.Ordinal)))
+        {
+            if (fauna.StepAerialForAcceptance())
+            {
+                samples++;
+            }
+        }
+        return samples;
     }
 
     private void RunAerialNavigationStaticProbes()
@@ -493,7 +514,7 @@ public partial class SalvageRepairSlice
         UpdateCombinedCatalogAndShipAcceptanceState();
     }
 
-    private static string BuildAerialNavigationAcceptanceOutput(
+    private string BuildAerialNavigationAcceptanceOutput(
         AerialNavigationAcceptanceReport report,
         AerialSteeringSnapshot? snapshot)
     {
@@ -508,6 +529,7 @@ public partial class SalvageRepairSlice
             $"evade={(report.Evade ? 1 : 0)}; arrive={(report.Arrive ? 1 : 0)}; formation={(report.Formation ? 1 : 0)}; " +
             $"combatStates={(report.CombatStates ? 1 : 0)}; clearance={(report.ShipObstacleClearance ? 1 : 0)}; " +
             $"runtimeSamples={(report.RuntimeSamples ? 1 : 0)}; " +
+            $"faunaProbeSamples={_aerialAcceptanceFaunaProbeSamples}; " +
             $"queries={snapshot?.GridQueries ?? 0}; faunaSamples={snapshot?.FlyingFaunaSamples ?? 0}; shipSamples={snapshot?.ShipSamples ?? 0}; " +
             $"avoidance={snapshot?.ObstacleAvoidanceActivations ?? 0}; transitions={snapshot?.CombatStateTransitions ?? 0}; " +
             $"result={report.Result}";

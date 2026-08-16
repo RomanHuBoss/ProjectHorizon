@@ -160,6 +160,48 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         ApplySteering((float)delta);
     }
 
+    /// <summary>
+    /// Exercises the same shared aerial-steering path used by live flying fauna
+    /// without moving the node or depending on the player's current distance.
+    /// This keeps TASK-126 acceptance valid after planet-scale traversal, where
+    /// the authored ecology population may legitimately be outside the 50 m live
+    /// AI update radius.
+    /// </summary>
+    public bool StepAerialForAcceptance()
+    {
+        if (_definition is null || _aerialSteering is null ||
+            !string.Equals(MovementMode, "Flying", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        Vector3 originalVelocity = Velocity;
+        float speed = Math.Max(0.5f, (float)_definition.Speed * 0.55f);
+        Vector3 direction = _wanderDirection.LengthSquared() > 0.0001f
+            ? _wanderDirection.Normalized()
+            : Vector3.Forward;
+
+        _ = ApplyFlyingSteering(direction * speed, speed);
+
+        // The acceptance probe must not resurrect or move dead fauna and must
+        // not replace the velocity that gameplay owned before the probe.
+        if (!Visible || Health <= 0.0)
+        {
+            _aerialSteering.RemoveEntity(InstanceId);
+        }
+        else
+        {
+            _aerialSteering.UpsertEntity(
+                InstanceId,
+                "flying_fauna",
+                GlobalPosition,
+                originalVelocity,
+                (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15));
+        }
+
+        return true;
+    }
+
     public void Interact(Node3D interactor)
     {
         Observed?.Invoke(this);

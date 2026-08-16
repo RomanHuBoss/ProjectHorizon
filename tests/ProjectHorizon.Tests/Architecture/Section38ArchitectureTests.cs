@@ -62,6 +62,15 @@ public sealed class Section38ArchitectureTests
             EcologyRuntime.GetUpdateFrequencyHz(35.0), 6);
         Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(80.0), 6);
     }
+
+    [Fact]
+    public void AerialAcceptanceHasDistanceIndependentFlyingFaunaProbe()
+    {
+        Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(160.0), 6);
+        Assert.NotNull(typeof(EcologyFaunaNode).GetMethod(
+            nameof(EcologyFaunaNode.StepAerialForAcceptance)));
+    }
+
     [Fact]
     public void LayeredAssembliesHaveOneWayDependencies()
     {

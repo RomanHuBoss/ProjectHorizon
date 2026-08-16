@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.160.1] - 2026-08-16
+
+### Fixed — TASK-160.1 Traversal-Safe Aerial Acceptance
+
+- Removed TASK-126 F5 dependence on player distance after planet-surface traversal: flying fauna now execute a non-moving acceptance probe through the same shared `AerialSteeringRuntime` even when the authored population is beyond the normal 50 m AI update radius.
+- Preserved the original strict `sharedRuntime` and `runtimeSamples` delta assertions instead of weakening them; the probe runs after the acceptance baseline and reports `faunaProbeSamples` for diagnosis.
+- Kept gameplay state intact during the probe: no `MoveAndSlide`, no position/velocity replacement, and dead/hidden fauna are not resurrected in the aerial spatial grid.
+- Added a distance-regression xUnit check, a TASK-160.1 repository gate and section-37 runner integration.
+
+### Compatibility
+
+- No world-generation, save-schema, resource identity, terrain, TASK-160 composition or TASK-158 streaming contracts changed. `ProjectHorizonGenerator.Version` remains `3`.
+
 ## [0.1.0-alpha.160] - 2026-08-16
 
 ### Added — TASK-160 Planet Surface World Composition & Persistence
