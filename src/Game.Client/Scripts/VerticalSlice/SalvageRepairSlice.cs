@@ -5511,6 +5511,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetSurfaceStreamingAcceptance();
         RunPlanetSurfaceWorldCompositionAcceptance();
         RunSurfacePresentationHotfixAcceptance();
+        RunSurfaceVisualLanguageAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5521,7 +5522,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7646,6 +7647,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-158 (F5): {_planetSurfaceStreamingAcceptanceHud}",
             $"TASK-160 (F5): {_planetSurfaceWorldCompositionAcceptanceHud}",
             $"TASK-162.2 (F5): {_surfacePresentationHotfixAcceptanceHud}",
+            $"TASK-164 (F5): {_surfaceVisualLanguageAcceptanceHud}",
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",

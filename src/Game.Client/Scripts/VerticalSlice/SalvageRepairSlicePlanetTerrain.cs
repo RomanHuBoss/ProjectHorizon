@@ -291,7 +291,11 @@ public partial class SalvageRepairSlice
                     profile,
                     logicalX,
                     logicalZ));
-                surfaceTool.SetColor(TerrainVertexColor(profile, sample));
+                surfaceTool.SetColor(TerrainVertexColor(
+                    profile,
+                    sample,
+                    logicalX,
+                    logicalZ));
                 surfaceTool.AddVertex(new Vector3(
                     (float)localX,
                     (float)sample.Height,
@@ -356,7 +360,11 @@ public partial class SalvageRepairSlice
                 surfaceTool.SetUV(new Vector2(
                     xIndex / (float)(resolution - 1),
                     zIndex / (float)(resolution - 1)));
-                surfaceTool.SetColor(TerrainVertexColor(profile, sample));
+                surfaceTool.SetColor(TerrainVertexColor(
+                    profile,
+                    sample,
+                    logicalX,
+                    logicalZ));
                 surfaceTool.AddVertex(new Vector3(
                     (float)x,
                     (float)sample.Height,
@@ -406,17 +414,30 @@ public partial class SalvageRepairSlice
 
     private static Color TerrainVertexColor(
         PlanetSurfaceTerrainProfile profile,
-        PlanetSurfaceTerrainSample sample)
+        PlanetSurfaceTerrainSample sample,
+        double logicalX,
+        double logicalZ)
     {
         Color baseColor = BuildGroundColor(profile.Archetype);
-        float heightFactor = (float)((sample.NormalizedHeight - 0.5) * 0.22);
+        float heightFactor = (float)((sample.NormalizedHeight - 0.5) * 0.26);
         float slopeFactor = (float)Math.Clamp(sample.SlopeDegrees / 60.0, 0.0, 1.0);
-        float multiplier = Math.Clamp(1.0f + heightFactor - slopeFactor * 0.10f, 0.65f, 1.25f);
-        return new Color(
+        double broad = Math.Sin(logicalX * 0.037 + Math.Cos(logicalZ * 0.029) * 1.7);
+        double detail = Math.Sin(logicalX * 0.19 + logicalZ * 0.13) *
+            Math.Cos(logicalZ * 0.11 - logicalX * 0.07);
+        float proceduralTexture = (float)(broad * 0.055 + detail * 0.035);
+        float multiplier = Math.Clamp(
+            1.0f + heightFactor + proceduralTexture - slopeFactor * 0.11f,
+            0.58f,
+            1.32f);
+        Color color = new(
             Math.Clamp(baseColor.R * multiplier, 0.0f, 1.0f),
             Math.Clamp(baseColor.G * multiplier, 0.0f, 1.0f),
             Math.Clamp(baseColor.B * multiplier, 0.0f, 1.0f),
             1.0f);
+        Color mineral = new Color(0.34f, 0.32f, 0.30f, 1.0f)
+            .Lerp(baseColor, 0.34f);
+        float mineralBlend = Mathf.SmoothStep(0.18f, 0.62f, slopeFactor);
+        return color.Lerp(mineral, mineralBlend * 0.58f);
     }
 
     private double EnsurePlayerAbovePlanetSurfaceFloor()

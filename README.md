@@ -4,6 +4,12 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-164 — Planet Surface Visual Language & Procedural Props
+
+Alpha.164 starts the next surface mega-iteration after the presentation stack became operational. The goal is not an AAA authored-asset replacement yet; it is a coherent **procedural visual-language layer** that removes the most obvious single-primitive placeholders while preserving the bounded gameplay/runtime contracts. Streamed resources now resolve into deterministic ore/crystal/fiber/organic compound silhouettes, POIs receive category-specific secondary geometry, fauna receive body-plan details (wings/fins/legs/tails), pad/fungus flora silhouettes are improved, and terrain receives low-cost logical-coordinate/height/slope color breakup across both streamed and distant terrain.
+
+The same revision also fixes the two external F5 regressions exposed after alpha.162.2: planet-scoped POI placement gets a broader deterministic candidate search without changing the historical legacy golden fixture, and flying fauna now maintain altitude relative to the actual terrain underneath them. F5 includes `TASK-164 surface visual language acceptance`; TASK-154 and TASK-126 must return to PASS before this iteration can be marked VERIFIED. Gameplay collision, resource IDs/depletion persistence, POI identities and the 25/9 terrain streaming budget remain unchanged.
+
 ## TASK-162.2 — Surface Presentation Recovery
 
 External Godot 4.7.1 evidence after TASK-162.1 proved that the surface stack now boots and that TASK-156/158/160/162 F5 contracts pass, but the live screenshot exposed a presentation gap the structural checks did not measure: the 5x5 gameplay streamer ended only ~80 m from the player, temperate relief was just 2.55 m, the system star had no guaranteed visible disc, and low thick cloud lobes read as nearby blobs. Alpha.162.2 keeps the **25-chunk / 9-collision gameplay streamer** unchanged and adds a separate visual-only 840 m distant-terrain proxy with a 116 m center hole, stronger low-frequency planet relief, denser aerial perspective, a camera-frame stellar core+halo aligned with the system-star direction, higher/flatter cloud clusters, and a safe player-to-terrain clearance guard for load/reset.

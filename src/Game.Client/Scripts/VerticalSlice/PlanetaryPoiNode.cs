@@ -109,6 +109,7 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
 
         _collisionShape = collisionShape;
         AddChild(meshInstance);
+        AddVisualDetails(definition, material);
         AddChild(collisionShape);
         OmniLight3D marker = new()
         {
@@ -126,6 +127,134 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
             ShadowEnabled = false
         };
         AddChild(marker);
+    }
+
+    private void AddVisualDetails(
+        PlanetaryPoiDefinition definition,
+        StandardMaterial3D material)
+    {
+        Node3D details = new()
+        {
+            Name = "VisualDetails"
+        };
+        AddChild(details);
+
+        float width = (float)definition.Size.X;
+        float height = (float)definition.Size.Y;
+        float depth = (float)definition.Size.Z;
+        bool vertical = definition.Category is "Signal" or "Science" or
+            "Ancient" or "Infrastructure" or "Monument" or
+            "Probe" or "Observatory";
+        bool industrial = definition.Category is "Settlement" or "Commerce" or
+            "Industry" or "Hostile" or "Shelter" or "Vault";
+
+        if (string.Equals(definition.Category, "Landing", StringComparison.Ordinal))
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "PadInset",
+                Mesh = new CylinderMesh
+                {
+                    Material = material,
+                    TopRadius = width * 0.34f,
+                    BottomRadius = width * 0.34f,
+                    Height = 0.08f,
+                    RadialSegments = 24
+                },
+                Position = new Vector3(0.0f, height * 0.62f, 0.0f)
+            });
+            for (int i = 0; i < 4; i++)
+            {
+                float angle = i * Mathf.Pi * 0.5f;
+                details.AddChild(new MeshInstance3D
+                {
+                    Name = $"PadBeacon{i}",
+                    Mesh = new CylinderMesh
+                    {
+                        Material = material,
+                        TopRadius = 0.06f,
+                        BottomRadius = 0.09f,
+                        Height = 0.35f,
+                        RadialSegments = 8
+                    },
+                    Position = new Vector3(
+                        Mathf.Cos(angle) * width * 0.38f,
+                        0.22f,
+                        Mathf.Sin(angle) * width * 0.38f)
+                });
+            }
+        }
+        else if (vertical)
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "Spire",
+                Mesh = new CylinderMesh
+                {
+                    Material = material,
+                    TopRadius = Math.Max(0.04f, width * 0.06f),
+                    BottomRadius = Math.Max(0.08f, width * 0.12f),
+                    Height = Math.Max(0.6f, height * 0.55f),
+                    RadialSegments = 8
+                },
+                Position = new Vector3(0.0f, height * 0.62f, 0.0f)
+            });
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "SensorCrown",
+                Mesh = new SphereMesh
+                {
+                    Material = material,
+                    Radius = Math.Max(0.12f, width * 0.15f),
+                    Height = Math.Max(0.22f, width * 0.28f),
+                    RadialSegments = 10,
+                    Rings = 5
+                },
+                Position = new Vector3(0.0f, height * 0.94f, 0.0f)
+            });
+        }
+        else if (industrial)
+        {
+            for (int i = -1; i <= 1; i += 2)
+            {
+                details.AddChild(new MeshInstance3D
+                {
+                    Name = i < 0 ? "SideModuleL" : "SideModuleR",
+                    Mesh = new BoxMesh
+                    {
+                        Material = material,
+                        Size = new Vector3(width * 0.28f, height * 0.52f, depth * 0.46f)
+                    },
+                    Position = new Vector3(i * width * 0.44f, height * 0.12f, 0.0f)
+                });
+            }
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "RoofUnit",
+                Mesh = new BoxMesh
+                {
+                    Material = material,
+                    Size = new Vector3(width * 0.45f, Math.Max(0.15f, height * 0.16f), depth * 0.34f)
+                },
+                Position = new Vector3(0.0f, height * 0.57f, 0.0f)
+            });
+        }
+        else
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "AccentMass",
+                Mesh = new BoxMesh
+                {
+                    Material = material,
+                    Size = new Vector3(width * 0.54f, Math.Max(0.18f, height * 0.35f), depth * 0.58f)
+                },
+                Position = new Vector3(width * 0.16f, height * 0.18f, -depth * 0.12f),
+                Rotation = new Vector3(0.0f, 0.22f, 0.0f)
+            });
+        }
+
+        details.SetMeta("surface_visual_parts", details.GetChildCount());
     }
 
     public void ApplyState(bool discovered, bool resolved)

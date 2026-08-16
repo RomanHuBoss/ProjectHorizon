@@ -513,18 +513,8 @@ public partial class SalvageRepairSlice
         node.AddToGroup("interactable");
         node.AddToGroup("planet_surface_resource");
 
-        MeshInstance3D meshInstance = new()
-        {
-            Name = "MeshInstance3D",
-            Mesh = new SphereMesh
-            {
-                Radius = 0.62f,
-                Height = 1.10f,
-                RadialSegments = 10,
-                Rings = 6
-            },
-            Scale = new Vector3(1.0f, 0.76f, 0.88f)
-        };
+        MeshInstance3D meshInstance =
+            ProceduralSurfaceVisualFactory.CreateResourceVisual(definition);
         CollisionShape3D collision = new()
         {
             Name = "CollisionShape3D",

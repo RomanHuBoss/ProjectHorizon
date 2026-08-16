@@ -2,12 +2,58 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task162.2-surface-presentation-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task164-surface-visual-language.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-164 Planet Surface Visual Language & Procedural Props
+
+**Исходный снимок:** `ProjectHorizon-main-task162.2-surface-presentation-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task164-surface-visual-language.zip`.  
+**Версия:** `0.1.0-alpha.164`.  
+**Статус:** TASK-164 `IMPLEMENTED`; исправления регрессий TASK-154/TASK-126 `IMPLEMENTED / PENDING EXTERNAL RUNTIME`; TASK-162.2 визуально подтверждён частично пользовательским screenshot, но его новый F5 acceptance-line ещё не предоставлен; TASK-163 остаётся `IN_PROGRESS`.
+
+### Внешнее runtime evidence пользователя после alpha.162.2
+
+Скриншот подтверждает, что surface-presentation stack теперь реально работает: видимы macro relief, atmosphere/haze, stellar disc и distant terrain вместо прежнего fallback-квадрата. Пользователь отдельно отметил, что «система, кажется, работает», при этом качество моделей/материалов остаётся явно прототипным.
+
+Полный F5 выявил две новые регрессии, которые alpha.164 исправляет до начала дальнейшей функциональной разработки:
+
+- `TASK-154 ... FAIL`: `Unable to place planetary POI poi.landing_pad within its biome/slope/height/water/danger constraints.` После повышения relief старый planet-scoped candidate window `±34m` оказался недостаточен для constrained low-slope infrastructure на одном из starter profiles.
+- `TASK-126 ... FAIL`: все navigation invariants равны `1`, кроме `altitude=0`. Flying-fauna runtime использовал начальную airborne Y как `_territoryCenter.Y`, после чего ещё раз добавлял altitude band; на macro relief это нарушило собственный §30.2/§30.3 envelope.
+
+### Исправлено перед TASK-164
+
+- legacy `PlanetaryPoiPlanner.Plan()` сохраняет историческую `±34m` lattice и golden identity; только terrain-aware `PlanPlanet()` использует deterministic `±48m` search window; environment latitude sampling масштабируется тем же extent;
+- xUnit `PlanetSurfaceContent_VariesAcrossFourStarterPlanets` теперь обязательно строит все 20 POI для каждого starter planet и валидирует constraints, поэтому landing-pad starvation не должен снова пройти unit suite;
+- flying fauna больше не использует airborne territory Y как ground reference; fresh spawn clamped в `+2.5..+6.5m`, а live altitude controller и acceptance envelope используют **текущий terrain floor под животным** (`SampleHeight(Position.X, Position.Z)`), а не исходную airborne Y.
+
+### TASK-164 — закрываемая подсистема
+
+- четыре deterministic visual families для streamed resources: `ore/crystal/fiber/organic`; каждый node получает compound silhouette из нескольких low-poly частей, но сохраняет прежний единственный gameplay collision/ID/depletion contract;
+- POI получают category-aware secondary geometry (landing beacons/pad inset, spire/sensor crown, industrial side modules/roof unit, generic accent mass) без изменения collision и persistence identity;
+- fauna получает body-plan secondary geometry: wings/tail, aquatic fins, ground legs; existing AI/collision/health не меняются;
+- flora `Pad/Fungus` уходят от box/sphere placeholders к более читаемым radial silhouettes в существующем MultiMesh budget;
+- fallback/distant/streamed terrain получают одинаковую low-cost procedural color breakup по logical X/Z + height/slope, без bitmap texture residency и без изменения deterministic height sampling;
+- F5 добавляет `TASK-164 surface visual language acceptance`: проверяет 4/4 resource families, compound live resources, detailed POI/fauna, сохранённые resource collision bindings и bounded 25-chunk terrain presentation;
+- section-37 добавляет `validate-task164-surface-visual-language.py`; xUnit добавляет family mapping + all-starter-planet POI regression coverage.
+
+### Граница итерации
+
+TASK-164 намеренно **не заявляет AAA/hand-authored art**: это procedural production foundation вместо разноцветных одиночных primitives. Импорт авторских GLTF/texture sets, LOD asset baking, PBR atlases/decals и art-direction pass должны идти отдельной следующей art-content итерацией после runtime acceptance TASK-164. Технический PDF в snapshot по-прежнему Git-LFS pointer, поэтому отсутствующий payload не реконструируется догадками.
+
+### Acceptance TASK-164
+
+1. Clean build `0 warnings / 0 errors` и section-37 green.
+2. F5: TASK-154 снова `PASS` (`starterPlanets=4/4`, `poiDeterministic=1`), TASK-126 снова `PASS` и обязательно `altitude=1`.
+3. F5: `TASK-164 surface visual language acceptance PASS` с `resourceFamilies=4/4`, compound resources, detailed POI/fauna, `terrainProcedural=1`, `boundedGameplayStreamer=25`.
+4. Manual visual smoke: ресурсы больше не выглядят одним одинаковым шаром/кубом; POI и fauna имеют читаемые вторичные формы; terrain не получает новый видимый square edge.
+5. Manual gameplay smoke: resource collect/depletion, POI interaction/scanning, fauna combat/scan и terrain collision работают как до визуального апгрейда.
+
+---
 
 ## 0. Текущая hotfix-итерация 2026-08-16 — TASK-162.2 Surface Presentation Recovery
 
@@ -5844,8 +5890,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-162.2` | Surface presentation visual rerun | horizon без 80m square edge; macro relief; видимый stellar disc; high cloud layer; F5 TASK-162.2 PASS |
-| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 1 | `TASK-164` | Surface Visual Language runtime/manual acceptance | clean build; TASK-154 PASS; TASK-126 altitude=1 PASS; F5 TASK-164 PASS; resource/POI/fauna interaction smoke |
+| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-160.1` | Traversal-safe TASK-126 acceptance | `VERIFIED`: external F5 `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
 | 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
@@ -5854,8 +5900,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-162.2 Surface Presentation hotfix `IMPLEMENTED`; TASK-162.1 и TASK-160.1 `VERIFIED`; TASK-162 остаётся `IMPLEMENTED`.  
-**Формально ближайший шаг:** Windows/Godot visual smoke TASK-162.2; после него TASK-163 live >2048m traversal и distant cold-restore. F5 TASK-162 и TASK-160.1 уже подтверждены внешним evidence.
+**Текущая разрабатываемая реализация:** TASK-164 Surface Visual Language `IMPLEMENTED`; TASK-154/TASK-126 runtime-regression fixes требуют внешнего F5; TASK-162 остаётся `IMPLEMENTED`.  
+**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-154/TASK-126/TASK-164 и visual/gameplay smoke; затем TASK-163 live >2048m traversal и distant cold-restore.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

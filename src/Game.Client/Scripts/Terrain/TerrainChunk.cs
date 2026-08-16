@@ -549,6 +549,9 @@ public partial class TerrainChunk : StaticBody3D
             float worldZ = (ChunkZ * ChunkSize) + vertex.Z;
             float macro = 0.5f + 0.5f * Mathf.Sin(
                 worldX * 0.071f + Mathf.Cos(worldZ * 0.047f) * 1.9f);
+            float detail = 0.5f + 0.5f * Mathf.Sin(
+                worldX * 0.19f + worldZ * 0.13f) * Mathf.Cos(
+                worldZ * 0.11f - worldX * 0.07f);
             Color low = PlanetSurfaceBaseColor.Darkened(0.20f);
             Color high = PlanetSurfaceBaseColor.Lightened(0.24f);
             Color rock = new Color(0.31f, 0.30f, 0.28f, 1.0f)
@@ -557,6 +560,9 @@ public partial class TerrainChunk : StaticBody3D
             heightColor = heightColor.Lerp(
                 PlanetSurfaceBaseColor.Lightened(0.08f),
                 macro * 0.16f);
+            heightColor = heightColor.Lerp(
+                PlanetSurfaceBaseColor.Darkened(0.10f),
+                detail * 0.10f);
             float rockBlend = Mathf.SmoothStep(0.14f, 0.52f, steepness);
             return heightColor.Lerp(rock, rockBlend);
         }

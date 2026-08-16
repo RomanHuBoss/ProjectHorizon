@@ -343,7 +343,44 @@ public sealed class WorldGenTests
             Assert.All(plan.Flora, flora => Assert.Contains(
                 flora.BiomeId,
                 profile.ActiveBiomeIds));
+
+            // TASK-164 regression: macro relief must not starve the deterministic
+            // POI planner of low-slope candidates (notably the landing pad on the
+            // desert starter planet).
+            IReadOnlyList<PlanetaryPoiPlacement> pois = surface.BuildPoiPlan(profile);
+            Assert.Equal(PlanetaryPoiCatalog.ExpectedPoiTypeCount, pois.Count);
+            Assert.All(pois, poi => Assert.True(
+                PlanetaryPoiPlanner.MeetsDefinitionConstraints(
+                    RepositoryFixture.Pois.GetDefinition(poi.PoiTypeId),
+                    poi.Environment)));
         });
+    }
+
+    [Theory]
+    [InlineData("crystal", "crystal")]
+    [InlineData("fiber", "fiber")]
+    [InlineData("bio", "organic")]
+    [InlineData("metal", "ore")]
+    public void SurfaceVisualLanguage_ResourceFamiliesAreDeterministic(
+        string tag,
+        string expectedFamily)
+    {
+        GameResourceDefinition resource = new(
+            "resource.test.visual",
+            "item.test.visual",
+            1,
+            1,
+            0,
+            "hand",
+            new ResourceVisualDefinition(
+                0.3, 0.4, 0.5,
+                0.0, 0.0, 0.0,
+                0.0, 0.2, 0.8),
+            new[] { "surface", tag });
+
+        Assert.Equal(
+            expectedFamily,
+            ProceduralSurfaceVisualFactory.ResolveResourceFamily(resource));
     }
 
     [Fact]

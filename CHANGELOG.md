@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0-alpha.164] - 2026-08-16
+
+### Added — TASK-164 Planet Surface Visual Language & Procedural Props
+- Added a bounded procedural visual-language subsystem for live surface resources, planetary POIs and fauna: streamed resources now use four deterministic compound families (ore/crystal/fiber/organic), POIs gain category-specific secondary geometry, fauna gain body-plan details, and pad/fungus flora silhouettes no longer use the previous box/blob primitives.
+- Added terrain color breakup driven by logical coordinates/height/slope to the fallback, distant proxy and streamed terrain paths without introducing bitmap-asset or persistence dependencies.
+- Added `TASK-164 surface visual language acceptance`, a section-37 static contract gate and resource-family/planet-POI xUnit regressions.
+
+### Fixed — runtime regressions reported after alpha.162.2
+- Fixed TASK-154 on macro-relief planets: planet-scoped POI placement now searches a deterministic +/-48 m candidate lattice while the legacy +/-34 m golden fixture remains unchanged; this restores low-slope candidates for constrained infrastructure such as `poi.landing_pad`.
+- Fixed TASK-126 flying-fauna altitude semantics: flight envelopes now follow the terrain floor under the fauna instead of treating the initial airborne Y as the territory floor, and fresh flying spawns are clamped into the terrain-relative altitude band.
+- Gameplay collision, interaction IDs, resource depletion identity and the 25-chunk/9-collision terrain budget are unchanged by TASK-164.
+
 ## [0.1.0-alpha.162.2] - 2026-08-16
 
 ### Fixed — TASK-162.2 Surface Presentation Recovery

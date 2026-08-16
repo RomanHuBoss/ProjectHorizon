@@ -43,6 +43,7 @@ dotnet build "%PROJECT%" -c Debug --no-restore -p:ContinuousIntegrationBuild=tru
 %PY% "%ROOT%\tools\validate-task162-planet-global-surface-frame.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task1621-runtime-bootstrap-hotfix.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task1622-surface-presentation-hotfix.py" || exit /b 1
+%PY% "%ROOT%\tools\validate-task164-surface-visual-language.py" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --collect:"XPlat Code Coverage" --settings "%ROOT%\tests\coverlet.runsettings" --results-directory "%RESULTS%" --logger "trx;LogFileName=section36.trx" || exit /b 1
 %PY% "%ROOT%\tools\verify-section36-coverage.py" --results-dir "%RESULTS%" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests" || exit /b 1

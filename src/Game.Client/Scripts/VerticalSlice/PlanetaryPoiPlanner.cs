@@ -25,6 +25,11 @@ public static class PlanetaryPoiPlanner
     private const double CandidateMinimum = -34.0;
     private const double CandidateMaximum = 34.0;
     private const double CandidateStep = 2.0;
+    // TASK-164: planet-scoped terrain uses broader macro relief than the legacy
+    // vertical-slice fixture. Keep the historical +/-34 m candidate lattice for
+    // legacy golden compatibility, but give real planet plans enough search area
+    // to satisfy low-slope infrastructure constraints deterministically.
+    private const double PlanetCandidateMaximum = 48.0;
     private const double CentralExclusionRadius = 23.0;
     private const double ResourceFieldMinimumX = -19.0;
     private const double ResourceFieldMaximumX = 19.0;
@@ -91,9 +96,13 @@ public static class PlanetaryPoiPlanner
             : activeQuestTags
                 .Where(tag => !string.IsNullOrWhiteSpace(tag))
                 .ToHashSet(StringComparer.Ordinal);
+        double candidateMaximum = terrainProfile is null
+            ? CandidateMaximum
+            : PlanetCandidateMaximum;
         List<(double X, double Z)> candidates = BuildCandidates(
             worldSeed,
-            regionKey);
+            regionKey,
+            candidateMaximum);
         List<PlanetaryPoiPlacement> placements = new();
         PlanetaryPoiDefinition[] orderedDefinitions = catalog.Definitions.Values
             .OrderByDescending(definition => definition.Rarity)
@@ -114,7 +123,8 @@ public static class PlanetaryPoiPlanner
                     worldSeed,
                     environmentRuntime,
                     environmentProfile,
-                    terrainProfile))
+                    terrainProfile,
+                    candidateMaximum))
                 .OrderBy(candidate => CandidateScore(
                     worldSeed,
                     regionKey,
@@ -139,7 +149,8 @@ public static class PlanetaryPoiPlanner
                 selected.Z,
                 environmentRuntime,
                 environmentProfile,
-                terrainProfile);
+                terrainProfile,
+                candidateMaximum);
             ulong hash = StableHash(
                 $"{worldSeed}|{regionKey}|" +
                 $"{definition.PoiTypeId}|rotation");
@@ -208,15 +219,19 @@ public static class PlanetaryPoiPlanner
 
     private static List<(double X, double Z)> BuildCandidates(
         long worldSeed,
-        string regionKey)
+        string regionKey,
+        double candidateMaximum)
     {
         List<(double X, double Z)> candidates = new();
-        for (double x = CandidateMinimum;
-             x <= CandidateMaximum;
+        double candidateMinimum = Math.Abs(candidateMaximum - CandidateMaximum) < 0.001
+            ? CandidateMinimum
+            : -candidateMaximum;
+        for (double x = candidateMinimum;
+             x <= candidateMaximum;
              x += CandidateStep)
         {
-            for (double z = CandidateMinimum;
-                 z <= CandidateMaximum;
+            for (double z = candidateMinimum;
+                 z <= candidateMaximum;
                  z += CandidateStep)
             {
                 bool outsideCentralGameplayArea =
@@ -257,7 +272,8 @@ public static class PlanetaryPoiPlanner
         long worldSeed,
         PlanetEnvironmentRuntime? environmentRuntime,
         PlanetEnvironmentProfile? environmentProfile,
-        PlanetSurfaceTerrainProfile? terrainProfile)
+        PlanetSurfaceTerrainProfile? terrainProfile,
+        double candidateMaximum)
     {
         if (!ClearsVerticalSliceInfrastructure(definition, x, z))
         {
@@ -270,7 +286,8 @@ public static class PlanetaryPoiPlanner
             z,
             environmentRuntime,
             environmentProfile,
-            terrainProfile);
+            terrainProfile,
+            candidateMaximum);
         if (!MeetsDefinitionConstraints(definition, environment))
         {
             return false;
@@ -302,7 +319,8 @@ public static class PlanetaryPoiPlanner
         double z,
         PlanetEnvironmentRuntime? environmentRuntime = null,
         PlanetEnvironmentProfile? environmentProfile = null,
-        PlanetSurfaceTerrainProfile? terrainProfile = null)
+        PlanetSurfaceTerrainProfile? terrainProfile = null,
+        double candidateMaximum = CandidateMaximum)
     {
         ulong hash = StableHash(string.Format(
             CultureInfo.InvariantCulture,
@@ -341,7 +359,8 @@ public static class PlanetaryPoiPlanner
         double distanceToWater = coverage <= 0.001
             ? 80.0
             : Math.Clamp(Math.Abs(x - shorelineX), 0.0, 80.0);
-        double latitude = Math.Clamp(z / CandidateMaximum * 58.0, -58.0, 58.0);
+        double latitudeExtent = Math.Max(CandidateMaximum, candidateMaximum);
+        double latitude = Math.Clamp(z / latitudeExtent * 58.0, -58.0, 58.0);
         double elevation01 = Math.Clamp(
             (syntheticHeight + 2.0) / 4.0,
             0.0,

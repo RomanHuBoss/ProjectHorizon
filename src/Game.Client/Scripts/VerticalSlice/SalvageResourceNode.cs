@@ -140,23 +140,29 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
         }
 
         ResourceVisualDefinition visual = definition.Visual;
-        _mesh.MaterialOverride = new StandardMaterial3D
+        ApplyMaterialRecursive(_mesh, visual, 1.0f);
+    }
+
+    private static void ApplyMaterialRecursive(
+        MeshInstance3D mesh,
+        ResourceVisualDefinition visual,
+        float brightness)
+    {
+        mesh.MaterialOverride =
+            ProceduralSurfaceVisualFactory.BuildResourceMaterial(
+                visual,
+                brightness);
+        int detailIndex = 0;
+        foreach (Node child in mesh.GetChildren())
         {
-            AlbedoColor = new Color(
-                (float)visual.AlbedoR,
-                (float)visual.AlbedoG,
-                (float)visual.AlbedoB),
-            EmissionEnabled = true,
-            Emission = new Color(
-                (float)visual.EmissionR,
-                (float)visual.EmissionG,
-                (float)visual.EmissionB),
-            EmissionEnergyMultiplier = (float)Math.Min(
-                visual.EmissionEnergy,
-                0.55),
-            Metallic = (float)visual.Metallic,
-            Roughness = (float)visual.Roughness
-        };
+            if (child is not MeshInstance3D detail)
+            {
+                continue;
+            }
+            float detailBrightness = detailIndex % 2 == 0 ? 1.12f : 0.84f;
+            ApplyMaterialRecursive(detail, visual, detailBrightness);
+            detailIndex++;
+        }
     }
 
     private void ApplyFallbackMaterial()

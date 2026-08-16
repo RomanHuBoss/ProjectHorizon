@@ -102,16 +102,21 @@ public partial class EcologyFloraSpecimenNode : StaticBody3D, IInteractable, IHi
                 RadialSegments = 10,
                 Rings = 5
             },
-            "Pad" => new BoxMesh
+            "Pad" => new CylinderMesh
             {
-                Size = new Vector3(0.95f, 0.34f, 0.95f)
+                TopRadius = 0.52f,
+                BottomRadius = 0.44f,
+                Height = 0.22f,
+                RadialSegments = 14,
+                Rings = 2
             },
-            "Fungus" => new SphereMesh
+            "Fungus" => new CylinderMesh
             {
-                Radius = 0.48f,
-                Height = 0.68f,
-                RadialSegments = 10,
-                Rings = 5
+                TopRadius = 0.50f,
+                BottomRadius = 0.16f,
+                Height = 0.72f,
+                RadialSegments = 12,
+                Rings = 3
             },
             "Tuft" => new CylinderMesh
             {

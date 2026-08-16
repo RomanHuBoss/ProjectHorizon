@@ -31,10 +31,21 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     public bool AerialSteeringBound => _aerialSteering is not null &&
         string.Equals(MovementMode, "Flying", StringComparison.Ordinal);
 
-    public bool InsideFlyingAltitudeEnvelope => _definition is null ||
-        !string.Equals(MovementMode, "Flying", StringComparison.Ordinal) ||
-        (GlobalPosition.Y >= _territoryCenter.Y + 1.25f &&
-         GlobalPosition.Y <= _territoryCenter.Y + 7.55f);
+    public bool InsideFlyingAltitudeEnvelope
+    {
+        get
+        {
+            if (_definition is null ||
+                !string.Equals(MovementMode, "Flying", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            float floorY = CurrentTerrainFloorY();
+            return GlobalPosition.Y >= floorY + 1.25f &&
+                GlobalPosition.Y <= floorY + 7.55f;
+        }
+    }
 
     public event Action<EcologyFaunaNode>? Observed;
 
@@ -55,13 +66,24 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         InstanceId = spawn.InstanceId;
         Name = spawn.InstanceId.Replace('.', '_');
         float initialY = (float)spawn.PositionY;
-        if (_terrainProfile is not null &&
-            string.Equals(definition.MovementMode, "Ground", StringComparison.Ordinal))
-        {
-            initialY = (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+        float terrainFloorY = _terrainProfile is null
+            ? 0.0f
+            : (float)PlanetSurfaceTerrainRuntime.SampleHeight(
                 _terrainProfile,
                 spawn.PositionX,
-                spawn.PositionZ) + 0.75f;
+                spawn.PositionZ);
+        if (string.Equals(definition.MovementMode, "Ground", StringComparison.Ordinal))
+        {
+            initialY = terrainFloorY + 0.75f;
+        }
+        else if (string.Equals(definition.MovementMode, "Flying", StringComparison.Ordinal))
+        {
+            // TASK-164 regression fix: fresh flying spawns start inside the
+            // same terrain-relative altitude band enforced by live steering.
+            initialY = Mathf.Clamp(
+                initialY,
+                terrainFloorY + 2.5f,
+                terrainFloorY + 6.5f);
         }
         Position = new Vector3(
             (float)spawn.PositionX,
@@ -71,6 +93,9 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             0.0f,
             Mathf.DegToRad((float)spawn.HeadingDegrees),
             0.0f);
+        // Territory behavior keeps the authored airborne/home position. The
+        // altitude controller below derives its floor independently from terrain,
+        // so ReturnToTerritory/FollowGroup steering does not aim at the ground.
         _territoryCenter = Position;
         Health = definition.Health;
         CollisionLayer = 1u;
@@ -119,6 +144,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             Scale = Vector3.One * 0.82f
         };
         AddChild(headNode);
+        AddBodyPlanVisualDetails(definition, material);
 
         AddChild(new CollisionShape3D
         {
@@ -388,8 +414,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     {
         if (_definition is null || _aerialSteering is null)
         {
-            float fallbackY = _territoryCenter.Y +
-                1.8f +
+            float fallbackY = CurrentTerrainFloorY() +
+                3.4f +
                 (float)(1.2 * Math.Sin(_ageSeconds * 0.33));
             targetVelocity.Y = Mathf.Clamp(
                 (fallbackY - Position.Y) * 1.8f,
@@ -442,14 +468,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
         float phase = (float)(_ageSeconds * 0.33 +
             (EcologyPlanner.StableHash(InstanceId) % 31) * 0.17);
-        float preferredY = _territoryCenter.Y + 3.4f +
+        // Follow the terrain under the current horizontal position rather than
+        // the original spawn point. Macro relief introduced in TASK-162.2 can
+        // vary by several metres across one fauna territory.
+        float terrainFloorY = CurrentTerrainFloorY();
+        float preferredY = terrainFloorY + 3.4f +
             (float)Math.Sin(phase) * 1.15f;
         desired = _aerialSteering.ApplyAltitudeEnvelope(
             desired,
             GlobalPosition.Y,
-            _territoryCenter.Y + 1.6f,
+            terrainFloorY + 1.6f,
             preferredY,
-            _territoryCenter.Y + 7.2f,
+            terrainFloorY + 7.2f,
             1.65f,
             3.0f);
 
@@ -475,6 +505,19 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             GlobalPosition,
             Velocity,
             (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15));
+    }
+
+    private float CurrentTerrainFloorY()
+    {
+        if (_terrainProfile is null)
+        {
+            return TerritoryCenterGlobal().Y;
+        }
+
+        return (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+            _terrainProfile,
+            Position.X,
+            Position.Z);
     }
 
     private Vector3 TerritoryCenterGlobal() =>
@@ -521,6 +564,107 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private double Fatigue()
     {
         return 0.5 + (0.5 * Math.Sin(_ageSeconds * 0.031 + 2.1));
+    }
+
+    private void AddBodyPlanVisualDetails(
+        EcologyFaunaDefinition definition,
+        StandardMaterial3D material)
+    {
+        Node3D details = new()
+        {
+            Name = "VisualDetails"
+        };
+        float scale = (float)definition.Scale;
+        AddChild(details);
+
+        if (string.Equals(definition.BodyPlan, "Flying", StringComparison.Ordinal))
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                details.AddChild(new MeshInstance3D
+                {
+                    Name = side < 0 ? "WingL" : "WingR",
+                    Mesh = new BoxMesh
+                    {
+                        Material = material,
+                        Size = new Vector3(1.15f, 0.08f, 0.52f) * scale
+                    },
+                    Position = new Vector3(side * 0.72f, 0.08f, 0.0f) * scale,
+                    Rotation = new Vector3(0.0f, side * -0.18f, side * 0.12f)
+                });
+            }
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "Tail",
+                Mesh = new CylinderMesh
+                {
+                    Material = material,
+                    TopRadius = 0.05f * scale,
+                    BottomRadius = 0.16f * scale,
+                    Height = 0.92f * scale,
+                    RadialSegments = 6
+                },
+                Position = new Vector3(0.0f, 0.0f, 0.72f) * scale,
+                Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f)
+            });
+        }
+        else if (string.Equals(definition.BodyPlan, "Aquatic", StringComparison.Ordinal))
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "TailFin",
+                Mesh = new BoxMesh
+                {
+                    Material = material,
+                    Size = new Vector3(0.12f, 0.62f, 0.66f) * scale
+                },
+                Position = new Vector3(0.0f, 0.0f, 0.88f) * scale,
+                Rotation = new Vector3(0.0f, 0.0f, 0.12f)
+            });
+            for (int side = -1; side <= 1; side += 2)
+            {
+                details.AddChild(new MeshInstance3D
+                {
+                    Name = side < 0 ? "FinL" : "FinR",
+                    Mesh = new BoxMesh
+                    {
+                        Material = material,
+                        Size = new Vector3(0.55f, 0.06f, 0.34f) * scale
+                    },
+                    Position = new Vector3(side * 0.58f, -0.04f, 0.0f) * scale,
+                    Rotation = new Vector3(0.0f, side * 0.30f, side * 0.10f)
+                });
+            }
+        }
+        else
+        {
+            int legPairs = string.Equals(definition.BodyPlan, "Hexapod", StringComparison.Ordinal)
+                ? 3
+                : 2;
+            for (int pair = 0; pair < legPairs; pair++)
+            {
+                float z = ((pair - (legPairs - 1) * 0.5f) * 0.46f) * scale;
+                for (int side = -1; side <= 1; side += 2)
+                {
+                    details.AddChild(new MeshInstance3D
+                    {
+                        Name = $"Leg{pair}{(side < 0 ? "L" : "R")}",
+                        Mesh = new CylinderMesh
+                        {
+                            Material = material,
+                            TopRadius = 0.07f * scale,
+                            BottomRadius = 0.10f * scale,
+                            Height = 0.70f * scale,
+                            RadialSegments = 6
+                        },
+                        Position = new Vector3(side * 0.48f, -0.45f, z),
+                        Rotation = new Vector3(0.0f, 0.0f, side * -0.42f)
+                    });
+                }
+            }
+        }
+
+        details.SetMeta("surface_visual_parts", details.GetChildCount());
     }
 
     private static Vector3 BodyScale(EcologyFaunaDefinition definition)
