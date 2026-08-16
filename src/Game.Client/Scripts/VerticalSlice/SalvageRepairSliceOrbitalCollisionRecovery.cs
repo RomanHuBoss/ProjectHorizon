@@ -10,6 +10,7 @@ public partial class SalvageRepairSlice
     private WorldSceneKind _orbitalCollisionPreviousWorldKind;
     private int _orbitalSweptCollisionCount;
     private int _freeFlightPlanetEntryCount;
+    private int _orbitalStationSweptCollisionCount;
     private string _orbitalCollisionLastBody = string.Empty;
     private bool _spaceflightCollisionRecoveryReadyPrinted;
 
@@ -55,6 +56,12 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        if (TryBlockOrbitalStationSweep(previous, current))
+        {
+            ArmOrbitalCollisionSweep(_voyageShip.GlobalPosition);
+            return;
+        }
+
         if (_starSystemSimulationNode.TryGetFirstSolidBodyHit(
                 previous,
                 current,
@@ -67,6 +74,87 @@ public partial class SalvageRepairSlice
         }
 
         ArmOrbitalCollisionSweep(current);
+    }
+
+    private bool TryBlockOrbitalStationSweep(Vector3 previous, Vector3 current)
+    {
+        if (_voyageShip is null || _orbitalStation is not CollisionObject3D station ||
+            !station.Visible || station.CollisionLayer == 0u ||
+            !previous.IsFinite() || !current.IsFinite())
+        {
+            return false;
+        }
+
+        bool found = false;
+        float bestFraction = float.PositiveInfinity;
+        CollisionShape3D? bestShape = null;
+        OrbitalStationCollisionHit bestHit = default;
+        foreach (Node child in station.GetChildren())
+        {
+            if (child is not CollisionShape3D shape || shape.Disabled ||
+                shape.Shape is null || !GodotObject.IsInstanceValid(shape))
+            {
+                continue;
+            }
+
+            Vector3 halfExtents = shape.Shape switch
+            {
+                BoxShape3D box => box.Size * 0.5f,
+                CylinderShape3D cylinder => new Vector3(
+                    cylinder.Radius,
+                    cylinder.Height * 0.5f,
+                    cylinder.Radius),
+                _ => Vector3.Zero
+            };
+            if (halfExtents == Vector3.Zero)
+            {
+                continue;
+            }
+
+            Vector3 localPrevious = shape.ToLocal(previous);
+            Vector3 localCurrent = shape.ToLocal(current);
+            if (!OrbitalStationCollisionRuntime.TrySweepExpandedAabb(
+                    localPrevious,
+                    localCurrent,
+                    halfExtents,
+                    OrbitalBodyCollisionRuntime.ShipCollisionRadiusMeters,
+                    out OrbitalStationCollisionHit candidate) ||
+                candidate.SegmentFraction >= bestFraction)
+            {
+                continue;
+            }
+
+            found = true;
+            bestFraction = candidate.SegmentFraction;
+            bestShape = shape;
+            bestHit = candidate;
+        }
+
+        if (!found || bestShape is null)
+        {
+            return false;
+        }
+
+        Vector3 globalNormal = bestShape.GlobalTransform.Basis *
+            bestHit.LocalSurfaceNormal;
+        globalNormal = globalNormal.LengthSquared() <= 0.000001f
+            ? Vector3.Up
+            : globalNormal.Normalized();
+        Vector3 impact = bestShape.ToGlobal(bestHit.LocalShipCenterAtImpact) +
+            globalNormal * OrbitalStationCollisionRuntime.SeparationPaddingMeters;
+        double impactSpeed = _voyageShip.Speed;
+        _voyageShip.GlobalPosition = impact;
+        _voyageShip.Velocity = Vector3.Zero;
+        _voyageShip.ClearExternalCommand();
+        _orbitalStationSweptCollisionCount++;
+        _orbitalCollisionLastBody = $"station:{bestShape.Name}";
+        GD.Print(
+            "TASK-180.1 orbital station collision BLOCKED: " +
+            $"shape={bestShape.Name}; swept=1; blocked=1; " +
+            $"speed={impactSpeed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+            $"fraction={bestHit.SegmentFraction.ToString("0.000", CultureInfo.InvariantCulture)}; " +
+            $"stationHits={_orbitalStationSweptCollisionCount}.");
+        return true;
     }
 
     private bool TryCaptureFreeFlightPlanetEntry(Vector3 previous, Vector3 current)

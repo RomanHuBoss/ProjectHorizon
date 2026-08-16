@@ -5,11 +5,14 @@ using Godot;
 public partial class SalvageRepairSlice
 {
     private const double PilotedShipMinimumTerrainClearanceMeters = 3.2;
+    private const double PilotedShipRecoveryPaddingMeters = 0.18;
     private int _pilotedShipSurfaceRecoveryCount;
     private int _pilotedShipSurfaceSweepBlockCount;
     private int _pilotedShipSurfaceSweepSamples;
     private bool _pilotedShipSurfaceSafetyReadyPrinted;
     private bool _pilotedShipSurfaceSweepInitialized;
+    private bool _pilotedShipSurfaceContactActive;
+    private int _pilotedShipSurfaceContactRecoveries;
     private Vector3 _pilotedShipSurfaceSweepPreviousPosition;
     private double _pilotedShipMinimumObservedTerrainClearance = double.PositiveInfinity;
 
@@ -87,6 +90,15 @@ public partial class SalvageRepairSlice
 
         if (!penetration)
         {
+            if (_pilotedShipSurfaceContactActive)
+            {
+                GD.Print(
+                    "TASK-180.1 surface contact RECOVERED: " +
+                    $"recoveries={_pilotedShipSurfaceContactRecoveries}; " +
+                    $"total={_pilotedShipSurfaceRecoveryCount}.");
+                _pilotedShipSurfaceContactActive = false;
+                _pilotedShipSurfaceContactRecoveries = 0;
+            }
             _pilotedShipSurfaceSweepPreviousPosition = current;
             return;
         }
@@ -97,7 +109,8 @@ public partial class SalvageRepairSlice
             hitTerrainHeight);
         Vector3 corrected = SurfaceLogicalToLocalPosition(
             hitLogical.X,
-            hitTerrainHeight + PilotedShipMinimumTerrainClearanceMeters,
+            hitTerrainHeight + PilotedShipMinimumTerrainClearanceMeters +
+                PilotedShipRecoveryPaddingMeters,
             hitLogical.Z);
         _voyageShip.GlobalPosition = corrected;
 
@@ -108,13 +121,18 @@ public partial class SalvageRepairSlice
         }
 
         _pilotedShipSurfaceRecoveryCount++;
+        _pilotedShipSurfaceContactRecoveries++;
         _pilotedShipSurfaceSweepBlockCount++;
         _pilotedShipSurfaceSweepPreviousPosition = corrected;
-        GD.PushWarning(
-            "TASK-178.7 surface penetration BLOCKED: " +
-            $"clearance={hitClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
-            $"terrain={hitTerrainHeight.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
-            $"samples={samples}; swept=1; recoveries={_pilotedShipSurfaceRecoveryCount}; blocked=1.");
+        if (!_pilotedShipSurfaceContactActive)
+        {
+            _pilotedShipSurfaceContactActive = true;
+            GD.PushWarning(
+                "TASK-178.7 surface penetration BLOCKED (TASK-180.1 debounced): " +
+                $"clearance={hitClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
+                $"terrain={hitTerrainHeight.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
+                $"samples={samples}; swept=1; padding={PilotedShipRecoveryPaddingMeters.ToString("0.00", CultureInfo.InvariantCulture)}m; blocked=1.");
+        }
     }
 
     private Vector3 BuildPilotedShipTerrainNormal(

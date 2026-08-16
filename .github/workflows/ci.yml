@@ -92,6 +92,7 @@ jobs:
           python3 tools/validate-task1786-orbital-scale-mouse-surface.py
           python3 tools/validate-task1787-surface-brake-handoff.py
           python3 tools/validate-task180-production-visual-language.py
+          python3 tools/validate-task1801-runtime-integrity-hotfix.py
 
       - name: Unit tests and coverage
         run: >-

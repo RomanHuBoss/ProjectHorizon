@@ -11,6 +11,7 @@ public sealed record DetailedPlanetGlobeDiagnostics(
     int ExpectedSeamComparisons,
     float MaximumSeamPositionError,
     float MaximumSeamNormalError,
+    bool OpaqueCoreShell,
     bool AtmosphereShell,
     bool WaterShell,
     bool CloudShell,
@@ -27,6 +28,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
     public const int FaceResolution = 17;
     public const int ProductionTerrainMaterialVariants = 6;
     private readonly List<MeshInstance3D> _terrainFaces = new();
+    private MeshInstance3D? _coreShell;
     private MeshInstance3D? _atmosphere;
     private MeshInstance3D? _water;
     private MeshInstance3D? _clouds;
@@ -39,7 +41,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
     public DetailedPlanetGlobeDiagnostics Diagnostics =>
         _diagnostics ?? new DetailedPlanetGlobeDiagnostics(
             string.Empty, 0, 0, 0, 0, 0, 0.0f, 0.0f,
-            false, false, false, 0.0f);
+            false, false, false, false, 0.0f);
 
     public void Configure(StarSystemBodyDefinition definition)
     {
@@ -91,6 +93,15 @@ public partial class DetailedPlanetGlobeNode : Node3D
             AddChild(meshNode);
             _terrainFaces.Add(meshNode);
         }
+
+        // TASK-180.1: keep a slightly inset opaque low-detail sphere behind the
+        // six cube-sphere faces. The far-space requirement is a closed planet,
+        // so a transient face/culling/LOD defect must never expose the sky
+        // through the body. Terrain remains the visible detailed surface.
+        _coreShell = BuildOpaqueCoreShell(
+            radius * 0.985f,
+            ResolveTerrainBaseColor(definition.Archetype));
+        AddChild(_coreShell);
 
         bool hasAtmosphere = !string.Equals(
             definition.Archetype,
@@ -145,6 +156,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
             build.ExpectedSeamComparisons,
             build.MaximumSeamPositionError,
             build.MaximumSeamNormalError,
+            _coreShell is not null,
             hasAtmosphere,
             hasWater,
             hasClouds,
@@ -168,10 +180,39 @@ public partial class DetailedPlanetGlobeNode : Node3D
             child.QueueFree();
         }
         _terrainFaces.Clear();
+        _coreShell = null;
         _atmosphere = null;
         _water = null;
         _clouds = null;
         _diagnostics = null;
+    }
+
+    private static MeshInstance3D BuildOpaqueCoreShell(
+        float radius,
+        Color color)
+    {
+        StandardMaterial3D material = new()
+        {
+            AlbedoColor = new Color(color.R, color.G, color.B, 1.0f),
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.PerPixel,
+            Roughness = 0.92f,
+            MetallicSpecular = 0.03f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
+        };
+        SphereMesh mesh = new()
+        {
+            Radius = radius,
+            Height = radius * 2.0f,
+            RadialSegments = 32,
+            Rings = 18,
+            Material = material
+        };
+        return new MeshInstance3D
+        {
+            Name = "OpaqueCoreShell",
+            Mesh = mesh,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+        };
     }
 
     private static MeshInstance3D BuildShell(
@@ -226,7 +267,12 @@ public partial class DetailedPlanetGlobeNode : Node3D
             AlbedoColor = Colors.White,
             VertexColorUseAsAlbedo = true,
             Roughness = roughness,
-            MetallicSpecular = 0.06f
+            MetallicSpecular = 0.06f,
+            // A planet observed from any orbital angle must remain closed even
+            // if a face winding regression slips through. The opaque inset core
+            // is the final guard; two-sided terrain removes the primary culling
+            // failure mode.
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled
         };
     }
 
@@ -235,17 +281,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
         Vector3 position,
         float nominalRadius)
     {
-        Color baseColor = archetype switch
-        {
-            "temperate" => new Color(0.18f, 0.44f, 0.22f),
-            "desert" => new Color(0.62f, 0.39f, 0.17f),
-            "frozen" => new Color(0.56f, 0.70f, 0.80f),
-            "volcanic" => new Color(0.30f, 0.12f, 0.08f),
-            "toxic" => new Color(0.31f, 0.48f, 0.12f),
-            "radioactive" => new Color(0.42f, 0.45f, 0.17f),
-            "oceanic" => new Color(0.10f, 0.24f, 0.34f),
-            _ => new Color(0.34f, 0.31f, 0.28f)
-        };
+        Color baseColor = ResolveTerrainBaseColor(archetype);
         Vector3 direction = position.Normalized();
         float broad = MathF.Sin(
             (direction.X * 13.7f) +
@@ -272,6 +308,18 @@ public partial class DetailedPlanetGlobeNode : Node3D
             Math.Clamp(baseColor.B * shade, 0.0f, 1.0f),
             1.0f);
     }
+
+    private static Color ResolveTerrainBaseColor(string archetype) => archetype switch
+    {
+        "temperate" => new Color(0.18f, 0.44f, 0.22f),
+        "desert" => new Color(0.62f, 0.39f, 0.17f),
+        "frozen" => new Color(0.56f, 0.70f, 0.80f),
+        "volcanic" => new Color(0.30f, 0.12f, 0.08f),
+        "toxic" => new Color(0.31f, 0.48f, 0.12f),
+        "radioactive" => new Color(0.42f, 0.45f, 0.17f),
+        "oceanic" => new Color(0.10f, 0.24f, 0.34f),
+        _ => new Color(0.34f, 0.31f, 0.28f)
+    };
 
     private static float ResolveReliefFraction(string archetype) => archetype switch
     {

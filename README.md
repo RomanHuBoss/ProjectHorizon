@@ -15,6 +15,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-180.1 — Runtime Integrity Hotfix
+
+Alpha.180.1 is the emergency correction pass driven by the first owner runtime of alpha.180. It fixes three confirmed defect classes rather than adding new content: incomplete orbital planet fill, pass-through orbital-station geometry, and terrain-streaming/runtime instability. Detailed planets now keep an inset opaque core behind the six cube-sphere faces and all planet/moon proxy materials are two-sided. The expanded station presentation now has a compound physical collision envelope (core, arms, spine, dock guides/tunnel, hub, radiators, antennas and 12 habitation-ring segments), plus a continuous high-speed sweep over the same live collision shapes.
+
+`TerrainChunkManager.SetRuntimeObserver()` now resolves the new observer chunk before replanning instead of sorting against the historical `int.MinValue` sentinel; Chebyshev distance is calculated in `Int64` and saturated. Near-surface recovery gains a small separation pad and edge-triggered logging instead of hundreds of duplicate warnings. Outbound surface residency now releases the terrain streamer at the 680 m surface handoff while inbound preload still begins at 900 m, preventing the fast ship from accumulating a large obsolete chunk-removal backlog in vacuum. Orbital/interplanetary directional shadows are disabled while surface shadows remain bounded to 320 m, preventing the large 1,200 km camera frustum from repeatedly entering Godot's shadow light-culler path. F5 includes `TASK-180.1 runtime integrity acceptance`; section-37/CI/release enforce `tools/validate-task1801-runtime-integrity-hotfix.py`.
+
 ## TASK-180 — Production Procedural Visual Language
 
 Alpha.180 performs the next isolated art/presentation pass without reopening verified flight/surface mechanics. The player ship now has an 11-part exterior silhouette and a renderable cockpit interior with consoles, emissive instruments and canopy framing; the orbital station has a separate mesh-only habitation/detail layer; NPC ships use a nine-part compound silhouette. Star-system bodies now receive semantic PBR-style material profiles and the focused cube-sphere planet uses six bounded face-material instances with seam-safe procedural vertex-colour breakup plus distinct water/atmosphere/cloud shell roughness.

@@ -52,7 +52,7 @@ need("clearanceNumericToleranceMeters = 0.01" in presentation and
 need("PlanetPhysicalRadialFrame_UprightBasisNeverIntroducesRollAcrossSixRadialAxes" in tests and
      "PointRoundTripToleranceMeters" in tests,
      "TASK-172.1 xUnit no-roll/precision regression coverage missing", f)
-need(version in {"0.1.0-alpha.172.1", "0.1.0-alpha.174", "0.1.0-alpha.174.1", "0.1.0-alpha.176", "0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180"}, "VERSION not alpha.172.1/174/174.1/176", f)
+need(version in {"0.1.0-alpha.172.1", "0.1.0-alpha.174", "0.1.0-alpha.174.1", "0.1.0-alpha.176", "0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1"}, "VERSION not alpha.172.1/174/174.1/176", f)
 
 if f:
     print("TASK-172.1 RADIAL PHYSICS HOTFIX CONTRACT FAIL:")

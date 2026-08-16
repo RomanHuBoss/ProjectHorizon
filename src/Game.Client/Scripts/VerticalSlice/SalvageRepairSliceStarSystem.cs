@@ -15,6 +15,7 @@ public partial class SalvageRepairSlice
 
     public const float PlanetRuntimeActivationRadiusMeters = 260.0f;
     public const float PlanetRuntimeActivationAltitudeMeters = 900.0f;
+    public const float PlanetRuntimeOutboundDeactivationAltitudeMeters = 680.0f;
     private StarSystemSimulationRuntime? _starSystemSimulationRuntime;
     private StarSystemSimulationNode? _starSystemSimulationNode;
     private readonly Dictionary<Node3D, SurfaceRuntimeNodeState>
@@ -150,10 +151,14 @@ public partial class SalvageRepairSlice
             logical.Z);
         double physicalClearance = _voyageShip.GlobalPosition.DistanceTo(
             physicalSurface);
+        double residencyAltitude = StageOneVoyage.Location ==
+            StageOneVoyageLocation.OutboundFlight
+                ? PlanetRuntimeOutboundDeactivationAltitudeMeters
+                : PlanetRuntimeActivationAltitudeMeters;
         return double.IsFinite(clearance) && double.IsFinite(physicalClearance) &&
             (clearance < 0.0 ||
-             (clearance <= PlanetRuntimeActivationAltitudeMeters &&
-              physicalClearance <= PlanetRuntimeActivationAltitudeMeters + 64.0));
+             (clearance <= residencyAltitude &&
+              physicalClearance <= residencyAltitude + 64.0));
     }
 
     private void ApplySurfaceRuntimeActivation(bool active, bool force)

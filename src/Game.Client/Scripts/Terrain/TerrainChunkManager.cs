@@ -264,10 +264,19 @@ public partial class TerrainChunkManager : Node3D
         }
 
         _player = observer;
-        _currentChunk = new Vector2I(int.MinValue, int.MinValue);
         if (IsInsideTree())
         {
+            // TASK-180.1: never feed the historical int.MinValue sentinel into
+            // distance sorting. Resolve the new observer's actual logical chunk
+            // before planning the revision; this removes the runtime overflow
+            // seen during player -> ship streaming handoff.
+            _currentChunk = WorldToChunkWithoutHysteresis(
+                ToLogicalPosition(observer.GlobalPosition));
             PlanRefresh(executeImmediately: true);
+        }
+        else
+        {
+            _currentChunk = new Vector2I(int.MinValue, int.MinValue);
         }
     }
 
@@ -2425,9 +2434,13 @@ public partial class TerrainChunkManager : Node3D
 
     private static int ChebyshevDistance(Vector2I first, Vector2I second)
     {
-        return Math.Max(
-            Math.Abs(first.X - second.X),
-            Math.Abs(first.Y - second.Y));
+        // TASK-180.1: subtraction in int space can overflow before Math.Abs and
+        // Math.Abs(int.MinValue) itself throws. Calculate in Int64 and saturate
+        // because this value is used only for ordering/LOD bands.
+        long dx = Math.Abs((long)first.X - second.X);
+        long dy = Math.Abs((long)first.Y - second.Y);
+        long distance = Math.Max(dx, dy);
+        return distance >= int.MaxValue ? int.MaxValue : (int)distance;
     }
 
     private enum TerrainStressTestState

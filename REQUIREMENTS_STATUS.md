@@ -2,13 +2,62 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task180.1-runtime-integrity-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-16 — TASK-180 Production Procedural Visual Language
+## 0. Текущая emergency mega-итерация 2026-08-16 — TASK-180.1 Runtime Integrity Hotfix
+
+**Исходный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip` (`0.1.0-alpha.180`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task180.1-runtime-integrity-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.180.1`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`; `TASK-181 External acceptance TASK-180` остаётся открытым и теперь принимает исправленную alpha.180.1.
+
+### Внешнее evidence и блокирующие дефекты
+
+Первый owner-run alpha.180 не принимается. Пользователь сообщил: (1) планеты из космоса визуально не залиты полностью; (2) корабль пролетает сквозь видимую станцию; (3) присутствуют другие дефекты. Приложенный полный Output содержит `49` строк `ERROR:` и `359` строк `WARNING:`. Из ошибок `48` — повторяющийся Godot `create_frustum_points`, ещё одна — `TASK-062 vertical slice load failed` из-за `OverflowException` в `TerrainChunkManager.ChebyshevDistance` при `SetRuntimeObserver -> PlanRefresh`. Повторные warnings — surface penetration guard, работающий сотни кадров подряд. Следовательно TASK-180 не переводится в `VERIFIED`; исправления имеют приоритет над дальнейшей функциональностью.
+
+### Нормативное основание
+
+В этой итерации пользователь отдельно приложил полный `Project_Horizon_Technical_Specification_v2.0.pdf`, поэтому прежнее ограничение alpha.180 про Git-LFS pointer более не действует для анализа. Использованы требования: Godot 4.7.1 .NET; cube-sphere из шести граней и устранение LOD-щелей; на большой дистанции планета обязана представляться целой low-detail сферой; station/space переход является обязательным vertical-slice маршрутом; collision создаётся при активации поверхности; визуальные компоненты требуют smoke tests, а нагрузочный baseline включает длительный полёт и многократные посадки.
+
+### Реализация
+
+- **Planet fill:** `DetailedPlanetGlobeNode` теперь создаёт `OpaqueCoreShell` радиусом `0.985R` под cube-sphere terrain; detailed terrain рендерится two-sided. Planet/moon low-detail proxy materials также two-sided. Это устраняет возможность увидеть фон через тело планеты даже при дефекте отдельной face/culling.
+- **Station solidity:** под тем же `Gameplay/OrbitalStation` добавлены физические shapes для arms/spine/dock guides/hub/radiators/antennas и 12 сегментов habitation ring; visual subtree остаётся presentation-only. В `UpdateOrbitalCollisionRecovery` добавлен continuous segment sweep по **фактическим live CollisionShape3D** станции (Box/Cylinder в собственных локальных системах), поэтому high-speed ship не может перескочить collider между physics frames. Dock marker остаётся перед core envelope и не перекрывается синтетическим монолитным AABB.
+- **Terrain overflow:** при смене runtime observer `_currentChunk` немедленно вычисляется из нового observer; sentinel `int.MinValue` больше не попадает в `PlanRefresh`. `ChebyshevDistance` выполняет subtraction/abs в `Int64` и насыщает результат до `int.MaxValue`.
+- **Surface guard chatter/streaming backlog:** коррекция получает `0.18 m` separation pad; warning печатается на входе в контакт, а после выхода — одна recovery-строка. На outbound surface runtime освобождается на handoff `680 m`, тогда как inbound preload по-прежнему начинается на `900 m`; это прекращает накопление obsolete chunk removals уже в vacuum.
+- **Godot light-culler:** surface directional shadow max distance закреплён `320 m`; в Orbit/InterplanetaryTransit/StationInterior directional dynamic shadows отключаются, при возврате surface/weather ownership включаются обратно.
+- Добавлены `RuntimeIntegrityAcceptanceRunner`, F5 `TASK-180.1`, xUnit `RuntimeIntegrityTests`, static validator `validate-task1801-runtime-integrity-hotfix.py`, section-37/CI/release gate.
+
+### Runtime-приёмка TASK-180.1
+
+1. `tools\run-section37-quality.cmd` — обязательны build `0 errors / 0 warnings`, tests green, `TASK-180.1 RUNTIME INTEGRITY HOTFIX CONTRACT PASS`.
+2. F5 — HUD должен показать `TASK-180.1 (F5): PASS planet=6/6 station=<N> sweep=1 terrain=1`, где station `>=20`. Output: `TASK-180.1 runtime integrity acceptance PASS: planetClosed=1; planetFaces=6; stationShapes=<N>; stationSweep=1; terrainObserver=1; ...`.
+3. Orbit: облететь focused planet и посмотреть минимум с четырёх существенно разных направлений; ни одной прозрачной/незалитой wedge/face. Повторить на любом proxy planet/moon.
+4. Station: вручную ударить core, оба arms, habitation ring и один radiator/antenna на обычной и высокой скорости; видимая конструкция не должна пропускать корабль. При swept-защите Output печатает `TASK-180.1 orbital station collision BLOCKED ...`. Затем проверить штатный docking через marker — он должен оставаться доступным.
+5. Surface flight: полетать низко над рельефом и сменить surface/orbit context. Не должно быть `OverflowException`, `TASK-062 vertical slice load failed`, spam сотен `surface contact` warnings или `create_frustum_points`. Допустима одиночная `TASK-180.1 surface contact BLOCKED` на фактический контакт и одна `RECOVERED` после выхода.
+6. При FAIL прислать последние 200 строк Output, F5 HUD, screenshot незалитой планеты либо места прохода сквозь станцию и точный манёвр/скорость.
+
+### Проверки в контейнере
+
+- финальный static regression: `45/45 tools/validate-*.py PASS` (`33/33 + 12/12`);
+- `validate-godot-text-resource-structure.py` PASS: `scenes=16`, `refs=353`, resource order/unique IDs/resolved refs = `1`;
+- `tools/ci/verify-version.py` PASS для `0.1.0-alpha.180.1`; `bash -n tools/run-section37-quality.sh` PASS; CI/release YAML parse PASS;
+- в `SalvageRepairSlice.tscn` у `Gameplay/OrbitalStation` теперь `25` direct `CollisionShape3D`;
+- `.NET build/test` и Godot runtime не запускались: в текущей среде отсутствуют `dotnet` и Godot executable. Поэтому `TASK-180.1` не помечается `VERIFIED`.
+
+### Изменения статусов
+
+- `TASK-180`: остаётся `IMPLEMENTED`; внешний alpha.180 run выявил блокирующие дефекты и не является PASS.
+- `TASK-180.1`: `IMPLEMENTED`, ожидает external clean build/runtime/F5.
+- `TASK-181`: остаётся `IN_PROGRESS`/external acceptance-tail; принимать следует alpha.180.1, а не дефектную alpha.180.
+
+---
+
+## 0A. Предыдущая mega-итерация 2026-08-16 — TASK-180 Production Procedural Visual Language
 
 **Исходный снимок:** `ProjectHorizon-main.zip` (`0.1.0-alpha.178.7`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip`.  

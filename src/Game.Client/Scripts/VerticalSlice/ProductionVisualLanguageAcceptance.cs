@@ -62,7 +62,7 @@ public static class ProductionVisualLanguageAcceptanceRunner
             stationCollisionPreserved,
             visualOnlyDetails,
             passed
-                ? "procedural production silhouettes, cockpit, station detail and semantic materials verified without gameplay collision changes"
+                ? "procedural production silhouettes, cockpit, station detail and semantic materials verified with primary collision roots preserved; station envelope is extended by TASK-180.1"
                 : "one or more TASK-180 production visual language invariants failed");
     }
 }

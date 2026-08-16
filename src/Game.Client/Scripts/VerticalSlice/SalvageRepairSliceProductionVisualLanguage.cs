@@ -15,7 +15,8 @@ public partial class SalvageRepairSlice
             $"stationDetails>={ProductionVisualLanguageAcceptanceRunner.MinimumStationDetailParts}; " +
             $"npcShip={NpcShipNavigationNode.ProductionVisualPartCount}; " +
             $"planetMaterialVariants={DetailedPlanetGlobeNode.ProductionTerrainMaterialVariants}; " +
-            "materials=semantic-PBR; collisionContract=unchanged; externalArtAssets=0; F5=acceptance.");
+            "materials=semantic-PBR; playerPrimaryCollision=unchanged; " +
+            "stationPhysicalEnvelope=TASK-180.1; externalArtAssets=0; F5=acceptance.");
     }
 
     private void RunProductionVisualLanguageAcceptance()

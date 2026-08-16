@@ -101,6 +101,29 @@ size = Vector3(2.2, 12, 38)
 [sub_resource type="BoxShape3D" id="OrbitalStationTunnelWallShape"]
 size = Vector3(2.2, 12, 38)
 
+[sub_resource type="BoxShape3D" id="OrbitalStationArmShape"]
+size = Vector3(34, 2.2, 11)
+
+[sub_resource type="BoxShape3D" id="OrbitalStationSpineShape"]
+size = Vector3(10, 28, 58)
+
+[sub_resource type="BoxShape3D" id="OrbitalStationGuideShape"]
+size = Vector3(16, 0.55, 0.7)
+
+[sub_resource type="BoxShape3D" id="OrbitalStationRadiatorShape"]
+size = Vector3(18, 0.7, 14)
+
+[sub_resource type="BoxShape3D" id="OrbitalStationRingSegmentShape"]
+size = Vector3(15.6, 4.0, 4.0)
+
+[sub_resource type="CylinderShape3D" id="OrbitalStationHubShape"]
+radius = 5.5
+height = 22.0
+
+[sub_resource type="CylinderShape3D" id="OrbitalStationAntennaShape"]
+radius = 0.42
+height = 18.0
+
 
 [sub_resource type="TorusMesh" id="OrbitalStationHabRingMesh"]
 material = SubResource("OrbitalStationMaterial")
@@ -203,6 +226,8 @@ environment = SubResource("Environment_main")
 transform = Transform3D(0.819152, 0.286788, -0.496732, 0, 0.866025, 0.5, 0.573576, -0.409576, 0.709406, 0, 8, 0)
 light_energy = 1.35
 shadow_enabled = true
+directional_shadow_max_distance = 320.0
+directional_shadow_fade_start = 0.82
 
 [node name="GroundBody" type="StaticBody3D" parent="."]
 
@@ -291,6 +316,107 @@ mesh = SubResource("OrbitalStationTunnelWallMesh")
 position = Vector3(8.2, 0, 20)
 shape = SubResource("OrbitalStationTunnelWallShape")
 
+[node name="LeftArmCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-43, 0, 1)
+shape = SubResource("OrbitalStationArmShape")
+
+[node name="RightArmCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(43, 0, 1)
+shape = SubResource("OrbitalStationArmShape")
+
+[node name="SpineCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, 0, -3)
+shape = SubResource("OrbitalStationSpineShape")
+
+[node name="DockGuideUpperCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, 7.6, 23.5)
+shape = SubResource("OrbitalStationGuideShape")
+
+[node name="DockGuideLowerCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, -7.6, 23.5)
+shape = SubResource("OrbitalStationGuideShape")
+
+[node name="CentralHubCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+rotation = Vector3(1.5708, 0, 0)
+shape = SubResource("OrbitalStationHubShape")
+
+[node name="PortRadiatorCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-35, 0, -4)
+rotation = Vector3(0, 0, 0.12)
+shape = SubResource("OrbitalStationRadiatorShape")
+
+[node name="StarboardRadiatorCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(35, 0, -4)
+rotation = Vector3(0, 0, -0.12)
+shape = SubResource("OrbitalStationRadiatorShape")
+
+[node name="UpperAntennaCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, 21, -5)
+shape = SubResource("OrbitalStationAntennaShape")
+
+[node name="LowerAntennaCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, -21, -5)
+shape = SubResource("OrbitalStationAntennaShape")
+
+[node name="HabitationRingCollision00" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(29.50000, 0.00000, 0)
+rotation = Vector3(0, 0, 1.570796)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision01" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(25.54775, 14.75000, 0)
+rotation = Vector3(0, 0, 2.094395)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision02" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(14.75000, 25.54775, 0)
+rotation = Vector3(0, 0, 2.617994)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision03" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0.00000, 29.50000, 0)
+rotation = Vector3(0, 0, 3.141593)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision04" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-14.75000, 25.54775, 0)
+rotation = Vector3(0, 0, 3.665191)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision05" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-25.54775, 14.75000, 0)
+rotation = Vector3(0, 0, 4.188790)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision06" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-29.50000, 0.00000, 0)
+rotation = Vector3(0, 0, 4.712389)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision07" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-25.54775, -14.75000, 0)
+rotation = Vector3(0, 0, 5.235988)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision08" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-14.75000, -25.54775, 0)
+rotation = Vector3(0, 0, 5.759587)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision09" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-0.00000, -29.50000, 0)
+rotation = Vector3(0, 0, 6.283185)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision10" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(14.75000, -25.54775, 0)
+rotation = Vector3(0, 0, 6.806784)
+shape = SubResource("OrbitalStationRingSegmentShape")
+
+[node name="HabitationRingCollision11" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(25.54775, -14.75000, 0)
+rotation = Vector3(0, 0, 7.330383)
+shape = SubResource("OrbitalStationRingSegmentShape")
 
 [node name="VisualDetail" type="Node3D" parent="Gameplay/OrbitalStation"]
 

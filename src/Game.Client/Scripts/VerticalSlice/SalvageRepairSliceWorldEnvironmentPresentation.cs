@@ -67,6 +67,14 @@ public partial class SalvageRepairSlice
             }
 
             _lastWorldEnvironmentPresentationProfile = effectiveProfile;
+            DirectionalLight3D? surfaceDirectional =
+                GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
+            if (surfaceDirectional is not null)
+            {
+                surfaceDirectional.ShadowEnabled = true;
+                surfaceDirectional.Set("directional_shadow_max_distance", 320.0f);
+            }
+
             if (changed)
             {
                 GD.Print(
@@ -188,6 +196,13 @@ public partial class SalvageRepairSlice
         {
             directional.LightEnergy = directionalEnergy;
             directional.LightColor = directionalColor;
+            // TASK-180.1: an orbital camera has a 1,200 km far plane. Feeding that
+            // frustum into directional shadow splitting produced repeated
+            // create_frustum_points errors in the runtime log. Surface weather
+            // owns bounded 320 m shadows; orbit/transit/interior use direct light
+            // without distant dynamic shadows.
+            directional.ShadowEnabled = false;
+            directional.Set("directional_shadow_max_distance", 320.0f);
         }
 
         _lastWorldEnvironmentPresentationProfile = effectiveProfile;

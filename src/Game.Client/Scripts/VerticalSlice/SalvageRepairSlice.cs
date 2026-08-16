@@ -501,6 +501,7 @@ public partial class SalvageRepairSlice : Node3D
         PrintOrbitalScaleMouseSurfaceReady();
         PrintSurfaceFlightSafetyReady();
         PrintProductionVisualLanguageReady();
+        PrintRuntimeIntegrityReady();
         InitializeAerialSteeringRuntime();
         InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
@@ -5547,6 +5548,7 @@ public partial class SalvageRepairSlice : Node3D
         RunOrbitalScaleMouseSurfaceAcceptance();
         RunSurfaceFlightSafetyAcceptance();
         RunProductionVisualLanguageAcceptance();
+        RunRuntimeIntegrityAcceptance();
         RequestSpaceflightNavigationSubsystemAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5556,7 +5558,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6749,7 +6751,8 @@ public partial class SalvageRepairSlice : Node3D
             _spaceflightCollisionRecoveryAcceptancePassed is null ||
             _orbitalScaleMouseSurfaceAcceptancePassed is null ||
             _surfaceFlightSafetyAcceptancePassed is null ||
-            _productionVisualLanguageAcceptancePassed is null)
+            _productionVisualLanguageAcceptancePassed is null ||
+            _runtimeIntegrityAcceptancePassed is null)
         {
             return;
         }
@@ -6771,13 +6774,14 @@ public partial class SalvageRepairSlice : Node3D
             _spaceflightCollisionRecoveryAcceptancePassed == true &&
             _orbitalScaleMouseSurfaceAcceptancePassed == true &&
             _surfaceFlightSafetyAcceptancePassed == true &&
-            _productionVisualLanguageAcceptancePassed == true;
+            _productionVisualLanguageAcceptancePassed == true &&
+            _runtimeIntegrityAcceptancePassed == true;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7728,6 +7732,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-178.6 (F5): {_orbitalScaleMouseSurfaceAcceptanceHud}",
             $"TASK-178.7 (F5): {_surfaceFlightSafetyAcceptanceHud}",
             $"TASK-180 (F5): {_productionVisualLanguageAcceptanceHud}",
+            $"TASK-180.1 (F5): {_runtimeIntegrityAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",

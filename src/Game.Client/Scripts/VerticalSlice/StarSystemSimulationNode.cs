@@ -368,7 +368,7 @@ public partial class StarSystemSimulationNode : Node3D
             ? _detailedGlobe.Diagnostics
             : new DetailedPlanetGlobeDiagnostics(
                 string.Empty, 0, 0, 0, 0, 0, 0.0f, 0.0f,
-                false, false, false, 0.0f);
+                false, false, false, false, 0.0f);
 
     public StarSystemSimulationDiagnostics CreateDiagnostics()
     {
@@ -567,6 +567,13 @@ public partial class StarSystemSimulationNode : Node3D
             AlbedoColor = color,
             MetallicSpecular = 0.08f
         };
+        // TASK-180.1: distant planets/moons are closed low-detail spheres.
+        // Two-sided rendering prevents camera-angle holes on proxy bodies;
+        // detailed planets additionally carry an inset opaque core shell.
+        if (definition.Kind is StarSystemBodyKind.Planet or StarSystemBodyKind.Moon)
+        {
+            material.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+        }
         switch (definition.Kind)
         {
             case StarSystemBodyKind.Star:

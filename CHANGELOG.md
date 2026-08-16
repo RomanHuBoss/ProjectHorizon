@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.180.1] - 2026-08-16
+
+### Fixed — TASK-180.1 runtime integrity hotfix
+
+- Closed orbital planet rendering with an inset opaque core sphere under the six detailed cube-sphere faces, two-sided detailed terrain, and two-sided low-detail planet/moon proxy materials.
+- Replaced the station's undersized collision contract with compound collision for visible arms, spine, guides, hub, radiators, antennae and a 12-segment habitation ring while preserving the docking corridor. Added a continuous segment sweep against every live station `CollisionShape3D` to prevent high-speed tunnelling.
+- Fixed the owner-observed `TerrainChunkManager.ChebyshevDistance` overflow: runtime observer handoff now resolves the incoming observer chunk before planning, and distance math uses 64-bit subtraction/absolute value with saturation.
+- Debounced near-surface penetration warnings and added 0.18 m recovery separation padding to avoid frame-by-frame contact chatter. Outbound terrain residency now releases at the 680 m surface handoff while inbound preload remains 900 m, preventing the vacuum-flight chunk queue from growing without bound.
+- Bounded surface directional shadows to 320 m and disabled dynamic directional shadows in Orbit/InterplanetaryTransit/StationInterior to avoid repeated Godot `create_frustum_points` errors with the 1,200 km orbital camera.
+- Added TASK-180.1 F5/model/xUnit/static gates and section-37/CI/release enforcement.
+
+### External runtime evidence
+
+- Owner alpha.180 log contained 49 `ERROR:` records: 48 repeated `create_frustum_points` failures and one fatal vertical-slice load failure caused by `OverflowException` in `TerrainChunkManager.ChebyshevDistance`. It also contained 359 repeated surface-contact warnings.
+- Owner visual feedback confirmed incomplete orbital planet fill and flight through visible station geometry. TASK-180 remains `IMPLEMENTED`; this hotfix must pass a new clean build/runtime acceptance before TASK-181 external acceptance can close it.
+
 ## [0.1.0-alpha.180] - 2026-08-16
 
 ### Added — TASK-180 production procedural visual language
