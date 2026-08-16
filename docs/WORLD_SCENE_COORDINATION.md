@@ -24,7 +24,7 @@ Surface/Orbit/Station transitions must keep the same stable system and planet ID
 The shell identifies context and environment profile; existing vertical-slice gameplay systems remain authoritative. Heavy local nodes are governed by residency instead of being duplicated:
 
 - Surface: surface active, orbit suspended.
-- Orbit: orbit active; surface may remain active only inside the existing 72 m near-planet activation radius.
+- Orbit: orbit active; surface may remain active only inside the current 260 m near-planet activation radius.
 - StationInterior: surface and orbit suspended.
 - HyperspaceTransit: surface and orbit suspended.
 

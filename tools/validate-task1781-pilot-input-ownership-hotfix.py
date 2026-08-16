@@ -25,7 +25,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.1", "0.1.0-alpha.178.2"}, "VERSION must be alpha.178.1 or later", f)
+need(version in {"0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3"}, "VERSION must be alpha.178.1 or later", f)
 need("SetParkedControlLock" in ship and
      "ParkedControlLocked" in ship and
      "ManualInputOwnershipActive" in ship and

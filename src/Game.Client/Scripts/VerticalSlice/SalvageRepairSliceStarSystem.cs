@@ -13,7 +13,7 @@ public partial class SalvageRepairSlice
         uint CollisionLayer,
         uint CollisionMask);
 
-    private const float PlanetRuntimeActivationRadiusMeters = 72.0f;
+    public const float PlanetRuntimeActivationRadiusMeters = 260.0f;
     private StarSystemSimulationRuntime? _starSystemSimulationRuntime;
     private StarSystemSimulationNode? _starSystemSimulationNode;
     private readonly Dictionary<Node3D, SurfaceRuntimeNodeState>

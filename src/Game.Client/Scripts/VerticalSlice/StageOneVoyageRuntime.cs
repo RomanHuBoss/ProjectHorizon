@@ -52,8 +52,8 @@ public sealed class StageOneVoyageRuntime
     public const double LaunchPositionY = 18.0;
     public const double StationDockPositionX = 0.0;
     public const double StationDockPositionY = 35.0;
-    public const double StationDockPositionZ = -124.0;
-    public const double StationUndockPositionZ = -112.0;
+    public const double StationDockPositionZ = -1600.0;
+    public const double StationUndockPositionZ = -1582.0;
 
     public static bool IsDockingCaptureReady(
         double distanceMeters,
@@ -106,6 +106,36 @@ public sealed class StageOneVoyageRuntime
         VelocityY = saveData.VelocityY;
         VelocityZ = saveData.VelocityZ;
         LastCheckpoint = saveData.LastCheckpoint;
+
+        // TASK-178.3: saved station poses from the previous compressed orbital
+        // scale must not restore the ship into the old near-surface station.
+        // Normalize only checkpoint-owned poses; free-flight saves remain exact.
+        if (Location == StageOneVoyageLocation.OrbitalStation)
+        {
+            PositionX = StationDockPositionX;
+            PositionY = StationDockPositionY;
+            PositionZ = StationDockPositionZ;
+            RotationX = 0.0;
+            RotationY = 0.0;
+            RotationZ = 0.0;
+            VelocityX = 0.0;
+            VelocityY = 0.0;
+            VelocityZ = 0.0;
+        }
+        else if (Location == StageOneVoyageLocation.InboundFlight &&
+                 string.Equals(LastCheckpoint, "station.undocked", StringComparison.Ordinal) &&
+                 Math.Abs(PositionZ) < 500.0)
+        {
+            PositionX = StationDockPositionX;
+            PositionY = StationDockPositionY;
+            PositionZ = StationUndockPositionZ;
+            RotationX = 0.0;
+            RotationY = Math.PI;
+            RotationZ = 0.0;
+            VelocityX = 0.0;
+            VelocityY = 0.0;
+            VelocityZ = 0.0;
+        }
     }
 
     public StageOneVoyageLocation Location { get; private set; }

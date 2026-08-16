@@ -32,15 +32,15 @@ public static class WorldSceneEnvironmentPresentationRuntime
                 "planet-atmosphere"),
             WorldSceneKind.Orbit => new(
                 kind, false,
-                0.0015, 0.0030, 0.0080,
-                0.10, 0.14, 0.22,
-                0.16, 0.85, false,
+                0.0030, 0.0060, 0.0140,
+                0.14, 0.18, 0.28,
+                0.30, 1.00, false,
                 "vacuum-orbit"),
             WorldSceneKind.InterplanetaryTransit => new(
                 kind, false,
-                0.0008, 0.0015, 0.0045,
-                0.08, 0.11, 0.18,
-                0.13, 0.72, false,
+                0.0020, 0.0040, 0.0100,
+                0.12, 0.16, 0.25,
+                0.26, 0.90, false,
                 "vacuum-cruise"),
             WorldSceneKind.HyperspaceTransit => new(
                 kind, false,

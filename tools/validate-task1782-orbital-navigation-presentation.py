@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.178.2", "VERSION must be alpha.178.2", f)
+need(version in {"0.1.0-alpha.178.2", "0.1.0-alpha.178.3"}, "VERSION must be alpha.178.2 or later", f)
 need("OrbitTimeScale = 1.0" in sim and
      "MinimumPlanetOrbitRadius = 1800.0" in sim and
      "PlanetOrbitSpacing = 1200.0" in sim and
@@ -63,10 +63,10 @@ need("WorldSceneEnvironmentPresentationRuntime" in env_model and
                                   "WorldSceneKind.InterplanetaryTransit", "WorldSceneKind.HyperspaceTransit")) and
      "luminance <= 0.02" in env_model and "!profile.FogEnabled" in env_model,
      "non-surface vacuum environment model is incomplete", f)
-need("background_mode\", 1" in env_live and "fog_enabled\", false" in env_live and
-     "ApplyPlanetSurfaceSky" in env_live and "ApplyPlanetWeatherPresentation" in env_live and
-     "TASK-178.2 world environment presentation PASS" in env_live,
-     "live world environment does not override blue surface atmosphere and restore it", f)
+need("background_mode\", 1" in env_live and "ApplyPlanetSurfaceSky" in env_live and
+     "ApplyPlanetWeatherPresentation" in env_live and "handoff.VacuumBlend" in env_live and
+     "TASK-178.3 world environment handoff PASS" in env_live,
+     "live world environment does not provide explicit orbit presentation and surface restore", f)
 need("UpdateWorldSceneEnvironmentPresentation();" in slice_cs,
      "world environment presentation is not called after weather update", f)
 need("TASK-178.2 orbital navigation/presentation acceptance" in acceptance and

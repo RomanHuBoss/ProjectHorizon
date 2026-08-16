@@ -50,6 +50,7 @@ python3 tools/validate-task1761-aerial-altitude-runtime-hotfix.py
 python3 tools/validate-task178-spaceflight-navigation-subsystem.py
 python3 tools/validate-task1781-pilot-input-ownership-hotfix.py
 python3 tools/validate-task1782-orbital-navigation-presentation.py
+python3 tools/validate-task1783-orbital-handoff-recovery.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

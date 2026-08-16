@@ -219,7 +219,7 @@ StartPilotEnabled = false
 AllowRuntimeReset = false
 
 [node name="OrbitalStation" type="StaticBody3D" parent="Gameplay"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, -155)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, -1631)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
 mesh = SubResource("OrbitalStationMesh")
@@ -270,7 +270,7 @@ light_energy = 5.0
 omni_range = 34.0
 
 [node name="OrbitalDockMarker" type="MeshInstance3D" parent="Gameplay"]
-position = Vector3(0, 35, -124)
+position = Vector3(0, 35, -1600)
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("DockBeaconMesh")
 

@@ -2,11 +2,49 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.2-orbital-navigation-presentation.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.3-orbital-handoff-recovery.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.3 Orbital Handoff Scale & Visibility Recovery
+
+**Исходный снимок:** `ProjectHorizon-main-task178.2-orbital-navigation-presentation.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.3-orbital-handoff-recovery.zip`.  
+**Версия:** `0.1.0-alpha.178.3`.  
+**Статус:** TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2 остаются `IMPLEMENTED / PENDING EXTERNAL F5`; TASK-178.3 `IMPLEMENTED / PENDING EXTERNAL BUILD+TAKEOFF/HANDOFF SMOKE+F5`.
+
+### Внешнее evidence и корневая причина
+
+Пользовательский alpha.178.2 run подтверждает, что pilot-input ownership остаётся исправленным: после `T` зарегистрировано `TASK-112 player takeoff PASS ... navigationAssist=0; manualControl=1; externalControl=0`. Одновременно ручной smoke выявил два новых интеграционных дефекта орбитального handoff:
+
+- физическая станция оставалась на старом near-surface масштабе (`dock z=-124`, launch z=-10`), поэтому была визуально рядом сразу после взлёта;
+- визуальный `WorldEnvironment` переключался в `vacuum-orbit` практически одновременно с окончанием ship-atmosphere physics (`EXIT altitude=84.9 m`), и фон/освещение резко переходили из атмосферного режима в почти чёрный.
+
+Следовательно TASK-178.2 не считается VERIFIED: его model/static contracts не ловили расстояние физической станции от launch и непрерывность atmosphere→vacuum presentation.
+
+### Исправлено
+
+- Stage-1 station docking target перенесён на `z=-1600 m`; station mesh центр — `z=-1631 m`; launch→dock distance ≈1.59 km;
+- нижняя атмосфера больше не показывает station/dock marker; station reveal threshold = 220 m;
+- surface-runtime overlap увеличен с 72 m до 260 m, чтобы terrain/planet presentation не исчезали около physics-atmosphere boundary;
+- введён отдельный `OrbitalHandoffPresentationRuntime`: lower atmosphere до 110 m, плавный vacuum blend 110..620 m, starfield reveal 145 m;
+- `WorldEnvironment` в Orbit теперь кросс-фейдит background/ambient/directional/fog вместо мгновенного `weather sky → black`;
+- vacuum Orbit profile усилен до ambient `0.30` / directional `1.00`, сохраняя dark fog-free vacuum contract;
+- добавлен deterministic emissive starfield `420` instances на радиусе `7200 m`, центрированный на локальном ship origin;
+- новый TASK-178.3 aggregate acceptance проверяет station scale, surface overlap, gradual handoff, starfield, vacuum visibility, station reveal и live scene alignment; включён в общий F5 final gate.
+
+### Acceptance TASK-178.3
+
+1. `tools\run-section37-quality.cmd`: clean build `0 errors / 0 warnings`, tests PASS и `TASK-178.3 ... CONTRACT PASS`.
+2. New Game → repair/board → `T`. Сразу после взлёта station не должна быть видна рядом с launch pad.
+3. До ~110 m сохраняется атмосферная sky presentation. На 110..620 m фон должен темнеть **плавно**, без одно-кадрового провала в чёрный. Звёзды начинают появляться примерно после 145 m.
+4. После ~220 m station может появиться как дальняя orbital target. Launch→dock должен требовать порядка 1.5 km полёта; при max speed ~85 m/s это не менее ~18 s без телепорта.
+5. После полного выхода в vacuum geometry ship/station/planet должна оставаться читаемой; ожидается `TASK-178.3 world environment handoff PASS ... phase=vacuum-orbit ... blend=1.000`.
+6. Нажать `K`: auto-assist должен продолжить прежний TASK-178.2 docking flow и завершить `TASK-112 player orbital docking PASS ... mode=navigation-assist`.
+7. F5: `TASK-178.3 orbital handoff recovery acceptance PASS` с `stationDistance=1; surfaceOverlap=1; gradualEnvironment=1; starfield=1; vacuumVisibility=1; stationReveal=1; liveStarfield=1; stationScene=1`.
+8. При FAIL прислать screenshot на высотах ~100 m, ~250 m и после полного выхода в vacuum, строку `TASK-178.3 ... FAIL` и последние 120 строк Output.
 
 ## 0. Текущая emergency/mega-итерация 2026-08-16 — TASK-178.2 Orbital Navigation & Presentation Repair
 
@@ -1198,7 +1236,7 @@ C# lexical structural check PASS: 5/5 changed C# files; dotnet/godot executables
 - в `Game.Application` добавлен Godot-независимый `WorldSceneCoordinatorRuntime` с четырьмя контекстами `Surface / Orbit / StationInterior / HyperspaceTransit` и строгим graph `Surface ↔ Orbit ↔ StationInterior → HyperspaceTransit → StationInterior`;
 - stable `SystemId/PlanetId` обязательны; произвольный `Surface→Station`, смена system вне hyperspace и другие нелегальные переходы отклоняются без мутации current context;
 - добавлены четыре лёгких PackedScene-shell и `Gameplay/WorldSceneCoordinator`; host держит ровно один shell, валидирует его kind и пишет system/planet/generation metadata для runtime evidence;
-- `Surface` включает surface runtime и выключает orbit objects; `Orbit` включает orbit objects и сохраняет уже принятую bounded `72 m` surface-overlap только у планеты; `StationInterior` и `HyperspaceTransit` suspend both surface+orbit;
+- `Surface` включает surface runtime и выключает orbit objects; `Orbit` включает orbit objects и сохраняет уже принятую bounded `260 m` surface-overlap только у планеты; `StationInterior` и `HyperspaceTransit` suspend both surface+orbit;
 - orbital station, dock marker, approach marker и NPC ship traffic сохраняют исходные Visible/ProcessMode/CollisionLayer/Mask и восстанавливаются после возврата в Orbit;
 - star-system proxy visuals теперь рендерятся только в `Orbit`; Station/Hyperspace не оставляют пространственные system proxies активными;
 - hyperspace jump обёрнут транзакционным scene transition: до `TryJumpToSelected` вход в `HyperspaceTransit`; при успехе — destination `StationInterior` с новым system/planet; при отказе — rollback в source station;
@@ -2362,7 +2400,7 @@ TASK-128 star-system simulation acceptance PASS: deterministic=1; bodyCoverage=1
 ```
 
 4. Manual activation smoke: HUD должен показывать `PlanetRuntime=ACTIVE` на
-   поверхности; после взлёта и удаления дальше ~72 m — `PROXY`; orbital station —
+   поверхности; после взлёта и удаления дальше ~260 m — `PROXY`; orbital station —
    `PROXY`; после возвращения/посадки — снова `ACTIVE`, без оживления ранее
    собранных resources и без пропажи NPC/base state.
 5. После hyperspace jump проверить новую строку `TASK-128 ... READY`/HUD с новым
@@ -6497,6 +6535,19 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-MANUAL-178` | Cross-system smoke подтверждает target clear/sync | `IN_PROGRESS` | repair/commission → station → hyperspace; expected targetCleared=1, interplanetarySync=1 |
 
 
+
+### 8.39. Orbital Handoff Scale & Visibility Recovery — TASK-178.3
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-HF-17830` | Physical station находится вне near-surface toy scale | `IMPLEMENTED` | launch→dock ≈1.59 km; scene marker/runtime constants aligned |
+| `FLIGHT-HF-17831` | Surface detail и visual atmosphere имеют перекрытие при ascent | `IMPLEMENTED` | surface runtime 260 m; visual blend 110..620 m |
+| `FLIGHT-HF-17832` | Orbit environment не имеет hard black switch | `IMPLEMENTED` | smooth background/ambient/directional/fog cross-fade |
+| `FLIGHT-HF-17833` | Vacuum имеет читаемый starfield/lighting | `IMPLEMENTED` | 420 emissive stars @ 7.2 km; orbit ambient=0.30, directional=1.00 |
+| `FLIGHT-HF-17834` | Station/dock marker не видны рядом с surface launch | `IMPLEMENTED` | reveal >=220 m, collision/visibility gated |
+| `FLIGHT-HF-17835` | F5/CI/xUnit защищают orbital handoff | `IMPLEMENTED` | TASK-178.3 aggregate + static validator + final-state gate |
+| `FLIGHT-HF-ACC-1783` | Clean build + manual ascent + F5 PASS | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -6513,8 +6564,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 `VERIFIED`; TASK-177 runtime criteria closed / standalone quality log superseded by TASK-179; TASK-178 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.  
-**Формально ближайший шаг:** TASK-179 — внешний reacceptance нового Spaceflight & Navigation closure. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2 `IMPLEMENTED`; TASK-178.3 `IMPLEMENTED / PENDING EXTERNAL BUILD+TAKEOFF/HANDOFF SMOKE+F5`.  
+**Формально ближайший шаг:** внешний reacceptance TASK-178.3 вместе с TASK-178/TASK-178.2; после зелёного ascent/dock smoke возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

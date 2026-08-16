@@ -15,6 +15,8 @@ public partial class SalvageRepairSlice
     private uint _playerCollisionMask;
     private uint _shipTerminalCollisionLayer;
     private uint _shipTerminalCollisionMask;
+    private uint _orbitalStationCollisionLayer;
+    private uint _orbitalStationCollisionMask;
     private bool _voyageNavigationAssist;
     private bool _stationServicesOpenedFromVoyage;
     private Task<StageOneVoyageAcceptanceReport>?
@@ -52,6 +54,12 @@ public partial class SalvageRepairSlice
         _playerCollisionMask = _player.CollisionMask;
         _shipTerminalCollisionLayer = _shipTerminal.CollisionLayer;
         _shipTerminalCollisionMask = _shipTerminal.CollisionMask;
+        if (_orbitalStation is CollisionObject3D stationCollision)
+        {
+            _orbitalStationCollisionLayer = stationCollision.CollisionLayer;
+            _orbitalStationCollisionMask = stationCollision.CollisionMask;
+        }
+        ApplyOrbitalStationVisibility(visible: false);
     }
 
     private void InitializeStageOneVoyageRuntime(
@@ -311,8 +319,15 @@ public partial class SalvageRepairSlice
     {
         if (_orbitalDockMarker is not null)
         {
+            double altitude = _voyageShip?.AltitudeAboveSurface ??
+                double.PositiveInfinity;
+            OrbitalHandoffPresentationState handoff =
+                OrbitalHandoffPresentationRuntime.Evaluate(altitude);
             _orbitalDockMarker.Visible =
                 _interplanetaryTravelRuntime?.IsCruising != true &&
+                _worldSceneCoordinatorRuntime is not null &&
+                WorldScenes.Current.Kind == WorldSceneKind.Orbit &&
+                handoff.StationVisible &&
                 _stageOneVoyageRuntime?.Location ==
                     StageOneVoyageLocation.OutboundFlight;
         }

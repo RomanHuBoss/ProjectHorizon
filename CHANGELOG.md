@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.178.3] - 2026-08-16
+
+### Fixed — orbital handoff scale and visibility
+- Moved the physical Stage-1 orbital station out of the near-surface toy scale: the docking target is now ~1.59 km from launch instead of ~115 m, while the station mesh remains aligned 31 m behind the capture marker.
+- Extended the detailed surface-runtime overlap from 72 m to 260 m and decoupled visual atmosphere handoff from the ship-physics atmosphere boundary.
+- Replaced the former hard `orbit-atmosphere-handoff → vacuum-orbit` switch around 85 m with a smooth 110..620 m upper-atmosphere blend. Orbit lighting stays readable while fog and blue atmospheric background fade progressively.
+- Added a deterministic emissive 420-star backdrop at 7.2 km radius; it follows the local flight origin and becomes visible during the upper-atmosphere/orbit transition.
+- The physical station and docking marker are hidden during the lower atmosphere and are revealed only after 220 m altitude, preventing the station from appearing next to the launch pad.
+- Raised vacuum ambient/directional illumination so station/ship/planet geometry remains readable against the dark background instead of collapsing into near-black silhouettes.
+
+### Added — TASK-178.3
+- Added model/live acceptance for station travel scale, surface/vacuum overlap, gradual environment transition, starfield, vacuum visibility and station reveal policy.
+- Added xUnit and section-37/CI/release regression gates; TASK-178.3 participates in final F5 PASS/FAIL.
+
+### Runtime evidence that triggered the repair
+- External Godot 4.7.1 run showed correct TASK-178.1 manual ownership, but the station was visible immediately after launch and the scene became abruptly dark exactly when the log changed from `profile=orbit-atmosphere-handoff` to `profile=vacuum-orbit` at `Ship atmosphere transition: EXIT altitude=84.9 m`.
+
 ## [0.1.0-alpha.178.2] - 2026-08-16
 
 ### Fixed — orbital navigation and presentation
