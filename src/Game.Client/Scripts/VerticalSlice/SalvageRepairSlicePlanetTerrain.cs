@@ -6,7 +6,13 @@ public partial class SalvageRepairSlice
 {
     private string _planetSurfaceTerrainAcceptanceHud = "READY";
     private string _planetSurfaceStreamingAcceptanceHud = "READY";
+    private const int PlanetSurfaceDistantTerrainResolution = 49;
+    private const double PlanetSurfaceDistantTerrainHalfExtentMeters = 420.0;
+    private const double PlanetSurfaceDistantTerrainInnerHalfExtentMeters = 58.0;
+
     private TerrainChunkManager? _planetSurfaceStreamer;
+    private MeshInstance3D? _planetSurfaceDistantTerrain;
+    private PlanetSurfaceChunkCoordinate? _planetSurfaceDistantTerrainCenter;
     private bool _planetSurfaceFallbackRetired;
     private bool _planetSurfaceStreamingReadyPrinted;
 
@@ -59,6 +65,7 @@ public partial class SalvageRepairSlice
         }
 
         EnsurePlanetSurfaceStreaming(profile);
+        EnsurePlanetSurfaceDistantTerrain(profile, force: true);
         _npcNavigationSurface?.SetTerrainProfile(profile);
         RepositionSurfaceBoundObjects();
 
@@ -115,6 +122,7 @@ public partial class SalvageRepairSlice
                 ShowWireframe = false,
                 ShowChunkBorders = false,
                 DebugViewMode = TerrainDebugViewMode.HeightAndSlope,
+                VerboseGenerationLogging = false,
                 Visible = false
             };
             _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
@@ -172,6 +180,7 @@ public partial class SalvageRepairSlice
         {
             return;
         }
+        EnsurePlanetSurfaceDistantTerrain(profile, force: false);
         PlanetSurfaceLogicalPosition logicalPlayer =
             GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceGeodesicAddress address =
@@ -191,6 +200,131 @@ public partial class SalvageRepairSlice
             $"lat={address.LatitudeDegrees:0.0000}; lon={address.LongitudeDegrees:0.0000}; " +
             "lod=33/17; async=1; cancellation=1; safeUnload=1; fallback=retired.");
         _planetSurfaceStreamingReadyPrinted = true;
+    }
+
+    private void EnsurePlanetSurfaceDistantTerrain(
+        PlanetSurfaceTerrainProfile profile,
+        bool force)
+    {
+        Node3D parent = GetNodeOrNull<Node3D>("Gameplay") ?? this;
+        if (_planetSurfaceDistantTerrain is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceDistantTerrain))
+        {
+            _planetSurfaceDistantTerrain = new MeshInstance3D
+            {
+                Name = "PlanetSurfaceDistantTerrain"
+            };
+            parent.AddChild(_planetSurfaceDistantTerrain);
+            _planetSurfaceDistantTerrainCenter = null;
+        }
+
+        PlanetSurfaceLogicalPosition logical =
+            GetPlanetSurfaceLogicalPlayerPosition();
+        PlanetSurfaceChunkCoordinate center =
+            _planetSurfaceStreamer is not null &&
+            GodotObject.IsInstanceValid(_planetSurfaceStreamer)
+                ? new PlanetSurfaceChunkCoordinate(
+                    _planetSurfaceStreamer.CurrentChunk.X,
+                    _planetSurfaceStreamer.CurrentChunk.Y)
+                : PlanetSurfaceStreamingRuntime.WorldToChunk(
+                    logical.EastMeters,
+                    logical.NorthMeters);
+        if (!force && _planetSurfaceDistantTerrainCenter is { } previous &&
+            previous == center)
+        {
+            _planetSurfaceDistantTerrain.Visible = _surfaceRuntimeActive;
+            return;
+        }
+
+        double logicalCenterEast =
+            center.X * PlanetSurfaceStreamingRuntime.ChunkSizeMeters;
+        double logicalCenterNorth =
+            center.Z * PlanetSurfaceStreamingRuntime.ChunkSizeMeters;
+        _planetSurfaceDistantTerrain.Mesh = BuildPlanetDistantTerrainMesh(
+            profile,
+            logicalCenterEast,
+            logicalCenterNorth);
+        Color baseColor = BuildGroundColor(profile.Archetype);
+        _planetSurfaceDistantTerrain.MaterialOverride = new StandardMaterial3D
+        {
+            AlbedoColor = Colors.White,
+            VertexColorUseAsAlbedo = true,
+            Roughness = 0.96f,
+            MetallicSpecular = 0.0f,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            EmissionEnabled = true,
+            Emission = baseColor.Darkened(0.64f),
+            EmissionEnergyMultiplier = 0.11f
+        };
+        // Child of Gameplay: logical X/Z are converted to local world space by
+        // the TASK-162 Gameplay floating-origin transform automatically.
+        _planetSurfaceDistantTerrain.Position = new Vector3(
+            (float)logicalCenterEast,
+            -0.08f,
+            (float)logicalCenterNorth);
+        _planetSurfaceDistantTerrain.Visible = _surfaceRuntimeActive;
+        _planetSurfaceDistantTerrainCenter = center;
+    }
+
+    private ArrayMesh BuildPlanetDistantTerrainMesh(
+        PlanetSurfaceTerrainProfile profile,
+        double logicalCenterEast,
+        double logicalCenterNorth)
+    {
+        const int resolution = PlanetSurfaceDistantTerrainResolution;
+        double half = PlanetSurfaceDistantTerrainHalfExtentMeters;
+        double step = (half * 2.0) / (resolution - 1);
+        SurfaceTool surfaceTool = new();
+        surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+
+        for (int zIndex = 0; zIndex < resolution; zIndex++)
+        {
+            double localZ = -half + zIndex * step;
+            for (int xIndex = 0; xIndex < resolution; xIndex++)
+            {
+                double localX = -half + xIndex * step;
+                double logicalX = logicalCenterEast + localX;
+                double logicalZ = logicalCenterNorth + localZ;
+                PlanetSurfaceTerrainSample sample =
+                    PlanetSurfaceTerrainRuntime.Sample(profile, logicalX, logicalZ);
+                surfaceTool.SetNormal(SampleTerrainNormal(
+                    profile,
+                    logicalX,
+                    logicalZ));
+                surfaceTool.SetColor(TerrainVertexColor(profile, sample));
+                surfaceTool.AddVertex(new Vector3(
+                    (float)localX,
+                    (float)sample.Height,
+                    (float)localZ));
+            }
+        }
+
+        for (int zIndex = 0; zIndex < resolution - 1; zIndex++)
+        {
+            double cellZ = -half + (zIndex + 0.5) * step;
+            for (int xIndex = 0; xIndex < resolution - 1; xIndex++)
+            {
+                double cellX = -half + (xIndex + 0.5) * step;
+                if (Math.Max(Math.Abs(cellX), Math.Abs(cellZ)) <
+                    PlanetSurfaceDistantTerrainInnerHalfExtentMeters)
+                {
+                    continue;
+                }
+
+                int v00 = zIndex * resolution + xIndex;
+                int v10 = v00 + 1;
+                int v01 = v00 + resolution;
+                int v11 = v01 + 1;
+                surfaceTool.AddIndex(v00);
+                surfaceTool.AddIndex(v01);
+                surfaceTool.AddIndex(v11);
+                surfaceTool.AddIndex(v00);
+                surfaceTool.AddIndex(v11);
+                surfaceTool.AddIndex(v10);
+            }
+        }
+
+        return surfaceTool.Commit();
     }
 
     private ArrayMesh BuildPlanetTerrainMesh(
@@ -283,6 +417,35 @@ public partial class SalvageRepairSlice
             Math.Clamp(baseColor.G * multiplier, 0.0f, 1.0f),
             Math.Clamp(baseColor.B * multiplier, 0.0f, 1.0f),
             1.0f);
+    }
+
+    private double EnsurePlayerAbovePlanetSurfaceFloor()
+    {
+        if (_player is null || CurrentTerrainProfile is null ||
+            StageOneVoyage.Piloted)
+        {
+            return double.NaN;
+        }
+
+        PlanetSurfaceLogicalPosition logical =
+            GetPlanetSurfaceLogicalPlayerPosition();
+        double terrainHeight = SamplePlanetSurfaceHeight(
+            logical.EastMeters,
+            logical.NorthMeters);
+        const double minimumBodyCenterClearance = 1.02;
+        double minimumY = terrainHeight + minimumBodyCenterClearance;
+        if (_player.GlobalPosition.Y < minimumY)
+        {
+            Vector3 position = _player.GlobalPosition;
+            position.Y = (float)minimumY;
+            _player.GlobalPosition = position;
+            _player.Velocity = new Vector3(
+                _player.Velocity.X,
+                Math.Max(0.0f, _player.Velocity.Y),
+                _player.Velocity.Z);
+        }
+
+        return _player.GlobalPosition.Y - terrainHeight;
     }
 
     private double SamplePlanetSurfaceHeight(double x, double z)

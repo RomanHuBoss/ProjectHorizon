@@ -39,14 +39,19 @@ public static class PlanetSurfaceTerrainRuntime
         (double amplitude, double frequency, double maximumSlope) =
             environment.Archetype switch
             {
-                "desert" => (2.65, 0.048, 34.0),
-                "frozen" => (2.85, 0.040, 35.0),
-                "volcanic" => (4.75, 0.055, 39.0),
-                "toxic" => (3.10, 0.047, 36.0),
-                "radioactive" => (3.75, 0.052, 38.0),
-                "barren" => (4.10, 0.050, 38.0),
-                "oceanic" => (1.95, 0.037, 32.0),
-                _ => (2.55, 0.043, 34.0)
+                // TASK-162.2: the first live surface pass used prototype-scale
+                // relief (roughly +/-2-5 m), which made a streamed planet read as
+                // a flat square from eye level. Keep the same deterministic shape
+                // functions but move to broader, lower-frequency landforms so the
+                // 32 m gameplay chunks form hills/valleys instead of micro-noise.
+                "desert" => (7.50, 0.026, 34.0),
+                "frozen" => (8.00, 0.024, 35.0),
+                "volcanic" => (12.00, 0.026, 39.0),
+                "toxic" => (8.00, 0.025, 36.0),
+                "radioactive" => (9.50, 0.026, 38.0),
+                "barren" => (10.50, 0.024, 38.0),
+                "oceanic" => (5.50, 0.022, 32.0),
+                _ => (7.00, 0.024, 34.0)
             };
 
         return new PlanetSurfaceTerrainProfile(

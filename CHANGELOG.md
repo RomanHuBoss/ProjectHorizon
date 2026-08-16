@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.162.2] - 2026-08-16
+
+### Fixed — TASK-162.2 Surface Presentation Recovery
+
+- Kept TASK-158's bounded 5x5 / 25-chunk gameplay terrain and 3x3 collision budget, but added an 840 m visual-only distant-terrain proxy with a 116 m center hole so the live surface no longer visibly ends at the gameplay-streamer boundary.
+- Promoted landable-planet morphology from prototype-scale micro-relief to broader low-frequency relief (temperate 7.0 m @ 0.024; archetype-specific 5.5–12.0 m ranges) while retaining the same deterministic terrain sampler and logical chunk addressing.
+- Strengthened atmospheric perspective to hide the distant-proxy edge before it reads as a square, raised/flattened deterministic cloud clusters, and added an explicit emissive stellar core+halo aligned with the system-star direction in addition to the DirectionalLight/ProceduralSky binding.
+- Added a load/reset player-clearance guard so existing logical positions cannot restore inside the stronger terrain relief.
+- Reduced normal live-surface Output noise: per-worker/per-chunk terrain logs are disabled for `PlanetSurfaceStreamer`, while revision plan/completion summaries and all errors remain visible; standalone terrain prototypes retain verbose logging.
+- Added `TASK-162.2 surface presentation acceptance`, startup `sunVisual`/`distantTerrain` diagnostics, a repository contract gate, and CI/release/section-37 integration.
+
+### Runtime evidence that triggered the hotfix
+
+- External Godot 4.7.1 confirmed the TASK-162.1 bootstrap fix: TASK-156/158/160 reached READY, streaming settled at `25/25` with `9/9` collision chunks, and TASK-160/TASK-162 plus the prior F5 matrix passed.
+- The accompanying surface screenshot still showed a flat, visibly bounded horizon and no readable stellar disc; this proved the earlier `sun=1` / `visibleStar=1` checks were structural rather than visual-quality checks.
+
 ## [0.1.0-alpha.162.1] - 2026-08-16
 
 ### Fixed — TASK-162.1 Runtime Bootstrap Order

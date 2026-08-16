@@ -101,9 +101,12 @@ public static class PlanetSurfaceWorldCompositionRuntime
                 environment.CloudLayerCount * 2,
                 6,
                 18);
+        // TASK-162.2: the bounded 5x5 gameplay terrain window is intentionally
+        // small. Atmospheric perspective must hide the transition to the cheap
+        // distant visual proxy before the player can read it as a square edge.
         double fogDensity = atmosphereEnabled
-            ? Math.Clamp(0.0012 + atmosphere * 0.0011 +
-                environment.CloudDensity * 0.00055, 0.0010, 0.0048)
+            ? Math.Clamp(0.0044 + atmosphere * 0.0022 +
+                environment.CloudDensity * 0.0010, 0.0045, 0.0105)
             : 0.0;
 
         return new PlanetSurfaceSkyProfile(
@@ -117,7 +120,7 @@ public static class PlanetSurfaceWorldCompositionRuntime
             starEnergy * Math.Clamp(0.82 + atmosphere * 0.18, 0.82, 1.18),
             azimuth,
             elevation,
-            0.62,
+            1.20,
             atmosphereEnabled,
             fogDensity,
             atmosphereEnabled ? Math.Clamp(0.32 + atmosphere * 0.22, 0.30, 0.68) : 0.0,

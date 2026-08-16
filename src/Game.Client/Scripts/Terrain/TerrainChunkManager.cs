@@ -94,6 +94,9 @@ public partial class TerrainChunkManager : Node3D
         TerrainDebugViewMode.HeightAndSlope;
 
     [Export]
+    public bool VerboseGenerationLogging { get; set; } = true;
+
+    [Export]
     public bool ShowWorldGrid { get; set; } = true;
 
     [Export]
@@ -448,12 +451,15 @@ public partial class TerrainChunkManager : Node3D
 
             _lastWorkerCpuMilliseconds = completedJob.Result.WorkerElapsedMilliseconds;
             Stopwatch applyStopwatch = Stopwatch.StartNew();
-            GD.Print(
+            if (VerboseGenerationLogging)
+            {
+                GD.Print(
                 $"Terrain worker: applying job={completedJob.JobId}; " +
                 $"revision={completedJob.Revision}; " +
                 $"type={activeJob.Operation.Type}; " +
                 $"coordinate={activeJob.Operation.Coordinate}; " +
                 $"worker={completedJob.Result.WorkerElapsedMilliseconds:F2} ms");
+            }
             ApplyCompletedGeneration(
                 activeJob.Operation,
                 completedJob.Result);
@@ -497,11 +503,14 @@ public partial class TerrainChunkManager : Node3D
 
                 _discardedStaleJobs++;
                 _totalDiscardedStaleJobs++;
-                GD.Print(
-                    $"Terrain worker: discarded stale job={completedJob.JobId}; " +
-                    $"jobRevision={completedJob.Revision}; " +
-                    $"currentRevision={_planRevision}; " +
-                    $"cancelled={completedJob.IsCancelled}");
+                if (VerboseGenerationLogging)
+                {
+                    GD.Print(
+                        $"Terrain worker: discarded stale job={completedJob.JobId}; " +
+                        $"jobRevision={completedJob.Revision}; " +
+                        $"currentRevision={_planRevision}; " +
+                        $"cancelled={completedJob.IsCancelled}");
+                }
                 continue;
             }
 
@@ -660,12 +669,15 @@ public partial class TerrainChunkManager : Node3D
             new ActiveChunkJob(jobId, operation, request));
         _jobApplyOrder.Enqueue(jobId);
 
-        GD.Print(
-            $"Terrain worker: started job={jobId}; " +
-            $"revision={operation.Revision}; type={operation.Type}; " +
-            $"coordinate={operation.Coordinate}; " +
-            $"visual={request.VisualResolution}; " +
-            $"collision={request.RebuildCollision}");
+        if (VerboseGenerationLogging)
+        {
+            GD.Print(
+                $"Terrain worker: started job={jobId}; " +
+                $"revision={operation.Revision}; type={operation.Type}; " +
+                $"coordinate={operation.Coordinate}; " +
+                $"visual={request.VisualResolution}; " +
+                $"collision={request.RebuildCollision}");
+        }
 
         _ = Task.Run(() =>
         {
@@ -898,7 +910,7 @@ public partial class TerrainChunkManager : Node3D
         _discardedStaleJobs = discardedReadyJobCount;
         _totalDiscardedStaleJobs += discardedReadyJobCount;
 
-        if (discardedReadyJobCount > 0)
+        if (discardedReadyJobCount > 0 && VerboseGenerationLogging)
         {
             GD.Print(
                 $"Terrain worker: discarded {discardedReadyJobCount} " +
@@ -1128,6 +1140,7 @@ public partial class TerrainChunkManager : Node3D
             DebugGridSpacing,
             UsePlanetSurfacePresentation,
             PlanetSurfaceBaseColor);
+        chunk.VerboseGenerationLogging = VerboseGenerationLogging;
     }
 
 

@@ -246,6 +246,8 @@ public partial class SalvageRepairSlice
             "Gameplay/NpcNavigation",
             "Gameplay/NpcPopulation",
             "Gameplay/BaseBuildPreview",
+            "Gameplay/PlanetSurfaceDistantTerrain",
+            "Gameplay/PlanetSurfaceSunVisual",
             "PlanetSurfaceStreamer"
         };
         foreach (string path in authoredPaths)

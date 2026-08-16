@@ -2,9 +2,61 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task162.1-runtime-bootstrap-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task162.2-surface-presentation-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+
+## 0. Текущая hotfix-итерация 2026-08-16 — TASK-162.2 Surface Presentation Recovery
+
+**Исходный снимок:** `ProjectHorizon-main-task162.1-runtime-bootstrap-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task162.2-surface-presentation-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.162.2`.  
+**Статус:** TASK-162.2 `IMPLEMENTED`; TASK-162.1 повышен до `VERIFIED` по внешнему Godot evidence; TASK-162 остаётся `IMPLEMENTED`, TASK-163 manual live-rebase/cold-restore acceptance остаётся `IN_PROGRESS`.
+
+### Внешнее runtime evidence пользователя
+
+Godot 4.7.1 после TASK-162.1 больше не воспроизводит `Galaxy navigation runtime is unavailable` и проходит полный startup до surface stack:
+
+- `TASK-156 planet terrain READY`;
+- `TASK-160 planet surface world composition READY: sky=1; sun=1; clouds=13`;
+- `TASK-158 planet surface streaming READY: active=25/25; collisions=9/9`;
+- полный F5 даёт `TASK-160 ... PASS`, `TASK-162 ... PASS` (`rebases=48; traversalSamples=49; maxLocal=2030.709m; logicalContinuity=1; chunkIdentity=1; coldRestore=1; planetReset=1; geodesic=1`), а также `TASK-126 ... PASS` с `faunaProbeSamples=4`.
+
+При этом пользовательский скриншот выявил отдельный presentation-дефект, который прежние структурные acceptance не ловили: поверхность визуально читается как плоский квадрат, фактический relief temperate-планеты всего `amplitude=2.55m`, граница bounded 5x5 streamer видна с уровня глаз, отдельный stellar disc отсутствует, а облака выглядят как близкие сферические lobes. Значит `sun=1/visibleStar=1` доказывал наличие lighting/runtime contract, но не приемлемый визуальный результат.
+
+### Причина
+
+- TASK-158 намеренно ограничивает gameplay terrain до 25 chunks (`5x5`, chunk `32m`), то есть ближайшая visual boundary находится всего примерно в 64-80 m от игрока.
+- TASK-156 сохранял prototype-scale рельеф (`temperate 2.55m @ 0.043`), поэтому на таком расстоянии поверхность выглядит практически плоской.
+- TASK-160 создавал только `DirectionalLight3D`/ProceduralSky sun binding; отдельного гарантированно видимого stellar-disc geometry не было.
+- атмосферный fog был слишком слабым (`~0.001-0.0048`) для маскировки bounded surface window.
+- cloud lobes находились на высоте 48-82 m и имели большую вертикальную толщину, из-за чего выглядели как близкие белые сферы.
+
+### Исправлено
+
+- gameplay streamer остаётся bounded `25 chunks / 9 collision`, но вокруг него добавлен **visual-only distant terrain proxy** `840m` шириной, `49x49`, без collision/nav; центральное окно `116m` вырезано, чтобы high-detail gameplay terrain оставался источником истины возле игрока;
+- temperate relief поднят до `7.0m @ 0.024`, остальные archetypes также переведены на более крупномасштабный relief (`oceanic 5.5m`, `volcanic 12m` и т.д.) без изменения deterministic sampling identity;
+- atmospheric fog усилен до диапазона `0.0045..0.0105`, чтобы дальний proxy растворялся в aerial perspective до чтения его внешней квадратной границы;
+- добавлен `PlanetSurfaceSunVisual`: emissive core+halo, привязанный к системной star direction и floating-origin player frame; DirectionalLight принудительно связан с sky через `sky_mode=LIGHT_AND_SKY`;
+- cloud layer поднят до `105..165m`, lobes сделаны значительно более плоскими и распределены на большем радиусе;
+- cold-load/reset игрока защищён `EnsurePlayerAbovePlanetSurfaceFloor()`, чтобы более высокий relief не оставлял старое сохранение внутри terrain;
+- live `PlanetSurfaceStreamer` отключает per-worker/per-chunk verbose logging: Output сохраняет plan/completed summary и ошибки, но больше не печатает десятки `started/applying/generated` строк на каждый переход чанка; prototype terrain tools сохраняют verbose default;
+- новые `PlanetSurfaceDistantTerrain` и `PlanetSurfaceSunVisual` включены в surface residency suspend/restore;
+- F5 дополнен `TASK-162.2 surface presentation acceptance`: проверяются macro relief, distant proxy, stellar disc, atmosphere fog и player clearance;
+- добавлен `validate-task1622-surface-presentation-hotfix.py` и включён в section-37 Windows/Linux quality runners и CI/release contract list.
+
+### Acceptance TASK-162.2
+
+1. Clean build `0 warnings / 0 errors`.
+2. New Game/Load: поверхность не заканчивается видимой квадратной границей на расстоянии порядка 80m; за gameplay terrain продолжается low-detail relief, уходящий в atmospheric haze.
+3. На temperate starter planet лог должен показывать `TASK-156 ... amplitude=7.00m`; на экране должны быть заметны холмы/понижения, а не плоская плита.
+4. Повернуться вокруг на 360°: должен присутствовать яркий stellar disc (core+halo) в направлении системной звезды; DirectionalLight/shadows сохраняются.
+5. Облака находятся высоко и читаются как плоские clusters, а не огромные близкие сферы, обрезанные экраном.
+6. Нажать F5: ожидается `TASK-162.2 surface presentation acceptance PASS` с `distantProxy=1; proxyExtent=840m; sunVisual=1; fogDensity>=0.0045; clearance>=0.80m`; прежние TASK-156/158/160/162 остаются PASS.
+7. Для визуальной приёмки прислать один screenshot поверхности с горизонтом и одну строку `TASK-162.2 ... PASS`. Live >2048m rebase и distant cold restore остаются отдельным TASK-163.
 
 ---
 
@@ -13,7 +65,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task162.1-runtime-bootstrap-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.162.1`.  
-**Статус:** TASK-162.1 `IMPLEMENTED`; TASK-162 остаётся `IMPLEMENTED`, TASK-163 runtime/manual acceptance остаётся `IN_PROGRESS`.
+**Статус:** TASK-162.1 `VERIFIED`; TASK-162 остаётся `IMPLEMENTED`, TASK-163 runtime/manual acceptance остаётся `IN_PROGRESS`.
 
 ### Внешнее runtime evidence пользователя
 
@@ -39,7 +91,7 @@ TASK-162 добавил зависимость frame-conversion от `GalaxyNavi
 
 1. Clean build: `0 warnings / 0 errors`.
 2. New Game: исключение `Galaxy navigation runtime is unavailable` отсутствует; после строк TASK-152/TASK-150 startup продолжается до terrain/world-composition READY.
-3. На экране нет прежнего fallback-only состояния: streamed landscape загружен, planet sky/sun/atmosphere присутствуют согласно TASK-160/TASK-150.
+3. На экране нет прежнего fallback-only состояния: surface stack доходит до TASK-156/158/160 READY. Качество горизонта/рельефа/stellar-disc **не считается** доказанным этой bootstrap-проверкой и вынесено в TASK-162.2.
 4. Load существующего slot и New Game/reset также не воспроизводят исключение.
 5. После успешного bootstrap выполнить F5 TASK-162 и дальнейший TASK-163 traversal/cold-restore acceptance.
 
@@ -50,7 +102,7 @@ TASK-162 добавил зависимость frame-conversion от `GalaxyNavi
 **Исходный снимок:** `ProjectHorizon-main(20260816-033933).zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`.  
 **Версия:** `0.1.0-alpha.162`.  
-**Статус:** TASK-162 `IMPLEMENTED`; runtime/manual acceptance TASK-163 `IN_PROGRESS`. Предыдущие manual tails TASK-160.1/161/159 не перепроверялись и не повышались до `VERIFIED`.
+**Исторический статус на момент alpha.162:** TASK-162 `IMPLEMENTED`; runtime/manual acceptance TASK-163 `IN_PROGRESS`. Последующий внешний Godot-прогон уже подтвердил F5 TASK-162 и TASK-160.1; live >2048 m traversal/cold-restore остаются TASK-163, а visual surface smoke выделен в TASK-162.2.
 
 ### Почему выбрана целая подсистема
 
@@ -108,7 +160,7 @@ TASK-162 закрывает coordinate/floating-origin scaling, но не зая
 **Исходный снимок:** `ProjectHorizon-main-task160-surface-world-composition.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task160.1-aerial-acceptance-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.160.1`.  
-**Статус:** TASK-160.1 `IMPLEMENTED`; повторный runtime F5 требуется. TASK-160 F5 contract подтверждён внешним Godot evidence; visual/persistence manual tail TASK-161 остаётся `IN_PROGRESS`.
+**Статус:** TASK-160.1 `VERIFIED`; внешний F5 подтвердил `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1`; visual/persistence manual tail TASK-161 остаётся `IN_PROGRESS`.
 
 ### Внешнее evidence пользователя
 
@@ -5762,7 +5814,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WORLD-170` | F5/static/xUnit проверяют composition+persistence contract | `IMPLEMENTED` | TASK-160 acceptance; validator; xUnit 3 tests |
 | `WORLD-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-161 external Windows/Godot verification |
 | `WORLD-ACC-101` | F5 TASK-160 PASS и старые TASK-138/158 остаются PASS | `VERIFIED` | external Godot: TASK-160/TASK-138/TASK-158 PASS; TASK-160.1 addresses unrelated TASK-126 far-traversal acceptance regression |
-| `WORLD-ACC-102` | Manual visual sky/terrain/declutter smoke | `IN_PROGRESS` | TASK-161 screenshot/runtime evidence |
+| `WORLD-ACC-102` | Manual visual sky/terrain/declutter smoke | `IN_PROGRESS` | внешний screenshot выявил flat/square horizon и отсутствие читаемого stellar disc; corrective TASK-162.2 implemented, требуется повторный visual smoke |
 | `WORLD-ACC-103` | Mine → chunk unload → save/restart → planet return preserves depletion | `IN_PROGRESS` | TASK-161 persistence scenario |
 
 ### 8.30. Planet-Global Surface Frame & Floating Origin
@@ -5779,9 +5831,10 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FRAME-1627` | Save/cold restore сохраняет logical player X/Z без schema bump | `IMPLEMENTED` | snapshot uses logical coordinates; cold load restores exact logical origin and local-zero player |
 | `FRAME-1628` | F5/static/xUnit проверяют long-traversal frame contract | `IMPLEMENTED` | TASK-162 F5 runner; static gate; 3 xUnit tests |
 | `FRAME-1629` | Live rebase синхронизирует absolute AI/navigation caches | `IMPLEMENTED` | ground-NPC targets; NPC-ship routes; fauna/aerial environment shifted/refreshed |
-| `FRAME-162A` | Frame-aware voyage bootstrap не обращается к GalaxyNavigation до его создания | `IMPLEMENTED` | TASK-162.1: galaxy-before-voyage in Ready/load/reset + static gate |
+| `FRAME-162A` | Frame-aware voyage bootstrap не обращается к GalaxyNavigation до его создания | `VERIFIED` | external Godot: startup/load path reaches TASK-152/156/158/160 without GalaxyNavigation exception |
+| `FRAME-162B` | Surface presentation скрывает bounded streamer edge и показывает macro relief/star/atmosphere | `IMPLEMENTED` | TASK-162.2 distant visual proxy 840m + relief promotion + stellar disc + fog/cloud layer + F5 gate |
 | `FRAME-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-163 external Windows verification |
-| `FRAME-ACC-101` | F5 TASK-162 PASS + prior F5 matrix no regressions | `IN_PROGRESS` | TASK-163 external Godot evidence |
+| `FRAME-ACC-101` | F5 TASK-162 PASS + prior F5 matrix no regressions | `VERIFIED` | external Godot: TASK-162 PASS rebases=48, traversalSamples=49, maxLocal=2030.709m; TASK-126/156/158/160 also PASS |
 | `FRAME-ACC-102` | Live >2048 m rebase bounded/no gap/no world jump | `IN_PROGRESS` | TASK-163 manual traversal |
 | `FRAME-ACC-103` | Distant logical save/restart + resource depletion persistence | `IN_PROGRESS` | TASK-163 cold restore scenario |
 
@@ -5791,9 +5844,9 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-162.1` | Runtime bootstrap hotfix rerun | new-game/load/reset без `Galaxy navigation runtime is unavailable`; terrain+sun+atmosphere/world composition initialize |
-| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + F5 TASK-162; live >2048 m rebase; distant cold restore/persistence |
-| 3 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | может быть закрыт тем же F5: `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
+| 1 | `TASK-162.2` | Surface presentation visual rerun | horizon без 80m square edge; macro relief; видимый stellar disc; high cloud layer; F5 TASK-162.2 PASS |
+| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 3 | `TASK-160.1` | Traversal-safe TASK-126 acceptance | `VERIFIED`: external F5 `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
 | 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
 | 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
@@ -5801,8 +5854,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-162.1 Runtime Bootstrap Order hotfix `IMPLEMENTED`; TASK-162 остаётся `IMPLEMENTED`.  
-**Формально ближайший шаг:** повторный Windows/Godot bootstrap smoke; после него TASK-163 F5/traversal acceptance. Тот же F5 может одновременно подтвердить TASK-160.1 regression.
+**Текущая разрабатываемая реализация:** TASK-162.2 Surface Presentation hotfix `IMPLEMENTED`; TASK-162.1 и TASK-160.1 `VERIFIED`; TASK-162 остаётся `IMPLEMENTED`.  
+**Формально ближайший шаг:** Windows/Godot visual smoke TASK-162.2; после него TASK-163 live >2048m traversal и distant cold-restore. F5 TASK-162 и TASK-160.1 уже подтверждены внешним evidence.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

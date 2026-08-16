@@ -9,11 +9,14 @@ public partial class SalvageRepairSlice
     private bool _planetSurfaceWorldCompositionInitialized;
     private PlanetSurfaceSkyProfile? _planetSurfaceSkyProfile;
     private Node3D? _planetSurfaceCloudRoot;
+    private Node3D? _planetSurfaceSunVisual;
+    private Vector3 _planetSurfaceSunDirection = new(0.0f, 0.65f, -0.76f);
     private Node3D? _planetSurfaceResourceRoot;
     private readonly Dictionary<string, SalvageResourceNode>
         _streamedSurfaceResources = new(StringComparer.Ordinal);
     private PlanetSurfaceChunkCoordinate? _lastSurfaceResourceCenter;
     private string _planetSurfaceWorldCompositionAcceptanceHud = "READY";
+    private string _surfacePresentationHotfixAcceptanceHud = "READY";
     private bool _planetSurfaceWorldCompositionReadyPrinted;
     private double _planetSurfaceCloudDrift;
 
@@ -109,6 +112,15 @@ public partial class SalvageRepairSlice
         environment.Set("fog_height", 18.0f);
         environment.Set("fog_height_density", 0.025f);
 
+        double azimuth = profile.SunAzimuthDegrees * Math.PI / 180.0;
+        double elevation = profile.SunElevationDegrees * Math.PI / 180.0;
+        Vector3 towardSun = new(
+            (float)(Math.Cos(elevation) * Math.Sin(azimuth)),
+            (float)Math.Sin(elevation),
+            (float)(Math.Cos(elevation) * Math.Cos(azimuth)));
+        towardSun = towardSun.Normalized();
+        EnsurePlanetSurfaceSunVisual(profile, towardSun);
+
         DirectionalLight3D? sun = GetNodeOrNull<DirectionalLight3D>(
             "DirectionalLight3D");
         if (sun is null)
@@ -119,18 +131,109 @@ public partial class SalvageRepairSlice
         sun.LightColor = ToColor(profile.SunColor);
         sun.LightEnergy = (float)profile.SunEnergy;
         sun.ShadowEnabled = true;
+        sun.Set("sky_mode", 0); // LIGHT_AND_SKY: expose the star to ProceduralSkyMaterial.
         sun.Set("light_angular_distance", (float)profile.SunAngularDiameterDegrees);
-        sun.Set("directional_shadow_max_distance", 240.0f);
+        sun.Set("directional_shadow_max_distance", 320.0f);
         sun.Set("directional_shadow_fade_start", 0.82f);
-        double azimuth = profile.SunAzimuthDegrees * Math.PI / 180.0;
-        double elevation = profile.SunElevationDegrees * Math.PI / 180.0;
-        Vector3 towardSun = new(
-            (float)(Math.Cos(elevation) * Math.Sin(azimuth)),
-            (float)Math.Sin(elevation),
-            (float)(Math.Cos(elevation) * Math.Cos(azimuth)));
-        Vector3 lightRay = -towardSun.Normalized();
+        Vector3 lightRay = -towardSun;
         sun.Position = Vector3.Zero;
         sun.LookAt(lightRay, Vector3.Up);
+    }
+
+    private void EnsurePlanetSurfaceSunVisual(
+        PlanetSurfaceSkyProfile profile,
+        Vector3 towardSun)
+    {
+        Node3D parent = GetNodeOrNull<Node3D>("Gameplay") ?? this;
+        if (_planetSurfaceSunVisual is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceSunVisual))
+        {
+            _planetSurfaceSunVisual = new Node3D
+            {
+                Name = "PlanetSurfaceSunVisual"
+            };
+            parent.AddChild(_planetSurfaceSunVisual);
+        }
+
+        foreach (Node child in _planetSurfaceSunVisual.GetChildren())
+        {
+            child.QueueFree();
+        }
+
+        Color sunColor = ToColor(profile.SunColor);
+        StandardMaterial3D coreMaterial = new()
+        {
+            AlbedoColor = sunColor.Lightened(0.20f),
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            EmissionEnabled = true,
+            Emission = sunColor,
+            EmissionEnergyMultiplier = 5.0f,
+            Roughness = 0.0f
+        };
+        SphereMesh coreMesh = new()
+        {
+            Radius = 1.0f,
+            Height = 2.0f,
+            RadialSegments = 24,
+            Rings = 12
+        };
+        _planetSurfaceSunVisual.AddChild(new MeshInstance3D
+        {
+            Name = "Core",
+            Mesh = coreMesh,
+            MaterialOverride = coreMaterial,
+            Scale = Vector3.One * 2.0f
+        });
+
+        StandardMaterial3D haloMaterial = new()
+        {
+            AlbedoColor = new Color(sunColor.R, sunColor.G, sunColor.B, 0.12f),
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            EmissionEnabled = true,
+            Emission = sunColor,
+            EmissionEnergyMultiplier = 2.1f,
+            Roughness = 0.0f
+        };
+        SphereMesh haloMesh = new()
+        {
+            Radius = 1.0f,
+            Height = 2.0f,
+            RadialSegments = 20,
+            Rings = 10
+        };
+        _planetSurfaceSunVisual.AddChild(new MeshInstance3D
+        {
+            Name = "Halo",
+            Mesh = haloMesh,
+            MaterialOverride = haloMaterial,
+            Scale = Vector3.One * 3.6f
+        });
+
+        _planetSurfaceSunDirection = towardSun;
+        UpdatePlanetSurfaceSunVisual();
+    }
+
+    private void UpdatePlanetSurfaceSunVisual()
+    {
+        if (_planetSurfaceSunVisual is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceSunVisual))
+        {
+            return;
+        }
+
+        _planetSurfaceSunVisual.Visible = _surfaceRuntimeActive;
+        if (!_surfaceRuntimeActive || _player is null)
+        {
+            return;
+        }
+
+        // Follow the local floating-origin frame while preserving a fixed
+        // planet-sky direction. Keep the disc close enough that atmospheric fog
+        // cannot erase it, while its ~1.3 degree angular size still reads as a
+        // celestial object rather than nearby scenery.
+        _planetSurfaceSunVisual.GlobalPosition =
+            _player.GlobalPosition + _planetSurfaceSunDirection * 180.0f;
     }
 
     private void RebuildPlanetSurfaceClouds(PlanetSurfaceSkyProfile profile)
@@ -178,9 +281,9 @@ public partial class SalvageRepairSlice
             {
                 Name = $"CloudCluster_{clusterIndex:00}",
                 Position = new Vector3(
-                    random.RandfRange(-135.0f, 135.0f),
-                    random.RandfRange(48.0f, 82.0f),
-                    random.RandfRange(-135.0f, 135.0f)),
+                    random.RandfRange(-260.0f, 260.0f),
+                    random.RandfRange(105.0f, 165.0f),
+                    random.RandfRange(-260.0f, 260.0f)),
                 RotationDegrees = new Vector3(
                     0.0f,
                     random.RandfRange(0.0f, 360.0f),
@@ -203,13 +306,13 @@ public partial class SalvageRepairSlice
                     Mesh = mesh,
                     MaterialOverride = cloudMaterial,
                     Position = new Vector3(
-                        random.RandfRange(-12.0f, 12.0f),
-                        random.RandfRange(-2.2f, 2.2f),
-                        random.RandfRange(-6.0f, 6.0f)),
+                        random.RandfRange(-20.0f, 20.0f),
+                        random.RandfRange(-1.4f, 1.4f),
+                        random.RandfRange(-10.0f, 10.0f)),
                     Scale = new Vector3(
-                        random.RandfRange(7.0f, 16.0f),
-                        random.RandfRange(2.2f, 4.8f),
-                        random.RandfRange(5.0f, 11.0f))
+                        random.RandfRange(12.0f, 28.0f),
+                        random.RandfRange(1.4f, 3.2f),
+                        random.RandfRange(8.0f, 20.0f))
                 };
                 cluster.AddChild(lobe);
             }
@@ -234,6 +337,8 @@ public partial class SalvageRepairSlice
         {
             return;
         }
+
+        UpdatePlanetSurfaceSunVisual();
 
         if (_planetSurfaceCloudRoot is not null)
         {
@@ -340,7 +445,9 @@ public partial class SalvageRepairSlice
                 "TASK-160 planet surface world composition READY: " +
                 $"planet={PlanetSurfaceContentProfile.PlanetId}; " +
                 $"sky={( _planetSurfaceSkyProfile?.AtmosphereEnabled == true ? 1 : 0)}; " +
-                $"sun=1; clouds={_planetSurfaceSkyProfile?.CloudClusterCount ?? 0}; " +
+                $"sun=1; sunVisual={(_planetSurfaceSunVisual is not null && GodotObject.IsInstanceValid(_planetSurfaceSunVisual) ? 1 : 0)}; " +
+                $"distantTerrain={(_planetSurfaceDistantTerrain is not null && GodotObject.IsInstanceValid(_planetSurfaceDistantTerrain) ? 1 : 0)}; " +
+                $"clouds={_planetSurfaceSkyProfile?.CloudClusterCount ?? 0}; " +
                 $"resourceWindow={plan.Count}; activeResources={_streamedSurfaceResources.Count}; " +
                 $"center={center.X},{center.Z}; starterReserve={PlanetSurfaceWorldCompositionRuntime.StarterReserveRadiusMeters:0}m; " +
                 "identity=planet+chunk+slot; persistence=seed+deltas; legacyFixtures=hidden.");
@@ -482,6 +589,63 @@ public partial class SalvageRepairSlice
             ("clouds", _planetSurfaceSkyProfile.CloudClusterCount),
             ("resources", _streamedSurfaceResources.Count),
             ("persistence", "seed+deltas"));
+    }
+
+    private void RunSurfacePresentationHotfixAcceptance()
+    {
+        PlanetSurfaceTerrainProfile? terrain = CurrentTerrainProfile;
+        PlanetSurfaceSkyProfile? sky = _planetSurfaceSkyProfile;
+        if (terrain is null || sky is null || _player is null)
+        {
+            _surfacePresentationHotfixAcceptanceHud = "FAIL unavailable";
+            GD.PushError(
+                "TASK-162.2 surface presentation acceptance FAIL: " +
+                "reason=runtime-unavailable.");
+            return;
+        }
+
+        PlanetSurfaceLogicalPosition logical =
+            GetPlanetSurfaceLogicalPlayerPosition();
+        double surfaceY = PlanetSurfaceTerrainRuntime.SampleHeight(
+            terrain,
+            logical.EastMeters,
+            logical.NorthMeters);
+        double clearance = _player.GlobalPosition.Y - surfaceY;
+        bool relief = terrain.HeightAmplitude >= 5.0 &&
+            terrain.BaseFrequency <= 0.030;
+        bool distantTerrain = _planetSurfaceDistantTerrain is not null &&
+            GodotObject.IsInstanceValid(_planetSurfaceDistantTerrain) &&
+            _planetSurfaceDistantTerrain.Mesh is not null;
+        bool visibleSun = _planetSurfaceSunVisual is not null &&
+            GodotObject.IsInstanceValid(_planetSurfaceSunVisual) &&
+            _planetSurfaceSunVisual.GetChildCount() >= 2;
+        bool atmosphere = !sky.AtmosphereEnabled || sky.FogDensity >= 0.0045;
+        bool safeClearance = StageOneVoyage.Piloted || clearance >= 0.80;
+        bool passed = relief && distantTerrain && visibleSun &&
+            atmosphere && safeClearance;
+
+        _surfacePresentationHotfixAcceptanceHud = passed
+            ? $"PASS relief={terrain.HeightAmplitude:0.0}m proxy=840m sun=1 fog={sky.FogDensity:0.0000} clearance={clearance:0.00}m"
+            : $"FAIL relief={(relief ? 1 : 0)} proxy={(distantTerrain ? 1 : 0)} sun={(visibleSun ? 1 : 0)} atmosphere={(atmosphere ? 1 : 0)} clearance={clearance:0.00}m";
+        string output =
+            $"TASK-162.2 surface presentation acceptance {(passed ? "PASS" : "FAIL")}: " +
+            $"reliefAmplitude={terrain.HeightAmplitude:0.00}m; " +
+            $"baseFrequency={terrain.BaseFrequency:0.000}; " +
+            $"distantProxy={(distantTerrain ? 1 : 0)}; " +
+            $"proxyExtent={PlanetSurfaceDistantTerrainHalfExtentMeters * 2.0:0}m; " +
+            $"streamerHole={PlanetSurfaceDistantTerrainInnerHalfExtentMeters * 2.0:0}m; " +
+            $"sunVisual={(visibleSun ? 1 : 0)}; " +
+            $"fogDensity={sky.FogDensity:0.0000}; " +
+            $"clearance={clearance:0.00}m; " +
+            "boundedGameplayStreamer=25-chunks.";
+        if (passed)
+        {
+            GD.Print(output);
+        }
+        else
+        {
+            GD.PushError(output);
+        }
     }
 
     private static Color ToColor(PlanetEnvironmentColor color) => new(

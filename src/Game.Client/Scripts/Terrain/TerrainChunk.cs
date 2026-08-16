@@ -75,6 +75,9 @@ public partial class TerrainChunk : StaticBody3D
     public bool UsePlanetSurfacePresentation { get; set; }
 
     [Export]
+    public bool VerboseGenerationLogging { get; set; } = true;
+
+    [Export]
     public Color PlanetSurfaceBaseColor { get; set; } =
         new Color(0.32f, 0.44f, 0.28f, 1.0f);
 
@@ -313,6 +316,11 @@ public partial class TerrainChunk : StaticBody3D
         double workerElapsedMilliseconds,
         double mainThreadElapsedMilliseconds)
     {
+        if (!VerboseGenerationLogging)
+        {
+            return;
+        }
+
         int topVertexCount = visualResolution * visualResolution;
         int topTriangleCount =
             (visualResolution - 1) * (visualResolution - 1) * 2;
