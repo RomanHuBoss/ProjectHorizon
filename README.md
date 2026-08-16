@@ -11,6 +11,10 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-184.1 — Production Asset Build Hotfix
+
+Alpha.184.1 fixes the external clean-build blocker found immediately after TASK-184 delivery. Godot 4.7.1 exposes `ResourceLoader.Exists` in a form that cannot be consumed as the LINQ `Count(Func<string,bool>)` predicate by method-group conversion. The live TASK-184 acceptance now uses an explicit `path => ResourceLoader.Exists(path)` adapter. No GLB, LOD, collision, docking or presentation contract is changed. `tools/validate-task1841-production-asset-build-hotfix.py` prevents the compile-breaking form from returning.
+
 ## TASK-184 — Production 3D Asset Pipeline & LOD Integration
 
 Alpha.184 moves the shipping vertical slice from primitive-only presentation to the Technical Specification §33 content-pipeline baseline. The player explorer, NPC interceptor and orbital station now use imported glTF 2.0 binary assets (`GLB`) with independent `LOD0/LOD1/LOD2` models, bounded PBR material slots and named `MNT_*` attachment markers. `ProductionModelLodController` selects one LOD by current camera distance; GLB assets contain no gameplay collision. Existing Godot `CollisionShape3D` hierarchies remain authoritative.

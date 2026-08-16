@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184"}, "VERSION must be alpha.180.2 or later hotfix", f)
+need(version in {"0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1"}, "VERSION must be alpha.180.2 or later hotfix", f)
 need('ShouldRenderSurfaceSun' in world_runtime and
      'worldKind == WorldSceneKind.Surface' in world_runtime and
      'ShouldRenderSurfaceSun(' in world and

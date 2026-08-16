@@ -2,13 +2,23 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task184.1-production-asset-build-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая мега-итерация 2026-08-16 — TASK-184 Production 3D Asset Pipeline & LOD Integration
+## 0. HOTFIX 2026-08-16 — TASK-184.1 Production Asset Build Hotfix
+
+**Исходный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip` (`0.1.0-alpha.184`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task184.1-production-asset-build-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.184.1`.  
+**Статус:** `IMPLEMENTED / PENDING OWNER CLEAN BUILD + GODOT IMPORT/RUNTIME`.
+
+Owner build-log подтвердил единственный compile blocker: `SalvageRepairSliceProductionAssetPipeline.cs(40,54) CS1503`, где overloaded `ResourceLoader.Exists` передавался напрямую как method group в `Enumerable.Count(Func<string,bool>)`. `Game.Domain` и restore прошли, итог `warnings=0 / errors=1`; до Godot import/F5 TASK-184 выполнение не дошло. Исправление использует явный адаптер `ProductionGlbResources.Count(path => ResourceLoader.Exists(path))`. Добавлен dedicated static gate, запрещающий возврат к compile-breaking форме; GLB/LOD/collision/docking contracts TASK-184 не изменены.
+
+
+## 0A. Мега-итерация 2026-08-16 — TASK-184 Production 3D Asset Pipeline & LOD Integration
 
 **Исходный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip` (`0.1.0-alpha.182`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip`.  

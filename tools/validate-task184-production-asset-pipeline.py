@@ -56,7 +56,7 @@ def triangles(doc):
                 total += doc['accessors'][prim['indices']]['count']//3
     return total
 
-if VERSION.read_text().strip() != '0.1.0-alpha.184': fail('VERSION must be 0.1.0-alpha.184')
+if VERSION.read_text().strip() not in {'0.1.0-alpha.184', '0.1.0-alpha.184.1'}: fail('VERSION must be alpha.184/184.1')
 
 all_glb=[]
 family_triangles={}

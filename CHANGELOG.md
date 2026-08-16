@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.0-alpha.184.1] - 2026-08-16
+
+### Fixed — TASK-184.1 production asset build hotfix
+
+- Fixed the owner-observed `CS1503` in `SalvageRepairSliceProductionAssetPipeline.cs`: `ResourceLoader.Exists` is now passed to LINQ through an explicit `path => ResourceLoader.Exists(path)` lambda rather than an incompatible overloaded method group.
+- Added a dedicated TASK-184.1 static build-regression gate and wired it into section-37, CI and release validation.
+- External alpha.184 evidence is recorded accurately: restore and dependent projects succeeded, but `Game.Client` CoreCompile failed with exactly 1 error and 0 warnings before Godot runtime/import acceptance could start.
+
 ## [0.1.0-alpha.184] - 2026-08-16
 
 ### Added — TASK-184 production 3D asset pipeline & LOD integration

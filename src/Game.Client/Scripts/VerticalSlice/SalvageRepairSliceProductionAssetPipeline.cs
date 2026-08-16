@@ -37,7 +37,7 @@ public partial class SalvageRepairSlice
         bool npcAssetsLoaded = _npcShipNavigationNodes.Count > 0 &&
             _npcShipNavigationNodes.All(ship => ship.ProductionAssetLoaded);
 
-        int glbAssets = ProductionGlbResources.Count(ResourceLoader.Exists);
+        int glbAssets = ProductionGlbResources.Count(path => ResourceLoader.Exists(path));
         int lodChains = CountLodChains(playerModel) + CountLodChains(stationModel);
         if (_npcShipNavigationNodes.Count > 0 &&
             _npcShipNavigationNodes[0].GetNodeOrNull<Node3D>("ProductionModel") is Node3D npcModel)
