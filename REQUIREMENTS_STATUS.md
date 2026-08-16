@@ -2,11 +2,42 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178-spaceflight-navigation-subsystem.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.1-pilot-input-ownership-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.1 Pilot Input Ownership Hotfix
+
+**Исходный снимок:** `ProjectHorizon-main-task178-spaceflight-navigation-subsystem.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.1-pilot-input-ownership-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.178.1`.  
+**Статус:** TASK-178 остаётся `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; обнаруженный gameplay blocker вынесен в TASK-178.1 `IMPLEMENTED / PENDING EXTERNAL BUILD+MANUAL CONTROL SMOKE`.
+
+### Внешнее evidence / корневая причина
+
+После ремонта и boarding пользователь получил `voyagePiloted=1`, но мышь и клавиатура не управляли кораблём. В том же run отсутствовал `TASK-112 player takeoff PASS`, однако корабль сам вышел из атмосферы (`EXIT altitude=84.8 m`), а Godot отдельно сообщил `Atmospheric surface recovery applied: altitude=2.43 m`.
+
+Корень дефекта: `ApplyStageOneVoyageToScene()` для piloted `PlanetSurface/OrbitalStation` вызывал `SetExternalCommand(Neutral)`. В `ArcadeShipController._PhysicsProcess()` наличие external control полностью обходит `ReadManualCommand()`, поэтому mouse/WASD становились неэффективны. Одновременно physics/atmosphere оставались активны и могли сами сдвигать корабль. Дополнительно launch/undock автоматически включали navigation assist, продолжая external-control takeover уже в полёте.
+
+### Исправлено
+
+- добавлен explicit `SetParkedControlLock`: parked/docked ship сохраняет pilot camera/input routing, но physics выключен, velocity/angular velocity обнулены, external command очищен;
+- `PlanetSurface/OrbitalStation` больше не используют `SetExternalCommand(Neutral)` как parking mechanism;
+- `T` launch/undock переводит ship в manual player ownership (`navigationAssist=0`, `ManualInputOwnershipActive=1`, `ExternalControlActive=0`);
+- `K` остаётся opt-in navigation assist;
+- boarding/takeoff/undock Output дополнен ownership diagnostics;
+- TASK-178 live closure расширен `pilotControl` до `live=8/8` и проверяет unpiloted/parked/manual/assist control-state invariants;
+- добавлен TASK-178.1 static validator в local section-37, CI и release gates.
+
+### Acceptance TASK-178.1
+
+1. Repair/commission ship, board with `E`: корабль не должен сам подниматься/дрейфовать; ожидается `parked=1; physics=0`.
+2. Нажать `T`: ожидается `TASK-112 player takeoff PASS ... navigationAssist=0; manualControl=1; externalControl=0`.
+3. Сразу после `T` проверить W/S/A/D, Space/C, Q/E, arrows и mouse pitch/yaw; управление должно менять speed/orientation.
+4. `K` включает navigation assist; повторный `K` возвращает manual control.
+5. F5: TASK-178 должен сообщить `pilotControl=1` и `live=8/8`; остальные TASK-126/TASK-176 regressions остаются PASS.
 
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-178 Spaceflight & Navigation Subsystem Closure
 
@@ -61,7 +92,7 @@ TASK-178 агрегирует 6 нормативных acceptance reports и д�
 
 1. `tools\run-section37-quality.cmd` — требуется clean build `0 errors / 0 warnings`, все тесты и `TASK-178 ... CONTRACT PASS`.
 2. New Game, дождаться `TASK-178 spaceflight navigation subsystem READY`.
-3. F5: требуется `TASK-178 ... acceptance PASS`, `contracts=6/6`; все six contract flags, six model chains и seven live flags = `1`.
+3. F5: требуется `TASK-178 ... acceptance PASS`, `contracts=6/6`; все six contract flags, six model chains и eight live flags = `1`.
 4. Регрессии TASK-126 и TASK-176 должны оставаться PASS.
 5. Manual cross-system smoke: repair/commission → orbital station → выбрать reachable другую систему → hyperspace. Строка `TASK-114 player hyperspace jump PASS` обязана иметь `planetTargetCleared=1; interplanetarySync=1`; после прыжка нельзя сохранять planet-target предыдущей системы.
 
@@ -6417,10 +6448,10 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-1784` | Ship/voyage/galaxy/planet/world persistence образует единый restore contract | `IMPLEMENTED` | aggregate `PersistenceChain` |
 | `FLIGHT-1785` | Galaxy/star-system/planet target identity не расходится | `IMPLEMENTED` | `NavigationIdentity` + `IsSelectionConsistentWith` |
 | `FLIGHT-1786` | Hyperspace transaction не переносит planet target между системами | `IMPLEMENTED` | immediate `SynchronizeSelection` + player-jump diagnostics |
-| `FLIGHT-1787` | Live world shell/star system/ship-voyage/current-target scope/residency согласованы | `IMPLEMENTED` | seven live TASK-178 invariants |
+| `FLIGHT-1787` | Live world shell/star system/ship-voyage/current-target scope/residency согласованы | `IMPLEMENTED` | eight live TASK-178 invariants including pilot-control ownership |
 | `FLIGHT-1788` | F5 final acceptance state зависит от TASK-178 | `IMPLEMENTED` | nullable closure result participates in combined PASS/FAIL |
 | `FLIGHT-1789` | Section-37/CI/release/xUnit защищают closure | `IMPLEMENTED` | TASK-178 validator + architecture tests |
-| `FLIGHT-ACC-178` | Clean build + F5 TASK-178 PASS | `IN_PROGRESS` | external Windows/Godot required; expected contracts=6/6, model chains=6/6, live=7/7 |
+| `FLIGHT-ACC-178` | Clean build + F5 TASK-178 PASS | `IN_PROGRESS` | external Windows/Godot required; expected contracts=6/6, model chains=6/6, live=8/8 |
 | `FLIGHT-MANUAL-178` | Cross-system smoke подтверждает target clear/sync | `IN_PROGRESS` | repair/commission → station → hyperspace; expected targetCleared=1, interplanetarySync=1 |
 
 
@@ -6430,7 +6461,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=7/7; manual hyperspace target-clear smoke |
+| 1 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
 | 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |

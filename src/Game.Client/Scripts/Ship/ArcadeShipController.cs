@@ -105,6 +105,7 @@ public partial class ArcadeShipController : CharacterBody3D
     private bool _externalControlActive;
     private bool _manualControlEnabled = true;
     private bool _pilotEnabled = true;
+    private bool _parkedControlLocked;
     private uint _defaultCollisionLayer;
     private uint _defaultCollisionMask;
     private int _runtimeErrorCount;
@@ -120,6 +121,12 @@ public partial class ArcadeShipController : CharacterBody3D
     public bool ExternalControlActive => _externalControlActive;
     public bool ManualControlEnabled => _manualControlEnabled;
     public bool PilotEnabled => _pilotEnabled;
+    public bool ParkedControlLocked => _parkedControlLocked;
+    public bool ManualInputOwnershipActive =>
+        _pilotEnabled &&
+        !_parkedControlLocked &&
+        _manualControlEnabled &&
+        !_externalControlActive;
     public ShipCameraMode CameraMode { get; private set; } = ShipCameraMode.Chase;
     public int CameraSwitchCount { get; private set; }
     public int RuntimeErrorCount => _runtimeErrorCount;
@@ -308,6 +315,30 @@ public partial class ArcadeShipController : CharacterBody3D
         }
     }
 
+    public void SetParkedControlLock(bool locked)
+    {
+        _parkedControlLocked = locked;
+        ClearExternalCommand();
+        Velocity = Vector3.Zero;
+        AngularVelocityLocal = Vector3.Zero;
+        _mouseLookInput = Vector2.Zero;
+
+        if (locked)
+        {
+            SetManualControlEnabled(false);
+            SetPhysicsProcess(false);
+            return;
+        }
+
+        if (_pilotEnabled)
+        {
+            SetManualControlEnabled(true);
+            SetPhysicsProcess(true);
+            UpdateAtmosphereContext();
+            UpdateDiagnostics();
+        }
+    }
+
     public void SetPilotEnabled(bool enabled)
     {
         _pilotEnabled = enabled;
@@ -319,6 +350,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
         if (!enabled)
         {
+            _parkedControlLocked = false;
             ClearExternalCommand();
             SetManualControlEnabled(false);
             Velocity = Vector3.Zero;
@@ -342,6 +374,7 @@ public partial class ArcadeShipController : CharacterBody3D
             return;
         }
 
+        _parkedControlLocked = false;
         SetManualControlEnabled(true);
         SetCameraMode(CameraMode, false);
         Input.MouseMode = Input.MouseModeEnum.Captured;

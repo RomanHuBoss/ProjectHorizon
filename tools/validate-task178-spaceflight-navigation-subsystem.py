@@ -32,7 +32,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.178", "VERSION must be alpha.178", failures)
+need(version in {"0.1.0-alpha.178", "0.1.0-alpha.178.1"}, "VERSION must be alpha.178/178.1", failures)
 need("ExpectedContractCount = 6" in model and
      all(token in model for token in (
          "ShipSystemsContract", "VoyageContract", "GalaxyContract",
@@ -55,7 +55,7 @@ need("GalaxyNavigation.LoadSystemForDeveloper" in developer and
 need("TASK-178 spaceflight navigation subsystem READY" in live and
      "TASK-178 spaceflight navigation subsystem acceptance" in live and
      "selectionSync=" in live and "worldContext=" in live and
-     "starSystemSync=" in live and "liveResidency=" in live and
+     "starSystemSync=" in live and "pilotControl=" in live and "liveResidency=" in live and
      "FailSpaceflightNavigationSubsystemAcceptance" in live and
      "did not complete" in live,
      "live TASK-178 integration diagnostics/fail-safe missing", failures)

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.0-alpha.178.1] - 2026-08-16
+
+### Fixed
+- TASK-178.1 fixes loss of mouse/keyboard ship control after boarding: parked/docked ships no longer use a permanent neutral external command that suppresses manual input.
+- Planet-surface and orbital-station states now use an explicit physics-off parked lock, preventing atmospheric safety/minimum-speed systems from making a parked ship fly by itself.
+- Takeoff and undock now return control to the player by default; `K` remains an opt-in navigation assist instead of an automatic external-control takeover.
+- TASK-178 live acceptance now includes an eighth `pilotControl` ownership invariant covering unpiloted, parked, manual-flight and navigation-assist states.
+
+### Runtime evidence that triggered the hotfix
+- User run: boarding reported `voyagePiloted=1` but no `player takeoff PASS`; the ship nevertheless emitted `Ship atmosphere transition: EXIT altitude=84.8 m`, and neither mouse nor keyboard affected it.
+- Godot warning `Atmospheric surface recovery applied: altitude=2.43 m` confirmed that parked ship physics/atmosphere processing was active before an explicit launch.
+
 ## [0.1.0-alpha.178] - 2026-08-16
 
 ### Added

@@ -17,7 +17,8 @@ public partial class SalvageRepairSlice
             _galaxyNavigationRuntime is null ||
             _interplanetaryTravelRuntime is null ||
             _stageOneVoyageRuntime is null ||
-            _shipSystemsRuntime is null)
+            _shipSystemsRuntime is null ||
+            _voyageShip is null)
         {
             return;
         }
@@ -36,7 +37,7 @@ public partial class SalvageRepairSlice
             $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
             $"hyperReady={(ShipSystems.HyperspaceReady ? 1 : 0)}; " +
             $"travelPhase={InterplanetaryTravel.Phase}; selectionSync={(live.SelectionSync ? 1 : 0)}; " +
-            $"residency={(live.Residency ? 1 : 0)}; F5=acceptance.");
+            $"pilotControl={(live.PilotControl ? 1 : 0)}; residency={(live.Residency ? 1 : 0)}; F5=acceptance.");
     }
 
     private void RequestSpaceflightNavigationSubsystemAcceptance()
@@ -104,10 +105,11 @@ public partial class SalvageRepairSlice
         bool passed = model.Passed && liveAvailable && live.AllPassed;
 
         _spaceflightNavigationSubsystemAcceptanceHud = passed
-            ? $"PASS contracts={model.ContractsPassed}/{model.ContractsTotal} live=7/7"
+            ? $"PASS contracts={model.ContractsPassed}/{model.ContractsTotal} live=8/8"
             : $"FAIL contracts={model.ContractsPassed}/{model.ContractsTotal} " +
               $"selection={(live.SelectionSync ? 1 : 0)} world={(live.WorldContext ? 1 : 0)} " +
-              $"star={(live.StarSystemSync ? 1 : 0)} voyage={(live.ShipVoyageSync ? 1 : 0)}";
+              $"star={(live.StarSystemSync ? 1 : 0)} voyage={(live.ShipVoyageSync ? 1 : 0)} " +
+              $"pilotControl={(live.PilotControl ? 1 : 0)}";
 
         string output =
             $"TASK-178 spaceflight navigation subsystem acceptance {(passed ? "PASS" : "FAIL")}: " +
@@ -121,7 +123,8 @@ public partial class SalvageRepairSlice
             $"selectionSync={(live.SelectionSync ? 1 : 0)}; worldContext={(live.WorldContext ? 1 : 0)}; " +
             $"starSystemSync={(live.StarSystemSync ? 1 : 0)}; shipVoyageSync={(live.ShipVoyageSync ? 1 : 0)}; " +
             $"currentPlanetScope={(live.CurrentPlanetScope ? 1 : 0)}; targetScope={(live.TargetScope ? 1 : 0)}; " +
-            $"liveResidency={(live.Residency ? 1 : 0)}; world={live.WorldKind}; system={live.SystemId}; planet={live.PlanetId}; " +
+            $"pilotControl={(live.PilotControl ? 1 : 0)}; liveResidency={(live.Residency ? 1 : 0)}; " +
+            $"world={live.WorldKind}; system={live.SystemId}; planet={live.PlanetId}; " +
             $"result={(passed ? "spaceflight and navigation stack closed as one coherent runtime subsystem" : model.Result)}";
 
         if (passed)
@@ -157,7 +160,8 @@ public partial class SalvageRepairSlice
             _galaxyNavigationRuntime is null ||
             _interplanetaryTravelRuntime is null ||
             _stageOneVoyageRuntime is null ||
-            _shipSystemsRuntime is null)
+            _shipSystemsRuntime is null ||
+            _voyageShip is null)
         {
             live = SpaceflightNavigationLiveSnapshot.Unavailable;
             return false;
@@ -202,6 +206,22 @@ public partial class SalvageRepairSlice
                 planet.PlanetId,
                 GalaxyNavigation.SelectedPlanetId,
                 StringComparison.Ordinal));
+        bool parked = StageOneVoyage.Piloted && StageOneVoyage.Location is
+            StageOneVoyageLocation.PlanetSurface or
+            StageOneVoyageLocation.OrbitalStation;
+        bool pilotControl = !StageOneVoyage.Piloted
+            ? !_voyageShip.PilotEnabled
+            : parked
+                ? _voyageShip.PilotEnabled &&
+                  _voyageShip.ParkedControlLocked &&
+                  !_voyageShip.IsPhysicsProcessing() &&
+                  !_voyageShip.ExternalControlActive
+                : _voyageNavigationAssist
+                    ? _voyageShip.PilotEnabled &&
+                      !_voyageShip.ParkedControlLocked &&
+                      _voyageShip.ExternalControlActive
+                    : _voyageShip.ManualInputOwnershipActive &&
+                      _voyageShip.IsPhysicsProcessing();
         bool residency = WorldResidencyPolicyMatches();
 
         live = new SpaceflightNavigationLiveSnapshot(
@@ -211,12 +231,14 @@ public partial class SalvageRepairSlice
             shipVoyageSync,
             currentPlanetScope,
             targetScope,
+            pilotControl,
             residency,
             world.Kind,
             world.SystemId,
             world.PlanetId);
         return selectionSync && worldContext && starSystemSync &&
-            shipVoyageSync && currentPlanetScope && targetScope && residency;
+            shipVoyageSync && currentPlanetScope && targetScope &&
+            pilotControl && residency;
     }
 
     private readonly record struct SpaceflightNavigationLiveSnapshot(
@@ -226,12 +248,14 @@ public partial class SalvageRepairSlice
         bool ShipVoyageSync,
         bool CurrentPlanetScope,
         bool TargetScope,
+        bool PilotControl,
         bool Residency,
         WorldSceneKind WorldKind,
         string SystemId,
         string PlanetId)
     {
         public static SpaceflightNavigationLiveSnapshot Unavailable => new(
+            false,
             false,
             false,
             false,
@@ -250,6 +274,7 @@ public partial class SalvageRepairSlice
             ShipVoyageSync &&
             CurrentPlanetScope &&
             TargetScope &&
+            PilotControl &&
             Residency;
     }
 }

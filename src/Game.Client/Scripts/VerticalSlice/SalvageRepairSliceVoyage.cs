@@ -150,13 +150,12 @@ public partial class SalvageRepairSlice
             : _shipTerminalCollisionMask;
         _voyageShip.SetPilotEnabled(piloted);
 
-        if (piloted && StageOneVoyage.Location is
+        bool parked = piloted && StageOneVoyage.Location is
             StageOneVoyageLocation.PlanetSurface or
-            StageOneVoyageLocation.OrbitalStation)
-        {
-            _voyageShip.SetExternalCommand(ShipControlCommand.Neutral);
-        }
-        else if (piloted && !_voyageNavigationAssist)
+            StageOneVoyageLocation.OrbitalStation;
+        _voyageShip.SetParkedControlLock(parked);
+
+        if (piloted && !parked && !_voyageNavigationAssist)
         {
             _voyageShip.ClearExternalCommand();
         }
@@ -432,7 +431,9 @@ public partial class SalvageRepairSlice
             $"class={ShipSystems.ShipClassId}; " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"flightReady={(ShipSystems.FlightReady ? 1 : 0)}; " +
-            $"interactor={interactor.Name}; controls=T takeoff,K assist,Enter dock/land,F2 camera.");
+            $"interactor={interactor.Name}; parked={(_voyageShip?.ParkedControlLocked == true ? 1 : 0)}; " +
+            $"physics={(_voyageShip?.IsPhysicsProcessing() == true ? 1 : 0)}; " +
+            "controls=T takeoff,K assist,Enter dock/land,F2 camera.");
     }
 
     private void BeginStageOneTakeoff()
@@ -446,7 +447,7 @@ public partial class SalvageRepairSlice
             return;
         }
 
-        _voyageNavigationAssist = true;
+        _voyageNavigationAssist = false;
         ApplyStageOneVoyageToScene();
         PublishDomainEvent(new PlanetExited(
             GalaxyNavigation.CurrentPlanetId,
@@ -459,7 +460,9 @@ public partial class SalvageRepairSlice
             $"acceleration={profile.Acceleration.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"maxSpeed={profile.MaxSpeed.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"maneuverYaw={profile.YawRateDegrees.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            "target=orbital_station; navigationAssist=1.");
+            $"target=orbital_station; navigationAssist=0; " +
+            $"manualControl={(_voyageShip?.ManualInputOwnershipActive == true ? 1 : 0)}; " +
+            $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
 
     private void TryDockStageOneVoyage()
@@ -535,14 +538,16 @@ public partial class SalvageRepairSlice
 
         CloseStationServices();
         _stationServicesOpenedFromVoyage = false;
-        _voyageNavigationAssist = true;
+        _voyageNavigationAssist = false;
         ApplyStageOneVoyageToScene();
         _lastDomainEvent = "StageOneUndock";
         QueueCurrentSnapshot(AutosaveTrigger.Takeoff);
         GD.Print(
             "TASK-112 player undock PASS: " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            "target=planetary_landing_pad; navigationAssist=1.");
+            $"target=planetary_landing_pad; navigationAssist=0; " +
+            $"manualControl={(_voyageShip?.ManualInputOwnershipActive == true ? 1 : 0)}; " +
+            $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
 
     private void TryLandStageOneVoyage()

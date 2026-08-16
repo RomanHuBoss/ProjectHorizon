@@ -15,9 +15,13 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.1 — Pilot Input Ownership Hotfix
+
+Alpha.178.1 fixes the player-facing control regression discovered after TASK-178. Boarding a repaired ship on the planet previously set a neutral **external** command while leaving ship physics and atmospheric safety active. External control overrides `ReadManualCommand()`, so mouse/WASD were ignored while atmosphere recovery/minimum-speed logic could still move the ship. Parked/docked states now use an explicit physics-off control lock. Press `T` to launch/undock; after the transition the player owns mouse/keyboard control immediately. `K` toggles navigation assist explicitly. TASK-178 F5 acceptance now reports and requires `pilotControl=1`.
+
 ## TASK-178 — Spaceflight & Navigation Subsystem Closure
 
-Alpha.178 moves the next mega-iteration outside the now-verified planetary-surface stack. It closes the already implemented ship/readiness, Stage-1 voyage, galaxy/hyperspace, star-system simulation, interplanetary transfer and world-scene coordinator mechanics as **one spaceflight/navigation subsystem**. F5 aggregates six normative reports (TASK-110/112/114/128/148/152), then requires cross-contract readiness, fuel, transition, persistence, navigation-identity and bounded-residency chains plus seven live Godot coherence invariants.
+Alpha.178 moves the next mega-iteration outside the now-verified planetary-surface stack. It closes the already implemented ship/readiness, Stage-1 voyage, galaxy/hyperspace, star-system simulation, interplanetary transfer and world-scene coordinator mechanics as **one spaceflight/navigation subsystem**. F5 aggregates six normative reports (TASK-110/112/114/128/148/152), then requires cross-contract readiness, fuel, transition, persistence, navigation-identity and bounded-residency chains plus eight live Godot coherence invariants, including explicit pilot-control ownership.
 
 The iteration also fixes a real boundary defect: a same-system planet selection could remain cached in `InterplanetaryTravelRuntime` after `GalaxyNavigation` successfully mutated to another star system. The successful hyperspace transaction now synchronizes the interplanetary state immediately, and `IsSelectionConsistentWith()` rejects any source/target that does not belong to the current system. `TASK-114 player hyperspace jump PASS` reports `planetTargetCleared` and `interplanetarySync`; TASK-178 exposes the full closure on the existing F5 acceptance. See `docs/SPACEFLIGHT_NAVIGATION_SUBSYSTEM.md`.
 

@@ -42,3 +42,8 @@ TASK-178 spaceflight navigation subsystem acceptance PASS: contracts=6/6; ship=1
 ```
 
 For manual cross-system smoke after F5: repair/commission the ship, reach the orbital station, select a reachable different system and hyperspace. `TASK-114 player hyperspace jump PASS` must include `planetTargetCleared=1; interplanetarySync=1`, and the destination system must open at its orbital station without retaining a planet target from the previous system.
+
+
+## TASK-178.1 pilot-control ownership
+
+The live closure additionally requires `pilotControl=1`. Unpiloted ships must have pilot control disabled; piloted surface/station ships must be parked with physics off and no external command; manual flight must expose `ManualInputOwnershipActive`; navigation assist may own external control only when explicitly enabled by the player.
