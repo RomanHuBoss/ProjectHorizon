@@ -254,6 +254,23 @@ public partial class TerrainChunkManager : Node3D
     }
 
 
+
+    public void SetRuntimeObserver(CharacterBody3D observer)
+    {
+        ArgumentNullException.ThrowIfNull(observer);
+        if (ReferenceEquals(_player, observer))
+        {
+            return;
+        }
+
+        _player = observer;
+        _currentChunk = new Vector2I(int.MinValue, int.MinValue);
+        if (IsInsideTree())
+        {
+            PlanRefresh(executeImmediately: true);
+        }
+    }
+
     public override void _ExitTree()
     {
         _operationTimer?.Stop();

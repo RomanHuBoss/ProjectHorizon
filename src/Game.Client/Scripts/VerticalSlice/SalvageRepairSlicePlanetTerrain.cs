@@ -191,8 +191,29 @@ public partial class SalvageRepairSlice
         }
     }
 
+    private void UpdatePlanetSurfaceStreamingObserver()
+    {
+        if (_planetSurfaceStreamer is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceStreamer))
+        {
+            return;
+        }
+
+        CharacterBody3D? observer = _surfaceRuntimeActive &&
+            StageOneVoyage.Piloted &&
+            _voyageShip is not null
+                ? _voyageShip
+                : _player;
+        if (observer is not null && GodotObject.IsInstanceValid(observer))
+        {
+            _planetSurfaceStreamer.SetRuntimeObserver(observer);
+        }
+    }
+
     private void UpdatePlanetSurfaceStreaming()
     {
+        UpdatePlanetSurfaceStreamingObserver();
+
         if (_surfaceRuntimeActive && !_planetSurfaceFallbackRetired)
         {
             // Keep the body on the safe side of the synchronous collider for

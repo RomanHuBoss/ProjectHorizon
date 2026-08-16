@@ -90,6 +90,7 @@ jobs:
           python3 tools/validate-task1784-planetary-landing-lighting.py
           python3 tools/validate-task1785-spaceflight-kinematics-collision.py
           python3 tools/validate-task1786-orbital-scale-mouse-surface.py
+          python3 tools/validate-task1787-surface-brake-handoff.py
 
       - name: Unit tests and coverage
         run: >-

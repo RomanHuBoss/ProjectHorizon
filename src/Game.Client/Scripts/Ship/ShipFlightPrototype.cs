@@ -660,7 +660,7 @@ public partial class ShipFlightPrototype : Node3D
             $"N={FormatCompactTestState(_landingTestState)}\n" +
             $"{TouchdownTestStatusText}\n" +
             $"{LandingSoakStatusText}\n" +
-            "W/S — тяга  •  A/D — боковая  •  Space/C — вверх/вниз  •  " +
+            "W — тяга  •  S/X — тормоз  •  A/D — боковая  •  Space/C — вверх/вниз  •  " +
             "мышь — тангаж/рыскание\n" +
             "Q/E — крен  •  B — форсаж  •  X — тормоз  •  " +
             "G — стабилизация  •  F2 — камера  •  P — атмосфера  •  " +
@@ -700,7 +700,7 @@ public partial class ShipFlightPrototype : Node3D
             $"vertical={_maximumVerticalSpeed:F2}; " +
             $"angular={_maximumAngularSpeed:F2}\n\n" +
             "Управление:\n" +
-            "W/S — тяга вперёд/назад\n" +
+            "W — тяга вперёд  •  S/X — тормоз\n" +
             "A/D — боковые импульсные двигатели\n" +
             "Space/C — вертикальные импульсные двигатели\n" +
             "Мышь или стрелки — тангаж и рыскание\n" +

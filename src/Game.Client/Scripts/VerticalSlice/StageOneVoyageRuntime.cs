@@ -357,7 +357,8 @@ public sealed class StageOneVoyageRuntime
         LastCheckpoint = "hyperspace.arrival";
     }
 
-    public void ArriveAtPlanetaryApproach()
+    public void ArriveAtPlanetaryApproach(
+        double incomingSpeedMetersPerSecond = 0.0)
     {
         if (!Piloted)
         {
@@ -372,17 +373,39 @@ public sealed class StageOneVoyageRuntime
                 "Planetary approach requires orbital flight.");
         }
 
+        // TASK-178.7: the old coordinate handoff hard-reset velocity to zero,
+        // creating a visible/physical jerk exactly when entering the planet
+        // approach. Preserve the incoming speed magnitude in the destination
+        // tangent frame, oriented toward the landing area with a bounded
+        // descent component. Atmosphere drag then changes it continuously.
+        double approachSpeed = double.IsFinite(incomingSpeedMetersPerSecond)
+            ? Math.Clamp(incomingSpeedMetersPerSecond, 0.0,
+                PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed)
+            : 0.0;
+        // An orbital entry trajectory is predominantly radial. Map that
+        // radial component to local -Y and retain a smaller forward tangent
+        // component instead of rotating almost all velocity sideways at the
+        // coordinate handoff. The ship pitch is matched to the same vector,
+        // keeping heading and velocity coherent across the transition.
+        double descentSpeed = approachSpeed * 0.86;
+        double horizontalSpeed = Math.Sqrt(Math.Max(
+            0.0,
+            (approachSpeed * approachSpeed) - (descentSpeed * descentSpeed)));
+        double entryPitch = approachSpeed <= 0.0001
+            ? 0.0
+            : -Math.Atan2(descentSpeed, Math.Max(0.0001, horizontalSpeed));
+
         Location = StageOneVoyageLocation.InboundFlight;
         SetPose(
             SurfacePositionX,
             PlanetApproachPositionY,
             PlanetApproachPositionZ,
+            entryPitch,
+            Math.PI,
             0.0,
             0.0,
-            0.0,
-            0.0,
-            0.0,
-            0.0);
+            -descentSpeed,
+            horizontalSpeed);
         LastCheckpoint = "planet.approach";
     }
 

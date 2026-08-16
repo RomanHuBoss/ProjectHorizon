@@ -121,6 +121,15 @@ public partial class SalvageRepairSlice
             24.0 - (12.0 * atmosphericFactor));
         _voyageShip.AtmosphereMaximumClimbSpeed = (float)(
             10.0 + (12.0 * atmosphericFactor));
+        // TASK-178.7: aerodynamic forces must fade over the same broad envelope
+        // as the visual atmosphere. The old 90 m atmosphere switched gravity,
+        // lift and drag off around 85 m while the sky continued blending to
+        // vacuum until 620 m, producing a very noticeable flight jerk in both
+        // directions.
+        _voyageShip.AtmosphereFadeStart = (float)
+            OrbitalHandoffPresentationRuntime.VacuumBlendStartMeters;
+        _voyageShip.AtmosphereHeight = (float)
+            OrbitalHandoffPresentationRuntime.VacuumBlendEndMeters;
     }
 
     private void ApplyStageOneVoyageToScene(bool restoreWorldContext = false)
@@ -440,7 +449,7 @@ public partial class SalvageRepairSlice
             displayRadius,
             Math.Max(displayRadius + 0.1, centerDistanceBeforeHandoff));
 
-        StageOneVoyage.ArriveAtPlanetaryApproach();
+        StageOneVoyage.ArriveAtPlanetaryApproach(entrySpeed);
         _voyageNavigationAssist = automatic;
         _voyageShip.ClearExternalCommand();
         ApplyStageOneVoyageToScene();

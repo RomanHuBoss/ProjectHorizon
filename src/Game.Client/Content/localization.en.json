@@ -651,7 +651,7 @@
     "ui.action.ship_lift_up": "Lift up",
     "ui.action.ship_pitch_down": "Pitch down",
     "ui.action.ship_pitch_up": "Pitch up",
-    "ui.action.ship_reverse": "Thrust reverse",
+    "ui.action.ship_reverse": "Brake (S)",
     "ui.action.ship_roll_left": "Roll left",
     "ui.action.ship_roll_right": "Roll right",
     "ui.action.ship_stabilize": "Stabilization toggle",

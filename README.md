@@ -15,6 +15,18 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.7 — Surface Solidity, Monotonic Brake & Smooth Atmosphere Handoff
+
+Alpha.178.7 closes three runtime defects exposed by the first alpha.178.6 owner flight. Near-surface residency is no longer a sphere around the starter landing pad: it is based on actual terrain-relative altitude, the bounded terrain streamer follows the piloted ship, and a 3.2 m terrain-aware **swept** floor checks the whole motion segment before accepting the new ship position. The ship therefore cannot continue below the sampled curved surface even if it crosses the terrain between frames.
+
+Manual arcade braking is now strictly monotonic. `S` and `X` brake the current velocity toward exact zero; no translational thrust or heading-alignment step can turn a held brake into reverse acceleration. The final brake envelope is applied after atmosphere/guidance forces, so those forces cannot push a nearly stopped ship through zero during the same tick. External/autopilot signed thrust remains available internally where an explicit manoeuvre requires it.
+
+The physical atmosphere now uses exactly the same **110..620 m smoothstep envelope** as the visual atmosphere-to-vacuum presentation. Gravity/lift/drag are the complement of the vacuum blend, and the old instantaneous radial climb-speed clamp is replaced by a blend-scaled acceleration limiter. Orbital-to-surface coordinate handoff occurs at 680 m, outside the completed blend, preserves incoming speed and maps it to a coherent radial descent/pitch; near-surface content is preloaded to 900 m. Both ascent and re-entry therefore cross one continuous dynamics/lighting envelope rather than a hidden physics switch.
+
+### Acceptance TASK-178.7
+
+Run `tools\run-section37-quality.cmd` and then verify in Godot: held `S/X` stops at zero without reversing; terrain remains solid after flying hundreds of metres away from the starter pad; ascent/re-entry has no abrupt dynamics/lighting step; F5 prints `TASK-178.7 surface solidity/braking/handoff acceptance PASS`.
+
 ## TASK-178.6 — Orbital Scale, Mouse Flight & Multi-Planet Surface Activation
 
 Alpha.178.6 addresses three defects exposed by the first alpha.178.5 flight. The orbital scene is widened by another order of magnitude: planet centres use ~100 km-class compressed spacing, moons keep tens of kilometres of clear space beyond the parent visual surface, and landable planet radii are derived from the catalogued 20–80 km bodies at a much larger compressed display scale. The focused planet is no longer moved farther away when its radius grows; it is kept at a fixed ~9 km surface clearance, so its angular size genuinely reads as a planet. Cameras retain the scene to ~1,200 km.

@@ -651,7 +651,7 @@
     "ui.action.ship_lift_up": "Подъём",
     "ui.action.ship_pitch_down": "Тангаж вниз",
     "ui.action.ship_pitch_up": "Тангаж вверх",
-    "ui.action.ship_reverse": "Обратная тяга",
+    "ui.action.ship_reverse": "Торможение (S)",
     "ui.action.ship_roll_left": "Крен влево",
     "ui.action.ship_roll_right": "Крен вправо",
     "ui.action.ship_stabilize": "Переключить стабилизацию",

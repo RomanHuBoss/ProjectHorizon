@@ -184,8 +184,9 @@ public partial class SalvageRepairSlice
             return true;
         }
 
+        double arrivalSpeed = _voyageShip.Speed;
         _voyageShip.ClearExternalCommand();
-        StageOneVoyage.ArriveAtPlanetaryApproach();
+        StageOneVoyage.ArriveAtPlanetaryApproach(arrivalSpeed);
         _voyageNavigationAssist = true;
         ActivateCurrentPlanetSurfaceContent();
         ApplyStageOneVoyageToScene();

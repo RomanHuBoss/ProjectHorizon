@@ -45,7 +45,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6"}, "VERSION must be alpha.178.4", f)
+need(version in {"0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7"}, "VERSION must be alpha.178.4", f)
 
 # Persistence restore must bypass only the live transition graph, not weaken it.
 need("restoreWorldContext: saveData is not null" in voyage and
@@ -85,7 +85,7 @@ need(number(ship_scene, "far") >= 500000.0 and ship_scene.count("far = ") >= 2,
 need("OrbitalEntryClearanceMeters = 220.0" in approach and
      "OrbitalEntryCaptureRadiusMeters = 95.0" in approach and
      number(approach, "MaximumOrbitalEntrySpeed") >= 28.0 and
-     "SurfaceApproachAltitudeMeters = 220.0" in approach and
+     "SurfaceApproachAltitudeMeters = 680.0" in approach and
      "IsOrbitalEntryCaptureReady" in approach,
      "planetary entry envelope contract is incomplete", f)
 need("TryGetBodyApproachPoint" in interplanetary and

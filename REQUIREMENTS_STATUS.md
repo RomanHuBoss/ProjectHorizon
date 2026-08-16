@@ -2,13 +2,47 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.7-surface-brake-handoff.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.6 Orbital Scale, Mouse Flight & Multi-Planet Surface Activation
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.7 Surface Solidity, Monotonic Brake & Smooth Atmosphere Handoff
+
+**Исходный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.7-surface-brake-handoff.zip`.  
+**Версия:** `0.1.0-alpha.178.7`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+SURFACE/BRAKE/HANDOFF SMOKE+F5`.
+
+### Внешнее evidence / обнаруженные дефекты
+
+Owner-run alpha.178.6 подтвердил `TASK-178.6 ship mouse steering INPUT PASS` и физический `TASK-178.5 free-flight planetary entry PASS` на 85 m/s. После surface handoff выявились три оставшихся runtime-дефекта: surface residency всё ещё вычислялась как расстояние до starter pad и могла отключить terrain collision при горизонтальном полёте; длительное торможение могло восприниматься как reverse thrust; аэродинамика исчезала около старого 90 m atmospheric height, тогда как визуальный переход продолжался до ~620 m, создавая рывок.
+
+### Реализация
+
+- near-surface residency теперь определяется clearance над фактическим `PlanetSurfaceTerrainRuntime`, ceiling `900 m`, а не расстоянием до единственной площадки;
+- `TerrainChunkManager.SetRuntimeObserver()` переключает bounded 25/9 streamer на `VoyageShip` при пилотируемом near-surface полёте и обратно на Player после выхода;
+- новый terrain-aware swept hard floor `3.2 m` использует фактический semantic terrain + curved mapping и проверяет previous→current segment шагом ~`1.25 m` (до 96 probes), поэтому terrain нельзя туннелировать между кадрами; при блокировке удаляется только inward normal velocity;
+- manual `S` и `X` трактуются как brake; `ArcadeShipBrakeRuntime` монотонно уменьшает модуль velocity до точного нуля, а post-environment envelope запрещает gravity/guidance перевести почти остановленный ship через ноль в обратное движение;
+- physical atmosphere синхронизирована с **тем же `110..620 m` smoothstep**, что и visual vacuum blend; gravity/lift/drag = complementary envelope, а прежний мгновенный radial climb clamp заменён blend-scaled acceleration limiter;
+- orbital→surface coordinate handoff поднят с `220` до `680 m`, то есть выполняется уже после завершения physical/visual blend; incoming speed сохраняется, velocity remap делается преимущественно radial-down с согласованным pitch вместо hard stop/почти горизонтального перенаправления; surface runtime заранее активируется до `900 m`;
+- добавлены TASK-178.7 acceptance, xUnit и quality gates.
+
+### Критерии внешней приёмки
+
+1. `tools\run-section37-quality.cmd`: `0 errors / 0 warnings`, TASK-178.7 static gate PASS.
+2. В ручном полёте удерживать `S` или `X` до полной остановки: speed монотонно уменьшается до `0`, корабль не начинает двигаться назад.
+3. На surface approach пролететь горизонтально >300 m от starter pad и попытаться пересечь terrain в том числе на высокой скорости: underground flight невозможен. При попытке tunnelling должен появиться `TASK-178.7 surface penetration BLOCKED ... swept=1`, после чего ship остаётся над terrain.
+4. Взлёт/повторный вход: отсутствие заметного physics/lighting jerk; общий dynamics/presentation envelope должен идти плавно `110..620 m`, без мгновенного обрезания radial velocity. Handoff в local surface выполняется на `680 m` без обнуления speed.
+5. F5: `TASK-178.7 ... acceptance PASS`, затем final runtime acceptance PASS.
+
+### Изменения статусов
+
+- `TASK-178.6`: runtime evidence частично подтверждает mouse input и free-flight entry; полный cross-planet/F5 остаётся внешним хвостом.
+- `TASK-178.7`: `IMPLEMENTED`, ожидает external build/runtime acceptance.
+
+## 0A. Предыдущая emergency-итерация 2026-08-16 — TASK-178.6 Orbital Scale, Mouse Flight & Multi-Planet Surface Activation
 
 **Исходный снимок:** `ProjectHorizon-main-task178.5-spaceflight-kinematics-collision.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`.  

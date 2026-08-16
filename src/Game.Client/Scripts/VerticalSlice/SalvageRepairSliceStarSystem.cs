@@ -14,6 +14,7 @@ public partial class SalvageRepairSlice
         uint CollisionMask);
 
     public const float PlanetRuntimeActivationRadiusMeters = 260.0f;
+    public const float PlanetRuntimeActivationAltitudeMeters = 900.0f;
     private StarSystemSimulationRuntime? _starSystemSimulationRuntime;
     private StarSystemSimulationNode? _starSystemSimulationNode;
     private readonly Dictionary<Node3D, SurfaceRuntimeNodeState>
@@ -133,12 +134,26 @@ public partial class SalvageRepairSlice
             return false;
         }
 
-        Vector3 surface = SurfaceLogicalToLocalPosition(
-            StageOneVoyageRuntime.SurfacePositionX,
-            StageOneVoyageRuntime.SurfacePositionY,
-            StageOneVoyageRuntime.SurfacePositionZ);
-        return _voyageShip.GlobalPosition.DistanceTo(surface) <=
-            PlanetRuntimeActivationRadiusMeters;
+        // TASK-178.7: surface residency is an altitude envelope, not a sphere
+        // around the starter landing pad. The old distance-to-pad test disabled
+        // terrain collision after only ~260 m of horizontal flight and allowed a
+        // piloted ship to pass below the visible surface. Keep the bounded 25/9
+        // surface runtime resident anywhere the ship is genuinely close to the
+        // current terrain.
+        Vector3 logical = WorldToPlanetSurfaceLogicalPosition(
+            _voyageShip.GlobalPosition);
+        double terrainHeight = SamplePlanetSurfaceHeight(logical.X, logical.Z);
+        double clearance = logical.Y - terrainHeight;
+        Vector3 physicalSurface = SurfaceLogicalToLocalPosition(
+            logical.X,
+            terrainHeight,
+            logical.Z);
+        double physicalClearance = _voyageShip.GlobalPosition.DistanceTo(
+            physicalSurface);
+        return double.IsFinite(clearance) && double.IsFinite(physicalClearance) &&
+            (clearance < 0.0 ||
+             (clearance <= PlanetRuntimeActivationAltitudeMeters &&
+              physicalClearance <= PlanetRuntimeActivationAltitudeMeters + 64.0));
     }
 
     private void ApplySurfaceRuntimeActivation(bool active, bool force)
@@ -170,6 +185,7 @@ public partial class SalvageRepairSlice
         {
             RefreshNpcNavigationObstacles();
         }
+        UpdatePlanetSurfaceStreamingObserver();
 
         if (!force)
         {

@@ -97,7 +97,7 @@ public partial class SalvageRepairSlice
         }
 
         InterplanetaryTravel.SynchronizeSelection(GalaxyNavigation);
-        StageOneVoyage.ArriveAtPlanetaryApproach();
+        StageOneVoyage.ArriveAtPlanetaryApproach(entrySpeed);
         _voyageNavigationAssist = false;
         _voyageShip.ClearExternalCommand();
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.178.7] - 2026-08-16
+
+### Fixed — TASK-178.7 surface solidity, monotonic braking and smooth atmosphere handoff
+
+- Replaced the old landing-pad-distance surface residency test with a terrain-relative altitude envelope. Surface collision/streaming can no longer disappear merely because a piloted ship moved more than ~260 m horizontally from the starter pad.
+- Terrain streaming now follows `VoyageShip` while the ship owns the near-surface runtime. A terrain-aware **swept** hard floor samples the entire previous→current ship segment at ~1.25 m intervals (bounded to 96 probes), clamps the ship to at least 3.2 m above curved terrain and removes inward normal velocity. This is a final safety net behind CharacterBody/trimesh collision and prevents both slow underground flight and high-speed terrain tunnelling.
+- Manual `S` and `X` now both mean braking in the arcade control set. Braking is exclusive and monotonic: no thrust is applied in the same tick, heading alignment is suspended, and a post-environment brake envelope prevents gravity/guidance from pushing velocity through zero into reverse acceleration.
+- Physical atmosphere dynamics now use the **same 110..620 m smoothstep** as the visual atmosphere/vacuum presentation. Gravity/lift/drag and lighting are exact complementary blends; the former hard radial-climb clamp is replaced by a blend-scaled acceleration limiter, so crossing the atmosphere boundary cannot inject an instantaneous velocity correction.
+- Planetary coordinate handoff is moved to 680 m, outside the completed atmosphere blend, while surface content preloads to 900 m. Incoming speed is preserved and remapped to a predominantly radial descent vector with matching ship pitch instead of being hard-stopped or redirected almost horizontally. This removes both magnitude and direction pops on re-entry.
+- Added TASK-178.7 model/live/xUnit/static/section-37/CI/release/F5 gates.
+
+### External evidence that triggered the repair
+
+- Alpha.178.6 owner runtime confirmed mouse input now reaches `_Input` and a safe 85 m/s free-flight planetary entry reaches the 220 m surface handoff, but the ship could subsequently leave the bounded pad-centred collision window and pass below the visible terrain.
+- Owner feedback also confirmed that held braking could become reverse acceleration and that atmosphere/vacuum transitions still felt abrupt.
+
 ## [0.1.0-alpha.178.6] - 2026-08-16
 
 ### Fixed — TASK-178.6 orbital scale, mouse flight and multi-planet surface activation

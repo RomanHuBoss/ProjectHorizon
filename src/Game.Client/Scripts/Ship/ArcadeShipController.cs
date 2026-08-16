@@ -311,9 +311,22 @@ public partial class ArcadeShipController : CharacterBody3D
             return;
         }
 
+        Vector3 velocityBeforeBrakeForces = Velocity;
         ApplyLinearFlight(command, deltaSeconds);
         ApplyAtmosphericFlight(command, deltaSeconds);
         ApplyAtmosphericRadialGuidance(deltaSeconds);
+        if (command.Brake)
+        {
+            // TASK-178.7: environmental/gravity forces are evaluated first,
+            // then the brake envelope clamps the final result. A held brake
+            // therefore cannot cross zero and start accelerating backwards,
+            // even at an atmosphere/space boundary.
+            Velocity = ArcadeShipBrakeRuntime.ApplyMonotonicBrakeEnvelope(
+                velocityBeforeBrakeForces,
+                Velocity,
+                BrakeDeceleration,
+                deltaSeconds);
+        }
         ApplyAngularFlight(command, deltaSeconds);
         ApplyArcadeFlightAssist(command, deltaSeconds);
         MoveAndSlide();
@@ -524,7 +537,15 @@ public partial class ArcadeShipController : CharacterBody3D
 
     private ShipControlCommand ReadManualCommand()
     {
-        float forward = Input.GetAxis("ship_reverse", "ship_forward");
+        // TASK-178.7: in the arcade control set S is a brake, not an
+        // unlatched reverse-thrust command. Holding a brake must be monotonic:
+        // speed can approach zero but may never cross zero and accelerate the
+        // ship backwards. External/autopilot commands can still request signed
+        // Forward values explicitly when a manoeuvre actually needs reverse
+        // thrust.
+        float forward = Input.GetActionStrength("ship_forward");
+        bool brake = Input.IsActionPressed("ship_brake") ||
+            Input.IsActionPressed("ship_reverse");
         float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right");
         float lift = Input.GetAxis("ship_lift_down", "ship_lift_up");
         float roll = Input.GetAxis("ship_roll_left", "ship_roll_right");
@@ -538,14 +559,25 @@ public partial class ArcadeShipController : CharacterBody3D
             Mathf.Clamp(_mouseLookInput.X + pitchKeyboard, -1.0f, 1.0f),
             Mathf.Clamp(_mouseLookInput.Y + yawKeyboard, -1.0f, 1.0f),
             roll,
-            Input.IsActionPressed("ship_boost"),
-            Input.IsActionPressed("ship_brake"));
+            Input.IsActionPressed("ship_boost") && !brake,
+            brake);
     }
 
     private void ApplyLinearFlight(
         ShipControlCommand command,
         float deltaSeconds)
     {
+        if (command.Brake)
+        {
+            // Braking is exclusive with pilot thrust. The actual monotonic
+            // deceleration is applied after atmosphere/environment forces so
+            // those forces cannot push the velocity through zero in the same
+            // physics tick.
+            BoostActive = false;
+            BrakeActive = true;
+            return;
+        }
+
         float forwardAcceleration = command.Forward >= 0.0f
             ? ForwardAcceleration
             : ReverseAcceleration;
@@ -561,13 +593,7 @@ public partial class ArcadeShipController : CharacterBody3D
             GlobalTransform.Basis.Orthonormalized() * localAcceleration;
         Velocity += worldAcceleration * deltaSeconds;
 
-        if (command.Brake)
-        {
-            Velocity = Velocity.MoveToward(
-                Vector3.Zero,
-                BrakeDeceleration * deltaSeconds);
-        }
-        else if (PassiveLinearDamping > 0.0f)
+        if (PassiveLinearDamping > 0.0f)
         {
             Velocity = Velocity.MoveToward(
                 Vector3.Zero,
@@ -593,6 +619,13 @@ public partial class ArcadeShipController : CharacterBody3D
         ShipControlCommand command,
         float deltaSeconds)
     {
+        // Directional alignment preserves speed by design. While braking that
+        // is the wrong contract: only speed reduction is allowed.
+        if (command.Brake)
+        {
+            return;
+        }
+
         Velocity = ArcadeFlightAssistRuntime.AlignVelocityToShipAxes(
             Velocity,
             GlobalTransform.Basis,

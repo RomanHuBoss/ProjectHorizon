@@ -66,7 +66,7 @@ need('TryApplyInterplanetaryNavigationAssist()' in voyage and 'SetExternalComman
      'existing K navigation assist is not integrated with physical cruise', failures)
 need('CancelInterplanetaryCruiseForManualControl' in voyage,
      'manual-control cruise cancellation missing', failures)
-need('ArriveAtPlanetaryApproach()' in voyage_runtime and 'planet.approach' in voyage_runtime,
+need('ArriveAtPlanetaryApproach(' in voyage_runtime and 'planet.approach' in voyage_runtime,
      'destination local-approach handoff missing', failures)
 need('ApplyStageOneVoyageToScene();' in slice_travel and 'QueueCurrentSnapshot' in slice_travel,
      'arrival does not rebase scene/persist state', failures)

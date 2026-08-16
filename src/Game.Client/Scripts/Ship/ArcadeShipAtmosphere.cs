@@ -12,6 +12,9 @@ public partial class ArcadeShipController
     [Export(PropertyHint.Range, "5.0,1000.0,1.0")]
     public float AtmosphereHeight { get; set; } = 90.0f;
 
+    [Export(PropertyHint.Range, "0.0,1000.0,1.0")]
+    public float AtmosphereFadeStart { get; set; } = 18.0f;
+
     [Export(PropertyHint.Range, "0.0,30.0,0.1")]
     public float AtmosphereGravityAcceleration { get; set; } = 7.5f;
 
@@ -32,6 +35,9 @@ public partial class ArcadeShipController
 
     [Export(PropertyHint.Range, "1.0,100.0,0.5")]
     public float AtmosphereMaximumClimbSpeed { get; set; } = 16.0f;
+
+    [Export(PropertyHint.Range, "1.0,150.0,0.5")]
+    public float AtmosphereClimbLimitAcceleration { get; set; } = 42.0f;
 
     [Export(PropertyHint.Range, "2.0,100.0,0.5")]
     public float SurfaceSafetyActivationAltitude { get; set; } = 32.0f;
@@ -135,6 +141,69 @@ public partial class ArcadeShipController
         return new Transform3D(basis, position);
     }
 
+    public static float ComputeAtmosphereBlend(
+        float altitudeAboveSurface,
+        float atmosphereHeight) =>
+        ComputeAtmosphereBlend(
+            altitudeAboveSurface,
+            0.0f,
+            atmosphereHeight);
+
+    public static float ComputeAtmosphereBlend(
+        float altitudeAboveSurface,
+        float fadeStartAltitude,
+        float fadeEndAltitude)
+    {
+        if (!float.IsFinite(altitudeAboveSurface) ||
+            !float.IsFinite(fadeStartAltitude) ||
+            !float.IsFinite(fadeEndAltitude) ||
+            fadeEndAltitude <= fadeStartAltitude)
+        {
+            return 0.0f;
+        }
+
+        float t = Mathf.Clamp(
+            (altitudeAboveSurface - fadeStartAltitude) /
+                Math.Max(1.0f, fadeEndAltitude - fadeStartAltitude),
+            0.0f,
+            1.0f);
+        float vacuumBlend = t * t * (3.0f - (2.0f * t));
+        return 1.0f - vacuumBlend;
+    }
+
+    public static float ComputeSmoothAtmosphericClimbSpeed(
+        float radialSpeed,
+        float atmosphereBlend,
+        float lowerAtmosphereLimit,
+        float vacuumLimit,
+        float correctionAcceleration,
+        float deltaSeconds)
+    {
+        if (!float.IsFinite(radialSpeed) ||
+            !float.IsFinite(atmosphereBlend) ||
+            !float.IsFinite(lowerAtmosphereLimit) ||
+            !float.IsFinite(vacuumLimit) ||
+            !float.IsFinite(correctionAcceleration) ||
+            !float.IsFinite(deltaSeconds))
+        {
+            return 0.0f;
+        }
+
+        float blend = Mathf.Clamp(atmosphereBlend, 0.0f, 1.0f);
+        float limit = Mathf.Lerp(
+            Math.Max(1.0f, vacuumLimit),
+            Math.Max(1.0f, lowerAtmosphereLimit),
+            blend);
+        if (radialSpeed <= limit || blend <= 0.0f)
+        {
+            return radialSpeed;
+        }
+
+        float maxCorrection = Math.Max(0.0f, correctionAcceleration) *
+            blend * Math.Max(0.0f, deltaSeconds);
+        return Mathf.MoveToward(radialSpeed, limit, maxCorrection);
+    }
+
     private void InitializeAtmosphere()
     {
         _atmosphereBody = GetNodeOrNull<Node3D>(AtmosphereBodyPath);
@@ -168,12 +237,10 @@ public partial class ArcadeShipController
             : offset / radialDistance;
         AltitudeAboveSurface = radialDistance - AtmosphereSurfaceRadius;
 
-        float linearBlend = 1.0f - Mathf.Clamp(
-            AltitudeAboveSurface / Math.Max(1.0f, AtmosphereHeight),
-            0.0f,
-            1.0f);
-        AtmosphereBlend = linearBlend * linearBlend *
-            (3.0f - (2.0f * linearBlend));
+        AtmosphereBlend = ComputeAtmosphereBlend(
+            AltitudeAboveSurface,
+            AtmosphereFadeStart,
+            AtmosphereHeight);
         InAtmosphere = AtmosphereBlend > 0.01f;
         RadialSpeed = Velocity.Dot(AtmosphereRadialUp);
         Basis basis = GlobalTransform.Basis.Orthonormalized();
@@ -276,11 +343,19 @@ public partial class ArcadeShipController
         }
 
         RadialSpeed = Velocity.Dot(AtmosphereRadialUp);
-        if (RadialSpeed > AtmosphereMaximumClimbSpeed)
+        float vacuumClimbLimit = Math.Max(MaxSpeed, BoostMaxSpeed);
+        float limitedRadialSpeed = ComputeSmoothAtmosphericClimbSpeed(
+            RadialSpeed,
+            blend,
+            AtmosphereMaximumClimbSpeed,
+            vacuumClimbLimit,
+            AtmosphereClimbLimitAcceleration,
+            deltaSeconds);
+        if (limitedRadialSpeed < RadialSpeed - 0.0001f)
         {
             Velocity -= AtmosphereRadialUp *
-                (RadialSpeed - AtmosphereMaximumClimbSpeed);
-            RadialSpeed = AtmosphereMaximumClimbSpeed;
+                (RadialSpeed - limitedRadialSpeed);
+            RadialSpeed = limitedRadialSpeed;
             ClimbLimitApplications++;
         }
 

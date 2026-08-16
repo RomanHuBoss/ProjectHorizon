@@ -240,6 +240,29 @@ public partial class SalvageRepairSlice
             return;
         }
         desired = desired.Normalized();
+
+        if (WorldScenes.Current.Kind == WorldSceneKind.Orbit)
+        {
+            // TASK-178.7: blend the *direction* of the key light through the
+            // same atmosphere/vacuum envelope, not just its color/energy. This
+            // keeps the day/night terminator continuous on both ascent and
+            // re-entry and prevents the lower-atmosphere weather sun from
+            // snapping to a different orbital star direction at ownership
+            // handoff.
+            OrbitalHandoffPresentationState handoff =
+                OrbitalHandoffPresentationRuntime.Evaluate(
+                    _voyageShip?.AltitudeAboveSurface ?? double.PositiveInfinity);
+            Vector3 surfaceRay = -SurfaceLocalDirectionToWorld(
+                _planetSurfaceSunDirection).Normalized();
+            float lightingBlend = (float)Math.Clamp(
+                handoff.VacuumBlend, 0.0, 1.0);
+            Vector3 blendedTarget = surfaceRay.Lerp(desired, lightingBlend);
+            if (blendedTarget.LengthSquared() > 0.0001f)
+            {
+                desired = blendedTarget.Normalized();
+            }
+        }
+
         if (!_orbitalLightDirectionInitialized)
         {
             _smoothedOrbitalLightDirection = desired;
@@ -247,7 +270,7 @@ public partial class SalvageRepairSlice
         }
         else
         {
-            float factor = 1.0f - Mathf.Exp(-(float)Math.Max(0.0, delta) * 0.65f);
+            float factor = 1.0f - Mathf.Exp(-(float)Math.Max(0.0, delta) * 3.2f);
             Vector3 blended = _smoothedOrbitalLightDirection.Lerp(desired, factor);
             if (blended.LengthSquared() > 0.0001f)
             {

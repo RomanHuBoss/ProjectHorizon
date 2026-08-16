@@ -95,7 +95,7 @@ public static class PlanetaryLandingRecoveryAcceptanceRunner
         bool surfaceHandoff =
             PlanetaryApproachRuntime.SurfaceApproachAltitudeMeters >= 150.0 &&
             PlanetaryApproachRuntime.SurfaceApproachAltitudeMeters <=
-                SalvageRepairSlice.PlanetRuntimeActivationRadiusMeters &&
+                SalvageRepairSlice.PlanetRuntimeActivationAltitudeMeters &&
             StageOneVoyageRuntime.PlanetApproachPositionY ==
                 PlanetaryApproachRuntime.SurfaceApproachAltitudeMeters;
 
