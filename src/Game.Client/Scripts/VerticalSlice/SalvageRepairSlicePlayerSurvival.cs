@@ -139,6 +139,24 @@ public partial class SalvageRepairSlice
             PlayerSurvivalCatalog.GetEnvironment(archetype);
         bool activeOnFoot = !StageOneVoyage.Piloted;
         bool safeInterior = StageOneVoyage.Location == StageOneVoyageLocation.OrbitalStation;
+        if (_planetWeatherState is { } weather &&
+            _surfaceRuntimeActive && activeOnFoot && !safeInterior)
+        {
+            environment = environment with
+            {
+                TemperatureHazard = Math.Clamp(
+                    environment.TemperatureHazard + weather.TemperatureHazardBonus,
+                    0.0,
+                    2.0),
+                ToxicHazard = Math.Clamp(
+                    environment.ToxicHazard + weather.ToxicHazardBonus,
+                    0.0,
+                    2.0),
+                LifeSupportDrainPerSecond = Math.Max(
+                    0.0,
+                    environment.LifeSupportDrainPerSecond + weather.LifeSupportDrainBonus)
+            };
+        }
         _lastPlayerEnvironmentTick = PlayerSurvival.Tick(
             environment,
             delta,

@@ -4,6 +4,12 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-166 — Dynamic Planetary Weather & Diurnal Cycle
+
+Alpha.166 closes the next cross-system surface subsystem: deterministic local time and climate-aware planetary weather. A full local day advances in 600 active-surface seconds; each planet has a seed-derived solar phase and deterministic two-hour weather cells (`Clear/Wind/Storm/Toxic`). The live state now drives sun direction/energy, day/night/sunset sky colors, atmospheric fog/visibility, cloud opacity/drift, weather audio and bounded rain/snow/toxic precipitation visuals. Storm/toxic states feed the existing suit/life-support hazard model, while flying fauna receive bounded wind drift and adverse-weather activity reduction without changing TASK-126's terrain-relative altitude envelope.
+
+Weather persistence stores only elapsed game-hours as the `planet_weather` setting; weather identity regenerates from planet seed + time and old saves remain valid. Existing developer commands `set_time <0..24>` and `set_weather <clear|wind|storm|toxic>` now control the real weather runtime rather than directly tweaking one light. F5 includes `TASK-166 planetary weather acceptance`; see `docs/PLANETARY_WEATHER.md`.
+
 ## TASK-164 — Planet Surface Visual Language & Procedural Props
 
 Alpha.164 starts the next surface mega-iteration after the presentation stack became operational. The goal is not an AAA authored-asset replacement yet; it is a coherent **procedural visual-language layer** that removes the most obvious single-primitive placeholders while preserving the bounded gameplay/runtime contracts. Streamed resources now resolve into deterministic ore/crystal/fiber/organic compound silhouettes, POIs receive category-specific secondary geometry, fauna receive body-plan details (wings/fins/legs/tails), pad/fungus flora silhouettes are improved, and terrain receives low-cost logical-coordinate/height/slope color breakup across both streamed and distant terrain.

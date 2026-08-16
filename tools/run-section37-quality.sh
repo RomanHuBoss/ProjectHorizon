@@ -37,6 +37,7 @@ python3 tools/validate-task162-planet-global-surface-frame.py
 python3 tools/validate-task1621-runtime-bootstrap-hotfix.py
 python3 tools/validate-task1622-surface-presentation-hotfix.py
 python3 tools/validate-task164-surface-visual-language.py
+python3 tools/validate-task166-planetary-weather.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

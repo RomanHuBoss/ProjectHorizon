@@ -668,6 +668,20 @@ public sealed partial class SaveDatabase : IDisposable
             return false;
         }
 
+        PlanetWeatherSaveData? expectedPlanetWeather = expected.PlanetWeather;
+        PlanetWeatherSaveData? actualPlanetWeather = actual.PlanetWeather;
+        if ((expectedPlanetWeather is null) != (actualPlanetWeather is null))
+        {
+            mismatch = "planet_weather presence differs";
+            return false;
+        }
+        if (expectedPlanetWeather is not null && actualPlanetWeather is not null &&
+            !NearlyEqual(expectedPlanetWeather.GameHours, actualPlanetWeather.GameHours))
+        {
+            mismatch = "planet_weather differs";
+            return false;
+        }
+
         if (expected.Ship.ShipId != actual.Ship.ShipId ||
             expected.Ship.TemplateId != actual.Ship.TemplateId ||
             expected.Ship.DisplayName != actual.Ship.DisplayName ||
@@ -1090,7 +1104,7 @@ public sealed partial class SaveDatabase : IDisposable
             "'inventory_properties', 'station_services', " +
             "'base_construction', 'planetary_exploration', 'ship_systems', " +
             "'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
-            "'procedural_quests', 'player_survival', 'npc_factions');",
+            "'procedural_quests', 'player_survival', 'npc_factions', 'planet_weather');",
             ("$slot_id", snapshot.SlotId));
         if (snapshot.TechnologyProgress is not null)
         {
@@ -1306,6 +1320,18 @@ public sealed partial class SaveDatabase : IDisposable
                 ("$slot_id", snapshot.SlotId),
                 ("$setting_value", JsonSerializer.Serialize(
                     CanonicalizeNpcFactions(snapshot.NpcFactions))));
+        }
+
+        if (snapshot.PlanetWeather is not null)
+        {
+            ValidatePlanetWeather(snapshot.PlanetWeather);
+            ExecuteNonQuery(
+                connection,
+                transaction,
+                "INSERT INTO save_settings(slot_id, setting_key, setting_value) " +
+                "VALUES($slot_id, 'planet_weather', $setting_value);",
+                ("$slot_id", snapshot.SlotId),
+                ("$setting_value", JsonSerializer.Serialize(snapshot.PlanetWeather)));
         }
 
         foreach (InventoryItemSaveData item in snapshot.Inventory)
@@ -1555,6 +1581,7 @@ public sealed partial class SaveDatabase : IDisposable
         ProceduralQuestSaveData? proceduralQuests = null;
         PlayerSurvivalSaveData? playerSurvival = null;
         NpcFactionSaveData? npcFactions = null;
+        PlanetWeatherSaveData? planetWeather = null;
         Dictionary<string, string> progressSettings = new(
             StringComparer.Ordinal);
         using (SqliteCommand command = connection.CreateCommand())
@@ -1567,7 +1594,7 @@ public sealed partial class SaveDatabase : IDisposable
                 "'inventory_properties', 'station_services', " +
                 "'base_construction', 'planetary_exploration', " +
                 "'ship_systems', 'stage_one_voyage', 'galaxy_navigation', 'ecology', " +
-                "'procedural_quests', 'player_survival', 'npc_factions') ORDER BY setting_key;";
+                "'procedural_quests', 'player_survival', 'npc_factions', 'planet_weather') ORDER BY setting_key;";
             command.Parameters.AddWithValue("$slot_id", slotId);
             using SqliteDataReader reader = command.ExecuteReader();
             while (reader.Read())
@@ -1939,6 +1966,31 @@ public sealed partial class SaveDatabase : IDisposable
         }
 
         if (progressSettings.TryGetValue(
+            "planet_weather",
+            out string? planetWeatherJson))
+        {
+            if (string.IsNullOrWhiteSpace(planetWeatherJson))
+            {
+                throw new InvalidDataException(
+                    "planet_weather setting is empty.");
+            }
+
+            try
+            {
+                planetWeather = JsonSerializer.Deserialize<PlanetWeatherSaveData>(
+                    planetWeatherJson) ?? throw new InvalidDataException(
+                        "planet_weather setting deserialized to null.");
+                ValidatePlanetWeather(planetWeather);
+            }
+            catch (JsonException exception)
+            {
+                throw new InvalidDataException(
+                    "planet_weather setting contains invalid JSON.",
+                    exception);
+            }
+        }
+
+        if (progressSettings.TryGetValue(
             "inventory_properties",
             out string? inventoryPropertiesJson))
         {
@@ -2047,7 +2099,8 @@ public sealed partial class SaveDatabase : IDisposable
             ecology,
             proceduralQuests,
             playerSurvival,
-            npcFactions);
+            npcFactions,
+            planetWeather);
     }
 
     private static StationServicesSaveData CanonicalizeStationServices(
@@ -2663,6 +2716,16 @@ public sealed partial class SaveDatabase : IDisposable
                 throw new InvalidDataException(
                     "npc_factions contains an invalid or duplicate NPC state delta.");
             }
+        }
+    }
+
+    private static void ValidatePlanetWeather(PlanetWeatherSaveData weather)
+    {
+        ArgumentNullException.ThrowIfNull(weather);
+        if (!double.IsFinite(weather.GameHours) || weather.GameHours < 0.0)
+        {
+            throw new InvalidDataException(
+                "planet_weather contains invalid game-hours value.");
         }
     }
 

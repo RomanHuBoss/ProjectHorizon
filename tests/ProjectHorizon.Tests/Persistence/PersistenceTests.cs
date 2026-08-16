@@ -115,6 +115,28 @@ public sealed class PersistenceTests
     }
 
     [Fact]
+    public async Task PlanetWeather_RoundTripsThroughSqliteWithoutSchemaMigration()
+    {
+        string path = RepositoryFixture.NewTempPath("weather.db");
+        using SaveDatabase database = new(path);
+        await database.InitializeAsync();
+        await database.ResetSlotAsync("slot.test");
+        SaveGameSnapshot source = SaveDatabase.CreateAcceptanceSnapshot(
+            "slot.test", 21, 0.0, 12, 1) with
+        {
+            PlanetWeather = new PlanetWeatherSaveData(9876.54321)
+        };
+
+        await database.SaveAsync(source);
+        SaveGameSnapshot? restored = await database.LoadAsync("slot.test");
+
+        Assert.NotNull(restored);
+        Assert.NotNull(restored!.PlanetWeather);
+        Assert.Equal(9876.54321, restored.PlanetWeather!.GameHours, 8);
+        Assert.True(SaveDatabase.SnapshotsEqual(source, restored, out string mismatch), mismatch);
+    }
+
+    [Fact]
     public void Serialization_RoundTripsCompleteSnapshotWithoutLosingOptionalState()
     {
         SaveGameSnapshot source = SaveDatabase.CreateAcceptanceSnapshot(
@@ -128,7 +150,8 @@ public sealed class PersistenceTests
                 91, 42, 83, 74, 61, 88, 47, 39,
                 "Mining",
                 Array.Empty<string>(),
-                Array.Empty<string>())
+                Array.Empty<string>()),
+            PlanetWeather = new PlanetWeatherSaveData(137.25)
         };
 
         string json = JsonSerializer.Serialize(source);

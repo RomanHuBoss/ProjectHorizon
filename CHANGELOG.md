@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.166] - 2026-08-16
+
+### Added — TASK-166 Dynamic Planetary Weather & Diurnal Cycle
+- Added deterministic planet-local time with a 600-second active-surface day and seed-derived solar phase, plus two-hour climate-aware weather cells covering clear, wind, storm and toxic states.
+- Bound weather to live sun/sky/fog/cloud presentation, bounded rain/snow/toxic precipitation visuals, Weather-bus intensity, player survival hazards and flying-fauna wind/activity response.
+- Added `PlanetWeatherSaveData` round-trip through the existing `save_settings` table with backwards-compatible old-save fallback; developer `set_time`/`set_weather` now drive the real runtime.
+- Added TASK-166 F5 acceptance, xUnit/persistence regressions, localized HUD weather status, documentation and section-37/CI/release contract gating.
+
+### Product-owner evidence carried forward
+- The alpha.164 procedural visual layer was accepted as "более-менее" sufficient to continue development; this records manual visual smoke only and does not substitute for the still-unreported TASK-164 F5/build acceptance.
+
 ## [0.1.0-alpha.164] - 2026-08-16
 
 ### Added — TASK-164 Planet Surface Visual Language & Procedural Props

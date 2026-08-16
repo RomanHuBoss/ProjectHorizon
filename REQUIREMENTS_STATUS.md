@@ -2,12 +2,51 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task164-surface-visual-language.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-166 Dynamic Planetary Weather & Diurnal Cycle
+
+**Исходный снимок:** `ProjectHorizon-main-task164-surface-visual-language.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`.  
+**Версия:** `0.1.0-alpha.166`.  
+**Статус:** TASK-166 `IMPLEMENTED`; TASK-164 остаётся `IMPLEMENTED` (product-owner manual visual smoke принят как «более-менее всё», но F5/build evidence не предоставлен); TASK-163 остаётся `IN_PROGRESS`.
+
+### Выбор mega-итерации
+
+После alpha.164 пользователь разрешил продолжить разработку, поэтому ручной art-smoke больше не блокирует следующий функциональный слой. Очередь после TASK-164 состояла главным образом из acceptance-хвостов уже реализованных подсистем; следующей логически целостной Stage-2 подсистемой выбрана динамическая планетарная погода и суточный цикл, использующая уже готовые TASK-150/160/120/116/134 вместо новой несвязанной механики. Технический PDF v2.0 в snapshot остаётся Git-LFS pointer без payload; отсутствующий текст ТЗ не реконструируется предположениями.
+
+### TASK-166 — закрываемая подсистема
+
+- Godot-independent `PlanetWeatherRuntime`: 600 s на полный local day, seed-derived planet solar phase и deterministic weather cells по 2 local hours;
+- состояния `Clear/Wind/Storm/Toxic` выводятся из atmosphere/moisture/cloud/toxicity/archetype текущей планеты; vacuum-like atmosphere принудительно остаётся clear;
+- live presentation: sun azimuth/elevation + energy, day/night/sunset ProceduralSky, fog/visibility, cloud opacity/drift, bounded rain/snow/toxic MultiMesh FX;
+- player survival получает дополнительные weather-specific temperature/toxic/life-support hazards через существующий `PlayerSurvivalRuntime`, поэтому suit protection остаётся единой точкой расчёта;
+- flying fauna получает adverse-weather speed multiplier и bounded horizontal wind drift; terrain-relative altitude envelope TASK-126 не заменяется;
+- Weather audio bus динамически меняет intensity/pitch по ветру/шторму;
+- persistence хранит только `PlanetWeatherSaveData.GameHours` в существующем `save_settings` ключе `planet_weather`; schema migration не требуется, старые saves без ключа поддерживаются;
+- существующие developer commands `set_time`/`set_weather` теперь управляют `PlanetWeatherRuntime`, а не напрямую `DirectionalLight3D`;
+- HUD локализован RU/EN; F5 включает `TASK-166 planetary weather acceptance`;
+- section-37/CI/release добавляет `validate-task166-planetary-weather.py`; xUnit покрывает deterministic clock/weather, day/night+hazard acceptance и weather persistence/JSON snapshot.
+
+### Граница итерации
+
+TASK-166 не является атмосферной CFD/volumetric-cloud simulation: precipitation — bounded presentation around player, ветер не моделирует rigid-body аэродинамику, weather override developer-only и намеренно не сохраняется. Не добавляются новые пользовательские hotkeys: приёмка входит в существующий F5 matrix, developer control использует существующую Debug Console.
+
+### Acceptance TASK-166
+
+1. Clean build `0 warnings / 0 errors`; section-37 и xUnit green.
+2. New Game: startup должен вывести `TASK-166 planetary weather READY` с `day`, `time`, `weather`, `wind`, `visibility`, без исключений.
+3. F5: `TASK-166 planetary weather acceptance PASS` с `planets>=1`, `deterministic=1`, `dayNight=1`, `weatherVariation=1`, `hazards=1`, `saveRestore=1`, `planetPhase=1`, `override=1`.
+4. Debug Console: `set_time 0` даёт ночное небо/скрытый stellar disc; `set_time 12` возвращает дневное освещение; `set_weather storm` усиливает cloud/fog/wind и включает precipitation; `set_weather toxic` даёт toxic presentation/hazard state.
+5. Manual persistence smoke: установить время, сохранить слот, перезапустить/Load; HUD local time должен восстановиться в том же диапазоне с естественным небольшим продвижением только после возобновления surface runtime.
+6. Предыдущие F5 TASK-154/TASK-126/TASK-164 не должны регрессировать; при FAIL прислать полную строку TASK-166 и первую C# exception/stack trace.
+
+---
 
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-164 Planet Surface Visual Language & Procedural Props
 
@@ -5884,24 +5923,44 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FRAME-ACC-102` | Live >2048 m rebase bounded/no gap/no world jump | `IN_PROGRESS` | TASK-163 manual traversal |
 | `FRAME-ACC-103` | Distant logical save/restart + resource depletion persistence | `IN_PROGRESS` | TASK-163 cold restore scenario |
 
+### 8.31. Dynamic Planetary Weather & Diurnal Cycle
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `WEATHER-1660` | Planet-local deterministic time/day cycle | `IMPLEMENTED` | `PlanetWeatherRuntime`; 600 s active-surface day; seed-derived phase |
+| `WEATHER-1661` | Climate-aware deterministic weather states | `IMPLEMENTED` | 2 h cells; Clear/Wind/Storm/Toxic; atmosphere/moisture/cloud/toxicity inputs |
+| `WEATHER-1662` | Sun/sky/fog/cloud presentation follows time/weather | `IMPLEMENTED` | ProceduralSky + DirectionalLight + stellar disc + fog + cloud drift/opacity |
+| `WEATHER-1663` | Storm/toxic precipitation has bounded live representation | `IMPLEMENTED` | player-following MultiMesh Rain/Snow/ToxicMotes; no collision/persistence payload |
+| `WEATHER-1664` | Weather affects survival through existing hazard runtime | `IMPLEMENTED` | temperature/toxic/life-support bonuses merged into `PlayerEnvironmentDefinition` |
+| `WEATHER-1665` | Flying fauna respond to weather without breaking altitude contract | `IMPLEMENTED` | speed multiplier + bounded wind drift; terrain-relative altitude unchanged |
+| `WEATHER-1666` | Weather audio is dynamic | `IMPLEMENTED` | existing Weather bus/WeatherWind loop intensity + pitch |
+| `WEATHER-1667` | Time persists and old saves remain compatible | `IMPLEMENTED` | `planet_weather` save_settings JSON; optional `PlanetWeatherSaveData`; no schema bump |
+| `WEATHER-1668` | Existing developer controls operate the live runtime | `IMPLEMENTED` | `set_time`; `set_weather` |
+| `WEATHER-1669` | RU/EN HUD and F5/static/xUnit acceptance | `IMPLEMENTED` | localized weather line; TASK-166 F5; validator; tests |
+| `WEATHER-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required; current environment has no dotnet/Godot |
+| `WEATHER-ACC-101` | F5 TASK-166 PASS with all invariants =1 | `IN_PROGRESS` | user runtime evidence required |
+| `WEATHER-ACC-102` | Manual midnight/noon/storm/toxic presentation smoke | `IN_PROGRESS` | developer console scenario |
+| `WEATHER-ACC-103` | Save/restart preserves local time | `IN_PROGRESS` | manual persistence smoke |
+
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-164` | Surface Visual Language runtime/manual acceptance | clean build; TASK-154 PASS; TASK-126 altitude=1 PASS; F5 TASK-164 PASS; resource/POI/fauna interaction smoke |
-| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
-| 3 | `TASK-160.1` | Traversal-safe TASK-126 acceptance | `VERIFIED`: external F5 `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
-| 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
+| 1 | `TASK-166` | Planetary Weather runtime/manual acceptance | clean build; F5 TASK-166 PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
+| 2 | `TASK-164` | Surface Visual Language F5 closure | manual visual smoke принят product owner; остаются clean build + TASK-154/TASK-126/TASK-164 F5 |
+| 3 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
 | 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
 | 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
-| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
+| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 ранее PASS; остаются manual variation/cold restore after current regression closure |
+| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 ранее PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-164 Surface Visual Language `IMPLEMENTED`; TASK-154/TASK-126 runtime-regression fixes требуют внешнего F5; TASK-162 остаётся `IMPLEMENTED`.  
-**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-154/TASK-126/TASK-164 и visual/gameplay smoke; затем TASK-163 live >2048m traversal и distant cold-restore.
+**Текущая разрабатываемая реализация:** TASK-166 Planetary Weather `IMPLEMENTED`; TASK-164 manual visual smoke принят, но F5/build closure остаётся открытым; TASK-162 остаётся `IMPLEMENTED`.  
+**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-154/TASK-126/TASK-164/TASK-166; затем manual weather smoke/persistence и TASK-163 live >2048m traversal.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

@@ -13,6 +13,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private Vector3 _wanderDirection = Vector3.Forward;
     private AerialSteeringRuntime? _aerialSteering;
     private PlanetSurfaceTerrainProfile? _terrainProfile;
+    private float _weatherSpeedMultiplier = 1.0f;
+    private Vector3 _weatherWindVelocity = Vector3.Zero;
 
     public string InstanceId { get; private set; } = string.Empty;
 
@@ -48,6 +50,25 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     }
 
     public event Action<EcologyFaunaNode>? Observed;
+
+    public void SetWeatherResponse(
+        double speedMultiplier,
+        double windMetersPerSecond,
+        double windDirectionDegrees)
+    {
+        _weatherSpeedMultiplier = (float)Math.Clamp(speedMultiplier, 0.45, 1.25);
+        if (!string.Equals(MovementMode, "Flying", StringComparison.Ordinal))
+        {
+            _weatherWindVelocity = Vector3.Zero;
+            return;
+        }
+        float angle = Mathf.DegToRad((float)windDirectionDegrees);
+        float drift = (float)Math.Clamp(windMetersPerSecond * 0.035, 0.0, 0.72);
+        _weatherWindVelocity = new Vector3(
+            Mathf.Sin(angle) * drift,
+            0.0f,
+            Mathf.Cos(angle) * drift);
+    }
 
     public void Configure(
         EcologyFaunaDefinition definition,
@@ -344,14 +365,14 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 break;
         }
 
-        float speed = (float)_definition.Speed * speedFactor;
+        float speed = (float)_definition.Speed * speedFactor * _weatherSpeedMultiplier;
         Vector3 targetVelocity = desiredDirection * speed;
         if (string.Equals(
             _definition.MovementMode,
             "Flying",
             StringComparison.Ordinal))
         {
-            targetVelocity = ApplyFlyingSteering(targetVelocity, speed);
+            targetVelocity = ApplyFlyingSteering(targetVelocity, speed) + _weatherWindVelocity;
         }
         else if (string.Equals(
             _definition.MovementMode,

@@ -549,6 +549,7 @@ public partial class SalvageRepairSlice : Node3D
             });
         ValidateResourceNodeBindings();
         InitializePlanetSurfaceWorldComposition();
+        InitializePlanetWeatherRuntime(saveData: null);
         InitializeGameplayProductionNetwork(
             saveData: null,
             legacySaveData: null);
@@ -792,6 +793,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdatePlanetSurfaceFrame();
         UpdatePlanetSurfaceStreaming();
         UpdatePlanetSurfaceWorldComposition(delta);
+        UpdatePlanetWeather(delta);
         UpdateEcology(delta);
         UpdateAerialNavigation(delta);
         UpdatePlayerSurvival(delta);
@@ -5512,6 +5514,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetSurfaceWorldCompositionAcceptance();
         RunSurfacePresentationHotfixAcceptance();
         RunSurfaceVisualLanguageAcceptance();
+        RunPlanetWeatherAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5522,7 +5525,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5569,7 +5572,8 @@ public partial class SalvageRepairSlice : Node3D
             ecology: CreateEcologyArchiveSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
             playerSurvival: PlayerSurvival.CreateSaveData(),
-            npcFactions: NpcFactions.CreateSaveData());
+            npcFactions: NpcFactions.CreateSaveData(),
+            planetWeather: PlanetWeather.CreateSaveData());
         _autosave.Request(trigger, snapshot);
         _autosaveElapsedSeconds = 0.0;
         _state = SalvageRepairSliceState.Saving;
@@ -5671,7 +5675,8 @@ public partial class SalvageRepairSlice : Node3D
             ecology: CreateEcologyArchiveSaveData(),
             proceduralQuests: ProceduralQuests.CreateSaveData(),
             playerSurvival: PlayerSurvival.CreateSaveData(),
-            npcFactions: NpcFactions.CreateSaveData());
+            npcFactions: NpcFactions.CreateSaveData(),
+            planetWeather: PlanetWeather.CreateSaveData());
         _state = SalvageRepairSliceState.Exiting;
         _status = LF("ui.game.status.flush", ("revision", snapshot.Revision));
         GD.Print(
@@ -5800,6 +5805,7 @@ public partial class SalvageRepairSlice : Node3D
                     snapshot.Player.PositionZ);
             }
             ActivateCurrentPlanetSurfaceContent();
+            InitializePlanetWeatherRuntime(snapshot?.PlanetWeather);
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
             InitializeNpcFactionRuntime(snapshot?.NpcFactions);
@@ -6004,6 +6010,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializePlanetSurfaceContentArchives(null, null);
             ResetPlanetSurfaceFrameForCurrentPlanet();
             ActivateCurrentPlanetSurfaceContent();
+            InitializePlanetWeatherRuntime(saveData: null);
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
             InitializeNpcFactionRuntime(saveData: null);
@@ -7602,6 +7609,7 @@ public partial class SalvageRepairSlice : Node3D
         string interplanetaryLine = BuildInterplanetaryTravelHudLine();
         string starSystemLine = BuildStarSystemSimulationHudLine();
         string planetEnvironmentLine = BuildPlanetEnvironmentHudLine();
+        string planetWeatherLine = BuildPlanetWeatherHudLine();
         string planetSurfaceContentLine = BuildPlanetSurfaceContentHudLine();
         string planetTerrainLine = BuildPlanetTerrainHudLine();
         string planetStreamingLine = BuildPlanetSurfaceStreamingHudLine();
@@ -7648,6 +7656,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-160 (F5): {_planetSurfaceWorldCompositionAcceptanceHud}",
             $"TASK-162.2 (F5): {_surfacePresentationHotfixAcceptanceHud}",
             $"TASK-164 (F5): {_surfaceVisualLanguageAcceptanceHud}",
+            $"TASK-166 (F5): {_planetWeatherAcceptanceHud}",
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
@@ -7676,6 +7685,7 @@ public partial class SalvageRepairSlice : Node3D
                 interplanetaryLine,
                 starSystemLine,
                 planetEnvironmentLine,
+                planetWeatherLine,
                 planetSurfaceContentLine,
                 planetTerrainLine,
                 planetStreamingLine,
@@ -7725,6 +7735,7 @@ public partial class SalvageRepairSlice : Node3D
             interplanetaryLine,
             starSystemLine,
             planetEnvironmentLine,
+            planetWeatherLine,
             planetSurfaceContentLine,
             planetTerrainLine,
             planetStreamingLine,

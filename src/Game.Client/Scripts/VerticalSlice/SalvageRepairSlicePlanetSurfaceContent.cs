@@ -177,6 +177,7 @@ public partial class SalvageRepairSlice
         {
             ApplyPlanetSurfaceWorldComposition();
         }
+        SyncPlanetWeatherToActivePlanet();
         if (rebuildScene)
         {
             RebuildEcologyScene();

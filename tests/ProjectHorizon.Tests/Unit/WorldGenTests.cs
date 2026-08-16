@@ -829,6 +829,62 @@ public sealed class WorldGenTests
     }
 
     [Fact]
+    public void PlanetWeather_IsDeterministicAndRoundTripsGameHours()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+
+        PlanetWeatherRuntime runtime = new(profile);
+        PlanetWeatherState baseline = runtime.Current;
+        Assert.Equal(
+            baseline,
+            PlanetWeatherRuntime.BuildState(profile, runtime.GameHours));
+
+        runtime.Advance(137.25);
+        PlanetWeatherSaveData save = runtime.CreateSaveData();
+        PlanetWeatherRuntime restored = new(profile, save);
+        Assert.Equal(save.GameHours, restored.CreateSaveData().GameHours, 8);
+        Assert.Equal(runtime.Current, restored.Current);
+
+        PlanetWeatherState midnight = restored.SetLocalHour(0.0);
+        Assert.Equal(0.0, midnight.LocalHour, 6);
+        Assert.True(midnight.SunElevationDegrees < 0.0);
+    }
+
+    [Fact]
+    public void PlanetWeather_AcceptanceCoversDayNightWeatherHazardsAndPersistence()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .Where(profile => profile.Landable)
+            .ToArray();
+
+        PlanetWeatherAcceptanceReport report =
+            PlanetWeatherAcceptanceRunner.Run(profiles);
+
+        Assert.True(report.Passed, report.BuildOutputLine());
+        Assert.True(report.Deterministic);
+        Assert.True(report.DayNightCycle);
+        Assert.True(report.WeatherVariation);
+        Assert.True(report.HazardProfiles);
+        Assert.True(report.SaveRestore);
+        Assert.True(report.OverrideControl);
+    }
+
+    [Fact]
     public void PlanetSurfaceFrame_RebaseKeepsLocalCoordinatesBoundedAndLogicalPositionContinuous()
     {
         PlanetSurfaceFrameRuntime frame = new();

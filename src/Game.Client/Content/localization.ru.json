@@ -1375,6 +1375,12 @@
     "ui.hud.planet_streaming.summary": "Стриминг поверхности: чанки={loaded}/{target}; collision={collisions}; очередь={queue}; сектор=({chunkX},{chunkZ}); lat={lat}° lon={lon}°",
     "ui.hud.planet_streaming.unavailable": "Стриминг поверхности: недоступен",
     "ui.hud.world_composition.summary": "Мир: звезда={sun}; облака={clouds}; потоковые ресурсы={resources}; сохранение={persistence}",
-    "ui.hud.world_composition.unavailable": "Композиция поверхности: недоступна"
+    "ui.hud.world_composition.unavailable": "Композиция поверхности: недоступна",
+    "ui.hud.weather.summary": "Погода: день {day} • {time} ч • {weather} • ветер {wind} м/с • видимость {visibility}% • T={temperature} °C",
+    "ui.hud.weather.unavailable": "Погода: недоступна",
+    "ui.weather.clear": "ясно",
+    "ui.weather.wind": "ветрено",
+    "ui.weather.storm": "буря",
+    "ui.weather.toxic": "токсичная погода"
   }
 }

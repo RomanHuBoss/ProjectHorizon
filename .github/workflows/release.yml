@@ -76,6 +76,7 @@ jobs:
           python3 tools/validate-task148-world-scene-coordinator.py
           python3 tools/validate-task1622-surface-presentation-hotfix.py
           python3 tools/validate-task164-surface-visual-language.py
+          python3 tools/validate-task166-planetary-weather.py
 
       - name: Unit tests and coverage
         run: >-

@@ -8,6 +8,8 @@ public partial class SalvageRepairSlice
 {
     private bool _planetSurfaceWorldCompositionInitialized;
     private PlanetSurfaceSkyProfile? _planetSurfaceSkyProfile;
+    private ProceduralSkyMaterial? _planetSurfaceSkyMaterial;
+    private StandardMaterial3D? _planetSurfaceCloudMaterial;
     private Node3D? _planetSurfaceCloudRoot;
     private Node3D? _planetSurfaceSunVisual;
     private Vector3 _planetSurfaceSunDirection = new(0.0f, 0.65f, -0.76f);
@@ -78,6 +80,7 @@ public partial class SalvageRepairSlice
         Color horizon = ToColor(profile.SkyHorizonColor);
         Color groundHorizon = ToColor(profile.GroundHorizonColor);
         ProceduralSkyMaterial skyMaterial = new();
+        _planetSurfaceSkyMaterial = skyMaterial;
         skyMaterial.Set("sky_top_color", top);
         skyMaterial.Set("sky_horizon_color", horizon);
         skyMaterial.Set("ground_bottom_color", groundHorizon.Darkened(0.62f));
@@ -272,6 +275,7 @@ public partial class SalvageRepairSlice
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             NoDepthTest = false
         };
+        _planetSurfaceCloudMaterial = cloudMaterial;
 
         for (int clusterIndex = 0;
              clusterIndex < profile.CloudClusterCount;
@@ -345,7 +349,8 @@ public partial class SalvageRepairSlice
             _planetSurfaceCloudRoot.Visible =
                 _surfaceRuntimeActive &&
                 (_planetSurfaceSkyProfile?.CloudClusterCount ?? 0) > 0;
-            if (_surfaceRuntimeActive && _player is not null)
+            if (_planetWeatherRuntime is null &&
+                _surfaceRuntimeActive && _player is not null)
             {
                 _planetSurfaceCloudDrift += delta * 0.55;
                 _planetSurfaceCloudRoot.GlobalPosition = new Vector3(

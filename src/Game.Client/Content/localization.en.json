@@ -1375,6 +1375,12 @@
     "ui.hud.planet_streaming.summary": "Surface stream: chunks={loaded}/{target}; collision={collisions}; queue={queue}; sector=({chunkX},{chunkZ}); lat={lat}° lon={lon}°",
     "ui.hud.planet_streaming.unavailable": "Surface stream: unavailable",
     "ui.hud.world_composition.summary": "World: star={sun}; clouds={clouds}; streamed resources={resources}; persistence={persistence}",
-    "ui.hud.world_composition.unavailable": "Surface world composition: unavailable"
+    "ui.hud.world_composition.unavailable": "Surface world composition: unavailable",
+    "ui.hud.weather.summary": "Weather: day {day} • {time} h • {weather} • wind {wind} m/s • visibility {visibility}% • T={temperature} °C",
+    "ui.hud.weather.unavailable": "Weather: unavailable",
+    "ui.weather.clear": "clear",
+    "ui.weather.wind": "wind",
+    "ui.weather.storm": "storm",
+    "ui.weather.toxic": "toxic weather"
   }
 }

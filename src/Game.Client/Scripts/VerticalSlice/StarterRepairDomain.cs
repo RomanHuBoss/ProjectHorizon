@@ -801,7 +801,8 @@ public static class StarterRepairSnapshotFactory
         EcologySaveData? ecology = null,
         ProceduralQuestSaveData? proceduralQuests = null,
         PlayerSurvivalSaveData? playerSurvival = null,
-        NpcFactionSaveData? npcFactions = null)
+        NpcFactionSaveData? npcFactions = null,
+        PlanetWeatherSaveData? planetWeather = null)
     {
         if (string.IsNullOrWhiteSpace(slotId))
         {
@@ -921,7 +922,8 @@ public static class StarterRepairSnapshotFactory
             ecology,
             proceduralQuests,
             playerSurvival,
-            npcFactions);
+            npcFactions,
+            planetWeather);
     }
 
     private static string ResolveCurrentPlanetId(

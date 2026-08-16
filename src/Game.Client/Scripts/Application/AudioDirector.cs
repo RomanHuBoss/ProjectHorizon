@@ -308,6 +308,17 @@ public partial class AudioDirector : Node
         ApplyEnvironmentState(environment, force, countTransition: true);
     }
 
+    public void SetWeatherIntensity(float normalized)
+    {
+        normalized = Mathf.Clamp(normalized, 0.0f, 1.0f);
+        if (!_ready || _weather is null || _environment != GameAudioEnvironment.Atmosphere)
+        {
+            return;
+        }
+        _weather.VolumeDb = Mathf.Lerp(-27.0f, -10.0f, normalized);
+        _weather.PitchScale = Mathf.Lerp(0.86f, 1.08f, normalized);
+    }
+
     private void ApplyEnvironmentState(
         GameAudioEnvironment environment,
         bool force,

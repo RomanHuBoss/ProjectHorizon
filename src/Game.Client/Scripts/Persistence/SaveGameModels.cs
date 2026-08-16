@@ -292,6 +292,9 @@ public sealed record NpcFactionSaveData(
     IReadOnlyList<NpcFactionReputationSaveData> Reputations,
     IReadOnlyList<NpcFactionAgentStateSaveData> Agents);
 
+public sealed record PlanetWeatherSaveData(
+    double GameHours);
+
 public sealed record SaveGameSnapshot(
     string SlotId,
     int Revision,
@@ -314,7 +317,8 @@ public sealed record SaveGameSnapshot(
     EcologySaveData? Ecology = null,
     ProceduralQuestSaveData? ProceduralQuests = null,
     PlayerSurvivalSaveData? PlayerSurvival = null,
-    NpcFactionSaveData? NpcFactions = null);
+    NpcFactionSaveData? NpcFactions = null,
+    PlanetWeatherSaveData? PlanetWeather = null);
 
 public sealed record SaveDatabaseDiagnostics(
     int SchemaVersion,

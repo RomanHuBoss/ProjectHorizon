@@ -160,10 +160,14 @@ public partial class SalvageRepairSlice
         if (parts.Length != 2 || !double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double hour))
             return new DeveloperCommandResult(false, "usage: set_time <0..24>");
         hour = ((hour % 24.0) + 24.0) % 24.0;
-        DirectionalLight3D? sun = GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
-        if (sun is null) return new DeveloperCommandResult(false, "directional light missing");
-        sun.RotationDegrees = new Vector3((float)(hour / 24.0 * 360.0 - 90.0), -35.0f, 0.0f);
-        return new DeveloperCommandResult(true, $"time={hour:F2}h");
+        if (_planetWeatherRuntime is null)
+            return new DeveloperCommandResult(false, "planet weather runtime unavailable");
+        PlanetWeatherState state = PlanetWeather.SetLocalHour(hour);
+        _planetWeatherState = state;
+        ApplyPlanetWeatherPresentation(state, forceFx: true);
+        return new DeveloperCommandResult(
+            true,
+            $"time={state.LocalHour:F2}h; day={state.DayIndex}; weather={state.Kind}");
     }
 
     private DeveloperCommandResult DeveloperSetWeather(string[] parts)
@@ -171,12 +175,24 @@ public partial class SalvageRepairSlice
         if (parts.Length != 2) return new DeveloperCommandResult(false, "usage: set_weather <clear|wind|storm|toxic>");
         string weather = parts[1].ToLowerInvariant();
         if (weather is not ("clear" or "wind" or "storm" or "toxic")) return new DeveloperCommandResult(false, "weather must be clear|wind|storm|toxic");
+        if (_planetWeatherRuntime is null)
+            return new DeveloperCommandResult(false, "planet weather runtime unavailable");
         _developerWeather = weather;
-        DirectionalLight3D? sun = GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
-        if (sun is not null) sun.LightEnergy = weather switch { "storm" => 0.45f, "toxic" => 0.75f, "wind" => 1.15f, _ => 1.35f };
+        PlanetWeatherKind kind = weather switch
+        {
+            "wind" => PlanetWeatherKind.Wind,
+            "storm" => PlanetWeatherKind.Storm,
+            "toxic" => PlanetWeatherKind.Toxic,
+            _ => PlanetWeatherKind.Clear
+        };
+        PlanetWeatherState state = PlanetWeather.SetDeveloperOverride(kind);
+        _planetWeatherState = state;
+        ApplyPlanetWeatherPresentation(state, forceFx: true);
         StructuredGameLogger.Log(GameLogLevel.Information, GameLogCategory.WORLDGEN, "developer weather override",
             fields: new Dictionary<string, object?> { ["weather"] = weather });
-        return new DeveloperCommandResult(true, $"weather={weather}");
+        return new DeveloperCommandResult(
+            true,
+            $"weather={weather}; intensity={state.Intensity:F2}; wind={state.WindMetersPerSecond:F1}m/s");
     }
 
     private DeveloperCommandResult DeveloperLoadSystem(string[] parts)
