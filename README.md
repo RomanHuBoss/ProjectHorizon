@@ -11,6 +11,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-184 — Production 3D Asset Pipeline & LOD Integration
+
+Alpha.184 moves the shipping vertical slice from primitive-only presentation to the Technical Specification §33 content-pipeline baseline. The player explorer, NPC interceptor and orbital station now use imported glTF 2.0 binary assets (`GLB`) with independent `LOD0/LOD1/LOD2` models, bounded PBR material slots and named `MNT_*` attachment markers. `ProductionModelLodController` selects one LOD by current camera distance; GLB assets contain no gameplay collision. Existing Godot `CollisionShape3D` hierarchies remain authoritative.
+
+The old primitive player/station meshes are hidden rather than deleted and the NPC primitive model is retained as an emergency fallback if the imported PackedScene cannot be loaded. This keeps TASK-178/180/182 flight, station collision, docking and cockpit contracts independent from the art import path. Deterministic asset regeneration is available at `tools/content/generate-production-glb.py`; static GLB/LOD validation is `tools/validate-task184-production-asset-pipeline.py`. F5 includes `TASK-184 production asset pipeline acceptance`. See `docs/PRODUCTION_3D_ASSET_PIPELINE.md`.
+
 **Project Horizon** — процедурный космический симулятор на Godot Engine с исследованием планет, космическими полётами, добычей ресурсов, крафтом, торговлей, заданиями и строительством баз.
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.

@@ -2,18 +2,67 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая мега-итерация 2026-08-16 — TASK-182 Flight Runtime Closure & Streaming Stability
+## 0. Текущая мега-итерация 2026-08-16 — TASK-184 Production 3D Asset Pipeline & LOD Integration
+
+**Исходный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip` (`0.1.0-alpha.182`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip`.  
+**Версия:** `0.1.0-alpha.184`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+GLB IMPORT+VISUAL/LOD SMOKE+F5`.
+
+### Основание и owner evidence alpha.182
+
+Владелец оценил flight feel как «лучше, но не идеально» и прямо разрешил наконец переходить к следующей мега-итерации. Это фиксируется как **development progression waiver**, а не как фиктивный `VERIFIED`: полного F5 TASK-182 в приложенном логе нет. При этом новый owner Output materially подтверждает исправления alpha.182: `ERROR=0`, `WARNING=0`, `Exception=0`, `create_frustum_points=0`; lethal planet penetration `normalSpeed=14.3 m/s / speed=43.8 m/s` приводит к `death=1` и death screen PASS; во втором запуске верхняя атмосфера имеет один чистый `EXIT altitude=601.5 m` без adjacent re-entry; terrain workers остаются `failed=0`, максимальный `queued=40`, `stale=4`; navigation-assist docking и station visit PASS, graceful-exit autosave PASS. Пять единичных `surface contact RECOVERED` между двумя запусками трактуются как редкие реальные контакты, а не прежний frame-by-frame chatter.
+
+После runtime-стабилизации повторный gap-analysis показывает первый крупный неисполненный **функциональный** слой: §33 content pipeline и отложенный `VIS-ART-180` asset debt. TASK-184 поэтому не продолжает flight tuning, а переводит ключевую presentation-тройку vertical slice на импортируемые production assets.
+
+### Реализация TASK-184
+
+- Добавлены 3 production asset family × 3 LOD = **9 self-contained glTF 2.0 binary GLB**: `SHP_Explorer_01`, `SHP_Interceptor_01`, `STN_Orbital_01`, каждый с `LOD0/LOD1/LOD2`.
+- Triangle chains materially уменьшаются: explorer `812→364→188`, interceptor `644→308→164`, station `3304→1168→384`; material slots bounded до `<=5` на asset.
+- GLB содержат named empty attachment markers `MNT_*`: player `6`, NPC `4`, station `4` (минимум 14 unique LOD0 markers); gameplay collision в GLB **отсутствует**.
+- `ProductionModelLodController` выбирает ровно один LOD по distance до current camera; family-specific thresholds: player `65/220 m`, NPC `120/520 m`, station `700/2600 m`; при отсутствии camera безопасно используется LOD0.
+- `ArcadeShip.tscn`: `Visuals/ProductionExterior` инстанцирует `SHP_Explorer_01.tscn`; прежние 11 exterior primitive meshes скрыты, но cockpit interior и единственный gameplay `CollisionShape3D` сохранены.
+- `SalvageRepairSlice.tscn`: `Gameplay/OrbitalStation/ProductionModel` инстанцирует `STN_Orbital_01.tscn`; прежняя station presentation скрыта, compound TASK-180.1 collision/docking envelope остаётся authoritative и не импортируется из GLB.
+- `NpcShipNavigationNode`: production `SHP_Interceptor_01.tscn` загружается через `ResourceLoader`; старый nine-part procedural visual перенесён в hidden `LegacyProceduralFallback` и включается только при невозможности загрузки production PackedScene; spherical gameplay collider сохранён.
+- `tools/content/generate-production-glb.py` детерминированно воспроизводит baseline GLB как build/editor tool. Runtime никогда не генерирует модели.
+- Добавлены `ProductionAssetPipelineAcceptanceRunner`, live F5 TASK-184, xUnit, raw-GLB/static validator, section-37/CI/release enforcement и `docs/PRODUCTION_3D_ASSET_PIPELINE.md`.
+
+### Нормативные требования §33
+
+TASK-184 реализует transfer/runtime baseline: glTF 2.0/GLB, metre scale, именование `SHP_/STN_/MAT_`, отдельные LOD-модели, bounded material count, отдельные collision shapes и attachment markers; source/raw art не помещается в runtime model folder/release ZIP. Требование об основном production authoring editor Blender остаётся pipeline policy: текущий baseline GLB создан детерминированным tooling, а не выдаётся за hand-authored Blender art. Финальный texture/decal/authoring pass может заменить GLB без изменения runtime contract.
+
+### Runtime acceptance TASK-184 / TASK-185
+
+1. `tools\run-section37-quality.cmd`: clean CoreCompile `0 errors / 0 warnings`; all tests/validators green; `TASK-184 PRODUCTION ASSET PIPELINE CONTRACT PASS`.
+2. Первый Godot import проекта: все 9 GLB должны импортироваться без parser/import errors. Startup: `TASK-184 production asset pipeline READY...`.
+3. Player external/chase view: виден новый angular explorer, без двойного наложения старых box/sphere primitives; cockpit `F2` остаётся пригодным, controls/landing collision без изменений.
+4. Station approach от >3 km к dock: LOD2→LOD1→LOD0 без disappearance/pop-to-origin; ring/core/arms/tunnel/radiators читаются; collision и navigation-assist docking работают как alpha.182.
+5. NPC traffic: imported interceptor видим у всех 4 ships; при смене расстояния LOD переключается, pathing/avoidance/collision не меняются.
+6. F5: HUD `TASK-184 (F5): PASS glb=9/9 lod=3/3 markers>=14`; Output `TASK-184 production asset pipeline acceptance PASS: families=3; glb=9; lodChains=3; markers=<N>; player=1; station=1; npc=1; collisionSeparate=1; fallbackHidden=1; lodController=1; ...`.
+7. FAIL: прислать import error, screenshot объекта/LOD и последние 150 строк Output.
+
+### Граница итерации
+
+TASK-184 не заявляет финальное AAA/art-authoring качество и не вводит baked textures/normal maps/decal atlas, которых нет в исходном payload. Это реальный production **asset/import/LOD contract** и первая GLB-визуальная замена procedural placeholders. Flight physics, save schema, controls, terrain, docking и collision не переопределяются.
+
+### Проверки в контейнере
+
+`.NET build/test` и Godot import/runtime недоступны до внешнего запуска, поскольку в контейнере отсутствуют `dotnet`/Godot executables. Выполняются raw GLB structural checks, Godot text-resource validation, all static regression validators, version/YAML/shell/archive integrity.
+
+---
+
+## 0A. Предыдущая мега-итерация 2026-08-16 — TASK-182 Flight Runtime Closure & Streaming Stability
 
 **Исходный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip` (`0.1.0-alpha.180.3`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip`.  
 **Версия:** `0.1.0-alpha.182`.  
-**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`.
+**Статус:** `IMPLEMENTED / OWNER RUNTIME SMOKE MATERIALLY PASSED / F5 PENDING`.
 
 ### Основание: owner-run alpha.180.3
 
@@ -6993,26 +7042,41 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-18206` | F5/xUnit/section-37/CI/release защищают closure contract | `IMPLEMENTED` | `FlightRuntimeClosureAcceptance`, tests, static validator |
 | `FLIGHT-ACC-182` | Clean build + mouse neutral-return + atmosphere/streaming smoke + F5 | `IN_PROGRESS` | external Windows/Godot required |
 
+### 8.45. Production 3D Asset Pipeline & LOD Integration — TASK-184
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `ASSET-18400` | Player/NPC/station используют импортируемый glTF2/GLB presentation baseline | `IMPLEMENTED` | 3 families / 9 GLB |
+| `ASSET-18401` | Каждая family имеет отдельные LOD0/LOD1/LOD2 | `IMPLEMENTED` | 3 complete descending triangle chains |
+| `ASSET-18402` | Production assets используют metre-scale/naming/material discipline | `IMPLEMENTED` | SHP_/STN_/MAT_ naming; <=5 materials/GLB |
+| `ASSET-18403` | Collision создаётся отдельно от visual GLB | `IMPLEMENTED` | no collision nodes in GLB; existing Godot shapes preserved |
+| `ASSET-18404` | Attachment points задаются markers | `IMPLEMENTED` | 14 LOD0 `MNT_*` markers |
+| `ASSET-18405` | Runtime LOD переключается camera-distance policy и не генерирует assets | `IMPLEMENTED` | `ProductionModelLodController`; GLB prebuilt |
+| `ASSET-18406` | Legacy primitives не дублируют imported production visuals | `IMPLEMENTED` | player/station hidden; NPC hidden fallback on successful load |
+| `ASSET-18407` | F5/xUnit/section-37/CI/release защищают §33 baseline | `IMPLEMENTED` | TASK-184 acceptance + validator/tests |
+| `ASSET-ACC-185` | Clean build + Godot import + player/station/NPC LOD smoke + F5 | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-182` | External acceptance flight runtime closure | clean build; neutral-return/atmosphere/streaming smoke; F5 TASK-182 PASS |
-| 2 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
-| 3 | `TASK-181` | External acceptance TASK-180 | clean build; cockpit/station/NPC/orbit visual smoke; F5 TASK-180 PASS |
-| 4 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
-| 5 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
-| 6 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
-| 7 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
-| 8 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
-| 9 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
-| 10 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
-| 11 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-185` | External acceptance TASK-184 production assets | clean build; 9/9 GLB import; player/station/NPC LOD smoke; F5 TASK-184 PASS |
+| 2 | `TASK-182` | Remaining F5 acceptance flight runtime closure | owner runtime smoke materially passed; F5 TASK-182 still pending |
+| 3 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
+| 4 | `TASK-181` | External acceptance TASK-180 | clean build; cockpit/station/NPC/orbit visual smoke; F5 TASK-180 PASS |
+| 5 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 6 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
+| 7 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
+| 8 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
+| 9 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
+| 10 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
+| 11 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
+| 12 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178…178.7 остаются `IMPLEMENTED` с указанным в журнале owner runtime evidence/acceptance tails; TASK-180 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`; TASK-182 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`. TASK-179/181/182 не закрываются без внешнего запуска.  
-**Формально ближайший шаг:** внешний section-37/F5 прогон alpha.182 должен сначала закрыть TASK-182 и одновременно может дать недостающий evidence для TASK-179 (flight stack) и TASK-181 (visual pass); `VERIFIED` присваивается только по фактическому логу/скриншотам. Планетарный surface-stack не переоткрывается; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178…178.7 остаются `IMPLEMENTED` с указанным в журнале owner runtime evidence/acceptance tails; TASK-180 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`; TASK-182 `IMPLEMENTED / OWNER RUNTIME SMOKE MATERIALLY PASSED / F5 PENDING`; TASK-184 `IMPLEMENTED / PENDING EXTERNAL GLB IMPORT+LOD/F5`. TASK-179/181/182 не закрываются без внешнего запуска.  
+**Формально ближайший шаг:** внешний clean build/Godot import/F5 прогон alpha.184 должен закрыть TASK-185; тот же owner-run может одновременно дать недостающий F5 evidence для TASK-182, TASK-179 и TASK-181; `VERIFIED` присваивается только по фактическому логу/скриншотам. Планетарный surface-stack не переоткрывается; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

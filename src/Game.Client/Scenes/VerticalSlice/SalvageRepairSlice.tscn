@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://dn124navsurface01" path="res://Scripts/VerticalSlice/NpcNavigationSurfaceNode.cs" id="9_npc_navigation"]
 [ext_resource type="Script" uid="uid://ss128node00001" path="res://Scripts/VerticalSlice/StarSystemSimulationNode.cs" id="10_star_system_simulation"]
 [ext_resource type="Script" uid="uid://c130pauseovr01" path="res://Scripts/Application/GamePauseOverlay.cs" id="11_application_shell"]
+[ext_resource type="PackedScene" path="res://Assets/Models/Stations/STN_Orbital_01.tscn" id="12_station_model"]
 
 [sub_resource type="StandardMaterial3D" id="GroundMaterial"]
 albedo_color = Color(0.055, 0.09, 0.075, 1)
@@ -274,33 +275,43 @@ AllowRuntimeReset = false
 [node name="OrbitalStation" type="StaticBody3D" parent="Gameplay"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, -1631)
 
+
+[node name="ProductionModel" parent="Gameplay/OrbitalStation" instance=ExtResource("12_station_model")]
+
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 mesh = SubResource("OrbitalStationMesh")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
 shape = SubResource("OrbitalStationShape")
 
 [node name="LeftArm" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(-43, 0, 1)
 mesh = SubResource("OrbitalStationArmMesh")
 
 [node name="RightArm" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(43, 0, 1)
 mesh = SubResource("OrbitalStationArmMesh")
 
 [node name="Spine" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(0, 0, -3)
 mesh = SubResource("OrbitalStationSpineMesh")
 
 [node name="DockGuideUpper" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(0, 7.6, 23.5)
 mesh = SubResource("OrbitalStationGuideMesh")
 
 [node name="DockGuideLower" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(0, -7.6, 23.5)
 mesh = SubResource("OrbitalStationGuideMesh")
 
 [node name="DockTunnelLeft" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(-8.2, 0, 20)
 mesh = SubResource("OrbitalStationTunnelWallMesh")
 
@@ -309,6 +320,7 @@ position = Vector3(-8.2, 0, 20)
 shape = SubResource("OrbitalStationTunnelWallShape")
 
 [node name="DockTunnelRight" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+visible = false
 position = Vector3(8.2, 0, 20)
 mesh = SubResource("OrbitalStationTunnelWallMesh")
 
@@ -421,33 +433,39 @@ shape = SubResource("OrbitalStationRingSegmentShape")
 [node name="VisualDetail" type="Node3D" parent="Gameplay/OrbitalStation"]
 
 [node name="HabitationRing" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("OrbitalStationHabRingMesh")
 cast_shadow = 1
 
 [node name="CentralHub" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("OrbitalStationHubMesh")
 cast_shadow = 1
 
 [node name="PortRadiator" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 position = Vector3(-35, 0, -4)
 rotation = Vector3(0, 0, 0.12)
 mesh = SubResource("OrbitalStationRadiatorMesh")
 cast_shadow = 1
 
 [node name="StarboardRadiator" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 position = Vector3(35, 0, -4)
 rotation = Vector3(0, 0, -0.12)
 mesh = SubResource("OrbitalStationRadiatorMesh")
 cast_shadow = 1
 
 [node name="UpperAntenna" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 position = Vector3(0, 21, -5)
 mesh = SubResource("OrbitalStationAntennaMesh")
 cast_shadow = 1
 
 [node name="LowerAntenna" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+visible = false
 position = Vector3(0, -21, -5)
 mesh = SubResource("OrbitalStationAntennaMesh")
 cast_shadow = 1

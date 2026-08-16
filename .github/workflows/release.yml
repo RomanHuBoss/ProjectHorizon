@@ -99,6 +99,7 @@ jobs:
           python3 tools/validate-task1802-flight-feel-hotfix.py
           python3 tools/validate-task1803-flight-control-log-integrity.py
           python3 tools/validate-task182-flight-runtime-closure.py
+          python3 tools/validate-task184-production-asset-pipeline.py
 
       - name: Unit tests and coverage
         run: >-

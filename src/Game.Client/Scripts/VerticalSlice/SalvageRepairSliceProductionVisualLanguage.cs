@@ -16,7 +16,7 @@ public partial class SalvageRepairSlice
             $"npcShip={NpcShipNavigationNode.ProductionVisualPartCount}; " +
             $"planetMaterialVariants={DetailedPlanetGlobeNode.ProductionTerrainMaterialVariants}; " +
             "materials=semantic-PBR; playerPrimaryCollision=unchanged; " +
-            "stationPhysicalEnvelope=TASK-180.1; externalArtAssets=0; F5=acceptance.");
+            "stationPhysicalEnvelope=TASK-180.1; externalArtAssets=TASK-184-GLB; F5=acceptance.");
     }
 
     private void RunProductionVisualLanguageAcceptance()
@@ -38,7 +38,9 @@ public partial class SalvageRepairSlice
         int stationDetailParts = CountDirectMeshes(stationDetail);
         int npcShipDetailParts = _npcShipNavigationNodes.Count == 0
             ? 0
-            : _npcShipNavigationNodes.Min(ship => CountDirectMeshes(ship));
+            : _npcShipNavigationNodes.Min(ship => ship.ProductionAssetLoaded
+                ? NpcShipNavigationNode.ProductionVisualPartCount
+                : CountRecursiveMeshes(ship));
         int planetMaterialVariants = _starSystemSimulationNode?
             .DetailedPlanetTerrainMaterialVariants ?? 0;
         int semanticMaterialProfiles = _starSystemSimulationNode?
@@ -77,4 +79,18 @@ public partial class SalvageRepairSlice
     private static int CountDirectMeshes(Node? root) => root is null
         ? 0
         : root.GetChildren().Count(child => child is MeshInstance3D);
+
+    private static int CountRecursiveMeshes(Node? root)
+    {
+        if (root is null)
+        {
+            return 0;
+        }
+        int count = root is MeshInstance3D ? 1 : 0;
+        foreach (Node child in root.GetChildren())
+        {
+            count += CountRecursiveMeshes(child);
+        }
+        return count;
+    }
 }

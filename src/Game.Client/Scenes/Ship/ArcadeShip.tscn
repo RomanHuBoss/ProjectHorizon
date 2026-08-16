@@ -1,6 +1,7 @@
-[gd_scene load_steps=24 format=3]
+[gd_scene load_steps=25 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Ship/ArcadeShipController.cs" id="1_ship"]
+[ext_resource type="PackedScene" path="res://Assets/Models/Ships/SHP_Explorer_01.tscn" id="2_production_model"]
 
 [sub_resource type="BoxShape3D" id="BoxShape_ship"]
 size = Vector3(2.4, 1.0, 5.8)
@@ -164,45 +165,56 @@ shape = SubResource("BoxShape_ship")
 
 [node name="Visuals" type="Node3D" parent="."]
 
+
+[node name="ProductionExterior" parent="Visuals" instance=ExtResource("2_production_model")]
+
 [node name="Hull" type="MeshInstance3D" parent="Visuals"]
+visible = false
 mesh = SubResource("BoxMesh_hull")
 cast_shadow = 1
 
 [node name="Nose" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(0, -0.02, -3.15)
 mesh = SubResource("BoxMesh_nose")
 cast_shadow = 1
 
 [node name="LeftWing" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(-2.25, -0.08, 0.25)
 rotation = Vector3(0, 0.12, 0)
 mesh = SubResource("BoxMesh_wing")
 cast_shadow = 1
 
 [node name="RightWing" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(2.25, -0.08, 0.25)
 rotation = Vector3(0, -0.12, 0)
 mesh = SubResource("BoxMesh_wing")
 cast_shadow = 1
 
 [node name="TailFin" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(0, 0.82, 2.0)
 mesh = SubResource("BoxMesh_tail")
 cast_shadow = 1
 
 [node name="Cockpit" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(0, 0.55, -1.2)
 scale = Vector3(1, 0.65, 1.35)
 mesh = SubResource("SphereMesh_cockpit")
 cast_shadow = 1
 
 [node name="LeftEngine" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(-0.72, 0, 3.0)
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("CylinderMesh_engine")
 cast_shadow = 1
 
 [node name="RightEngine" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(0.72, 0, 3.0)
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("CylinderMesh_engine")
@@ -210,18 +222,21 @@ cast_shadow = 1
 
 
 [node name="LeftChine" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(-1.08, 0.12, 0.28)
 rotation = Vector3(0, 0.055, 0)
 mesh = SubResource("BoxMesh_chine")
 cast_shadow = 1
 
 [node name="RightChine" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(1.08, 0.12, 0.28)
 rotation = Vector3(0, -0.055, 0)
 mesh = SubResource("BoxMesh_chine")
 cast_shadow = 1
 
 [node name="DorsalSpine" type="MeshInstance3D" parent="Visuals"]
+visible = false
 position = Vector3(0, 0.52, 1.0)
 mesh = SubResource("BoxMesh_spine")
 cast_shadow = 1

@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.184] - 2026-08-16
+
+### Added — TASK-184 production 3D asset pipeline & LOD integration
+
+- Added three glTF 2.0/GLB production model families (`SHP_Explorer_01`, `SHP_Interceptor_01`, `STN_Orbital_01`) with separate LOD0/LOD1/LOD2 assets and bounded PBR material slots.
+- Replaced visible player-ship, orbital-station and NPC primitive presentation with imported GLB scene wrappers while preserving all authoritative Godot collision, docking, cockpit and flight contracts. Legacy primitive visuals remain hidden runtime fallbacks.
+- Added camera-distance `ProductionModelLodController` with family-specific thresholds, safe LOD0 fallback, and exact-one-LOD visibility semantics.
+- Added named `MNT_*` hardpoint/cockpit/engine/docking/traffic markers to the production assets; imported GLBs intentionally contain no gameplay collision nodes.
+- Added deterministic editor/build-time GLB generation, raw GLB structural/LOD validation, TASK-184 model/F5/xUnit/static acceptance and section-37/CI/release enforcement.
+- Owner alpha.182 log is recorded as a materially successful flight-runtime smoke: no ERROR/WARNING/Exception/light-culler failures, lethal planet impact reached the death screen, atmosphere produced a single clean EXIT at 601.5 m, terrain workers remained `failed=0`, and station navigation-assist docking/save-exit completed. Owner permits progression despite flight feel still not being considered final.
+
 ## [0.1.0-alpha.182] - 2026-08-16
 
 ### Fixed — TASK-182 flight runtime closure & streaming stability

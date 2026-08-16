@@ -36,6 +36,7 @@ public sealed record NpcShipNavigationDiagnostics(
 public partial class NpcShipNavigationNode : CharacterBody3D
 {
     public const int ProductionVisualPartCount = 9;
+    public const string ProductionAssetScenePath = "res://Assets/Models/Ships/SHP_Interceptor_01.tscn";
     private AerialSteeringRuntime? _steering;
     private Node3D? _primaryTarget;
     private NpcShipNavigationNode? _formationLeader;
@@ -66,6 +67,8 @@ public partial class NpcShipNavigationNode : CharacterBody3D
     public NpcShipNavigationRole Role { get; private set; }
 
     public NpcShipNavigationState NavigationState => _state;
+
+    public bool ProductionAssetLoaded { get; private set; }
 
     public void Configure(
         AerialSteeringRuntime steering,
@@ -617,8 +620,33 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             ? parent.GlobalTransform.Basis.Orthonormalized().Inverse() * worldVector
             : worldVector;
 
+
+    private bool TryAttachProductionModel()
+    {
+        if (!ResourceLoader.Exists(ProductionAssetScenePath))
+        {
+            return false;
+        }
+
+        PackedScene? packed = ResourceLoader.Load<PackedScene>(ProductionAssetScenePath);
+        Node3D? model = packed?.Instantiate<Node3D>();
+        if (model is null)
+        {
+            return false;
+        }
+
+        model.Name = "ProductionModel";
+        AddChild(model);
+        return true;
+    }
+
     private void BuildVisual(Color bodyColor)
     {
+        Node3D legacyVisual = new() { Name = "LegacyProceduralFallback" };
+        AddChild(legacyVisual);
+        ProductionAssetLoaded = TryAttachProductionModel();
+        legacyVisual.Visible = !ProductionAssetLoaded;
+
         StandardMaterial3D hullMaterial = new()
         {
             AlbedoColor = bodyColor,
@@ -651,7 +679,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
             Roughness = 0.18f
         };
 
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "Hull",
             Mesh = new BoxMesh
@@ -660,7 +688,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = hullMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "Wings",
             Position = new Vector3(0.0f, -0.02f, 0.15f),
@@ -670,7 +698,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = hullMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "Nose",
             Position = new Vector3(0.0f, 0.0f, -1.72f),
@@ -680,7 +708,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = accentMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "DorsalSpine",
             Position = new Vector3(0.0f, 0.38f, 0.32f),
@@ -690,7 +718,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = accentMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "Canopy",
             Position = new Vector3(0.0f, 0.36f, -0.72f),
@@ -704,7 +732,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = canopyMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "LeftNacelle",
             Position = new Vector3(-1.15f, 0.02f, 0.82f),
@@ -714,7 +742,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = hullMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "RightNacelle",
             Position = new Vector3(1.15f, 0.02f, 0.82f),
@@ -724,7 +752,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = hullMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "LeftEngineGlow",
             Position = new Vector3(-1.15f, 0.02f, 1.68f),
@@ -737,7 +765,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Material = engineMaterial
             }
         });
-        AddChild(new MeshInstance3D
+        legacyVisual.AddChild(new MeshInstance3D
         {
             Name = "RightEngineGlow",
             Position = new Vector3(1.15f, 0.02f, 1.68f),
@@ -753,6 +781,7 @@ public partial class NpcShipNavigationNode : CharacterBody3D
 
         SetMeta("production_visual_profile", "task180");
         SetMeta("production_visual_parts", ProductionVisualPartCount);
+        SetMeta("production_asset_loaded", ProductionAssetLoaded);
         AddChild(new CollisionShape3D
         {
             Name = "CollisionShape3D",

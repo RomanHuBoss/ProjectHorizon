@@ -1,0 +1,17 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://Scripts/Presentation/ProductionModelLodController.cs" id="1_lod"]
+[ext_resource type="PackedScene" path="res://Assets/Models/Stations/STN_Orbital_01_LOD0.glb" id="2_lod0"]
+[ext_resource type="PackedScene" path="res://Assets/Models/Stations/STN_Orbital_01_LOD1.glb" id="3_lod1"]
+[ext_resource type="PackedScene" path="res://Assets/Models/Stations/STN_Orbital_01_LOD2.glb" id="4_lod2"]
+
+[node name="STN_Orbital_01" type="Node3D"]
+script = ExtResource("1_lod")
+Lod1DistanceMeters = 700.0
+Lod2DistanceMeters = 2600.0
+
+[node name="LOD0" parent="." instance=ExtResource("2_lod0")]
+[node name="LOD1" parent="." instance=ExtResource("3_lod1")]
+visible = false
+[node name="LOD2" parent="." instance=ExtResource("4_lod2")]
+visible = false
