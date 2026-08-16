@@ -1310,4 +1310,34 @@ public sealed class WorldGenTests
         Assert.Equal(6, report.FacesCovered);
     }
 
+    [Fact]
+    public void PlanetCurvedSurface_ColdStartGuardKeepsBodyAboveCurvedCollider()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments, RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(planet, galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfaceTerrainProfile terrain = PlanetSurfaceTerrainRuntime.BuildProfile(
+            profile,
+            profile.Seed == long.MinValue ? long.MaxValue : Math.Max(1L, Math.Abs(profile.Seed)));
+        const double east = 0.0;
+        const double north = 5.5;
+        const double authoredHeight = 1.05;
+        double terrainHeight = PlanetSurfaceTerrainRuntime.SampleHeight(terrain, east, north);
+        double safeHeight = PlanetSurfaceSpawnSafetyRuntime.RequiredSemanticHeight(
+            terrain, east, north, authoredHeight);
+        PlanetSurfaceCurvedPatchDescriptor patch = new(
+            profile.RadiusKm * 1000.0, 0.0, 0.0);
+        Godot.Vector3 terrainPoint = patch.ToLocalPoint(east, terrainHeight, north);
+        Godot.Vector3 playerPoint = patch.ToLocalPoint(east, safeHeight, north);
+
+        Assert.True(safeHeight >= authoredHeight);
+        Assert.InRange(
+            playerPoint.Y - terrainPoint.Y,
+            (float)PlanetSurfaceSpawnSafetyRuntime.MinimumBodyCenterClearanceMeters - 0.0001f,
+            100.0f);
+    }
+
 }

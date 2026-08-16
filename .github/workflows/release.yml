@@ -82,6 +82,7 @@ jobs:
           python3 tools/validate-task172-physical-radial-surface.py
           python3 tools/validate-task1721-radial-hotfix.py
           python3 tools/validate-task174-curved-surface.py
+          python3 tools/validate-task1741-cold-start-safety.py
 
       - name: Unit tests and coverage
         run: >-

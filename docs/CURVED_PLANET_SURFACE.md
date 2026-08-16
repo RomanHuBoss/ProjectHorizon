@@ -13,3 +13,8 @@ F5 runs `TASK-174 curved cube-sphere surface acceptance`. It verifies all six cu
 ## Curvature-anchor resident remap
 
 Floating-origin changes preserve semantic terrain height for Node3D residents and MultiMesh flora separately. MultiMesh instance transforms are adjusted explicitly because they are not individual scene-tree nodes. Cloud-root altitude is also referenced to the curved tangent baseline so long traversals do not lift cloud decks away from the planet.
+
+
+## Alpha.174.1 cold-start safety
+
+The initial curved fallback collision is built synchronously and uses backface collision. Before the async 25/9 streamer replaces it, `PlanetSurfaceSpawnSafetyRuntime` enforces a minimum 1.02 m semantic body-center clearance and rechecks clearance during the fallback handoff. This prevents an authored or restored spawn from beginning below the curved terrain and falling radially away from the surface.

@@ -8,10 +8,37 @@
 
 ---
 
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-174.1 Curved Surface Cold-Start Safety
+
+**Исходный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task174.1-curved-surface-cold-start-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.174.1`.  
+**Статус:** TASK-174.1 `IMPLEMENTED / PENDING EXTERNAL BUILD+NEW-GAME+F5`; дальнейшая mega-итерация заблокирована до reacceptance cold start.
+
+### Внешнее evidence
+
+На первом запуске alpha.174 игрок оказался под surface mesh. Для стартовой cube-face `+X` radial gravity направлена по `-X`, поэтому после провала HUD показывал большой отрицательный X, а камера смотрела снизу на огромный curved terrain patch.
+
+### Исправления
+
+- cold start теперь применяет terrain-aware body-center clearance **синхронно после построения curved fallback collision и до async streamer handoff**;
+- единая политика `PlanetSurfaceSpawnSafetyRuntime` требует минимум `1.02 m` от semantic terrain height до центра capsule;
+- initial fallback и rebase bridge используют `ConcavePolygonShape3D.BackfaceCollision=true`;
+- до retirement fallback короткое handoff-окно дополнительно защищено идемпотентным clearance guard;
+- F5 получает `TASK-174.1 curved surface cold-start safety acceptance`; добавлен xUnit regression и section-37/CI/release gate.
+
+### Acceptance
+
+1. Clean build: `0 errors / 0 warnings`.
+2. **New Game с нуля:** игрок сразу стоит над поверхностью и не проваливается; Output содержит `TASK-174.1 curved surface cold-start guard READY`.
+3. После settle streamer снова `25/25`, collisions `9/9`.
+4. F5: `TASK-174.1 ... PASS` с `fallbackBackface=1`, `guardSamples>0`, `minGuardClearance>=0.79m`, `streamer=25/9`.
+5. TASK-174/TASK-172/TASK-124/TASK-126 остаются PASS.
+
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-174 True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles
 
 **Исходный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`.  
-**Подготовленный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task174.1-curved-surface-cold-start-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.174`.  
 **Статус:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-174 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-163 остаётся acceptance-хвостом.
 

@@ -54,7 +54,7 @@ need("PlanetRadialSurfaceFrame_CoversCubeFacesWithOrthonormalTangentBases" in te
      "PlanetRadialSurfaceFrame_GeodesicWarpAndFaceSeamRemainContinuous" in tests and
      "PlanetRadialSurfaceFrame_AcceptanceClosesGravityFaceAndBoundedStreamingContract" in tests,
      "TASK-170 xUnit regression groups missing", f)
-need(version in {"0.1.0-alpha.170", "0.1.0-alpha.172", "0.1.0-alpha.172.1", "0.1.0-alpha.174"}, "VERSION not alpha.170/172/172.1/174", f)
+need(version in {"0.1.0-alpha.170", "0.1.0-alpha.172", "0.1.0-alpha.172.1", "0.1.0-alpha.174", "0.1.0-alpha.174.1"}, "VERSION not alpha.170/172/172.1/174", f)
 
 if f:
     print("TASK-170 RADIAL SURFACE FRAME CONTRACT FAIL:")

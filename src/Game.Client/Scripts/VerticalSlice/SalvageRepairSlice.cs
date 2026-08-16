@@ -5524,6 +5524,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetRadialSurfaceAcceptance();
         RunPlanetSurfacePhysicalFrameAcceptance();
         RunPlanetCurvedSurfaceAcceptance();
+        RunPlanetSurfaceStartupSafetyAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5534,7 +5535,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()

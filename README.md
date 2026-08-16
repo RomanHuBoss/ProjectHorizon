@@ -15,6 +15,10 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-174.1 — Curved Surface Cold-Start Safety
+
+Alpha.174.1 closes the first-run regression where the authored player spawn could be below the newly curved terrain before the async streamer settled. The synchronous curved fallback collider is now backface-safe, the player is lifted to at least 1.02 m body-center clearance over semantic terrain during terrain bootstrap, and the same idempotent guard remains active through the short fallback→25/9 streamer handoff. F5 exposes `TASK-174.1 curved surface cold-start safety acceptance`.
+
 ## TASK-174 — True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles
 
 Alpha.174 bends the live bounded terrain **visual and trimesh collision** by the real current-planet radius instead of keeping TASK-172's collision patch mathematically flat. TASK-124 navigation tiles consume the same spherical-sag model, player Up follows the curved local normal, and floating-origin/frame handoffs preserve semantic surface height for the player and resident AI/content. The established 25-active/9-collision budget and logical-X/Z save identity remain unchanged.

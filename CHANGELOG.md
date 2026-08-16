@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.174.1] - 2026-08-16
+
+### Fixed — TASK-174.1 Curved Surface Cold-Start Safety
+- Fixed first-run/new-surface spawn under curved terrain by applying terrain-aware body-center clearance synchronously after the curved fallback collider is built, before the async 25/9 streamer is allowed to replace it.
+- Made both the initial curved fallback trimesh and curvature-rebase bridge backface-safe so a body cannot fall through from the wrong side during a transient overlap/recovery case.
+- Kept an idempotent clearance guard active through the short streamer handoff window and added a dedicated TASK-174.1 F5 acceptance plus xUnit/static/CI/release regression coverage.
+- Preserved the TASK-174 curved collision/navigation model, logical-XZ persistence and 25-active/9-collision streaming budget.
+
+### External runtime evidence that triggered the hotfix
+- Alpha.174 could spawn the player below the new curved surface on first start; on the starter `+X` radial face gravity then accelerated the player along `-X`, leaving the camera underneath the large terrain patch.
+
 ## [0.1.0-alpha.174] - 2026-08-16
 
 ### Added — TASK-174 True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles

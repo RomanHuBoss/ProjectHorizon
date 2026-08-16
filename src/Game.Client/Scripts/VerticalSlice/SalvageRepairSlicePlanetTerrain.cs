@@ -15,6 +15,10 @@ public partial class SalvageRepairSlice
     private PlanetSurfaceChunkCoordinate? _planetSurfaceDistantTerrainCenter;
     private bool _planetSurfaceFallbackRetired;
     private bool _planetSurfaceStreamingReadyPrinted;
+    private bool _planetSurfaceFallbackBackfaceCollisionEnabled;
+    private int _planetSurfaceStartupClearanceSamples;
+    private double _planetSurfaceStartupMinimumClearanceMeters = double.PositiveInfinity;
+    private string _planetSurfaceStartupSafetyAcceptanceHud = "READY";
 
     private PlanetSurfaceTerrainProfile? CurrentTerrainProfile =>
         _planetSurfaceContentProfile?.Terrain;
@@ -54,8 +58,11 @@ public partial class SalvageRepairSlice
         groundMesh.Mesh = mesh;
         groundMesh.MaterialOverride = material;
         groundMesh.Visible = true;
-        groundCollision.Shape = mesh.CreateTrimeshShape();
+        ConcavePolygonShape3D fallbackShape = mesh.CreateTrimeshShape();
+        fallbackShape.BackfaceCollision = true;
+        groundCollision.Shape = fallbackShape;
         groundCollision.Disabled = false;
+        _planetSurfaceFallbackBackfaceCollisionEnabled = true;
         _planetSurfaceFallbackRetired = false;
         _planetSurfaceStreamingReadyPrinted = false;
         if (_planetSurfaceStreamer is not null &&
@@ -63,6 +70,14 @@ public partial class SalvageRepairSlice
         {
             _planetSurfaceStreamer.Visible = false;
         }
+
+        // TASK-174.1: cold start used to leave the authored Player Y=1.05
+        // untouched. With macro relief / curved terrain that position can be
+        // inside the synchronous fallback mesh, so radial gravity can pull the
+        // player through the one-sided side before the async streamer settles.
+        // Snap the body above the exact semantic terrain immediately, while the
+        // backface-safe curved fallback collider is already live.
+        ApplyPlanetSurfaceStartupClearanceGuard("terrain-bootstrap");
 
         EnsurePlanetSurfaceStreaming(profile);
         _planetSurfaceStreamer?.SetRuntimeCollisionEnabled(false);
@@ -107,8 +122,11 @@ public partial class SalvageRepairSlice
             originNorthMeters);
         groundMesh.Mesh = bridgeMesh;
         groundMesh.Visible = true;
-        groundCollision.Shape = bridgeMesh.CreateTrimeshShape();
+        ConcavePolygonShape3D bridgeShape = bridgeMesh.CreateTrimeshShape();
+        bridgeShape.BackfaceCollision = true;
+        groundCollision.Shape = bridgeShape;
         groundCollision.Disabled = false;
+        _planetSurfaceFallbackBackfaceCollisionEnabled = true;
         _planetSurfaceStreamer?.SetRuntimeCollisionEnabled(false);
         _planetSurfaceFallbackRetired = false;
         _planetSurfaceStreamingReadyPrinted = false;
@@ -175,6 +193,14 @@ public partial class SalvageRepairSlice
 
     private void UpdatePlanetSurfaceStreaming()
     {
+        if (_surfaceRuntimeActive && !_planetSurfaceFallbackRetired)
+        {
+            // Keep the body on the safe side of the synchronous collider for
+            // the short async handoff window as an additional cold-load/rebase
+            // guard. This is idempotent once clearance is healthy.
+            ApplyPlanetSurfaceStartupClearanceGuard("streamer-handoff");
+        }
+
         if (!_surfaceRuntimeActive ||
             _planetSurfaceStreamer is null ||
             !GodotObject.IsInstanceValid(_planetSurfaceStreamer) ||
@@ -490,21 +516,79 @@ public partial class SalvageRepairSlice
         return color.Lerp(mineral, mineralBlend * 0.58f);
     }
 
+    private double ApplyPlanetSurfaceStartupClearanceGuard(string source)
+    {
+        double clearance = EnsurePlayerAbovePlanetSurfaceFloor();
+        if (!double.IsFinite(clearance))
+        {
+            return clearance;
+        }
+
+        _planetSurfaceStartupClearanceSamples++;
+        _planetSurfaceStartupMinimumClearanceMeters = Math.Min(
+            _planetSurfaceStartupMinimumClearanceMeters,
+            clearance);
+        if (_planetSurfaceStartupClearanceSamples == 1)
+        {
+            GD.Print(
+                "TASK-174.1 curved surface cold-start guard READY: " +
+                $"source={source}; clearance={clearance.ToString("0.000", CultureInfo.InvariantCulture)}m; " +
+                $"fallbackBackface={(_planetSurfaceFallbackBackfaceCollisionEnabled ? 1 : 0)}; " +
+                "release=after-synchronous-curved-collider.");
+        }
+        return clearance;
+    }
+
+    private void RunPlanetSurfaceStartupSafetyAcceptance()
+    {
+        double clearance = EnsurePlayerAbovePlanetSurfaceFloor();
+        bool currentSafe = double.IsNaN(clearance) || clearance >= 0.79;
+        bool guarded = _planetSurfaceStartupClearanceSamples > 0 &&
+            double.IsFinite(_planetSurfaceStartupMinimumClearanceMeters) &&
+            _planetSurfaceStartupMinimumClearanceMeters >= 0.79;
+        TerrainChunkProfilerSnapshot? snapshot =
+            _planetSurfaceStreamer is not null && GodotObject.IsInstanceValid(_planetSurfaceStreamer)
+                ? _planetSurfaceStreamer.CaptureProfilerSnapshot()
+                : null;
+        bool streamerSafe = snapshot is not null &&
+            snapshot.LoadedChunks == PlanetSurfaceStreamingRuntime.ExpectedActiveChunks &&
+            snapshot.Collisions == PlanetSurfaceStreamingRuntime.ExpectedCollisionChunks;
+        bool passed = _planetSurfaceFallbackBackfaceCollisionEnabled &&
+            guarded && currentSafe && streamerSafe;
+
+        _planetSurfaceStartupSafetyAcceptanceHud = passed
+            ? "PASS cold-start collider/clearance"
+            : "FAIL cold-start safety";
+        string output =
+            $"TASK-174.1 curved surface cold-start safety acceptance {(passed ? "PASS" : "FAIL")}: " +
+            $"fallbackBackface={(_planetSurfaceFallbackBackfaceCollisionEnabled ? 1 : 0)}; " +
+            $"guardSamples={_planetSurfaceStartupClearanceSamples}; " +
+            $"minGuardClearance={(_planetSurfaceStartupClearanceSamples > 0 ? _planetSurfaceStartupMinimumClearanceMeters.ToString("0.000", CultureInfo.InvariantCulture) : "n/a")}m; " +
+            $"currentClearance={(double.IsNaN(clearance) ? "piloted" : clearance.ToString("0.000", CultureInfo.InvariantCulture))}m; " +
+            $"streamer={(streamerSafe ? "25/9" : "not-ready")}; " +
+            "coldStart=spawn-after-curved-fallback.";
+        if (passed) GD.Print(output); else GD.PushError(output);
+    }
+
     private double EnsurePlayerAbovePlanetSurfaceFloor()
     {
-        if (_player is null || CurrentTerrainProfile is null ||
-            StageOneVoyage.Piloted)
+        PlanetSurfaceTerrainProfile? profile = CurrentTerrainProfile;
+        if (_player is null || profile is null || StageOneVoyage.Piloted)
         {
             return double.NaN;
         }
 
         PlanetSurfaceLogicalPosition logical =
             GetPlanetSurfaceLogicalPlayerPosition();
-        double terrainHeight = SamplePlanetSurfaceHeight(
+        double terrainHeight = PlanetSurfaceTerrainRuntime.SampleHeight(
+            profile,
             logical.EastMeters,
             logical.NorthMeters);
-        const double minimumBodyCenterClearance = 1.02;
-        double minimumY = terrainHeight + minimumBodyCenterClearance;
+        double minimumY = PlanetSurfaceSpawnSafetyRuntime.RequiredSemanticHeight(
+            profile,
+            logical.EastMeters,
+            logical.NorthMeters,
+            logical.HeightMeters);
         if (logical.HeightMeters < minimumY)
         {
             _player.GlobalPosition = SurfaceLogicalToLocalPosition(
