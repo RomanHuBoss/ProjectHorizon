@@ -15,6 +15,14 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-180.2 — Stellar Scale, Planet Crash & Mouse Attitude Hotfix
+
+Alpha.180.2 corrects three owner-reported flight defects without advancing the feature queue. The atmospheric `PlanetSurfaceSunVisual` is now owned strictly by `WorldSceneKind.Surface`; it cannot leak into Orbit/InterplanetaryTransit as a tiny follower sphere. Surface sky keeps a distant follower disc only for atmospheric presentation, while space renders the actual `StarSystemSimulation` star with a strong unshaded emissive profile. F5 checks that the real system star has a substantial angular diameter from the focused planet.
+
+Planet collision is no longer equivalent to invulnerability. Normal piloting mistakes remain inside the surface-safety envelope, but a high-energy descent is deliberately not cancelled by `SurfaceSafetyAcceleration`. `ArcadeShipController` captures the strongest physical `MoveAndSlide` impact from pre-collision velocity; the vertical-slice arbiter kills the ship on lethal terrain-normal impact. Manual free-flight entry has a stricter 55 m/s safe-capture envelope than navigation-assist entry, so a boosted direct run can reach the solid-body collision path instead of being silently converted into a safe atmospheric handoff.
+
+Mouse flight is now explicitly nose-first: vertical mouse motion commands pitch, horizontal motion commands yaw plus coordinated bank, and A/D remain independent lateral thrusters. Mouse angular response is accelerated relative to keyboard rate input. No Euler pitch clamp is introduced; local-axis integration retains full 360-degree attitude rotation, including passing through vertical and completing loops/rolls. F5 includes `TASK-180.2 flight feel hotfix acceptance`; section-37/CI/release enforce `tools/validate-task1802-flight-feel-hotfix.py`.
+
 ## TASK-180.1 — Runtime Integrity Hotfix
 
 Alpha.180.1 is the emergency correction pass driven by the first owner runtime of alpha.180. It fixes three confirmed defect classes rather than adding new content: incomplete orbital planet fill, pass-through orbital-station geometry, and terrain-streaming/runtime instability. Detailed planets now keep an inset opaque core behind the six cube-sphere faces and all planet/moon proxy materials are two-sided. The expanded station presentation now has a compound physical collision envelope (core, arms, spine, dock guides/tunnel, hub, radiators, antennas and 12 habitation-ring segments), plus a continuous high-speed sweep over the same live collision shapes.

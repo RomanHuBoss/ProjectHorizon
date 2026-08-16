@@ -229,7 +229,7 @@ public partial class SalvageRepairSlice
             Name = "Core",
             Mesh = coreMesh,
             MaterialOverride = coreMaterial,
-            Scale = Vector3.One * 2.0f
+            Scale = Vector3.One * 7.5f
         });
 
         StandardMaterial3D haloMaterial = new()
@@ -254,7 +254,7 @@ public partial class SalvageRepairSlice
             Name = "Halo",
             Mesh = haloMesh,
             MaterialOverride = haloMaterial,
-            Scale = Vector3.One * 3.6f
+            Scale = Vector3.One * 13.5f
         });
 
         _planetSurfaceSunDirection = towardSun;
@@ -269,8 +269,11 @@ public partial class SalvageRepairSlice
             return;
         }
 
-        _planetSurfaceSunVisual.Visible = _surfaceRuntimeActive;
-        if (!_surfaceRuntimeActive || _player is null)
+        bool surfaceSceneOwnsSky = PlanetSurfaceWorldCompositionRuntime.ShouldRenderSurfaceSun(
+            _surfaceRuntimeActive,
+            WorldScenes.Current.Kind);
+        _planetSurfaceSunVisual.Visible = surfaceSceneOwnsSky;
+        if (!surfaceSceneOwnsSky || _player is null)
         {
             return;
         }
@@ -281,7 +284,7 @@ public partial class SalvageRepairSlice
         // celestial object rather than nearby scenery.
         _planetSurfaceSunVisual.GlobalPosition =
             _player.GlobalPosition +
-            SurfaceLocalDirectionToWorld(_planetSurfaceSunDirection).Normalized() * 180.0f;
+            SurfaceLocalDirectionToWorld(_planetSurfaceSunDirection).Normalized() * 900.0f;
     }
 
     private void RebuildPlanetSurfaceClouds(PlanetSurfaceSkyProfile profile)

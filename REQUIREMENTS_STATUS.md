@@ -2,13 +2,47 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task180.1-runtime-integrity-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task180.2-flight-feel-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая emergency mega-итерация 2026-08-16 — TASK-180.1 Runtime Integrity Hotfix
+## 0. Текущая emergency hotfix-итерация 2026-08-16 — TASK-180.2 Stellar Scale / Planet Crash / Mouse Attitude
+
+**Исходный снимок:** `ProjectHorizon-main-task180.1-runtime-integrity-hotfix.zip` (`0.1.0-alpha.180.1`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task180.2-flight-feel-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.180.2`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`; дальнейшие функциональные TASK не продвигаются до owner-проверки полёта.
+
+### Owner evidence / блокирующие дефекты
+
+Пользователь сообщил три блокера: (1) солнце выглядит миниатюрной точкой рядом с планетой; (2) корабль невозможно разбить о планету; (3) мышь в полёте должна поворачивать нос/сцену по pitch/yaw и давать полноценное пространственное вращение, а не ощущение бокового сдвига. Эти замечания трактуются как runtime-неприёмка flight feel, а не как запрос новой механики.
+
+### Реализация
+
+- **Stellar ownership:** `PlanetSurfaceSunVisual` теперь видим только когда одновременно активен surface runtime и `WorldScenes.Current.Kind == Surface`. В Orbit/InterplanetaryTransit он не может появляться рядом с кораблём. Surface-disc перенесён с 180 m на 900 m и масштабирован для сохранения углового размера; это presentation-only follower без parallax. `StarSystemSimulationNode` остаётся единственным владельцем звезды в космосе; stellar material переведён в `Unshaded`, two-sided, emission `7.5`.
+- **Crashable planet:** добавлен `PlanetaryImpactRuntime`: assist спасает только при inward speed `<=12 m/s`; lethal normal impact начинается с `16 m/s` либо при сочетании high normal/total speed. `ArcadeShipController` сохраняет strongest physical `MoveAndSlide` impact по pre-collision velocity, а `SalvageRepairSliceShipSurfaceSafety` переводит hard terrain impact в `ui.death.planet_impact`. Penetration fallback использует тот же lethal envelope.
+- **Manual orbital impact:** общий navigation-assist entry limit `110 m/s` сохранён для регрессии/автопилота, но ручной free-flight capture ограничен `55 m/s`; boosted direct run выше этого порога не телепортируется в безопасный surface handoff и доходит до inner solid-body collision/death path.
+- **Mouse attitude:** `mouse Y -> pitch`, `mouse X -> yaw`; yaw автоматически добавляет bounded coordinated bank (`MouseBankFactor=0.62`). Mouse angular acceleration умножается на `3.2`, scene gain поднят до `2.55`, decay снижен до `5.2/s`. A/D остаются `ship_strafe_left/right`; mouse translation coupling отсутствует. `RotateObjectLocal` по X/Y/forward остаётся без Euler pitch clamp, поэтому полный pitch loop/roll не запрещён.
+- Добавлены `FlightFeelHotfixAcceptanceRunner`, F5 `TASK-180.2`, xUnit `FlightFeelHotfixTests`, static validator `validate-task1802-flight-feel-hotfix.py`, section-37/CI/release gate.
+
+### Runtime-приёмка TASK-180.2
+
+1. `tools\run-section37-quality.cmd` — clean build `0 errors / 0 warnings`, tests green, `TASK-180.2 FLIGHT FEEL HOTFIX CONTRACT PASS`.
+2. F5 — HUD: `TASK-180.2 (F5): PASS sun=<deg> crash=1 mouse=nose+bank`; Output: `TASK-180.2 flight feel hotfix acceptance PASS ...`.
+3. **Sun:** на поверхности солнце читается как небесный диск; после выхода в Orbit рядом с кораблём не остаётся follower-sun. Видна только звезда системы, не point-like marker.
+4. **Crash:** нормальный контролируемый вход/landing должен работать. Затем выполнить boosted/manual dive прямо в планету и отдельно hard dive уже в atmosphere: ожидается death screen `planet impact`, а не вечный safety-hover.
+5. **Mouse:** без A/D двигать мышь вправо/влево — нос обязан yaw-поворачиваться с креном; вверх/вниз — pitch. Продолжительное вертикальное управление должно позволять пройти через вертикаль и выполнить полный loop; мышь не должна создавать lateral strafe сама по себе.
+6. При любом FAIL прислать F5 HUD + последние 150 строк Output + короткое описание манёвра/скорости.
+
+### Ограничение проверки в контейнере
+
+В среде по-прежнему отсутствуют `dotnet` и Godot executable. Поэтому выполняются static/resource/version/archive gates, но `TASK-180.2` не переводится в `VERIFIED` без owner clean build и runtime/F5.
+
+---
+
+## 0A. Предыдущая emergency mega-итерация 2026-08-16 — TASK-180.1 Runtime Integrity Hotfix
 
 **Исходный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip` (`0.1.0-alpha.180`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task180.1-runtime-integrity-hotfix.zip`.  
@@ -57,7 +91,7 @@
 
 ---
 
-## 0A. Предыдущая mega-итерация 2026-08-16 — TASK-180 Production Procedural Visual Language
+## 0B. Предыдущая mega-итерация 2026-08-16 — TASK-180 Production Procedural Visual Language
 
 **Исходный снимок:** `ProjectHorizon-main.zip` (`0.1.0-alpha.178.7`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip`.  

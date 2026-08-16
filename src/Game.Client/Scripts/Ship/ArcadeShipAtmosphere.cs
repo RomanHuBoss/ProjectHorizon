@@ -367,7 +367,9 @@ public partial class ArcadeShipController
             SurfaceSafetyActivationAltitude,
             SurfaceSafetyClearance + stoppingDistance);
 
-        if (AltitudeAboveSurface < triggerAltitude)
+        bool recoverableSurfaceApproach = inwardSpeed <=
+            PlanetaryImpactRuntime.SurfaceSafetyMaximumRecoverableInwardSpeed;
+        if (AltitudeAboveSurface < triggerAltitude && recoverableSurfaceApproach)
         {
             float normalizedDanger = Mathf.Clamp(
                 (triggerAltitude - AltitudeAboveSurface) /
@@ -399,6 +401,16 @@ public partial class ArcadeShipController
         UpdateAtmosphereContext();
         if (AltitudeAboveSurface >= SurfaceHardFloor)
         {
+            return;
+        }
+
+        float inwardSpeed = Math.Max(0.0f, -Velocity.Dot(AtmosphereRadialUp));
+        if (inwardSpeed >= PlanetaryImpactRuntime.LethalNormalImpactSpeed)
+        {
+            // Do not turn a deliberate high-energy dive into an invulnerable
+            // hover. The vertical-slice impact arbiter consumes the physical
+            // collision/penetration and presents the death state.
+            SurfaceSafetyActive = false;
             return;
         }
 

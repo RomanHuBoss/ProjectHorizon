@@ -28,6 +28,13 @@ public readonly record struct ShipControlCommand(
         false);
 }
 
+public readonly record struct ShipCollisionImpact(
+    Vector3 Normal,
+    Vector3 Position,
+    float NormalClosingSpeed,
+    float TotalSpeed,
+    string ColliderName);
+
 public readonly record struct ArcadeShipRuntimeState(
     Transform3D GlobalTransform,
     Vector3 Velocity,
@@ -37,6 +44,9 @@ public readonly record struct ArcadeShipRuntimeState(
 
 public partial class ArcadeShipController : CharacterBody3D
 {
+    public const bool FullAttitudeRotationEnabled = true;
+    public const bool MouseTranslationCouplingEnabled = false;
+
     [Export]
     public bool StartPilotEnabled { get; set; } = true;
 
@@ -104,6 +114,12 @@ public partial class ArcadeShipController : CharacterBody3D
     [Export(PropertyHint.Range, "0.5,4.0,0.05")]
     public float MouseFlightGain { get; set; } = 2.25f;
 
+    [Export(PropertyHint.Range, "0.0,1.0,0.05")]
+    public float MouseBankFactor { get; set; } = 0.62f;
+
+    [Export(PropertyHint.Range, "1.0,6.0,0.1")]
+    public float MouseAngularResponseMultiplier { get; set; } = 3.2f;
+
     private Camera3D? _chaseCamera;
     private Camera3D? _cockpitCamera;
     private Transform3D _spawnTransform;
@@ -120,6 +136,7 @@ public partial class ArcadeShipController : CharacterBody3D
     private int _collisionEvents;
     private int _mouseSteeringSamples;
     private float _lastMouseSteeringMagnitude;
+    private ShipCollisionImpact? _pendingCollisionImpact;
 
     public Vector3 AngularVelocityLocal { get; private set; } = Vector3.Zero;
     public Vector3 LocalVelocity { get; private set; } = Vector3.Zero;
@@ -145,6 +162,19 @@ public partial class ArcadeShipController : CharacterBody3D
     public int CollisionEvents => _collisionEvents;
     public int MouseSteeringSampleCount => _mouseSteeringSamples;
     public float LastMouseSteeringMagnitude => _lastMouseSteeringMagnitude;
+
+    public bool TryConsumeCollisionImpact(out ShipCollisionImpact impact)
+    {
+        if (_pendingCollisionImpact is ShipCollisionImpact pending)
+        {
+            impact = pending;
+            _pendingCollisionImpact = null;
+            return true;
+        }
+
+        impact = default;
+        return false;
+    }
 
     public override void _Ready()
     {
@@ -329,14 +359,17 @@ public partial class ArcadeShipController : CharacterBody3D
         }
         ApplyAngularFlight(command, deltaSeconds);
         ApplyArcadeFlightAssist(command, deltaSeconds);
+        Vector3 velocityBeforeMove = Velocity;
         MoveAndSlide();
-        ApplyAtmosphericSurfaceCorrection();
 
         int slideCount = GetSlideCollisionCount();
         if (slideCount > 0)
         {
             _collisionEvents += slideCount;
+            CaptureStrongestCollisionImpact(velocityBeforeMove, slideCount);
         }
+
+        ApplyAtmosphericSurfaceCorrection();
 
         DecayMouseFlightInput(deltaSeconds);
         UpdateDiagnostics();
@@ -481,6 +514,7 @@ public partial class ArcadeShipController : CharacterBody3D
         Velocity = Vector3.Zero;
         AngularVelocityLocal = Vector3.Zero;
         _mouseLookInput = Vector2.Zero;
+        _pendingCollisionImpact = null;
         _collisionEvents = 0;
         SetManualControlEnabled(true);
         UpdateAtmosphereContext();
@@ -523,6 +557,7 @@ public partial class ArcadeShipController : CharacterBody3D
         AutoStabilizationEnabled = state.AutoStabilizationEnabled;
         SetCameraMode(state.CameraMode, false);
         _mouseLookInput = Vector2.Zero;
+        _pendingCollisionImpact = null;
         UpdateAtmosphereContext();
         UpdateDiagnostics();
     }
@@ -548,17 +583,20 @@ public partial class ArcadeShipController : CharacterBody3D
             Input.IsActionPressed("ship_reverse");
         float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right");
         float lift = Input.GetAxis("ship_lift_down", "ship_lift_up");
-        float roll = Input.GetAxis("ship_roll_left", "ship_roll_right");
+        float rollKeyboard = Input.GetAxis("ship_roll_left", "ship_roll_right");
         float pitchKeyboard = Input.GetAxis("ship_pitch_down", "ship_pitch_up");
         float yawKeyboard = Input.GetAxis("ship_yaw_right", "ship_yaw_left");
+        Vector3 mouseAttitude = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
+            _mouseLookInput,
+            MouseBankFactor);
 
         return new ShipControlCommand(
             forward,
             strafe,
             lift,
-            Mathf.Clamp(_mouseLookInput.X + pitchKeyboard, -1.0f, 1.0f),
-            Mathf.Clamp(_mouseLookInput.Y + yawKeyboard, -1.0f, 1.0f),
-            roll,
+            Mathf.Clamp(mouseAttitude.X + pitchKeyboard, -1.0f, 1.0f),
+            Mathf.Clamp(mouseAttitude.Y + yawKeyboard, -1.0f, 1.0f),
+            Mathf.Clamp(mouseAttitude.Z + rollKeyboard, -1.0f, 1.0f),
             Input.IsActionPressed("ship_boost") && !brake,
             brake);
     }
@@ -651,9 +689,13 @@ public partial class ArcadeShipController : CharacterBody3D
 
         if (hasRotationInput)
         {
+            bool mouseAttitudeActive = _mouseLookInput.LengthSquared() > 0.000004f &&
+                ManualInputOwnershipActive;
+            float angularResponse = AngularAcceleration *
+                (mouseAttitudeActive ? MouseAngularResponseMultiplier : 1.0f);
             AngularVelocityLocal = AngularVelocityLocal.MoveToward(
                 desiredAngularVelocity,
-                AngularAcceleration * deltaSeconds);
+                angularResponse * deltaSeconds);
         }
         else if (AutoStabilizationEnabled || command.Brake)
         {
@@ -675,6 +717,51 @@ public partial class ArcadeShipController : CharacterBody3D
         GlobalTransform = new Transform3D(
             GlobalTransform.Basis.Orthonormalized(),
             GlobalPosition);
+    }
+
+    private void CaptureStrongestCollisionImpact(
+        Vector3 velocityBeforeMove,
+        int slideCount)
+    {
+        if (!velocityBeforeMove.IsFinite() || slideCount <= 0)
+        {
+            return;
+        }
+
+        ShipCollisionImpact? strongest = null;
+        for (int index = 0; index < slideCount; index++)
+        {
+            KinematicCollision3D collision = GetSlideCollision(index);
+            Vector3 normal = collision.GetNormal();
+            if (!normal.IsFinite() || normal.LengthSquared() <= 0.000001f)
+            {
+                continue;
+            }
+
+            normal = normal.Normalized();
+            float closing = Math.Max(0.0f, -velocityBeforeMove.Dot(normal));
+            if (strongest is ShipCollisionImpact current &&
+                closing <= current.NormalClosingSpeed)
+            {
+                continue;
+            }
+
+            GodotObject? collider = collision.GetCollider();
+            string colliderName = collider is Node node
+                ? node.Name.ToString()
+                : collider?.ToString() ?? string.Empty;
+            strongest = new ShipCollisionImpact(
+                normal,
+                collision.GetPosition(),
+                closing,
+                velocityBeforeMove.Length(),
+                colliderName);
+        }
+
+        if (strongest is ShipCollisionImpact resolved)
+        {
+            _pendingCollisionImpact = resolved;
+        }
     }
 
     private void UpdateDiagnostics()

@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.180.1", "VERSION must be alpha.180.1", f)
+need(version in {"0.1.0-alpha.180.1", "0.1.0-alpha.180.2"}, "VERSION must be alpha.180.1", f)
 need('PlanetRuntimeOutboundDeactivationAltitudeMeters = 680.0f' in surface_residency and
      'residencyAltitude' in surface_residency and
      'StageOneVoyageLocation.OutboundFlight' in surface_residency,

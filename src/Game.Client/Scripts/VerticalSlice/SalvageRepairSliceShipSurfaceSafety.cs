@@ -32,6 +32,28 @@ public partial class SalvageRepairSlice
 
         UpdatePlanetSurfaceStreamingObserver();
 
+        if (_voyageShip.TryConsumeCollisionImpact(out ShipCollisionImpact impact))
+        {
+            Vector3 expectedUp = SurfaceLocalDirectionToWorld(Vector3.Up).Normalized();
+            bool surfaceLikeNormal = impact.Normal.LengthSquared() > 0.000001f &&
+                impact.Normal.Normalized().Dot(expectedUp) >= 0.45f;
+            if (surfaceLikeNormal && PlanetaryImpactRuntime.IsLethalSurfaceImpact(
+                    impact.NormalClosingSpeed,
+                    impact.TotalSpeed))
+            {
+                GD.Print(
+                    "TASK-180.2 planetary crash IMPACT: " +
+                    $"normalSpeed={impact.NormalClosingSpeed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+                    $"speed={impact.TotalSpeed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+                    $"collider={impact.ColliderName}; death=1.");
+                _voyageShip.Velocity = Vector3.Zero;
+                _voyageShip.ClearExternalCommand();
+                ShowApplicationDeathScreen("ui.death.planet_impact");
+                _pilotedShipSurfaceSweepInitialized = false;
+                return;
+            }
+        }
+
         Vector3 current = _voyageShip.GlobalPosition;
         if (!_pilotedShipSurfaceSweepInitialized ||
             !_pilotedShipSurfaceSweepPreviousPosition.IsFinite() ||
@@ -107,6 +129,24 @@ public partial class SalvageRepairSlice
             hitLogical.X,
             hitLogical.Z,
             hitTerrainHeight);
+        float penetrationInwardSpeed = Math.Max(0.0f,
+            -_voyageShip.Velocity.Dot(normal));
+        if (PlanetaryImpactRuntime.IsLethalSurfaceImpact(
+                penetrationInwardSpeed,
+                _voyageShip.Speed))
+        {
+            GD.Print(
+                "TASK-180.2 planetary crash PENETRATION: " +
+                $"normalSpeed={penetrationInwardSpeed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+                $"speed={_voyageShip.Speed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+                $"clearance={hitClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; death=1.");
+            _voyageShip.Velocity = Vector3.Zero;
+            _voyageShip.ClearExternalCommand();
+            ShowApplicationDeathScreen("ui.death.planet_impact");
+            _pilotedShipSurfaceSweepInitialized = false;
+            return;
+        }
+
         Vector3 corrected = SurfaceLogicalToLocalPosition(
             hitLogical.X,
             hitTerrainHeight + PilotedShipMinimumTerrainClearanceMeters +

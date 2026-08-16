@@ -175,7 +175,7 @@ public partial class SalvageRepairSlice
             return false;
         }
 
-        if (_voyageShip.Speed > PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed)
+        if (_voyageShip.Speed > PlanetaryApproachRuntime.MaximumManualOrbitalEntrySpeed)
         {
             // Safe-entry shell is deliberately ignored at excessive speed. The
             // inner swept solid-body collision below will then stop/death the

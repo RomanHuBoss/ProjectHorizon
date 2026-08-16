@@ -31,7 +31,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180", "0.1.0-alpha.180.1"}, "VERSION must be alpha.180 or alpha.180.1", f)
+need(version in {"0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2"}, "VERSION must be alpha.180 or alpha.180.1", f)
 for node in (
     'name="LeftChine"', 'name="RightChine"', 'name="DorsalSpine"',
     'name="CockpitInterior"', 'name="InstrumentPanel"', 'name="PrimaryDisplay"',
@@ -58,7 +58,7 @@ need('ProductionTerrainMaterialVariants = 6' in globe and
      'BuildTerrainVertexColor' in globe and 'VertexColorUseAsAlbedo = true' in globe and
      'surface.SetColor' in globe and 'roughness: 0.28f' in globe and 'roughness: 0.90f' in globe,
      "detailed globe seam-safe material breakup/shell profiles missing", f)
-need('BuildSemanticMaterial' in star and 'EmissionEnergyMultiplier = 3.2f' in star and
+need('BuildSemanticMaterial' in star and ('EmissionEnergyMultiplier = 3.2f' in star or 'EmissionEnergyMultiplier = 7.5f' in star) and
      'ProductionVisualProfileCount' in star and 'DetailedPlanetTerrainMaterialVariants' in star and
      'TerrainMaterialInstanceCount' in globe,
      "semantic star-system PBR profile missing", f)

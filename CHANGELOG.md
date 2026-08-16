@@ -1,3 +1,13 @@
+## [0.1.0-alpha.180.2] - 2026-08-16
+
+### Fixed — TASK-180.2 stellar/crash/mouse-flight feel hotfix
+
+- Prevented the local atmospheric `PlanetSurfaceSunVisual` from rendering outside `Surface`; space now shows only the actual star-system stellar body.
+- Strengthened the system-star material to unshaded high-emission presentation and added angular-size runtime acceptance.
+- Added recoverable-vs-lethal planetary impact policy, physical `MoveAndSlide` impact capture, lethal surface crash/death handling, and a stricter 55 m/s manual-entry capture envelope.
+- Reworked mouse flight into pitch/yaw nose steering with coordinated bank and faster angular response; lateral strafe remains keyboard/thruster-only and full attitude rotation remains unclamped.
+- Added TASK-180.2 F5/model/xUnit/static gates and section-37/CI/release enforcement.
+
 # Changelog
 
 ## [0.1.0-alpha.180.1] - 2026-08-16

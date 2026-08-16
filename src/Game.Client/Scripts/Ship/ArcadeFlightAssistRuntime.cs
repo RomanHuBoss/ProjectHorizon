@@ -87,6 +87,21 @@ public static class ArcadeFlightAssistRuntime
             new Vector2(1.0f, 1.0f));
     }
 
+    public static Vector3 BuildMouseAttitudeCommand(
+        Vector2 steering,
+        float bankFactor)
+    {
+        if (!steering.IsFinite() || !float.IsFinite(bankFactor))
+        {
+            return Vector3.Zero;
+        }
+
+        float pitch = Mathf.Clamp(steering.X, -1.0f, 1.0f);
+        float yaw = Mathf.Clamp(steering.Y, -1.0f, 1.0f);
+        float roll = Mathf.Clamp(yaw * Math.Max(0.0f, bankFactor), -1.0f, 1.0f);
+        return new Vector3(pitch, yaw, roll);
+    }
+
     public static Vector2 DecayMouseSteering(
         Vector2 current,
         float decayRatePerSecond,

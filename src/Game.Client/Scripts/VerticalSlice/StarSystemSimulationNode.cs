@@ -577,10 +577,13 @@ public partial class StarSystemSimulationNode : Node3D
         switch (definition.Kind)
         {
             case StarSystemBodyKind.Star:
-                material.Roughness = 0.38f;
+                material.AlbedoColor = color.Lightened(0.18f);
+                material.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
+                material.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
+                material.Roughness = 0.0f;
                 material.EmissionEnabled = true;
                 material.Emission = color;
-                material.EmissionEnergyMultiplier = 3.2f;
+                material.EmissionEnergyMultiplier = 7.5f;
                 break;
             case StarSystemBodyKind.Station:
                 material.Metallic = 0.72f;

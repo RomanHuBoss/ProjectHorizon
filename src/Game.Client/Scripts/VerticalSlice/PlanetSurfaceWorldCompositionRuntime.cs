@@ -51,6 +51,11 @@ public static class PlanetSurfaceWorldCompositionRuntime
     public const double ResourceChunkMarginMeters = 4.25;
     public const double MaximumResourceSlopeDegrees = 30.0;
 
+    public static bool ShouldRenderSurfaceSun(
+        bool surfaceRuntimeActive,
+        WorldSceneKind worldKind) =>
+        surfaceRuntimeActive && worldKind == WorldSceneKind.Surface;
+
     public static PlanetSurfaceSkyProfile BuildSkyProfile(
         PlanetEnvironmentProfile environment,
         GalaxyStarType starType)

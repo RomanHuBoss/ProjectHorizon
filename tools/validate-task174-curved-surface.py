@@ -23,7 +23,7 @@ ecology=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceEcology.cs
 accept=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceCurvedSurface.cs')
 runner=text('src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceCurvedCollisionAcceptance.cs')
 tests=text('tests/ProjectHorizon.Tests/Unit/WorldGenTests.cs')
-need(version in {'0.1.0-alpha.174','0.1.0-alpha.174.1','0.1.0-alpha.176','0.1.0-alpha.176.1','0.1.0-alpha.178','0.1.0-alpha.178.1','0.1.0-alpha.178.2','0.1.0-alpha.178.3','0.1.0-alpha.178.4','0.1.0-alpha.178.5','0.1.0-alpha.178.6','0.1.0-alpha.178.7','0.1.0-alpha.180','0.1.0-alpha.180.1'},'VERSION not alpha.174/174.1/176',f)
+need(version in {'0.1.0-alpha.174','0.1.0-alpha.174.1','0.1.0-alpha.176','0.1.0-alpha.176.1','0.1.0-alpha.178','0.1.0-alpha.178.1','0.1.0-alpha.178.2','0.1.0-alpha.178.3','0.1.0-alpha.178.4','0.1.0-alpha.178.5','0.1.0-alpha.178.6','0.1.0-alpha.178.7','0.1.0-alpha.180','0.1.0-alpha.180.1','0.1.0-alpha.180.2'},'VERSION not alpha.174/174.1/176',f)
 need('TangentSagMeters' in curved and 'SurfaceUpLocal' in curved and 'TerrainNormalLocal' in curved,'shared spherical sag/normal runtime missing',f)
 need('CurvedPatch' in builder and 'SampleSurfaceHeight' in builder,'terrain visual/collision builder is not curvature-aware',f)
 need('ConfigurePlanetSurfaceCurvature' in manager and 'CurvatureRevision' in manager and 'activeChunk.CurvatureRevision != _surfaceCurvatureRevision' in manager and 'PlanRefresh(executeImmediately: false)' in manager and 'SetRuntimeCollisionEnabled' in manager and 'SetRuntimeCollisionEnabled' in chunk,'bounded streamer curvature/collision rebase refresh missing',f)
