@@ -46,6 +46,7 @@ python3 tools/validate-task174-curved-surface.py
 python3 tools/validate-task1741-cold-start-safety.py
 python3 tools/validate-task1742-aerial-altitude-lifecycle-hotfix.py
 python3 tools/validate-task176-planetary-surface-subsystem.py
+python3 tools/validate-task1761-aerial-altitude-runtime-hotfix.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

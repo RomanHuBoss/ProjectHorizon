@@ -339,6 +339,25 @@ public sealed class AerialSteeringRuntime
         return separation;
     }
 
+    public static Vector3 ClampHorizontalAndVerticalSpeed(
+        Vector3 localVelocity,
+        float maximumHorizontalSpeed,
+        float maximumVerticalSpeed)
+    {
+        maximumHorizontalSpeed = Math.Max(0.0f, maximumHorizontalSpeed);
+        maximumVerticalSpeed = Math.Max(0.0f, maximumVerticalSpeed);
+        Vector3 horizontal = new(localVelocity.X, 0.0f, localVelocity.Z);
+        if (horizontal.Length() > maximumHorizontalSpeed &&
+            horizontal.LengthSquared() > 0.000001f)
+        {
+            horizontal = horizontal.Normalized() * maximumHorizontalSpeed;
+        }
+        return new Vector3(
+            horizontal.X,
+            Math.Clamp(localVelocity.Y, -maximumVerticalSpeed, maximumVerticalSpeed),
+            horizontal.Z);
+    }
+
     public Vector3 ApplyAltitudeEnvelope(
         Vector3 desiredVelocity,
         float currentY,

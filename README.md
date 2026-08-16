@@ -15,6 +15,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-176.1 — Flying Fauna Terrain-Altitude Runtime Hotfix
+
+External Godot 4.7.1 evidence verified the complete TASK-176 planetary-surface subsystem (`contracts=11/11`, live streamer/navigation/player/presentation/content/weather/radial stack all PASS), but exposed a remaining TASK-126 runtime defect with all four flying fauna alive: `altitudeProbe=1` while the live `altitude` invariant was `0`. The controller itself was correct; after it produced vertical correction, the old whole-vector maximum-speed normalization scaled that vertical authority down together with obstacle/separation/POI steering. On steep streamed terrain this could leave live fauna outside the required terrain-relative altitude corridor.
+
+Alpha.176.1 limits tangent and vertical speeds independently, preserves up to 3 m/s of altitude authority, and applies a hard `+1.6..+7.2 m` terrain-relative safety envelope after `MoveAndSlide`, while distant fauna are on the zero-Hz AI tier, and after radial/curved frame transitions. TASK-126 Output additionally reports `altitudeRange` and exact `altitudeViolations`, so any remaining failure is directly diagnosable rather than a single `altitude=0` bit. No save/content schema or user controls change.
+
 ## TASK-176 — Planetary Surface Subsystem Closure
 
 Alpha.176 turns the already implemented TASK-150…174 planet stack into one integration boundary instead of treating environment, interplanetary handoff, surface content, terrain, streaming, presentation, weather, floating origin, radial/physical frames and curved collision as unrelated green checks. F5 now runs a model-level aggregate over **11 existing normative acceptance runners**, then verifies eight live Godot invariants: settled 25/9 curved residency, curved TASK-124 navigation, arbitrary-up player alignment, radial atmosphere/world presentation, active ecology/POIs, cold-start guard, weather runtime and radial/physical alignment. PASS additionally requires end-to-end persistence, traversal, bounded-residency and cross-planet-identity chains. See `docs/PLANETARY_SURFACE_SUBSYSTEM.md`.

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.0-alpha.176.1] - 2026-08-16
+
+### Fixed
+- Fixed TASK-126 live flying-fauna altitude drift on steep streamed terrain: horizontal steering is now limited independently from vertical altitude authority instead of normalizing the whole 3D velocity vector.
+- Added a hard terrain-relative flying envelope after physics movement, on zero-Hz distant AI ticks, and after radial/curved frame transitions.
+- TASK-126 diagnostics now report live altitude clearance range and exact violating fauna IDs/clearances on FAIL.
+
+### Verified externally
+- Promoted TASK-176 Planetary Surface Subsystem Closure to VERIFIED from the owner-provided Godot 4.7.1 F5 evidence: `contracts=11/11`, all cross-contract/live invariants `=1`, `chunks=25/25`, `collisions=9/9`, `navRegions=25/25`.
+
 ## [0.1.0-alpha.176] - 2026-08-16
 
 ### Fixed — TASK-174.2 Aerial Altitude Lifecycle Acceptance

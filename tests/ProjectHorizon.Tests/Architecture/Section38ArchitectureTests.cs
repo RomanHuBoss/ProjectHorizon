@@ -95,6 +95,26 @@ public sealed class Section38ArchitectureTests
     }
 
     [Fact]
+    public void AerialSpeedLimiterPreservesVerticalAuthorityUnderHeavyHorizontalSteering()
+    {
+        Vector3 desiredLocal = new(18.0f, 2.75f, -24.0f);
+        Vector3 limited = AerialSteeringRuntime.ClampHorizontalAndVerticalSpeed(
+            desiredLocal,
+            5.0f,
+            EcologyFaunaNode.FlyingMaximumVerticalSpeed);
+
+        Vector3 horizontal = new(limited.X, 0.0f, limited.Z);
+        Assert.InRange(horizontal.Length(), 4.999f, 5.001f);
+        Assert.Equal(2.75f, limited.Y, 3);
+
+        Vector3 verticalClamped = AerialSteeringRuntime.ClampHorizontalAndVerticalSpeed(
+            new Vector3(100.0f, 8.0f, 100.0f),
+            7.0f,
+            3.0f);
+        Assert.Equal(3.0f, verticalClamped.Y, 3);
+    }
+
+    [Fact]
     public void LayeredAssembliesHaveOneWayDependencies()
     {
         var domainAssembly = typeof(IDomainEvent).Assembly;

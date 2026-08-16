@@ -544,6 +544,21 @@ public partial class SalvageRepairSlice
         AerialNavigationAcceptanceReport report,
         AerialSteeringSnapshot? snapshot)
     {
+        EcologyFaunaNode[] activeFlying = _ecologyFaunaNodes
+            .Where(node => node.IsActiveFlyingNavigationParticipant)
+            .ToArray();
+        string altitudeRange = activeFlying.Length == 0
+            ? "n/a"
+            : $"{activeFlying.Min(node => node.FlyingAltitudeClearanceMeters):0.00}.." +
+              $"{activeFlying.Max(node => node.FlyingAltitudeClearanceMeters):0.00}m";
+        string altitudeViolations = string.Join(",", activeFlying
+            .Where(node => !node.InsideFlyingAltitudeEnvelope)
+            .Select(node => $"{node.InstanceId}:{node.FlyingAltitudeClearanceMeters:0.00}m"));
+        if (altitudeViolations.Length == 0)
+        {
+            altitudeViolations = "none";
+        }
+
         return "TASK-126 aerial navigation acceptance " +
             (report.Passed ? "PASS" : "FAIL") + ": " +
             $"flyingFauna={report.FlyingFauna}; npcShips={report.NpcShips}; " +
@@ -551,7 +566,9 @@ public partial class SalvageRepairSlice
             $"faunaCoverage={(report.FlyingFaunaCoverage ? 1 : 0)}; activeFlying={_ecologyFaunaNodes.Count(node => node.IsActiveFlyingNavigationParticipant)}; " +
             $"sharedRuntime={(report.SharedSteeringRuntime ? 1 : 0)}; " +
             $"localGrid={(report.LocalSpatialGrid ? 1 : 0)}; sphericalAvoidance={(report.SphericalObstacleAvoidance ? 1 : 0)}; " +
-            $"altitude={(report.AltitudeEnvelope ? 1 : 0)}; altitudeProbe={(_aerialAltitudeProbe ? 1 : 0)}; poiSteering={(report.PointOfInterestSteering ? 1 : 0)}; " +
+            $"altitude={(report.AltitudeEnvelope ? 1 : 0)}; altitudeProbe={(_aerialAltitudeProbe ? 1 : 0)}; " +
+            $"altitudeRange={altitudeRange}; altitudeViolations={altitudeViolations}; " +
+            $"poiSteering={(report.PointOfInterestSteering ? 1 : 0)}; " +
             $"shipSteering={(report.ShipSteering ? 1 : 0)}; pursuit={(report.Pursuit ? 1 : 0)}; " +
             $"evade={(report.Evade ? 1 : 0)}; arrive={(report.Arrive ? 1 : 0)}; formation={(report.Formation ? 1 : 0)}; " +
             $"combatStates={(report.CombatStates ? 1 : 0)}; clearance={(report.ShipObstacleClearance ? 1 : 0)}; " +

@@ -2,11 +2,58 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task176-planetary-surface-subsystem.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task176.1-aerial-altitude-runtime-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-176.1 Flying Fauna Terrain-Altitude Runtime Hotfix
+
+**Исходный снимок:** `ProjectHorizon-main-task176-planetary-surface-subsystem.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task176.1-aerial-altitude-runtime-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.176.1`.  
+**Статус:** TASK-176 `VERIFIED`; TASK-174.2 `SUPERSEDED` расширенным live-runtime исправлением; TASK-176.1 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.
+
+### Новое внешнее evidence
+
+Полный Godot 4.7.1 F5-прогон пользователя подтверждает закрытие planetary-surface subsystem:
+
+- `TASK-176 planetary surface subsystem acceptance PASS`: `starterPlanets=4/4`, `contracts=11/11`, все eleven contract flags `=1`, `persistenceChain=1`, `traversalChain=1`, `bounded=1`, `planetIdentity=1`, `globe=1`, все восемь live-инвариантов `=1`, `chunks=25/25`, `collisions=9/9`, `navRegions=25/25`, `minGuard=1.020m`;
+- TASK-150/152/154/156/158/160/162/166/168/170/172/174/174.1 и TASK-148/130/132/134/136/138/142/144/110/112/114/116/118/120/122/124 одновременно PASS;
+- TASK-126 остаётся единственным красным инвариантом: `activeFlying=4`, `altitudeProbe=1`, но `altitude=0`. Это опровергает прежнюю гипотезу, что remaining FAIL обусловлен только killed/hidden fauna.
+
+### Корневая причина TASK-126
+
+`ApplyAltitudeEnvelope()` корректно формировал вертикальную скорость (что прямо подтверждается `altitudeProbe=1`), но затем `EcologyFaunaNode.ApplyFlyingSteering()` ограничивал **длину всего 3D velocity vector** через `desired.Normalized() * maximumSpeed`. При сильном горизонтальном obstacle/separation/POI steering эта нормализация одновременно уменьшала Y-компоненту altitude-controller. На TASK-156/TASK-162.2 terrain с `maxSlope=67.7°` агент мог горизонтально войти на более высокий участок быстрее, чем фактическая вертикальная составляющая возвращала его в terrain-relative corridor.
+
+Дополнительный edge case: fauna за пределами live AI radius переходит на `0 Hz`; если terrain/frame relation изменился во время streaming/radial handoff, behavioural steering намеренно не выполнялся и altitude invariant не имел отдельного safety enforcement.
+
+### Исправлено
+
+- `AerialSteeringRuntime.ClampHorizontalAndVerticalSpeed()` раздельно ограничивает tangent XZ и Y: горизонтальный steering больше не может масштабировать вниз вертикальную authority;
+- единые constants flying envelope: minimum `+1.6 m`, preferred `+3.4 m`, maximum `+7.2 m`, max vertical speed `3.0 m/s`, acceptance slack `0.35 m`;
+- после `MoveAndSlide()` live flying fauna жёстко удерживается в `+1.6..+7.2 m` от **текущего terrain floor**; наружная Y-скорость при safety correction обнуляется;
+- тот же hard envelope выполняется на `0 Hz` distant-AI tier и сразу после radial/curved `ApplyWorldFrameTransform`;
+- F5 output теперь показывает `altitudeRange=min..max` и `altitudeViolations=<instance:clearance>`, поэтому повторный FAIL локализуется до конкретной особи и фактической высоты;
+- добавлен xUnit `AerialSpeedLimiterPreservesVerticalAuthorityUnderHeavyHorizontalSteering`;
+- новый static gate `validate-task1761-aerial-altitude-runtime-hotfix.py` включён в Windows/Linux section-37, CI и release.
+
+### Изменённые файлы
+
+`AerialSteeringRuntime.cs`, `EcologyFaunaNode.cs`, `SalvageRepairSliceAerialNavigation.cs`, `Section38ArchitectureTests.cs`, новый TASK-176.1 validator, section-37 runners, CI/release workflows, forward-version gates TASK-170/172/172.1/174/174.1, `VERSION`, `CHANGELOG.md`, `README.md`, этот журнал.
+
+### Проверки в среде подготовки
+
+Статически PASS: TASK-176.1, TASK-174.2, TASK-176, TASK-170, TASK-172, TASK-172.1, TASK-174 и TASK-174.1. Проверяется наличие независимого horizontal/vertical limiter, отсутствие прежней whole-vector normalization в flying path, post-physics/zero-Hz/frame-transition safety hooks, расширенная диагностика и xUnit regression. В среде по-прежнему отсутствуют `dotnet` и Godot executable, поэтому компиляция, xUnit execution и runtime alpha.176.1 здесь не заявляются.
+
+### Acceptance TASK-176.1
+
+1. `tools\run-section37-quality.cmd`: clean build должен завершиться `0 errors / 0 warnings`, новый `TASK-176.1 ... CONTRACT PASS`.
+2. New Game; не требуется убивать fauna. Желательно походить 60–90 s по нескольким terrain chunks, как в проблемном прогоне.
+3. Нажать F5. TASK-176 должен снова оставаться PASS с `contracts=11/11`.
+4. TASK-126 должен завершиться PASS: `activeFlying=4` допустимо и ожидаемо; `altitude=1; altitudeProbe=1; altitudeViolations=none`; `altitudeRange` должен полностью лежать в acceptance corridor `1.25..7.55m`; остальные navigation flags `=1`.
+5. Если TASK-126 всё же FAIL, прислать **одну полную строку**: новая диагностика уже содержит IDs/clearances, поэтому по ней можно локализовать оставшийся edge case без ещё одного слепого цикла.
 
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-174.2 + TASK-176 Planetary Surface Subsystem Closure
 

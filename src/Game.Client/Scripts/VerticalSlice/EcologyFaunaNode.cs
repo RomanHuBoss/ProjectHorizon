@@ -3,6 +3,12 @@ using Godot;
 
 public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IInteractable
 {
+    public const float FlyingMinimumClearanceMeters = 1.6f;
+    public const float FlyingPreferredClearanceMeters = 3.4f;
+    public const float FlyingMaximumClearanceMeters = 7.2f;
+    public const float FlyingAcceptanceSlackMeters = 0.35f;
+    public const float FlyingMaximumVerticalSpeed = 3.0f;
+
     private EcologyFaunaDefinition? _definition;
     private Node3D? _player;
     private Vector3 _territoryCenter;
@@ -53,11 +59,13 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 return true;
             }
 
-            float floorY = CurrentTerrainFloorY();
-            return Position.Y >= floorY + 1.25f &&
-                Position.Y <= floorY + 7.55f;
+            float clearance = FlyingAltitudeClearanceMeters;
+            return clearance >= FlyingMinimumClearanceMeters - FlyingAcceptanceSlackMeters &&
+                clearance <= FlyingMaximumClearanceMeters + FlyingAcceptanceSlackMeters;
         }
     }
+
+    public float FlyingAltitudeClearanceMeters => Position.Y - CurrentTerrainFloorY();
 
     public event Action<EcologyFaunaNode>? Observed;
 
@@ -117,8 +125,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             // same terrain-relative altitude band enforced by live steering.
             initialY = Mathf.Clamp(
                 initialY,
-                terrainFloorY + 2.5f,
-                terrainFloorY + 6.5f);
+                terrainFloorY + FlyingMinimumClearanceMeters + 0.9f,
+                terrainFloorY + FlyingMaximumClearanceMeters - 0.7f);
         }
         Position = new Vector3(
             (float)spawn.PositionX,
@@ -207,6 +215,13 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         if (frequency <= 0.0)
         {
             Velocity = Velocity.MoveToward(Vector3.Zero, (float)(delta * 3.0));
+            if (string.Equals(_definition.MovementMode, "Flying", StringComparison.Ordinal))
+            {
+                // Terrain/frame changes can occur while distant fauna is on the
+                // zero-Hz AI tier. Preserve the hard altitude invariant even
+                // while behavioral steering is intentionally suspended.
+                EnforceFlyingAltitudeSafety();
+            }
             return;
         }
 
@@ -411,6 +426,10 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         UpDirection = SurfaceWorldUp();
         Velocity = Velocity.Lerp(targetVelocity, Math.Clamp(delta * 3.2f, 0.0f, 1.0f));
         MoveAndSlide();
+        if (string.Equals(_definition.MovementMode, "Flying", StringComparison.Ordinal))
+        {
+            EnforceFlyingAltitudeSafety();
+        }
         if (string.Equals(BehaviorState, "Attack", StringComparison.Ordinal) &&
             _player is PlayerController player &&
             GlobalPosition.DistanceTo(player.GlobalPosition) <= 1.75f &&
@@ -512,25 +531,55 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         // the original spawn point. Macro relief introduced in TASK-162.2 can
         // vary by several metres across one fauna territory.
         float terrainFloorY = CurrentTerrainFloorY();
-        float preferredY = terrainFloorY + 3.4f +
+        float preferredY = terrainFloorY + FlyingPreferredClearanceMeters +
             (float)Math.Sin(phase) * 1.15f;
         Vector3 desiredLocal = SurfaceWorldVectorToLocal(desired);
         desiredLocal = _aerialSteering.ApplyAltitudeEnvelope(
             desiredLocal,
             Position.Y,
-            terrainFloorY + 1.6f,
+            terrainFloorY + FlyingMinimumClearanceMeters,
             preferredY,
-            terrainFloorY + 7.2f,
+            terrainFloorY + FlyingMaximumClearanceMeters,
             1.65f,
-            3.0f);
-        desired = SurfaceLocalVectorToWorld(desiredLocal);
+            FlyingMaximumVerticalSpeed);
 
-        float maximumSpeed = Math.Max(0.5f, speed * 1.35f);
-        if (desired.Length() > maximumSpeed)
+        // TASK-176.1: horizontal obstacle/POI/separation steering must not
+        // normalize away the vertical authority of the terrain-following
+        // controller. Bound tangent and altitude speeds independently.
+        float maximumHorizontalSpeed = Math.Max(0.5f, speed * 1.35f);
+        desiredLocal = AerialSteeringRuntime.ClampHorizontalAndVerticalSpeed(
+            desiredLocal,
+            maximumHorizontalSpeed,
+            FlyingMaximumVerticalSpeed);
+        return SurfaceLocalVectorToWorld(desiredLocal);
+    }
+
+    private void EnforceFlyingAltitudeSafety()
+    {
+        if (!IsActiveFlyingNavigationParticipant)
         {
-            desired = desired.Normalized() * maximumSpeed;
+            return;
         }
-        return desired;
+
+        float floorY = CurrentTerrainFloorY();
+        float minimumY = floorY + FlyingMinimumClearanceMeters;
+        float maximumY = floorY + FlyingMaximumClearanceMeters;
+        float clampedY = Mathf.Clamp(Position.Y, minimumY, maximumY);
+        if (Mathf.Abs(clampedY - Position.Y) <= 0.001f)
+        {
+            return;
+        }
+
+        bool below = Position.Y < minimumY;
+        bool above = Position.Y > maximumY;
+        Position = new Vector3(Position.X, clampedY, Position.Z);
+
+        Vector3 localVelocity = SurfaceWorldVectorToLocal(Velocity);
+        if ((below && localVelocity.Y < 0.0f) || (above && localVelocity.Y > 0.0f))
+        {
+            localVelocity.Y = 0.0f;
+            Velocity = SurfaceLocalVectorToWorld(localVelocity);
+        }
     }
 
     public void ApplyWorldOriginShift()
@@ -568,6 +617,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             nextFrame.Basis.Orthonormalized(),
             Velocity);
         UpDirection = nextFrame.Basis.Y.Normalized();
+        EnforceFlyingAltitudeSafety();
         ApplyWorldOriginShift();
     }
 

@@ -45,10 +45,10 @@ need("surface.BuildPoiPlan(profile)" in tests and
 need("CurrentTerrainFloorY()" in fauna and
      "PlanetSurfaceTerrainRuntime.SampleHeight(" in fauna,
      "flying fauna does not sample the current terrain floor", failures)
-need("terrainFloorY + 2.5f" in fauna and
-     "terrainFloorY + 6.5f" in fauna and
-     "terrainFloorY + 1.6f" in fauna and
-     "terrainFloorY + 7.2f" in fauna,
+need("FlyingMinimumClearanceMeters = 1.6f" in fauna and
+     "FlyingMaximumClearanceMeters = 7.2f" in fauna and
+     "terrainFloorY + FlyingMinimumClearanceMeters" in fauna and
+     "terrainFloorY + FlyingMaximumClearanceMeters" in fauna,
      "flying altitude envelope is not terrain-relative", failures)
 
 # Visual-language subsystem.

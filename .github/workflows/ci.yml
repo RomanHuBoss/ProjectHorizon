@@ -82,6 +82,7 @@ jobs:
           python3 tools/validate-task1741-cold-start-safety.py
           python3 tools/validate-task1742-aerial-altitude-lifecycle-hotfix.py
           python3 tools/validate-task176-planetary-surface-subsystem.py
+          python3 tools/validate-task1761-aerial-altitude-runtime-hotfix.py
 
       - name: Unit tests and coverage
         run: >-
