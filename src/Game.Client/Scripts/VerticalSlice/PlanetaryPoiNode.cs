@@ -6,6 +6,7 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
     private PlanetaryPoiDefinition? _definition;
     private MeshInstance3D? _meshInstance;
     private StandardMaterial3D? _material;
+    private CollisionShape3D? _collisionShape;
 
     public string InstanceId { get; private set; } = string.Empty;
 
@@ -106,6 +107,7 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
             };
         }
 
+        _collisionShape = collisionShape;
         AddChild(meshInstance);
         AddChild(collisionShape);
         OmniLight3D marker = new()
@@ -154,6 +156,13 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
         {
             marker.LightEnergy = resolved ? 0.1f : discovered ? 0.85f : 0.35f;
         }
+    }
+
+    public void SetRuntimeResident(bool resident)
+    {
+        Visible = resident;
+        CollisionLayer = resident ? 1u : 0u;
+        _collisionShape?.SetDeferred("disabled", !resident);
     }
 
     public void Interact(Node3D interactor)

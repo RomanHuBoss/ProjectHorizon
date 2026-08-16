@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.160] - 2026-08-16
+
+### Added — TASK-160 Planet Surface World Composition & Persistence
+
+- Replaced the color-only surface background with a deterministic planet/star sky profile: procedural sky, system-star directional light, sky ambient/reflections, aerial fog and lightweight visible cloud clusters.
+- Added a weak planet-colored indirect-light floor and richer terrain macro/slope coloring so streamed PBR terrain cannot collapse to absolute black while retaining direct-light relief.
+- Replaced the live 58-node catalog resource showcase with chunk-scoped deterministic deposits; legacy nodes remain hidden acceptance fixtures except the three starter salvage nodes required by the repair loop.
+- Added stable `planet + chunk + slot` surface-resource identities and dynamic cold-restore bindings; untouched procedural resources create no save delta, while mined deposits stay depleted after chunk unload, save/load and planet return.
+- Spread existing stable POI instances through a deterministic 78–420 m live exploration annulus without changing reviewed POI IDs or the TASK-138 golden generation fixture.
+- Added TASK-160 F5 acceptance, three xUnit regressions, RU/EN HUD diagnostics, subsystem documentation and a section-37 repository quality gate.
+
+### Compatibility
+
+- `ProjectHorizonGenerator.Version` remains `3`: TASK-160 changes live presentation and introduces a new resource layer without changing the reviewed system/POI golden generator output.
+- TASK-156 terrain identity, TASK-158 chunk residency, Stage-1 resource fixture IDs and existing POI/ecology save identities remain compatible.
+
 ## [0.1.0-alpha.158.1] - 2026-08-16
 
 ### Fixed — TASK-158.1 Runtime Acceptance / Golden POI closure

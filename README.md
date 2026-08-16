@@ -4,6 +4,10 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-160 — Planet Surface World Composition & Persistence
+
+The live TASK-158 terrain is now composed as a planet rather than a technical test field. Surface presentation uses the active planet atmosphere plus the current system star to build a procedural sky, visible sun, sky ambient/reflections, aerial haze and lightweight deterministic clouds. The legacy 58-node resource showcase is hidden from normal gameplay (the three starter salvage nodes remain), while the active 5x5 terrain window receives deterministic chunk-scoped deposits with stable planet+chunk+slot IDs and delta-only depletion persistence. Existing POIs keep their reviewed stable identities but are spread through a 78–420 m live exploration annulus instead of being piled around the landing pad. F5 includes `TASK-160 planet surface world composition acceptance`; see `docs/PLANET_SURFACE_WORLD_COMPOSITION.md`.
+
 ## TASK-158.1 — Runtime acceptance hotfix
 
 External Godot 4.7.1 evidence confirms TASK-158 live streaming (`25/25` resident chunks, `9/9` collision chunks and F5 PASS), while TASK-138 exposed a stale POI golden fixture left behind by the earlier TASK-156 terrain projection change. Alpha.158.1 versions that deterministic POI change correctly (`ProjectHorizonGenerator.Version = 3`), refreshes the reviewed 20-POI golden checksum and removes the two nullable warnings reported by the Windows build. No TASK-158 streaming behavior or save schema is changed.
@@ -36,7 +40,7 @@ The live landable-planet surface now uses the verified terrain chunk pipeline as
 
 ## Текущее состояние
 
-Stage 1 remains intact and the Stage 2 planet stack now runs through environment → interplanetary travel → planet-scoped content → planet-specific relief → **bounded live surface streaming**. The product owner reported the TASK-156 revision as working and requested the next mega-iteration; TASK-156/TASK-157 are therefore recorded as accepted by owner waiver without reconstructing missing numeric build metrics. `TASK-158` promotes the already verified Prototype-B async terrain-chunk architecture into `SalvageRepairSlice`: 25-chunk bounded residency, 33/17 LODs, 3x3 collision, exact TASK-156 terrain sampling, safe fallback handoff, moving terrain-aware NPC navigation and planet-radius surface addressing. `TASK-159` remains the Windows/Godot runtime/manual acceptance tail. The live gameplay frame is still tangent-plane based; physical cube-sphere/floating-origin traversal is the next scaling layer, not claimed by TASK-158.
+Stage 1 remains intact and the Stage 2 planet stack now runs through environment → interplanetary travel → planet-scoped content → planet-specific relief → bounded live surface streaming → **surface-world composition and delta-persistent procedural resources**. The product owner reported the TASK-156 revision as working and requested the next mega-iteration; TASK-156/TASK-157 are therefore recorded as accepted by owner waiver without reconstructing missing numeric build metrics. `TASK-158` promotes the already verified Prototype-B async terrain-chunk architecture into `SalvageRepairSlice`: 25-chunk bounded residency, 33/17 LODs, 3x3 collision, exact TASK-156 terrain sampling, safe fallback handoff, moving terrain-aware NPC navigation and planet-radius surface addressing. `TASK-159` remains the Windows/Godot runtime/manual acceptance tail. The live gameplay frame is still tangent-plane based; physical cube-sphere/floating-origin traversal is the next scaling layer, not claimed by TASK-158.
 
 ### TASK-156 Planet-Specific Terrain & Surface Geometry mega-iteration — `VERIFIED` (product-owner acceptance)
 

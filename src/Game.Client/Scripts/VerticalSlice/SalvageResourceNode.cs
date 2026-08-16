@@ -13,8 +13,11 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
     private CollisionShape3D? _collisionShape;
     private GameResourceDefinition? _definition;
     private bool _collected;
+    private bool _runtimeSuppressed;
 
     public bool IsCollected => _collected;
+
+    public bool RuntimeSuppressed => _runtimeSuppressed;
 
     public int Quantity => _definition?.GetDeterministicYield() ?? 0;
 
@@ -51,6 +54,10 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
         }
 
         ApplyFallbackMaterial();
+        if (_definition is not null)
+        {
+            ApplyDefinitionMaterial(_definition);
+        }
         ApplyCollectedState();
     }
 
@@ -75,28 +82,10 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
                 $"Resource node {Name} resolved invalid quantity {quantity}.");
         }
 
-        if (_mesh is null)
+        if (_mesh is not null)
         {
-            throw new InvalidOperationException(
-                $"Resource node {Name} was configured before _Ready.");
+            ApplyDefinitionMaterial(definition);
         }
-
-        ResourceVisualDefinition visual = definition.Visual;
-        _mesh.MaterialOverride = new StandardMaterial3D
-        {
-            AlbedoColor = new Color(
-                (float)visual.AlbedoR,
-                (float)visual.AlbedoG,
-                (float)visual.AlbedoB),
-            EmissionEnabled = true,
-            Emission = new Color(
-                (float)visual.EmissionR,
-                (float)visual.EmissionG,
-                (float)visual.EmissionB),
-            EmissionEnergyMultiplier = (float)visual.EmissionEnergy,
-            Metallic = (float)visual.Metallic,
-            Roughness = (float)visual.Roughness
-        };
     }
 
     public void Interact(Node3D interactor)
@@ -137,6 +126,39 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
         ApplyCollectedState();
     }
 
+    public void SetRuntimeSuppressed(bool suppressed)
+    {
+        _runtimeSuppressed = suppressed;
+        ApplyCollectedState();
+    }
+
+    private void ApplyDefinitionMaterial(GameResourceDefinition definition)
+    {
+        if (_mesh is null)
+        {
+            return;
+        }
+
+        ResourceVisualDefinition visual = definition.Visual;
+        _mesh.MaterialOverride = new StandardMaterial3D
+        {
+            AlbedoColor = new Color(
+                (float)visual.AlbedoR,
+                (float)visual.AlbedoG,
+                (float)visual.AlbedoB),
+            EmissionEnabled = true,
+            Emission = new Color(
+                (float)visual.EmissionR,
+                (float)visual.EmissionG,
+                (float)visual.EmissionB),
+            EmissionEnergyMultiplier = (float)Math.Min(
+                visual.EmissionEnergy,
+                0.55),
+            Metallic = (float)visual.Metallic,
+            Roughness = (float)visual.Roughness
+        };
+    }
+
     private void ApplyFallbackMaterial()
     {
         if (_mesh is null)
@@ -155,13 +177,14 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
 
     private void ApplyCollectedState()
     {
+        bool unavailable = _collected || _runtimeSuppressed;
         if (_mesh is not null)
         {
-            _mesh.Visible = !_collected;
+            _mesh.Visible = !unavailable;
         }
 
-        CollisionLayer = _collected ? 0u : 1u;
-        CollisionMask = _collected ? 0u : 1u;
-        _collisionShape?.SetDeferred("disabled", _collected);
+        CollisionLayer = unavailable ? 0u : 1u;
+        CollisionMask = unavailable ? 0u : 1u;
+        _collisionShape?.SetDeferred("disabled", unavailable);
     }
 }

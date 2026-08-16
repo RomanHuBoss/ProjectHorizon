@@ -631,4 +631,164 @@ public sealed class WorldGenTests
         Assert.True(Math.Abs(small.LatitudeDegrees) > Math.Abs(large.LatitudeDegrees));
     }
 
+    [Fact]
+    public void PlanetSurfaceWorldComposition_SkyProfilesExposeStarAtmosphereAndCloudPolicy()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        GalaxySystemDefinition system = galaxy.CurrentSystem;
+
+        PlanetSurfaceSkyProfile[] skies = system.Planets
+            .Select(planet => surface.BuildProfile(planet, system.StarType))
+            .Select(profile => PlanetSurfaceWorldCompositionRuntime.BuildSkyProfile(
+                profile.Environment,
+                system.StarType))
+            .ToArray();
+
+        Assert.Equal(4, skies.Length);
+        Assert.All(skies, sky =>
+        {
+            Assert.True(sky.AtmosphereEnabled);
+            Assert.True(sky.SunEnergy >= 0.8);
+            Assert.InRange(sky.SunElevationDegrees, 20.0, 75.0);
+            Assert.True(sky.FogDensity > 0.0);
+        });
+        Assert.All(skies.Where(sky => sky.CloudLayerCount == 0),
+            sky => Assert.Equal(0, sky.CloudClusterCount));
+        Assert.All(skies.Where(sky => sky.CloudLayerCount > 0),
+            sky => Assert.True(sky.CloudClusterCount >= 6));
+    }
+
+    [Fact]
+    public void PlanetSurfaceWorldComposition_ResourcesAreDeterministicDistributedAndPlanetScoped()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        GalaxySystemDefinition system = galaxy.CurrentSystem;
+        PlanetSurfaceChunkCoordinate center = new(4, -3);
+        HashSet<string> allIds = new(StringComparer.Ordinal);
+
+        foreach (GalaxyPlanetDefinition planet in system.Planets)
+        {
+            PlanetSurfaceContentProfile profile = surface.BuildProfile(
+                planet,
+                system.StarType);
+            IReadOnlyList<PlanetSurfaceResourcePlacement> first =
+                PlanetSurfaceWorldCompositionRuntime.BuildResourceWindow(
+                    profile,
+                    RepositoryFixture.Content.Resources,
+                    center);
+            IReadOnlyList<PlanetSurfaceResourcePlacement> second =
+                PlanetSurfaceWorldCompositionRuntime.BuildResourceWindow(
+                    profile,
+                    RepositoryFixture.Content.Resources,
+                    center);
+
+            Assert.NotEmpty(first);
+            Assert.Equal(
+                string.Join("|", first.Select(value => value.ResourceNodeId)),
+                string.Join("|", second.Select(value => value.ResourceNodeId)));
+            Assert.All(first, placement =>
+            {
+                Assert.True(PlanetSurfaceWorldCompositionRuntime.IsOutsideStarterReserve(
+                    placement.PositionX,
+                    placement.PositionZ));
+                Assert.InRange(
+                    placement.SlopeDegrees,
+                    0.0,
+                    PlanetSurfaceWorldCompositionRuntime.MaximumResourceSlopeDegrees);
+                Assert.True(RepositoryFixture.Content.Resources.ContainsKey(
+                    placement.ResourceDefinitionId));
+                Assert.True(allIds.Add(placement.ResourceNodeId));
+            });
+        }
+
+        PlanetSurfaceContentProfile starterProfile = surface.BuildProfile(
+            system.Planets[0],
+            system.StarType);
+        (double X, double Z)[] livePois = surface.BuildPoiPlan(starterProfile)
+            .Select(placement =>
+                PlanetSurfaceWorldCompositionRuntime.BuildPoiPresentationPosition(
+                    starterProfile,
+                    placement.InstanceId))
+            .ToArray();
+        Assert.Equal(PlanetaryPoiCatalog.ExpectedPoiTypeCount, livePois.Length);
+        Assert.All(livePois, point => Assert.InRange(
+            Math.Sqrt(point.X * point.X + point.Z * point.Z),
+            78.0,
+            421.0));
+        Assert.True(livePois
+            .Select(point => PlanetSurfaceStreamingRuntime.WorldToChunk(point.X, point.Z))
+            .Distinct()
+            .Count() >= 12);
+    }
+
+    [Fact]
+    public void PlanetSurfaceWorldComposition_DynamicDepletionSurvivesColdRestoreWithoutUntouchedDeltas()
+    {
+        GameContentCatalog content = RepositoryFixture.Content;
+        CraftingRecipeDefinition repair = content.GetRecipe("recipe.ship.starter_repair");
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetSurfaceContentProfile profile = surface.BuildProfile(
+            galaxy.CurrentSystem.Planets[0],
+            galaxy.CurrentSystem.StarType);
+        PlanetSurfaceResourcePlacement placement =
+            PlanetSurfaceWorldCompositionRuntime.BuildResourceWindow(
+                profile,
+                content.Resources,
+                new PlanetSurfaceChunkCoordinate(3, 2))[0];
+        GameResourceDefinition resource = content.Resources[
+            placement.ResourceDefinitionId];
+        StarterRepairSession session = new(repair, static _ => true);
+
+        Assert.True(session.TryCollect(
+            placement.ResourceNodeId,
+            resource.ItemDefinitionId,
+            resource.GetDeterministicYield(),
+            out _));
+        SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
+            "save_1", 1, session, 0.0, 0.0, 0.0);
+        StarterRepairSession restored =
+            StarterRepairSession.FromSnapshotWithDynamicResources(
+                snapshot,
+                new Dictionary<string, ResourceNodeBinding>(StringComparer.Ordinal),
+                repair,
+                static _ => true,
+                (nodeId, itemDefinitionId) =>
+                    nodeId.StartsWith("surface_resource.", StringComparison.Ordinal) &&
+                    string.Equals(itemDefinitionId, resource.ItemDefinitionId, StringComparison.Ordinal)
+                        ? new ResourceNodeBinding(
+                            nodeId,
+                            itemDefinitionId,
+                            resource.GetDeterministicYield())
+                        : null);
+
+        Assert.Contains(placement.ResourceNodeId, restored.CollectedNodeIds);
+        StarterRepairSession untouched = new(repair, static _ => true);
+        SaveGameSnapshot untouchedSnapshot = StarterRepairSnapshotFactory.Create(
+            "save_1", 1, untouched, 0.0, 0.0, 0.0);
+        Assert.DoesNotContain(
+            untouchedSnapshot.Inventory,
+            item => item.ItemId.StartsWith("item.surface_resource.", StringComparison.Ordinal));
+    }
+
 }

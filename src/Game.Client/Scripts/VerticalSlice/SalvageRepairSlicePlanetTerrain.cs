@@ -34,8 +34,13 @@ public partial class SalvageRepairSlice
         ArrayMesh mesh = BuildPlanetTerrainMesh(profile);
         StandardMaterial3D material = new()
         {
+            AlbedoColor = Colors.White,
             VertexColorUseAsAlbedo = true,
-            Roughness = 0.93f
+            Roughness = 0.94f,
+            MetallicSpecular = 0.0f,
+            EmissionEnabled = true,
+            Emission = BuildGroundColor(profile.Archetype).Darkened(0.60f),
+            EmissionEnergyMultiplier = 0.14f
         };
         groundMesh.Mesh = mesh;
         groundMesh.MaterialOverride = material;
@@ -281,18 +286,26 @@ public partial class SalvageRepairSlice
         PlanetaryPoiRuntimeState state)
     {
         PlanetaryPoiPlacement placement = state.Placement;
-        double surfaceY = SamplePlanetSurfaceHeight(
-            placement.PositionX,
-            placement.PositionZ);
+        double worldX = placement.PositionX;
+        double worldZ = placement.PositionZ;
+        if (_planetSurfaceWorldCompositionInitialized &&
+            _planetSurfaceContentProfile is not null)
+        {
+            (worldX, worldZ) =
+                PlanetSurfaceWorldCompositionRuntime.BuildPoiPresentationPosition(
+                    PlanetSurfaceContentProfile,
+                    placement.InstanceId);
+        }
+        double surfaceY = SamplePlanetSurfaceHeight(worldX, worldZ);
         return placement with
         {
+            PositionX = worldX,
             PositionY = surfaceY + 0.1 + state.Definition.Size.Y / 2.0,
+            PositionZ = worldZ,
             Environment = placement.Environment with
             {
                 Height = surfaceY,
-                SlopeDegrees = SamplePlanetSurfaceSlope(
-                    placement.PositionX,
-                    placement.PositionZ)
+                SlopeDegrees = SamplePlanetSurfaceSlope(worldX, worldZ)
             }
         };
     }

@@ -488,11 +488,10 @@ public partial class TerrainChunk : StaticBody3D
     {
         bool useUnshaded = DebugViewMode is
             TerrainDebugViewMode.Lod or TerrainDebugViewMode.Normals;
-
-        return new StandardMaterial3D
+        StandardMaterial3D material = new()
         {
             AlbedoColor = Colors.White,
-            Roughness = 0.88f,
+            Roughness = UsePlanetSurfacePresentation ? 0.94f : 0.88f,
             MetallicSpecular = 0.0f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             VertexColorUseAsAlbedo = true,
@@ -501,6 +500,16 @@ public partial class TerrainChunk : StaticBody3D
                 ? BaseMaterial3D.ShadingModeEnum.Unshaded
                 : BaseMaterial3D.ShadingModeEnum.PerPixel
         };
+        if (UsePlanetSurfacePresentation && !useUnshaded)
+        {
+            // A tiny indirect floor prevents a terrain patch facing away from
+            // the star from collapsing to absolute black while preserving
+            // directional-light shading and the planet palette.
+            material.EmissionEnabled = true;
+            material.Emission = PlanetSurfaceBaseColor.Darkened(0.58f);
+            material.EmissionEnergyMultiplier = 0.16f;
+        }
+        return material;
     }
 
     private static StandardMaterial3D CreateDebugLineMaterial()
@@ -527,16 +536,21 @@ public partial class TerrainChunk : StaticBody3D
                 (vertex.Y / amplitude + 1.0f) * 0.5f,
                 0.0f,
                 1.0f);
-            float slope = 1.0f - Math.Clamp(normal.Y, 0.0f, 1.0f);
-            float multiplier = Math.Clamp(
-                0.88f + normalizedHeight * 0.22f - slope * 0.18f,
-                0.62f,
-                1.18f);
-            return new Color(
-                Math.Clamp(PlanetSurfaceBaseColor.R * multiplier, 0.0f, 1.0f),
-                Math.Clamp(PlanetSurfaceBaseColor.G * multiplier, 0.0f, 1.0f),
-                Math.Clamp(PlanetSurfaceBaseColor.B * multiplier, 0.0f, 1.0f),
-                1.0f);
+            float steepness = 1.0f - Math.Clamp(normal.Y, 0.0f, 1.0f);
+            float worldX = (ChunkX * ChunkSize) + vertex.X;
+            float worldZ = (ChunkZ * ChunkSize) + vertex.Z;
+            float macro = 0.5f + 0.5f * Mathf.Sin(
+                worldX * 0.071f + Mathf.Cos(worldZ * 0.047f) * 1.9f);
+            Color low = PlanetSurfaceBaseColor.Darkened(0.20f);
+            Color high = PlanetSurfaceBaseColor.Lightened(0.24f);
+            Color rock = new Color(0.31f, 0.30f, 0.28f, 1.0f)
+                .Lerp(PlanetSurfaceBaseColor, 0.28f);
+            Color heightColor = low.Lerp(high, normalizedHeight);
+            heightColor = heightColor.Lerp(
+                PlanetSurfaceBaseColor.Lightened(0.08f),
+                macro * 0.16f);
+            float rockBlend = Mathf.SmoothStep(0.14f, 0.52f, steepness);
+            return heightColor.Lerp(rock, rockBlend);
         }
 
         return DebugViewMode switch

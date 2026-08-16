@@ -531,6 +531,41 @@ public sealed class StarterRepairSession
         Func<string, bool> isTechnologyUnlocked,
         params CraftingRecipeDefinition[] stationRecipes)
     {
+        return FromSnapshotCore(
+            snapshot,
+            resourceBindings,
+            repairRecipe,
+            isTechnologyUnlocked,
+            dynamicResourceResolver: null,
+            stationRecipes);
+    }
+
+    public static StarterRepairSession FromSnapshotWithDynamicResources(
+        SaveGameSnapshot? snapshot,
+        IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
+        CraftingRecipeDefinition repairRecipe,
+        Func<string, bool> isTechnologyUnlocked,
+        Func<string, string, ResourceNodeBinding?> dynamicResourceResolver,
+        params CraftingRecipeDefinition[] stationRecipes)
+    {
+        ArgumentNullException.ThrowIfNull(dynamicResourceResolver);
+        return FromSnapshotCore(
+            snapshot,
+            resourceBindings,
+            repairRecipe,
+            isTechnologyUnlocked,
+            dynamicResourceResolver,
+            stationRecipes);
+    }
+
+    private static StarterRepairSession FromSnapshotCore(
+        SaveGameSnapshot? snapshot,
+        IReadOnlyDictionary<string, ResourceNodeBinding> resourceBindings,
+        CraftingRecipeDefinition repairRecipe,
+        Func<string, bool> isTechnologyUnlocked,
+        Func<string, string, ResourceNodeBinding?>? dynamicResourceResolver,
+        params CraftingRecipeDefinition[] stationRecipes)
+    {
         ArgumentNullException.ThrowIfNull(resourceBindings);
         ArgumentNullException.ThrowIfNull(repairRecipe);
         ArgumentNullException.ThrowIfNull(isTechnologyUnlocked);
@@ -553,15 +588,12 @@ public sealed class StarterRepairSession
             }
 
             string nodeId = item.ItemId[itemPrefix.Length..];
-            if (!resourceBindings.TryGetValue(
+            ResourceNodeBinding? binding = resourceBindings.TryGetValue(
                 nodeId,
-                out ResourceNodeBinding? binding) ||
-                binding is null)
-            {
-                continue;
-            }
-
-            if (!string.Equals(
+                out ResourceNodeBinding? fixedBinding)
+                ? fixedBinding
+                : dynamicResourceResolver?.Invoke(nodeId, item.DefinitionId);
+            if (binding is null || !string.Equals(
                 item.DefinitionId,
                 binding.ItemDefinitionId,
                 StringComparison.Ordinal))

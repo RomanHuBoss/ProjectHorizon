@@ -1373,6 +1373,8 @@
     "ui.world_scene.kind.surface": "поверхность",
     "ui.world_scene.kind.unknown": "неизвестно",
     "ui.hud.planet_streaming.summary": "Стриминг поверхности: чанки={loaded}/{target}; collision={collisions}; очередь={queue}; сектор=({chunkX},{chunkZ}); lat={lat}° lon={lon}°",
-    "ui.hud.planet_streaming.unavailable": "Стриминг поверхности: недоступен"
+    "ui.hud.planet_streaming.unavailable": "Стриминг поверхности: недоступен",
+    "ui.hud.world_composition.summary": "Мир: звезда={sun}; облака={clouds}; потоковые ресурсы={resources}; сохранение={persistence}",
+    "ui.hud.world_composition.unavailable": "Композиция поверхности: недоступна"
   }
 }

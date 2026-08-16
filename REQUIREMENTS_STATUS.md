@@ -8,6 +8,38 @@
 
 ---
 
+## 0. Текущая mega-итерация 2026-08-16 — TASK-160 Planet Surface World Composition & Persistence
+
+**Версия:** `0.1.0-alpha.160`  
+**Статус:** TASK-160 `IMPLEMENTED`; runtime/manual acceptance TASK-161 `IN_PROGRESS`. Предыдущий TASK-158.1 F5 подтверждён внешним Godot log: TASK-138/TASK-158/TASK-124 PASS; manual >160 m / planet-switch tail TASK-159 не реконструируется без отдельного доказательства.
+
+### Причина итерации
+
+Runtime screenshot после TASK-158 показал не технический streaming-дефект, а следующий системный разрыв: streamed terrain был почти чёрным, surface sky представлял собой цветной фон без убедительного солнца/атмосферной перспективы, а Stage-1 catalog fixtures и POI визуально концентрировались около стартовой площадки. Пользователь отдельно потребовал, чтобы добытые на планете procedural resources не респавнились после отлёта/возврата.
+
+### Что реализовано
+
+- `planet environment + current system star -> procedural sky + visible sun + sky ambient/reflection + aerial fog + deterministic clouds`;
+- streamed terrain остаётся PBR-lit, но получил слабый planet-colored indirect-light floor и macro/slope color variation, устраняя абсолютный black-floor failure mode;
+- 55 из 58 legacy catalog resource fixtures runtime-скрыты; три starter salvage nodes остаются для repair tutorial и legacy acceptance;
+- live resources теперь генерируются по TASK-158 chunks (0–2 на chunk), terrain/slope aware, с 28 m starter reserve и archetype-weighted resource selection;
+- stable resource identity = `planet + chunk X/Z + slot`; cold restore поддерживает dynamic bindings, а untouched procedural chunks не создают save delta;
+- существующие 20 POI не меняют reviewed IDs/plan/golden fixture, но live nodes детерминированно распределяются по exploration annulus 78–420 m;
+- F5 добавлен `TASK-160 planet surface world composition acceptance`; 3 xUnit regressions и `tools/validate-task160-surface-world-composition.py`; RU/EN parity сохранена.
+
+### Ограничение
+
+TASK-160 не заявляет day/night orbital clock, physical atmospheric scattering/ray marching, whole-planet ecology streaming или cube-sphere surface frames. Это качественная composition/persistence подсистема поверх TASK-158 tangent-plane streamer.
+
+### Acceptance TASK-161
+
+1. Clean build/section-37: `0 warnings / 0 errors`, новый TASK-160 static gate PASS.
+2. F5: TASK-138/TASK-158 остаются PASS; новый TASK-160 PASS.
+3. Визуально на temperate: terrain не чёрный; в sky видим star disk/sky gradient/haze; при cloudLayerCount>0 видим cloud clusters.
+4. В landing reserve нет прежней стены из catalog resources; кроме трёх salvage узлов streamed deposits появляются за пределами 28 m; POI разнесены по территории.
+5. Собрать один `surface_resource.*`, уйти так, чтобы chunk выгрузился, вернуться — узел не появляется. Штатно сохранить/перезапустить и повторить — узел остаётся depleted.
+6. Перелететь на другую starter planet: sky/ground/cloud/resource composition меняются; возврат на исходную планету не восстанавливает добытый node.
+
 ## 0. Текущая hotfix-итерация 2026-08-16 — TASK-158.1 Runtime Acceptance / Golden POI Closure
 
 **Исходный снимок:** `ProjectHorizon-main-task158-planet-surface-streaming.zip`.  
@@ -5583,20 +5615,42 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `STREAM-ACC-103` | Live settled streamer reaches queue=0/workers=0/fallback=retired | `VERIFIED` | external READY exact evidence |
 | `STREAM-ACC-104` | Manual >160 m + diagonal traversal without gap/fall and planet-switch smoke | `IN_PROGRESS` | выполнить TASK-159 after alpha.158.1 clean build |
 
+
+### 8.29. Planet Surface World Composition & Persistent Chunk Resources
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `WORLD-160` | Surface использует procedural sky вместо color-only background | `IMPLEMENTED` | `ProceduralSkyMaterial`; Environment BG_SKY; sky ambient/reflection |
+| `WORLD-161` | Current system star видим и задаёт surface directional light | `IMPLEMENTED` | deterministic star color/azimuth/elevation + DirectionalLight3D |
+| `WORLD-162` | Atmosphere имеет aerial perspective/haze, cloud policy следует environment | `IMPLEMENTED` | fog + aerial perspective + deterministic cloud clusters |
+| `WORLD-163` | Streamed terrain не проваливается в абсолютный black | `IMPLEMENTED` | PBR direct lighting + weak planet-colored emission floor + macro/slope vertex colors |
+| `WORLD-164` | Legacy 58-node catalog showcase не отображается как live gameplay | `IMPLEMENTED` | 55 fixtures runtime-suppressed; starter salvage alpha/beta/gamma retained |
+| `WORLD-165` | Live resources распределяются по current 5x5 chunk window | `IMPLEMENTED` | deterministic 0–2/chunk, 28 m reserve, slope-aware placement |
+| `WORLD-166` | Resource identity planet/chunk scoped и не конфликтует между планетами | `IMPLEMENTED` | stable `surface_resource.*` derived from planet+chunk+slot |
+| `WORLD-167` | Добытые procedural resources не респавнятся после unload/save/return | `IMPLEMENTED` | `FromSnapshotWithDynamicResources`; `CollectedNodeIds` suppression; seed+deltas |
+| `WORLD-168` | Непосещённые/неизменённые procedural resources не раздувают save | `IMPLEMENTED` | deterministic regeneration; only collected node deltas persist |
+| `WORLD-169` | Existing POI live presentation не сконцентрирован у landing pad | `IMPLEMENTED` | stable IDs retained; deterministic 78–420 m presentation annulus |
+| `WORLD-170` | F5/static/xUnit проверяют composition+persistence contract | `IMPLEMENTED` | TASK-160 acceptance; validator; xUnit 3 tests |
+| `WORLD-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-161 external Windows/Godot verification |
+| `WORLD-ACC-101` | F5 TASK-160 PASS и старые TASK-138/158 остаются PASS | `IN_PROGRESS` | TASK-161 |
+| `WORLD-ACC-102` | Manual visual sky/terrain/declutter smoke | `IN_PROGRESS` | TASK-161 screenshot/runtime evidence |
+| `WORLD-ACC-103` | Mine → chunk unload → save/restart → planet return preserves depletion | `IN_PROGRESS` | TASK-161 persistence scenario |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | повторный clean build `0/0`; TASK-138 generatorVersion=3 PASS; TASK-158 remains PASS; >160 m/diagonal traversal + planet-switch smoke |
-| 2 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 3 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
-| 4 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke where not covered by owner acceptance |
-| 5 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | clean build/section-37; TASK-160 F5; visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
+| 2 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke (F5 already PASS) |
+| 3 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
+| 4 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
+| 5 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke where not covered by owner acceptance |
+| 6 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая runtime-подтверждённая реализация:** TASK-158 Planetary Surface Streaming (`VERIFIED` по F5 + live chunk evidence); alpha.158.1 исправляет stale §36 golden fixture и две build warnings.  
-**Формально ближайший шаг:** TASK-159 — повторить clean build/F5 на alpha.158.1 и закончить manual traversal/planet-switch smoke.
+**Текущая разрабатываемая реализация:** TASK-160 Planet Surface World Composition & Persistence поверх runtime-подтверждённого TASK-158/158.1.  
+**Формально ближайший шаг:** TASK-161 — clean build/F5/visual/persistence acceptance TASK-160; TASK-159 manual long-traversal tail остаётся отдельным незакрытым доказательством.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 

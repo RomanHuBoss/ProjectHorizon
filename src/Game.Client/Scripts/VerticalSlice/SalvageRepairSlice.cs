@@ -548,6 +548,7 @@ public partial class SalvageRepairSlice : Node3D
                         StringComparison.Ordinal);
             });
         ValidateResourceNodeBindings();
+        InitializePlanetSurfaceWorldComposition();
         InitializeGameplayProductionNetwork(
             saveData: null,
             legacySaveData: null);
@@ -789,6 +790,7 @@ public partial class SalvageRepairSlice : Node3D
         SynchronizeWorldSceneCoordinator();
         UpdateStarSystemSimulation(delta);
         UpdatePlanetSurfaceStreaming();
+        UpdatePlanetSurfaceWorldComposition(delta);
         UpdateEcology(delta);
         UpdateAerialNavigation(delta);
         UpdatePlayerSurvival(delta);
@@ -4708,6 +4710,10 @@ public partial class SalvageRepairSlice : Node3D
             left.InstanceId,
             right.InstanceId,
             StringComparison.Ordinal));
+        if (_planetSurfaceWorldCompositionInitialized)
+        {
+            UpdatePlanetaryPoiResidency();
+        }
         RefreshNpcNavigationObstacles();
         RefreshAerialNavigationEnvironment();
     }
@@ -5496,6 +5502,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetSurfaceContentAcceptance();
         RunPlanetSurfaceTerrainAcceptance();
         RunPlanetSurfaceStreamingAcceptance();
+        RunPlanetSurfaceWorldCompositionAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5505,7 +5512,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5735,11 +5742,12 @@ public partial class SalvageRepairSlice : Node3D
                 ContentCatalog.Technologies,
                 snapshot?.TechnologyProgress,
                 DefaultResearchPoints);
-            _session = StarterRepairSession.FromSnapshot(
+            _session = StarterRepairSession.FromSnapshotWithDynamicResources(
                 snapshot,
                 BuildResourceBindings(),
                 RepairRecipe,
                 TechnologyProgress.IsUnlocked,
+                ResolveDynamicResourceBinding,
                 StationRecipes.ToArray());
             InitializeGameplayProductionNetwork(
                 snapshot?.ProductionQueueNetwork,
@@ -7564,6 +7572,7 @@ public partial class SalvageRepairSlice : Node3D
         string planetSurfaceContentLine = BuildPlanetSurfaceContentHudLine();
         string planetTerrainLine = BuildPlanetTerrainHudLine();
         string planetStreamingLine = BuildPlanetSurfaceStreamingHudLine();
+        string worldCompositionLine = BuildPlanetSurfaceWorldCompositionHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7602,6 +7611,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-154 (F5): {_planetSurfaceContentAcceptanceHud}",
             $"TASK-156 (F5): {_planetSurfaceTerrainAcceptanceHud}",
             $"TASK-158 (F5): {_planetSurfaceStreamingAcceptanceHud}",
+            $"TASK-160 (F5): {_planetSurfaceWorldCompositionAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7632,6 +7642,7 @@ public partial class SalvageRepairSlice : Node3D
                 planetSurfaceContentLine,
                 planetTerrainLine,
                 planetStreamingLine,
+                worldCompositionLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7678,6 +7689,8 @@ public partial class SalvageRepairSlice : Node3D
             planetEnvironmentLine,
             planetSurfaceContentLine,
             planetTerrainLine,
+            planetStreamingLine,
+            worldCompositionLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

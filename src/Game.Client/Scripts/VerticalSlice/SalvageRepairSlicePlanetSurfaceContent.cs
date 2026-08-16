@@ -172,6 +172,10 @@ public partial class SalvageRepairSlice
 
         ApplyPlanetSurfaceTerrain();
         ApplyPlanetSurfacePresentation();
+        if (_planetSurfaceWorldCompositionInitialized)
+        {
+            ApplyPlanetSurfaceWorldComposition();
+        }
         if (rebuildScene)
         {
             RebuildEcologyScene();
@@ -356,15 +360,15 @@ public partial class SalvageRepairSlice
 
     private static Color BuildGroundColor(string archetype) => archetype switch
     {
-        "desert" => new Color(0.48f, 0.31f, 0.16f),
-        "frozen" => new Color(0.54f, 0.66f, 0.72f),
-        "volcanic" => new Color(0.16f, 0.12f, 0.10f),
+        "desert" => new Color(0.54f, 0.36f, 0.19f),
+        "frozen" => new Color(0.58f, 0.70f, 0.78f),
+        "volcanic" => new Color(0.27f, 0.16f, 0.12f),
         "oceanic" => new Color(0.15f, 0.31f, 0.29f),
         "toxic" => new Color(0.27f, 0.34f, 0.16f),
         "barren" => new Color(0.31f, 0.29f, 0.27f),
         "radioactive" => new Color(0.34f, 0.28f, 0.20f),
         "exotic" => new Color(0.28f, 0.20f, 0.39f),
-        _ => new Color(0.28f, 0.39f, 0.24f)
+        _ => new Color(0.32f, 0.43f, 0.26f)
     };
 
     private static bool IsPlanetId(string? value) =>
