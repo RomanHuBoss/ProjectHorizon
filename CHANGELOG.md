@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.180] - 2026-08-16
+
+### Added — TASK-180 production procedural visual language
+
+- Upgraded the player spacecraft from the previous coarse flight silhouette to an 11-part exterior presentation while preserving the authoritative `CharacterBody3D` and single gameplay `BoxShape3D`. Added lateral chines and a dorsal spine without touching TASK-178.7 kinematics/collision.
+- Added a real cockpit-interior render hierarchy: instrument panel, primary/side emissive displays, left/right consoles, canopy frame and local instrument glow. The cockpit subtree is render/light-only and is visible from the existing cockpit camera.
+- Added a collision-free orbital-station `VisualDetail` subtree with a habitation ring, central hub, paired radiators and antenna masts; existing station/tunnel collision remains authoritative.
+- Replaced the four-part NPC ship presentation with a nine-part compound silhouette including canopy, dorsal spine, nacelles and paired engine glow while retaining the existing spherical collision contract.
+- Added semantic PBR-style `StandardMaterial3D` profiles to star-system proxies: emissive stars, metallic stations/ship contacts, rough moons and archetype-aware planets. The detailed focused globe now has six bounded face-material instances with seam-safe deterministic vertex-colour breakup plus separate water/atmosphere/cloud roughness profiles.
+- Added `ProductionVisualLanguageAcceptanceRunner`, live F5 `TASK-180` acceptance, xUnit coverage, a dedicated static validator and section-37/CI/release enforcement.
+- Documented the visual contract in `docs/PRODUCTION_VISUAL_LANGUAGE.md`. This pass deliberately does not claim hand-authored GLTF/texture/LOD/atlas content absent from the supplied snapshot.
+
+### Compatibility
+
+- No persistence schema change, no input-map change, no navigation/flight-physics change and no new gameplay collision shapes are introduced. TASK-179 external acceptance for the TASK-178 flight stack remains pending rather than being marked verified without owner runtime evidence.
+
 ## [0.1.0-alpha.178.7] - 2026-08-16
 
 ### Fixed — TASK-178.7 surface solidity, monotonic braking and smooth atmosphere handoff

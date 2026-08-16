@@ -2,13 +2,67 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.7-surface-brake-handoff.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.7 Surface Solidity, Monotonic Brake & Smooth Atmosphere Handoff
+## 0. Текущая mega-итерация 2026-08-16 — TASK-180 Production Procedural Visual Language
+
+**Исходный снимок:** `ProjectHorizon-main.zip` (`0.1.0-alpha.178.7`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task180-production-visual-language.zip`.  
+**Версия:** `0.1.0-alpha.180`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`; TASK-179 остаётся внешним acceptance-tail TASK-178 и не помечается `VERIFIED` без owner runtime evidence.
+
+### Основание выбора следующего шага
+
+Формально ближайшая строка очереди до этой итерации — `TASK-179 External acceptance TASK-178`, но в текущем контейнере отсутствуют `dotnet` и Godot executable, а пользователь явно запросил очередную mega-итерацию разработки. Поэтому TASK-179 не подменяется фиктивной приёмкой: разработка продолжена в изолированном presentation-слое, который не меняет flight physics/collision/persistence. Выбор TASK-180 также закрывает ранее явно отложенный TASK-164 art-content debt: журнал требовал отдельный art-direction/content pass после procedural surface foundation.
+
+Технический `Project_Horizon_Technical_Specification_v2.0.pdf` в переданном ZIP является Git-LFS pointer (`size 1774256`), а не PDF payload. Отсутствующий текст ТЗ не реконструируется догадками; используются требования, уже ранее зеркалированные в этом журнале.
+
+### Реализация
+
+- `ArcadeShip.tscn`: 11-part exterior presentation с left/right chines и dorsal spine; authoritative `CharacterBody3D` и единственный gameplay `BoxShape3D` сохранены;
+- `Visuals/CockpitInterior`: instrument panel, primary/left/right emissive displays, two side consoles, three canopy frame members и instrument glow; subtree содержит только render/light nodes;
+- `Gameplay/OrbitalStation/VisualDetail`: habitation ring, central hub, paired radiators и antenna masts — без новых collision shapes; старые station/dock-tunnel colliders не изменены;
+- `NpcShipNavigationNode`: nine-part compound ship visual (hull/wings/nose/spine/canopy/2 nacelles/2 engines), старый spherical gameplay collider сохранён;
+- `StarSystemSimulationNode`: semantic material profiles — emissive star, metallic station/ship contact, rough moon, archetype-aware planet; live nodes маркируются production visual profile;
+- `DetailedPlanetGlobeNode`: 6 bounded face materials with seam-safe deterministic vertex-colour breakup вместо одного материала на все cube-sphere faces; water/atmosphere/cloud shells имеют разные roughness profiles;
+- добавлены model/live `TASK-180` acceptance, F5 final gating, xUnit, static validator и section-37/CI/release enforcement;
+- документация: `docs/PRODUCTION_VISUAL_LANGUAGE.md`, README/CHANGELOG/VERSION/status.
+
+### Затронутые требования PDF-ТЗ / зеркала журнала
+
+Из-за отсутствия PDF payload прямые новые цитаты из v2.0 не добавляются. TASK-180 опирается на уже зеркалированные требования к: cockpit/spaceflight presentation и кораблю (`TASK-112/178`), orbital station/docking presentation (`TASK-102/178.2`), NPC ship traffic/navigation (`TASK-126`), planet/system visual representation и единственному detailed globe (`TASK-128/168`), а также на явно отложенный после `TASK-164` отдельный art-content/art-direction pass. Ни одно gameplay-требование этих подсистем не переопределяется.
+
+### Изменённые файлы
+
+Основной runtime/content scope: `ArcadeShip.tscn`, `SalvageRepairSlice.tscn`, `NpcShipNavigationNode.cs`, `DetailedPlanetGlobeNode.cs`, `StarSystemSimulationNode.cs`, `ProductionVisualLanguageAcceptance.cs`, `SalvageRepairSliceProductionVisualLanguage.cs`, `SalvageRepairSlice.cs`. Tests/gates: `ProductionVisualLanguageTests.cs`, новый `validate-task180-production-visual-language.py`, section-37 shell/cmd, CI/release; старые version-aware TASK-170…178.7 validators расширены для alpha.180. Documentation/release: `docs/PRODUCTION_VISUAL_LANGUAGE.md`, `README.md`, `CHANGELOG.md`, `VERSION`, этот журнал. Всего относительно входного ZIP: 33 изменённых/новых файла, 0 удалённых.
+
+### Runtime-показатели
+
+В текущем контейнере runtime не запускался. Поэтому реальные `playerExterior/cockpit/station/npcShip/planetMaterials/semanticProfiles` из Godot Output ещё не зафиксированы и не подменяются статическими значениями. F5 acceptance должен измерить их непосредственно из live scene tree; PASS-пороги: exterior `>=11`, cockpit `>=9`, station detail `>=6`, NPC ship `>=9`, planet material instances `=6`, semantic profiles `>0`, ship/station collision preserved `1/1`, visual-only subtrees `1`.
+
+### Граница итерации
+
+TASK-180 — production procedural art-direction pass, но **не** заявление о финальном hand-authored AAA art. В supplied snapshot нет авторских GLTF/texture sets, baked LOD chain, PBR/decal atlas payload; они не генерируются фиктивно. Save schema, controls, TASK-178.7 braking/atmosphere/handoff, terrain streaming, orbital collision и navigation не менялись.
+
+### Acceptance TASK-180
+
+1. Windows/Godot: `tools\run-section37-quality.cmd` → clean build `0 errors / 0 warnings`, tests/coverage/static gates green, `TASK-180 PRODUCTION VISUAL LANGUAGE CONTRACT PASS`.
+2. New Game/flight: визуально подтвердить compound exterior; `F2` (существующий `ship_camera` toggle) должен показывать panel/consoles/displays/canopy framing без opaque geometry, перекрывающей весь обзор.
+3. Station approach: habitation ring, hub, radiator pair и antenna silhouette видимы; docking/tunnel collision работает как до TASK-180.
+4. Наблюдать NPC ships: canopy/nacelles/twin engine glow читаются, pathing/collision остаются прежними.
+5. Orbit: focused planet сохраняет 6/6 cube-sphere faces, но terrain получает непрерывный procedural colour breakup без cube-face seams; star emits, station/contacts read metallic; performance остаётся bounded.
+6. F5: HUD `TASK-180 (F5): PASS ...`; Output содержит `TASK-180 production visual language acceptance PASS: playerExterior=<N>; cockpit=<N>; station=<N>; npcShip=<N>; planetMaterials=6; semanticProfiles=<N>; shipCollision=1; stationCollision=1; visualOnly=1; ...`, где пороги соответственно `>=11/9/6/9`, semanticProfiles `>0`. Acceptance read-only и не меняет состояние gameplay, поэтому отдельный restore не требуется.
+7. Если FAIL: прислать screenshot HUD, последние 100 строк Output и указать, какой visual subtree/scene отсутствует.
+
+### Проверки, доступные в текущем контейнере
+
+После TASK-180 полный набор из **44 `tools/validate-*.py`** пройден: `44 PASS / 0 FAIL`, включая Godot text-resource structure, JSON/localization/architecture и все TASK-146…178.7 regression gates; новый `validate-task180-production-visual-language.py` также PASS. `tools/ci/verify-version.py` PASS для `0.1.0-alpha.180`; `bash -n tools/run-section37-quality.sh` и YAML parse CI/release PASS. `.NET build/test` и Godot runtime в контейнере недоступны из-за отсутствия executables; TASK-180 остаётся `IMPLEMENTED`, не `VERIFIED`.
+
+## 0A. Предыдущая emergency-итерация 2026-08-16 — TASK-178.7 Surface Solidity, Monotonic Brake & Smooth Atmosphere Handoff
 
 **Исходный снимок:** `ProjectHorizon-main-task178.6-orbital-scale-mouse-surface.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task178.7-surface-brake-handoff.zip`.  
@@ -6757,6 +6811,21 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-HF-17868` | 100 km-class compressed distances остаются игровыми по времени | `IMPLEMENTED` | K cruise <=600 m/s + stopping-distance speed envelope + external-only speed override |
 | `FLIGHT-HF-ACC-1786` | Clean build + live mouse + cross-planet landing/content + F5 | `IN_PROGRESS` | external Windows/Godot required |
 
+### 8.43. Production Procedural Visual Language — TASK-180
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `VIS-18000` | Player ship имеет compound exterior вместо coarse placeholder silhouette | `IMPLEMENTED` | >=11 direct exterior meshes; chines/spine; original collision preserved |
+| `VIS-18001` | Cockpit camera имеет физически читаемый interior presentation | `IMPLEMENTED` | >=9 panel/console/display/frame meshes + local instrument light |
+| `VIS-18002` | Orbital station имеет secondary silhouette/detail без изменения docking collision | `IMPLEMENTED` | mesh-only `VisualDetail` >=6 parts |
+| `VIS-18003` | NPC ships имеют compound silhouette и role-readable engine/canopy treatment | `IMPLEMENTED` | `ProductionVisualPartCount=9`; existing spherical collider |
+| `VIS-18004` | Star/planet/moon/station/contact используют семантически разные material profiles | `IMPLEMENTED` | `BuildSemanticMaterial`; live profile metadata |
+| `VIS-18005` | Detailed planet не использует один идентичный terrain material для всех 6 faces | `IMPLEMENTED` | 6 face materials + seam-safe deterministic vertex-colour breakup; separate shell roughness |
+| `VIS-18006` | Visual pass не меняет save/input/flight/navigation/collision contracts | `IMPLEMENTED` | no schema/input changes; acceptance requires original ship/station shapes |
+| `VIS-18007` | F5/xUnit/section-37/CI/release защищают visual contract | `IMPLEMENTED` | TASK-180 aggregate + validator + tests |
+| `VIS-ACC-180` | Clean build + cockpit/station/NPC/orbit visual smoke + F5 | `IN_PROGRESS` | external Windows/Godot required |
+| `VIS-ART-180` | Авторские GLTF/textures/LOD/PBR atlases | `DEFERRED` | payload absent from supplied snapshot; later art-content import pass |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -6764,17 +6833,18 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
 | 1 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
-| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
-| 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
-| 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
-| 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
-| 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
-| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
-| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
-| 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 2 | `TASK-181` | External acceptance TASK-180 | clean build; cockpit/station/NPC/orbit visual smoke; F5 TASK-180 PASS |
+| 3 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 4 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
+| 5 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
+| 6 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
+| 7 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
+| 8 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
+| 9 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
+| 10 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED` с external build/runtime smoke; TASK-178.5 имеет external proof swept-moon collision, но mouse/scale acceptance переоткрыт; TASK-178.6 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MOUSE+MULTI-PLANET LANDING+F5`.  
-**Формально ближайший шаг:** внешний clean build alpha.178.6 + mouse steering smoke + safe entry на другую landable planet с non-zero content diagnostics + общий F5 TASK-178.6/178.5/178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178…178.7 остаются `IMPLEMENTED` с указанным в журнале owner runtime evidence/acceptance tails; TASK-180 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`. TASK-179 не закрывается без внешнего запуска.  
+**Формально ближайший шаг:** внешний section-37/F5 прогон alpha.180 может одним owner-run закрыть evidence для TASK-179 (flight stack) и TASK-181 (visual pass), после чего задачи переводятся в `VERIFIED` только по фактическому логу/скриншотам. Планетарный surface-stack не переоткрывается; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

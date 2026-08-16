@@ -354,6 +354,15 @@ public partial class StarSystemSimulationNode : Node3D
             ? 1
             : 0;
 
+
+    public int ProductionVisualProfileCount => _visuals.Values.Count(visual =>
+        visual.HasMeta("production_visual_profile"));
+
+    public int DetailedPlanetTerrainMaterialVariants =>
+        _detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe)
+            ? _detailedGlobe.TerrainMaterialInstanceCount
+            : 0;
+
     public DetailedPlanetGlobeDiagnostics CreateDetailedGlobeDiagnostics() =>
         _detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe)
             ? _detailedGlobe.Diagnostics
@@ -511,10 +520,8 @@ public partial class StarSystemSimulationNode : Node3D
         {
             Name = definition.BodyId.Replace('.', '_')
         };
-        StandardMaterial3D material = new()
-        {
-            AlbedoColor = ResolveColor(definition)
-        };
+        StandardMaterial3D material = BuildSemanticMaterial(definition);
+        visual.SetMeta("production_visual_profile", definition.Kind.ToString());
         if (definition.Kind is StarSystemBodyKind.Station or
             StarSystemBodyKind.ShipContact)
         {
@@ -548,6 +555,46 @@ public partial class StarSystemSimulationNode : Node3D
             visual.Mesh = mesh;
         }
         return visual;
+    }
+
+
+    private static StandardMaterial3D BuildSemanticMaterial(
+        StarSystemBodyDefinition definition)
+    {
+        Color color = ResolveColor(definition);
+        StandardMaterial3D material = new()
+        {
+            AlbedoColor = color,
+            MetallicSpecular = 0.08f
+        };
+        switch (definition.Kind)
+        {
+            case StarSystemBodyKind.Star:
+                material.Roughness = 0.38f;
+                material.EmissionEnabled = true;
+                material.Emission = color;
+                material.EmissionEnergyMultiplier = 3.2f;
+                break;
+            case StarSystemBodyKind.Station:
+                material.Metallic = 0.72f;
+                material.MetallicSpecular = 0.62f;
+                material.Roughness = 0.28f;
+                break;
+            case StarSystemBodyKind.ShipContact:
+                material.Metallic = 0.58f;
+                material.MetallicSpecular = 0.52f;
+                material.Roughness = 0.31f;
+                break;
+            case StarSystemBodyKind.Moon:
+                material.Roughness = 0.94f;
+                break;
+            default:
+                material.Roughness = definition.Archetype == "gas_giant"
+                    ? 0.66f
+                    : 0.82f;
+                break;
+        }
+        return material;
     }
 
     private static Color ResolveColor(StarSystemBodyDefinition definition)

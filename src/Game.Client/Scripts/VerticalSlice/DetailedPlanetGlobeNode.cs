@@ -25,6 +25,7 @@ public sealed record DetailedPlanetGlobeDiagnostics(
 public partial class DetailedPlanetGlobeNode : Node3D
 {
     public const int FaceResolution = 17;
+    public const int ProductionTerrainMaterialVariants = 6;
     private readonly List<MeshInstance3D> _terrainFaces = new();
     private MeshInstance3D? _atmosphere;
     private MeshInstance3D? _water;
@@ -32,6 +33,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
     private DetailedPlanetGlobeDiagnostics? _diagnostics;
 
     public string PlanetId { get; private set; } = string.Empty;
+
+    public int TerrainMaterialInstanceCount => _terrainFaces.Count;
 
     public DetailedPlanetGlobeDiagnostics Diagnostics =>
         _diagnostics ?? new DetailedPlanetGlobeDiagnostics(
@@ -59,18 +62,20 @@ public partial class DetailedPlanetGlobeNode : Node3D
             relief,
             0.21f,
             seed);
-        StandardMaterial3D terrainMaterial = BuildTerrainMaterial(
-            definition.Archetype);
-
-        foreach (CubeSphereFaceData face in build.Faces)
+        for (int faceIndex = 0; faceIndex < build.Faces.Count; faceIndex++)
         {
+            CubeSphereFaceData face = build.Faces[faceIndex];
             SurfaceTool surface = new();
             surface.Begin(Mesh.PrimitiveType.Triangles);
-            surface.SetMaterial(terrainMaterial);
+            surface.SetMaterial(BuildTerrainMaterial(definition.Archetype, faceIndex));
             for (int index = 0; index < face.Vertices.Count; index++)
             {
                 surface.SetNormal(face.Normals[index]);
                 surface.SetUV(face.Uvs[index]);
+                surface.SetColor(BuildTerrainVertexColor(
+                    definition.Archetype,
+                    face.Vertices[index],
+                    radius));
                 surface.AddVertex(face.Vertices[index]);
             }
             foreach (int index in face.Indices)
@@ -102,7 +107,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
                 radius * 1.012f,
                 ResolveWaterColor(definition.Archetype),
                 unshaded: false,
-                emissionEnergy: 0.05f);
+                emissionEnergy: 0.05f,
+                roughness: 0.28f);
             AddChild(_water);
         }
 
@@ -113,7 +119,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
                 radius * 1.075f,
                 ResolveAtmosphereColor(definition.Archetype),
                 unshaded: false,
-                emissionEnergy: 0.055f);
+                emissionEnergy: 0.055f,
+                roughness: 0.90f);
             AddChild(_atmosphere);
         }
 
@@ -124,7 +131,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
                 radius * 1.035f,
                 ResolveCloudColor(definition.Archetype),
                 unshaded: false,
-                emissionEnergy: 0.025f);
+                emissionEnergy: 0.025f,
+                roughness: 0.84f);
             AddChild(_clouds);
         }
 
@@ -171,7 +179,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
         float radius,
         Color color,
         bool unshaded,
-        float emissionEnergy)
+        float emissionEnergy,
+        float roughness)
     {
         StandardMaterial3D material = new()
         {
@@ -180,7 +189,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
             ShadingMode = unshaded
                 ? BaseMaterial3D.ShadingModeEnum.Unshaded
                 : BaseMaterial3D.ShadingModeEnum.PerPixel,
-            Roughness = 0.72f,
+            Roughness = roughness,
             MetallicSpecular = 0.0f,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             EmissionEnabled = emissionEnergy > 0.0f,
@@ -203,9 +212,30 @@ public partial class DetailedPlanetGlobeNode : Node3D
         };
     }
 
-    private static StandardMaterial3D BuildTerrainMaterial(string archetype)
+    private static StandardMaterial3D BuildTerrainMaterial(
+        string archetype,
+        int faceIndex)
     {
-        Color color = archetype switch
+        float roughness = archetype is "oceanic" or "frozen" ? 0.76f : 0.88f;
+        // One bounded material instance per cube face keeps the face lifecycle
+        // explicit while vertex colours carry seam-safe terrain breakup. Do not
+        // tint by face index: that would make cube-sphere seams visible.
+        _ = faceIndex;
+        return new StandardMaterial3D
+        {
+            AlbedoColor = Colors.White,
+            VertexColorUseAsAlbedo = true,
+            Roughness = roughness,
+            MetallicSpecular = 0.06f
+        };
+    }
+
+    private static Color BuildTerrainVertexColor(
+        string archetype,
+        Vector3 position,
+        float nominalRadius)
+    {
+        Color baseColor = archetype switch
         {
             "temperate" => new Color(0.18f, 0.44f, 0.22f),
             "desert" => new Color(0.62f, 0.39f, 0.17f),
@@ -216,12 +246,31 @@ public partial class DetailedPlanetGlobeNode : Node3D
             "oceanic" => new Color(0.10f, 0.24f, 0.34f),
             _ => new Color(0.34f, 0.31f, 0.28f)
         };
-        return new StandardMaterial3D
-        {
-            AlbedoColor = color,
-            Roughness = 0.88f,
-            MetallicSpecular = 0.04f
-        };
+        Vector3 direction = position.Normalized();
+        float broad = MathF.Sin(
+            (direction.X * 13.7f) +
+            (direction.Y * 9.1f) +
+            (direction.Z * 17.3f));
+        float fine = MathF.Sin(
+            (direction.X * 31.0f) -
+            (direction.Y * 23.0f) +
+            (direction.Z * 27.0f));
+        float relief = nominalRadius <= 0.0f
+            ? 0.0f
+            : Math.Clamp(
+                (position.Length() - nominalRadius) /
+                    Math.Max(0.01f, nominalRadius * 0.018f),
+                -1.0f,
+                1.0f);
+        float shade = Math.Clamp(
+            0.90f + (broad * 0.075f) + (fine * 0.035f) + (relief * 0.07f),
+            0.72f,
+            1.08f);
+        return new Color(
+            Math.Clamp(baseColor.R * shade, 0.0f, 1.0f),
+            Math.Clamp(baseColor.G * shade, 0.0f, 1.0f),
+            Math.Clamp(baseColor.B * shade, 0.0f, 1.0f),
+            1.0f);
     }
 
     private static float ResolveReliefFraction(string archetype) => archetype switch

@@ -43,7 +43,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.6", "0.1.0-alpha.178.7"}, "VERSION must be alpha.178.6 or later", f)
+need(version in {"0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180"}, "VERSION must be alpha.178.6 or later", f)
 
 # Scale: large bodies, large orbital gaps, and focused planet angular dominance.
 need(number(sim, "MinimumPlanetOrbitRadius") >= 110000.0 and

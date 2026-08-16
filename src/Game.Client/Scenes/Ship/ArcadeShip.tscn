@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=24 format=3]
 
 [ext_resource type="Script" path="res://Scripts/Ship/ArcadeShipController.cs" id="1_ship"]
 
@@ -31,6 +31,44 @@ roughness = 0.25
 albedo_color = Color(0.32, 0.36, 0.42, 1)
 metallic = 0.75
 roughness = 0.28
+
+
+[sub_resource type="StandardMaterial3D" id="Material_panel"]
+albedo_color = Color(0.025, 0.038, 0.055, 1)
+metallic = 0.72
+roughness = 0.31
+
+[sub_resource type="StandardMaterial3D" id="Material_display"]
+albedo_color = Color(0.02, 0.2, 0.28, 1)
+emission_enabled = true
+emission = Color(0.04, 0.82, 1, 1)
+emission_energy_multiplier = 2.8
+metallic = 0.12
+roughness = 0.18
+
+[sub_resource type="BoxMesh" id="BoxMesh_chine"]
+material = SubResource("Material_hull")
+size = Vector3(0.38, 0.36, 4.6)
+
+[sub_resource type="BoxMesh" id="BoxMesh_spine"]
+material = SubResource("Material_accent")
+size = Vector3(0.46, 0.28, 2.8)
+
+[sub_resource type="BoxMesh" id="BoxMesh_panel"]
+material = SubResource("Material_panel")
+size = Vector3(1.5, 0.16, 0.46)
+
+[sub_resource type="BoxMesh" id="BoxMesh_console"]
+material = SubResource("Material_panel")
+size = Vector3(0.42, 0.18, 1.12)
+
+[sub_resource type="BoxMesh" id="BoxMesh_frame"]
+material = SubResource("Material_hull")
+size = Vector3(0.10, 0.10, 1.75)
+
+[sub_resource type="BoxMesh" id="BoxMesh_display"]
+material = SubResource("Material_display")
+size = Vector3(0.58, 0.025, 0.22)
 
 [sub_resource type="BoxMesh" id="BoxMesh_hull"]
 material = SubResource("Material_hull")
@@ -160,6 +198,89 @@ position = Vector3(0.72, 0, 3.0)
 rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("CylinderMesh_engine")
 cast_shadow = 1
+
+
+[node name="LeftChine" type="MeshInstance3D" parent="Visuals"]
+position = Vector3(-1.08, 0.12, 0.28)
+rotation = Vector3(0, 0.055, 0)
+mesh = SubResource("BoxMesh_chine")
+cast_shadow = 1
+
+[node name="RightChine" type="MeshInstance3D" parent="Visuals"]
+position = Vector3(1.08, 0.12, 0.28)
+rotation = Vector3(0, -0.055, 0)
+mesh = SubResource("BoxMesh_chine")
+cast_shadow = 1
+
+[node name="DorsalSpine" type="MeshInstance3D" parent="Visuals"]
+position = Vector3(0, 0.52, 1.0)
+mesh = SubResource("BoxMesh_spine")
+cast_shadow = 1
+
+[node name="CockpitInterior" type="Node3D" parent="Visuals"]
+
+[node name="InstrumentPanel" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0, 0.25, -2.52)
+rotation = Vector3(-0.22, 0, 0)
+mesh = SubResource("BoxMesh_panel")
+cast_shadow = 1
+
+[node name="PrimaryDisplay" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0, 0.37, -2.76)
+rotation = Vector3(-0.24, 0, 0)
+mesh = SubResource("BoxMesh_display")
+cast_shadow = 0
+
+[node name="LeftConsole" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(-0.72, 0.12, -2.14)
+rotation = Vector3(0, 0, -0.08)
+mesh = SubResource("BoxMesh_console")
+cast_shadow = 1
+
+[node name="RightConsole" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0.72, 0.12, -2.14)
+rotation = Vector3(0, 0, 0.08)
+mesh = SubResource("BoxMesh_console")
+cast_shadow = 1
+
+[node name="LeftDisplay" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(-0.70, 0.25, -2.34)
+rotation = Vector3(-0.05, 0, -0.08)
+scale = Vector3(0.58, 1, 1)
+mesh = SubResource("BoxMesh_display")
+cast_shadow = 0
+
+[node name="RightDisplay" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0.70, 0.25, -2.34)
+rotation = Vector3(-0.05, 0, 0.08)
+scale = Vector3(0.58, 1, 1)
+mesh = SubResource("BoxMesh_display")
+cast_shadow = 0
+
+[node name="CanopyLeft" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(-0.76, 0.80, -2.08)
+rotation = Vector3(0.03, 0.08, -0.18)
+mesh = SubResource("BoxMesh_frame")
+cast_shadow = 1
+
+[node name="CanopyRight" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0.76, 0.80, -2.08)
+rotation = Vector3(0.03, -0.08, 0.18)
+mesh = SubResource("BoxMesh_frame")
+cast_shadow = 1
+
+[node name="CanopyTop" type="MeshInstance3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0, 1.08, -2.18)
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.72, 1, 1)
+mesh = SubResource("BoxMesh_frame")
+cast_shadow = 1
+
+[node name="InstrumentGlow" type="OmniLight3D" parent="Visuals/CockpitInterior"]
+position = Vector3(0, 0.43, -2.30)
+light_color = Color(0.10, 0.62, 0.92, 1)
+light_energy = 0.55
+omni_range = 2.2
 
 [node name="LandingGear" type="Node3D" parent="Visuals"]
 visible = false

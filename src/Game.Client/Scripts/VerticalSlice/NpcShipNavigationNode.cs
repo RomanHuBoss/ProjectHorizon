@@ -35,6 +35,7 @@ public sealed record NpcShipNavigationDiagnostics(
 
 public partial class NpcShipNavigationNode : CharacterBody3D
 {
+    public const int ProductionVisualPartCount = 9;
     private AerialSteeringRuntime? _steering;
     private Node3D? _primaryTarget;
     private NpcShipNavigationNode? _formationLeader;
@@ -621,19 +622,36 @@ public partial class NpcShipNavigationNode : CharacterBody3D
         StandardMaterial3D hullMaterial = new()
         {
             AlbedoColor = bodyColor,
-            Metallic = 0.55f,
-            Roughness = 0.32f
+            Metallic = 0.62f,
+            Roughness = 0.29f,
+            MetallicSpecular = 0.62f
+        };
+        StandardMaterial3D accentMaterial = new()
+        {
+            AlbedoColor = new Color(
+                Math.Min(1.0f, bodyColor.R * 1.28f),
+                Math.Min(1.0f, bodyColor.G * 1.28f),
+                Math.Min(1.0f, bodyColor.B * 1.28f),
+                1.0f),
+            Metallic = 0.42f,
+            Roughness = 0.23f
+        };
+        StandardMaterial3D canopyMaterial = new()
+        {
+            AlbedoColor = new Color(0.025f, 0.12f, 0.18f, 1.0f),
+            Metallic = 0.18f,
+            Roughness = 0.10f
         };
         StandardMaterial3D engineMaterial = new()
         {
             AlbedoColor = new Color(0.08f, 0.55f, 1.0f, 1.0f),
             EmissionEnabled = true,
             Emission = new Color(0.05f, 0.45f, 1.0f, 1.0f),
-            EmissionEnergyMultiplier = 3.0f,
+            EmissionEnergyMultiplier = 3.4f,
             Roughness = 0.18f
         };
 
-        MeshInstance3D body = new()
+        AddChild(new MeshInstance3D
         {
             Name = "Hull",
             Mesh = new BoxMesh
@@ -641,10 +659,8 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Size = new Vector3(1.4f, 0.55f, 3.0f),
                 Material = hullMaterial
             }
-        };
-        AddChild(body);
-
-        MeshInstance3D wings = new()
+        });
+        AddChild(new MeshInstance3D
         {
             Name = "Wings",
             Position = new Vector3(0.0f, -0.02f, 0.15f),
@@ -653,36 +669,90 @@ public partial class NpcShipNavigationNode : CharacterBody3D
                 Size = new Vector3(3.8f, 0.18f, 1.15f),
                 Material = hullMaterial
             }
-        };
-        AddChild(wings);
-
-        MeshInstance3D nose = new()
+        });
+        AddChild(new MeshInstance3D
         {
             Name = "Nose",
             Position = new Vector3(0.0f, 0.0f, -1.72f),
             Mesh = new BoxMesh
             {
                 Size = new Vector3(0.72f, 0.36f, 0.65f),
-                Material = hullMaterial
+                Material = accentMaterial
             }
-        };
-        AddChild(nose);
-
-        MeshInstance3D engine = new()
+        });
+        AddChild(new MeshInstance3D
         {
-            Name = "EngineGlow",
-            Position = new Vector3(0.0f, 0.0f, 1.72f),
+            Name = "DorsalSpine",
+            Position = new Vector3(0.0f, 0.38f, 0.32f),
+            Mesh = new BoxMesh
+            {
+                Size = new Vector3(0.34f, 0.24f, 1.65f),
+                Material = accentMaterial
+            }
+        });
+        AddChild(new MeshInstance3D
+        {
+            Name = "Canopy",
+            Position = new Vector3(0.0f, 0.36f, -0.72f),
+            Scale = new Vector3(1.0f, 0.52f, 1.35f),
             Mesh = new SphereMesh
             {
-                Radius = 0.24f,
-                Height = 0.48f,
+                Radius = 0.42f,
+                Height = 0.72f,
+                RadialSegments = 16,
+                Rings = 8,
+                Material = canopyMaterial
+            }
+        });
+        AddChild(new MeshInstance3D
+        {
+            Name = "LeftNacelle",
+            Position = new Vector3(-1.15f, 0.02f, 0.82f),
+            Mesh = new BoxMesh
+            {
+                Size = new Vector3(0.42f, 0.38f, 1.55f),
+                Material = hullMaterial
+            }
+        });
+        AddChild(new MeshInstance3D
+        {
+            Name = "RightNacelle",
+            Position = new Vector3(1.15f, 0.02f, 0.82f),
+            Mesh = new BoxMesh
+            {
+                Size = new Vector3(0.42f, 0.38f, 1.55f),
+                Material = hullMaterial
+            }
+        });
+        AddChild(new MeshInstance3D
+        {
+            Name = "LeftEngineGlow",
+            Position = new Vector3(-1.15f, 0.02f, 1.68f),
+            Mesh = new SphereMesh
+            {
+                Radius = 0.19f,
+                Height = 0.38f,
                 RadialSegments = 10,
                 Rings = 5,
                 Material = engineMaterial
             }
-        };
-        AddChild(engine);
+        });
+        AddChild(new MeshInstance3D
+        {
+            Name = "RightEngineGlow",
+            Position = new Vector3(1.15f, 0.02f, 1.68f),
+            Mesh = new SphereMesh
+            {
+                Radius = 0.19f,
+                Height = 0.38f,
+                RadialSegments = 10,
+                Rings = 5,
+                Material = engineMaterial
+            }
+        });
 
+        SetMeta("production_visual_profile", "task180");
+        SetMeta("production_visual_parts", ProductionVisualPartCount);
         AddChild(new CollisionShape3D
         {
             Name = "CollisionShape3D",

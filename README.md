@@ -15,6 +15,14 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-180 — Production Procedural Visual Language
+
+Alpha.180 performs the next isolated art/presentation pass without reopening verified flight/surface mechanics. The player ship now has an 11-part exterior silhouette and a renderable cockpit interior with consoles, emissive instruments and canopy framing; the orbital station has a separate mesh-only habitation/detail layer; NPC ships use a nine-part compound silhouette. Star-system bodies now receive semantic PBR-style material profiles and the focused cube-sphere planet uses six bounded face-material instances with seam-safe procedural vertex-colour breakup plus distinct water/atmosphere/cloud shell roughness.
+
+Gameplay collision is intentionally unchanged: the player ship keeps its single authoritative box collider, station docking/collision uses the existing shapes and the new detail subtrees are visual-only. F5 now includes `TASK-180 production visual language acceptance`; the static contract is enforced by `tools/validate-task180-production-visual-language.py`. Full scope and limits are in `docs/PRODUCTION_VISUAL_LANGUAGE.md`.
+
+This is still a procedural production foundation. The supplied snapshot does not contain author GLTF/texture payloads, baked LODs or authored PBR/decal atlases, so alpha.180 does not claim final hand-authored AAA art.
+
 ## TASK-178.7 — Surface Solidity, Monotonic Brake & Smooth Atmosphere Handoff
 
 Alpha.178.7 closes three runtime defects exposed by the first alpha.178.6 owner flight. Near-surface residency is no longer a sphere around the starter landing pad: it is based on actual terrain-relative altitude, the bounded terrain streamer follows the piloted ship, and a 3.2 m terrain-aware **swept** floor checks the whole motion segment before accepting the new ship position. The ship therefore cannot continue below the sampled curved surface even if it crosses the terrain between frames.

@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.178.7", "VERSION must be alpha.178.7", f)
+need(version in {"0.1.0-alpha.178.7", "0.1.0-alpha.180"}, "VERSION must be alpha.178.7 or later", f)
 need("ArcadeShipBrakeRuntime.ApplyMonotonicBrake" in controller and
      "if (command.Brake)" in controller and
      "BoostActive = false" in controller and

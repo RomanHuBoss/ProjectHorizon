@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7"}, "VERSION must be alpha.178.5 or later", f)
+need(version in {"0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180"}, "VERSION must be alpha.178.5 or later", f)
 
 # Default arcade flight must couple translation direction to the ship heading.
 need("DefaultVelocityAlignmentRate = 3.2f" in assist and

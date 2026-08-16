@@ -101,6 +101,34 @@ size = Vector3(2.2, 12, 38)
 [sub_resource type="BoxShape3D" id="OrbitalStationTunnelWallShape"]
 size = Vector3(2.2, 12, 38)
 
+
+[sub_resource type="TorusMesh" id="OrbitalStationHabRingMesh"]
+material = SubResource("OrbitalStationMaterial")
+inner_radius = 28.0
+outer_radius = 31.0
+rings = 48
+ring_segments = 16
+
+[sub_resource type="CylinderMesh" id="OrbitalStationHubMesh"]
+material = SubResource("OrbitalStationMaterial")
+top_radius = 5.5
+bottom_radius = 5.5
+height = 22.0
+radial_segments = 24
+rings = 2
+
+[sub_resource type="BoxMesh" id="OrbitalStationRadiatorMesh"]
+material = SubResource("OrbitalStationAccentMaterial")
+size = Vector3(18, 0.34, 14)
+
+[sub_resource type="CylinderMesh" id="OrbitalStationAntennaMesh"]
+material = SubResource("OrbitalStationAccentMaterial")
+top_radius = 0.22
+bottom_radius = 0.42
+height = 18.0
+radial_segments = 12
+rings = 2
+
 [sub_resource type="StandardMaterial3D" id="DockBeaconMaterial"]
 albedo_color = Color(0.08, 0.72, 1, 1)
 emission_enabled = true
@@ -262,6 +290,41 @@ mesh = SubResource("OrbitalStationTunnelWallMesh")
 [node name="DockTunnelRightCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
 position = Vector3(8.2, 0, 20)
 shape = SubResource("OrbitalStationTunnelWallShape")
+
+
+[node name="VisualDetail" type="Node3D" parent="Gameplay/OrbitalStation"]
+
+[node name="HabitationRing" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("OrbitalStationHabRingMesh")
+cast_shadow = 1
+
+[node name="CentralHub" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+rotation = Vector3(1.5708, 0, 0)
+mesh = SubResource("OrbitalStationHubMesh")
+cast_shadow = 1
+
+[node name="PortRadiator" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+position = Vector3(-35, 0, -4)
+rotation = Vector3(0, 0, 0.12)
+mesh = SubResource("OrbitalStationRadiatorMesh")
+cast_shadow = 1
+
+[node name="StarboardRadiator" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+position = Vector3(35, 0, -4)
+rotation = Vector3(0, 0, -0.12)
+mesh = SubResource("OrbitalStationRadiatorMesh")
+cast_shadow = 1
+
+[node name="UpperAntenna" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+position = Vector3(0, 21, -5)
+mesh = SubResource("OrbitalStationAntennaMesh")
+cast_shadow = 1
+
+[node name="LowerAntenna" type="MeshInstance3D" parent="Gameplay/OrbitalStation/VisualDetail"]
+position = Vector3(0, -21, -5)
+mesh = SubResource("OrbitalStationAntennaMesh")
+cast_shadow = 1
 
 [node name="DockLight" type="OmniLight3D" parent="Gameplay/OrbitalStation"]
 position = Vector3(0, 0, 27)
