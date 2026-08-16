@@ -7,7 +7,7 @@ This is the safe foundation for later full radial collision/navigation. Alpha.17
 
 ## Alpha 0.1.0-alpha.168 — Planetary Globe & Geodesic Surface Topology
 
-TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world as a bounded detailed current-planet globe in Orbit/Interplanetary contexts. Surface gameplay keeps the stable 25-chunk floating-origin tangent streamer, but now shares a planet-global spherical address model with normalized latitude/longitude, great-circle distance and radius-derived distant-horizon curvature. See `docs/PLANETARY_GLOBE.md`. TASK-170 now supplies the radial tangent/gravity/face-address foundation; globally curved physical collision and NavigationServer face remeshing remain a later physics layer.
+TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world as a bounded detailed current-planet globe in Orbit/Interplanetary contexts. Surface gameplay keeps the stable 25-chunk floating-origin tangent streamer, but now shares a planet-global spherical address model with normalized latitude/longitude, great-circle distance and radius-derived distant-horizon curvature. See `docs/PLANETARY_GLOBE.md`. TASK-170 supplies the radial tangent/gravity/face-address foundation; alpha.174 now bends the bounded collision/navigation patch by the real planet radius while keeping global collision residency streamed rather than permanent.
 
 # Project Horizon
 
@@ -15,9 +15,15 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-174 — True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles
+
+Alpha.174 bends the live bounded terrain **visual and trimesh collision** by the real current-planet radius instead of keeping TASK-172's collision patch mathematically flat. TASK-124 navigation tiles consume the same spherical-sag model, player Up follows the curved local normal, and floating-origin/frame handoffs preserve semantic surface height for the player and resident AI/content. The established 25-active/9-collision budget and logical-X/Z save identity remain unchanged.
+
+The same revision fixes the radial-atmosphere artifact exposed by alpha.172.1: the procedural sky hemisphere is aligned to the active radial frame, global-Y height fog is disabled on the surface, horizon gradients are softened, and atmosphere-bearing planets retain a dim blue night dome instead of a near-black half-sky. F5 includes `TASK-174 curved cube-sphere surface acceptance`; see `docs/CURVED_PLANET_SURFACE.md`.
+
 ## TASK-172.1 — Radial physics/navigation hotfix
 
-External Godot 4.7.1 testing of alpha.172 exposed three regressions: NavigationServer3D rejected regions rotated >=90° away from the navigation-map UP orientation, the arbitrary-up player visibly rolled while strafing A/D, and two acceptance thresholds produced false negatives (`maxPointErr=7.814 mm`, displayed clearance `0.80 m`). Alpha.172.1 fixes those defects without starting TASK-174: TASK-124 now owns a dedicated navigation map aligned to the current radial Up; navigation regions, avoidance obstacles and NPC navigation agents are detached/rebound around a tangent-frame rotation instead of remaining on Godot's default global-UP map. Ground-NPC avoidance uses Godot's 3D/radius avoidance path (then projects the safe velocity back to the tangent plane), because the 2D avoidance path is global-XZ based. The player body is reconstructed from tangent-forward + radial-Up with zero roll, and the two acceptance tolerances now reflect the actual float/numeric budgets.
+External Godot 4.7.1 testing of alpha.172 exposed three regressions: NavigationServer3D rejected regions rotated >=90° away from the navigation-map UP orientation, the arbitrary-up player visibly rolled while strafing A/D, and two acceptance thresholds produced false negatives (`maxPointErr=7.814 mm`, displayed clearance `0.80 m`). Alpha.172.1 fixes those defects; alpha.174 starts only after external reacceptance: TASK-124 now owns a dedicated navigation map aligned to the current radial Up; navigation regions, avoidance obstacles and NPC navigation agents are detached/rebound around a tangent-frame rotation instead of remaining on Godot's default global-UP map. Ground-NPC avoidance uses Godot's 3D/radius avoidance path (then projects the safe velocity back to the tangent plane), because the 2D avoidance path is global-XZ based. The player body is reconstructed from tangent-forward + radial-Up with zero roll, and the two acceptance tolerances now reflect the actual float/numeric budgets.
 
 ## TASK-172 — Physical Radial Surface Frame & Navigation Migration
 

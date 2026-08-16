@@ -2,9 +2,47 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-174 True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles
+
+**Исходный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task174-curved-cube-sphere-surface.zip`.  
+**Версия:** `0.1.0-alpha.174`.  
+**Статус:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-174 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-163 остаётся acceptance-хвостом.
+
+### Внешнее evidence перед TASK-174
+
+Alpha.172.1 внешний прогон закрыл исправления: `TASK-172 ... PASS` с `roundTrip=1`, `upright=1`, `nav=1`, `bounded25x9=1`; TASK-124 и TASK-126 также PASS, navigation-map UP error отсутствует. На скриншоте при этом выявлен отдельный presentation defect: процедурное небо делилось вертикальной резкой границей, а атмосферная ночная половина выглядела почти чёрно-синей на поверхности.
+
+### TASK-174 — закрываемая подсистема
+
+- единый `PlanetSurfaceCurvedPatchDescriptor` задаёт exact spherical sag и локальную нормаль по реальному радиусу планеты;
+- TASK-158 visual/collision chunk meshes используют одинаковую curvature-модель; collision остаётся bounded 9 chunks, а визуальная residency — 25 chunks;
+- curvature revision заставляет async streamer атомарно перестроить resident collision/visual meshes при floating-origin handoff, не меняя logical chunk identity;
+- TASK-124 navigation tile heights используют тот же spherical sag, что и collision mesh; snapshot сообщает curved state, cube face и maximum local sag;
+- player Up непрерывно следует локальной нормали curved patch;
+- frame/rebase handoff сохраняет semantic height игрока, surface residents и cached NPC/ship/fauna targets при смене tangent anchor;
+- resource/POI/flora/base placements используют physical curved Y, тогда как persistence/environment height остаётся semantic terrain height;
+- radial atmosphere fixes: sky hemisphere поворачивается в текущий surface basis, global-Y height fog отключён, sky/ground gradients смягчены, атмосферная ночь остаётся низкояркостной синей вместо vacuum-black;
+- F5 TASK-174 проверяет curvature/normals, all 6 cube faces, rebase continuity, live curved collision/navigation, player Up, radial sky и неизменный 25/9 budget; добавлены 3 xUnit regression groups и static/CI/release gate.
+
+### Граница TASK-174
+
+TASK-174 делает **resident physical patch реально криволинейным**, но не создаёт глобально резидентный collision globe. Сфера по-прежнему покрывается bounded streamed tangent/curved patches с floating-origin handoff; это сохраняет производительность, persistence и существующие gameplay-системы.
+
+### Acceptance
+
+1. Clean build: `0 errors / 0 warnings`.
+2. New Game: `TASK-174 curved cube-sphere surface READY` с `collision=curved-trimesh; nav=curved-tiles; sky=radial-atmosphere; streamer=25/9`.
+3. F5: `TASK-174 ... PASS` с `curvature=1`, `normals=1`, `rebaseContinuity=1`, `faces=6/6`, `collision=1`, `navigation=1`, `playerUp=1`, `skyRadial=1`, `bounded25x9=1`.
+4. Небо на поверхности не имеет вертикальной half-screen границы; атмосферная ночь не выглядит как чёрный вакуум на половине кадра.
+5. `surface_warp 0 44.9` → `surface_warp 0 45.1`: TASK-170/TASK-172 handoff без падения игрока/NPC и без NavigationServer error; TASK-174 снова стабилизируется на 25/9.
+6. Реальный rebase >2048 m не даёт скачка высоты/провала: logical identity сохраняется, collision и navigation догружают curvature revision.
 
 ---
 
@@ -13,7 +51,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task172-physical-radial-surface.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.172.1`.  
-**Статус:** TASK-172 `IMPLEMENTED / RUNTIME REGRESSION FIXED, PENDING EXTERNAL RECHECK`; TASK-172.1 `IMPLEMENTED`; TASK-174 заблокирован до повторной приёмки 172.1.
+**Статус:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 recheck; TASK-174 начат отдельной последующей итерацией.
 
 ### Внешнее runtime evidence, вызвавшее hotfix
 
@@ -44,7 +82,7 @@
 5. F5: TASK-172 `PASS` с `roundTrip=1`, `upright=1`, `nav=1`, `faces=6/6`, `pointBudget=0.020m`; `maxPointErr` должен быть <= 0.020m.
 6. Seam smoke: `surface_warp 0 44.9` → `surface_warp 0 45.1`; должны появиться TASK-170 logical transition и TASK-172 physical handoff, без NavigationServer UP error.
 7. После seam streamer снова `25/25`, collisions `9/9`; TASK-124 и TASK-126 остаются PASS.
-8. До выполнения этих критериев TASK-172 не переводить в VERIFIED и TASK-174 не начинать.
+8. Критерии подтверждены внешним alpha.172.1 прогоном; TASK-172/TASK-172.1 переведены в VERIFIED.
 
 ---
 
@@ -6131,19 +6169,19 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `PHYSRAD-1726` | Weather/flying altitude/surface ship steering follow radial Up | `IMPLEMENTED` | tangent-vector conversions and local altitude envelope |
 | `PHYSRAD-1727` | F5/static/xUnit regression contract | `IMPLEMENTED` | TASK-172 acceptance + validator + 3 unit groups |
 | `PHYSRAD-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required |
-| `PHYSRAD-ACC-101` | F5 TASK-172 PASS + seam physical smoke | `IN_PROGRESS / RECHECK` | alpha.172 external FAIL: nav-map UP + roundTrip 7.814mm + A/D roll; alpha.172.1 recheck required |
+| `PHYSRAD-ACC-101` | F5 TASK-172 PASS + seam physical smoke | `VERIFIED` | alpha.172.1 external Godot 4.7.1: TASK-172 PASS, upright=1, roundTrip=1, nav=1, bounded25x9=1; gameplay smoke passed |
 
 ### 8.36. TASK-172.1 Emergency radial hotfix
 
 | ID | Требование | Статус | Evidence / критерий |
 |---|---|---|---|
-| `PHYSRAD-HF-1721` | Player never accumulates roll while strafing under arbitrary radial Up | `IMPLEMENTED` | radial-axis yaw + per-physics upright basis; F5 `upright=1` |
-| `PHYSRAD-HF-1722` | Navigation map UP follows current radial frame without >=90° region transform rejection | `IMPLEMENTED` | dedicated map `MapCreate/MapSetUp`; regions removed before parent rotation |
-| `PHYSRAD-HF-1723` | NavigationAgent3D and NavigationObstacle3D use the same dedicated radial map / radial-safe avoidance | `IMPLEMENTED` | explicit detach/rebind; 3D radius avoidance + tangent projection instead of global-XZ 2D avoidance |
-| `PHYSRAD-HF-1724` | Physical point round-trip tolerance reflects float-world precision | `IMPLEMENTED` | 0.020m budget; alpha.172 observed error 0.007814m |
-| `PHYSRAD-HF-1725` | Surface clearance acceptance has numeric tolerance without weakening 0.80m target | `IMPLEMENTED` | target 0.80m + 0.01m numerical tolerance |
-| `PHYSRAD-HF-ACC-100` | External clean build + New Game free of NavigationServer UP errors | `PENDING` | Godot 4.7.1 runtime evidence required |
-| `PHYSRAD-HF-ACC-101` | A/D no-roll + F5 TASK-162.2/TASK-172 PASS + seam smoke | `PENDING` | external runtime evidence required |
+| `PHYSRAD-HF-1721` | Player never accumulates roll while strafing under arbitrary radial Up | `VERIFIED` | external alpha.172.1 run: no A/D roll regression; F5 `upright=1` |
+| `PHYSRAD-HF-1722` | Navigation map UP follows current radial frame without >=90° region transform rejection | `VERIFIED` | external alpha.172.1 run completed without NavigationServer >=90° UP transform error |
+| `PHYSRAD-HF-1723` | NavigationAgent3D and NavigationObstacle3D use the same dedicated radial map / radial-safe avoidance | `VERIFIED` | external alpha.172.1: TASK-124/TASK-126 PASS after radial-map migration |
+| `PHYSRAD-HF-1724` | Physical point round-trip tolerance reflects float-world precision | `VERIFIED` | external alpha.172.1: roundTrip=1, maxPointErr=0.007814m within 0.020m budget |
+| `PHYSRAD-HF-1725` | Surface clearance acceptance has numeric tolerance without weakening 0.80m target | `VERIFIED` | external alpha.172.1: TASK-162.2 PASS; clearance=3.85m, minimum remains 0.80m |
+| `PHYSRAD-HF-ACC-100` | External clean build + New Game free of NavigationServer UP errors | `VERIFIED` | external Godot 4.7.1 alpha.172.1 runtime completed without the prior NavigationServer UP error |
+| `PHYSRAD-HF-ACC-101` | A/D no-roll + F5 TASK-162.2/TASK-172 PASS + seam smoke | `VERIFIED` | external alpha.172.1: TASK-162.2 PASS, TASK-172 PASS/upright=1, normal gameplay/navigation smoke passed |
 
 
 ## 9. Очередь ближайших задач
@@ -6152,7 +6190,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-172.1` | Emergency radial physics/navigation reacceptance | clean build; no nav-UP error; A/D no-roll; F5 162.2/172 PASS; seam handoff |
+| 1 | `TASK-174` | True Curved Cube-Sphere Collision & Face-Aware Navigation acceptance | clean build; radial sky seam removed; F5 TASK-174 PASS; face warp + >2048m rebase smoke |
 | 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
@@ -6162,8 +6200,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 ранее PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-172.1 radial hotfix `IMPLEMENTED`; TASK-172 остаётся `PENDING RECHECK`; TASK-170/TASK-168/TASK-166/TASK-164 F5 externally PASS; TASK-162 manual long-traversal tail остаётся открытым.  
-**Формально ближайший шаг:** Windows/Godot clean build + TASK-172.1 recheck: no navigation-UP error, A/D no-roll, F5 TASK-162.2/TASK-172 PASS и seam `surface_warp`; только затем TASK-163/TASK-174.
+**Текущая разрабатываемая реализация:** TASK-172/TASK-172.1 `VERIFIED` по внешнему Godot 4.7.1 evidence; TASK-174 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-162 manual long-traversal tail остаётся открытым.  
+**Формально ближайший шаг:** Windows/Godot clean build + TASK-174 F5/runtime acceptance: radial sky without half-screen seam, curved collision/navigation 25/9, seam warp and >2048 m rebase continuity; затем перевод TASK-174 в VERIFIED и выбор следующей mega-подсистемы.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

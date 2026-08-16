@@ -73,7 +73,7 @@ need((('ApplyPlanetSurfaceOriginShiftToRuntimeCaches' in slice_frame and
        'ApplyWorldOriginShift(worldShift)' in slice_frame and
        'RefreshAerialNavigationEnvironment();' in slice_frame) or
       ('ApplyPlanetSurfaceFrameTransformToRuntimeCaches' in physical_frame and
-       'ApplyWorldFrameTransform(previousFrame, nextFrame)' in physical_frame and
+       ('ApplyWorldFrameTransform(previousFrame, nextFrame)' in physical_frame or 'agent.ApplyWorldFrameTransform(' in physical_frame) and
        'RefreshAerialNavigationEnvironment();' in physical_frame)),
      'live rebase does not update absolute runtime caches', failures)
 need('SurfaceGlobalToLocal' in npc_agent and

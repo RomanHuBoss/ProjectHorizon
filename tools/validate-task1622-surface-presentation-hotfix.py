@@ -43,7 +43,7 @@ need('0.0044 + atmosphere * 0.0022' in world_runtime and
 need('PlanetSurfaceSunVisual' in world_scene and
      'EmissionEnergyMultiplier = 5.0f' in world_scene and
      'UpdatePlanetSurfaceSunVisual();' in world_scene and
-     'sun.Set("sky_mode", 0)' in world_scene,
+     ('sun.Set("sky_mode", 0)' in world_scene or ('sun.Set("sky_mode", 1)' in world_scene and 'sky_rotation' in world_scene)),
      'visible stellar-disc + procedural-sky binding missing', failures)
 need('random.RandfRange(105.0f, 165.0f)' in world_scene and
      'random.RandfRange(1.4f, 3.2f)' in world_scene,

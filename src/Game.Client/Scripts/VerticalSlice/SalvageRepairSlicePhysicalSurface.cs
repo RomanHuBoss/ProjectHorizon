@@ -71,18 +71,39 @@ public partial class SalvageRepairSlice
         }
 
         Transform3D previousGameplay = gameplay.GlobalTransform;
+        PlanetSurfacePhysicalFrameState? previousState =
+            _planetSurfacePhysicalFrameState;
         PlanetSurfacePhysicalFrameState next =
             _planetSurfacePhysicalFrameRuntime.Build(
                 originEastMeters,
                 originNorthMeters);
         Basis previousBasis = previousGameplay.Basis.Orthonormalized();
         Basis nextBasis = next.SurfaceBasis.Orthonormalized();
+        double radiusMeters = Math.Max(
+            PlanetSurfaceTopologyRuntime.MinimumRadiusMeters,
+            PlanetSurfaceContentProfile.Environment.RadiusKm * 1000.0);
+        PlanetSurfaceCurvedPatchDescriptor? previousPatch = previousState is { } oldState
+            ? new PlanetSurfaceCurvedPatchDescriptor(
+                radiusMeters, oldState.OriginEastMeters, oldState.OriginNorthMeters)
+            : null;
+        PlanetSurfaceCurvedPatchDescriptor nextPatch = new(
+            radiusMeters, originEastMeters, originNorthMeters);
         double axisDelta = PlanetSurfacePhysicalFrameRuntime.MaximumAxisErrorDegrees(
             previousBasis,
             nextBasis);
         _planetSurfacePhysicalFrameMaximumAxisDelta = Math.Max(
             _planetSurfacePhysicalFrameMaximumAxisDelta,
             axisDelta);
+
+        if (previousState is { } bridgeState &&
+            (Math.Abs(bridgeState.OriginEastMeters - originEastMeters) > 0.001 ||
+             Math.Abs(bridgeState.OriginNorthMeters - originNorthMeters) > 0.001))
+        {
+            // TASK-174: the curvature anchor changes at a floating-origin/frame
+            // handoff. Keep a synchronously rebuilt curved fallback collision
+            // active while the 25/9 streamer replaces its meshes asynchronously.
+            ActivateCurvedSurfaceFallbackBridge(originEastMeters, originNorthMeters);
+        }
 
         // TASK-172.1: NavigationServer3D has a map-level UP direction.
         // Detach the old regions and prepare a dedicated map for the next
@@ -100,6 +121,18 @@ public partial class SalvageRepairSlice
                 next.GameplayTransform,
                 next.Radial.GravityMetersPerSecondSquared /
                     PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared);
+            if (previousPatch is not null)
+            {
+                AdjustNodeForCurvatureAnchorChange(
+                    _player, next.GameplayTransform, previousPatch, nextPatch);
+            }
+        }
+
+        if (previousPatch is not null)
+        {
+            AdjustCurvedSurfaceResidentsAfterFrameChange(
+                gameplay, next.GameplayTransform, previousPatch, nextPatch);
+            AdjustEcologyFloraCurvatureAnchor(previousPatch, nextPatch);
         }
 
         Node3D? ground = GetNodeOrNull<Node3D>("GroundBody");
@@ -121,7 +154,17 @@ public partial class SalvageRepairSlice
 
         ApplyPlanetSurfaceFrameTransformToRuntimeCaches(
             previousGameplay,
-            next.GameplayTransform);
+            next.GameplayTransform,
+            previousPatch,
+            nextPatch);
+        if (_npcNavigationSurface is not null && _planetSurfaceContentProfile is not null)
+        {
+            _npcNavigationSurface.SetCurvedSurfaceFrame(
+                PlanetSurfaceContentProfile.Environment.RadiusKm,
+                originEastMeters,
+                originNorthMeters);
+        }
+        ApplyPlanetSurfaceAtmosphereFrame(nextBasis);
         _npcNavigationSurface?.NotifySurfaceFrameChanged();
         AttachNpcNavigationAgents();
         if (_aerialSteeringRuntime is not null)
@@ -129,8 +172,6 @@ public partial class SalvageRepairSlice
             RefreshAerialNavigationEnvironment();
         }
 
-        PlanetSurfacePhysicalFrameState? previousState =
-            _planetSurfacePhysicalFrameState;
         _planetSurfacePhysicalFrameState = next;
         _planetSurfacePhysicalFrameTransitions++;
 
@@ -152,36 +193,142 @@ public partial class SalvageRepairSlice
                 $"planet={next.PlanetId}; face={next.Radial.FaceName}; " +
                 $"up={next.WorldUp}; " +
                 $"gravity={next.Radial.GravityMetersPerSecondSquared.ToString("0.00", CultureInfo.InvariantCulture)}m/s2; " +
-                "player=arbitrary-up; collision=rotating-tangent; " +
-                "navigation=rotating-local-regions; streamer=25/9; " +
+                "player=arbitrary-up; collision=rotating-curved-tangent; " +
+                "navigation=radial-map+curved-tiles; streamer=25/9; " +
                 "persistence=logical-xz/no-schema-bump; F5=acceptance.");
             _planetSurfacePhysicalFrameReadyPrinted = true;
         }
     }
 
+    private void UpdatePlanetCurvedSurfacePlayerUp()
+    {
+        if (!_surfaceRuntimeActive || _player is null || StageOneVoyage.Piloted ||
+            _planetSurfacePhysicalFrameState is not { } state ||
+            _planetSurfaceContentProfile is null)
+        {
+            return;
+        }
+
+        Vector3 worldUp = GetCurrentPlanetCurvedWorldUp();
+        if (_player.ActiveSurfaceUp.Dot(worldUp) < 0.9999995f)
+        {
+            _player.SetPlanetSurfaceFrame(
+                worldUp,
+                state.Radial.GravityMetersPerSecondSquared /
+                    PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared,
+                snapOrientation: true);
+            Basis skyBasis = PlanetSurfacePhysicalFrameRuntime.BuildUprightBasis(
+                state.WorldNorth,
+                worldUp);
+            ApplyPlanetSurfaceAtmosphereFrame(skyBasis);
+        }
+    }
+
+    private Vector3 GetCurrentPlanetCurvedWorldUp()
+    {
+        if (_planetSurfacePhysicalFrameState is not { } state)
+        {
+            return Vector3.Up;
+        }
+        if (_planetSurfaceContentProfile is null || _player is null)
+        {
+            return state.WorldUp;
+        }
+        PlanetSurfaceLogicalPosition logical = GetPlanetSurfaceLogicalPlayerPosition();
+        PlanetSurfaceCurvedPatchDescriptor patch = new(
+            Math.Max(
+                PlanetSurfaceTopologyRuntime.MinimumRadiusMeters,
+                PlanetSurfaceContentProfile.Environment.RadiusKm * 1000.0),
+            state.OriginEastMeters,
+            state.OriginNorthMeters);
+        Vector3 localUp = patch.SurfaceUpLocal(logical.EastMeters, logical.NorthMeters);
+        return (state.SurfaceBasis * localUp).Normalized();
+    }
+
     private void ApplyPlanetSurfaceFrameTransformToRuntimeCaches(
         Transform3D previousFrame,
-        Transform3D nextFrame)
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor? previousPatch,
+        PlanetSurfaceCurvedPatchDescriptor nextPatch)
     {
         foreach (NpcFactionAgentNode agent in
                  GetTree().GetNodesInGroup("npc_faction_agent"))
         {
-            agent.ApplyWorldFrameTransform(previousFrame, nextFrame);
+            agent.ApplyWorldFrameTransform(
+                previousFrame, nextFrame, previousPatch, nextPatch);
         }
         foreach (NpcShipNavigationNode ship in _npcShipNavigationNodes)
         {
             if (GodotObject.IsInstanceValid(ship))
             {
-                ship.ApplyWorldFrameTransform(previousFrame, nextFrame);
+                ship.ApplyWorldFrameTransform(
+                    previousFrame, nextFrame, previousPatch, nextPatch);
             }
         }
         foreach (EcologyFaunaNode fauna in _ecologyFaunaNodes)
         {
             if (GodotObject.IsInstanceValid(fauna))
             {
-                fauna.ApplyWorldFrameTransform(previousFrame, nextFrame);
+                fauna.ApplyWorldFrameTransform(
+                    previousFrame, nextFrame, previousPatch, nextPatch);
             }
         }
+    }
+
+    private static void AdjustNodeForCurvatureAnchorChange(
+        Node3D node,
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor previousPatch,
+        PlanetSurfaceCurvedPatchDescriptor nextPatch)
+    {
+        Vector3 logical = nextFrame.AffineInverse() * node.GlobalPosition;
+        double semanticHeight = logical.Y + previousPatch.TangentSagMeters(
+            logical.X, logical.Z);
+        logical.Y = (float)(semanticHeight - nextPatch.TangentSagMeters(
+            logical.X, logical.Z));
+        node.GlobalPosition = nextFrame * logical;
+    }
+
+    private void AdjustCurvedSurfaceResidentsAfterFrameChange(
+        Node3D gameplay,
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor previousPatch,
+        PlanetSurfaceCurvedPatchDescriptor nextPatch)
+    {
+        string[] groups =
+        {
+            "npc_faction_agent", "ecology_fauna", "npc_ship_navigation",
+            "planet_surface_resource", "vertical_slice_resource",
+            "planetary_poi", "ecology_flora", "base_construction_module"
+        };
+        HashSet<Node3D> adjusted = new();
+        foreach (string group in groups)
+        {
+            foreach (Node candidate in GetTree().GetNodesInGroup(group))
+            {
+                if (candidate is not Node3D node || !GodotObject.IsInstanceValid(node) ||
+                    !IsDescendantOf(node, gameplay) || !adjusted.Add(node))
+                {
+                    continue;
+                }
+                AdjustNodeForCurvatureAnchorChange(
+                    node, nextFrame, previousPatch, nextPatch);
+            }
+        }
+    }
+
+    private static bool IsDescendantOf(Node node, Node ancestor)
+    {
+        Node? current = node.GetParent();
+        while (current is not null)
+        {
+            if (ReferenceEquals(current, ancestor))
+            {
+                return true;
+            }
+            current = current.GetParent();
+        }
+        return false;
     }
 
     private Vector3 SurfaceLocalDirectionToWorld(Vector3 localDirection)
@@ -207,8 +354,9 @@ public partial class SalvageRepairSlice
             return "physical frame: unavailable";
         }
 
+        Vector3 expectedUp = GetCurrentPlanetCurvedWorldUp();
         double upError = Math.Acos(Math.Clamp(
-            _player.ActiveSurfaceUp.Normalized().Dot(state.WorldUp),
+            _player.ActiveSurfaceUp.Normalized().Dot(expectedUp),
             -1.0f,
             1.0f)) * 180.0 / Math.PI;
         return
@@ -238,15 +386,16 @@ public partial class SalvageRepairSlice
         PlanetSurfacePhysicalFrameAcceptanceReport report =
             PlanetSurfacePhysicalFrameAcceptanceRunner.Run(profiles);
 
+        Vector3 expectedPlayerUp = GetCurrentPlanetCurvedWorldUp();
         bool livePlayer = _player is not null &&
             _player.SurfaceFrameActive &&
-            _planetSurfacePhysicalFrameState is { } live &&
-            _player.ActiveSurfaceUp.Normalized().Dot(live.WorldUp) >= 0.9999f;
+            _planetSurfacePhysicalFrameState is { } &&
+            _player.ActiveSurfaceUp.Normalized().Dot(expectedPlayerUp) >= 0.9999f;
         bool playerUpright = livePlayer && _player is not null &&
-            _planetSurfacePhysicalFrameState is { } uprightState &&
-            _player.GlobalTransform.Basis.Y.Normalized().Dot(uprightState.WorldUp) >= 0.9999f &&
-            Math.Abs(_player.GlobalTransform.Basis.X.Normalized().Dot(uprightState.WorldUp)) <= 0.001f &&
-            Math.Abs(_player.GlobalTransform.Basis.Z.Normalized().Dot(uprightState.WorldUp)) <= 0.001f;
+            _planetSurfacePhysicalFrameState is { } &&
+            _player.GlobalTransform.Basis.Y.Normalized().Dot(expectedPlayerUp) >= 0.9999f &&
+            Math.Abs(_player.GlobalTransform.Basis.X.Normalized().Dot(expectedPlayerUp)) <= 0.001f &&
+            Math.Abs(_player.GlobalTransform.Basis.Z.Normalized().Dot(expectedPlayerUp)) <= 0.001f;
         bool liveGameplay = _planetSurfacePhysicalFrameState is { } current &&
             GetNodeOrNull<Node3D>("Gameplay") is { } gameplay &&
             gameplay.GlobalTransform.Basis.Y.Normalized().Dot(current.WorldUp) >= 0.9999f;

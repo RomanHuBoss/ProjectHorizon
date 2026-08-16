@@ -18,7 +18,10 @@ public sealed record TerrainChunkProfilerSnapshot(
     int Vertices,
     int Collisions,
     int CancelledJobs,
-    int StaleJobs);
+    int StaleJobs,
+    bool CurvedSurface,
+    double CurvatureRadiusMeters,
+    int CurvatureRevision);
 
 public partial class TerrainChunkManager : Node3D
 {
@@ -222,6 +225,9 @@ public partial class TerrainChunkManager : Node3D
     private double _lastMainThreadApplyMilliseconds;
     private double _logicalOriginEastMeters;
     private double _logicalOriginNorthMeters;
+    private double _planetSurfaceRadiusMeters;
+    private int _surfaceCurvatureRevision;
+    private bool _runtimeCollisionEnabled = true;
 
     public override void _Ready()
     {
@@ -630,7 +636,9 @@ public partial class TerrainChunkManager : Node3D
         {
             rebuildCollision =
                 activeChunk.GenerateCollision != spec.GenerateCollision ||
-                activeChunk.CollisionResolution != CollisionResolution;
+                activeChunk.CollisionResolution != CollisionResolution ||
+                (spec.GenerateCollision &&
+                    activeChunk.CurvatureRevision != _surfaceCurvatureRevision);
         }
 
         request = new TerrainChunkBuildRequest(
@@ -648,7 +656,9 @@ public partial class TerrainChunkManager : Node3D
             rebuildCollision,
             spec.StitchMask,
             spec.SkirtMask,
-            PlanetSurfaceProfile);
+            PlanetSurfaceProfile,
+            BuildCurvedPatchDescriptor(),
+            _surfaceCurvatureRevision);
         return true;
     }
 
@@ -832,7 +842,8 @@ public partial class TerrainChunkManager : Node3D
                 desiredSpec.VisualResolution,
                 desiredSpec.GenerateCollision,
                 desiredSpec.StitchMask,
-                desiredSpec.SkirtMask))
+                desiredSpec.SkirtMask,
+                _surfaceCurvatureRevision))
             {
                 ChunkOperation updateOperation = ChunkOperation.Update(
                     _planRevision,
@@ -1111,6 +1122,7 @@ public partial class TerrainChunkManager : Node3D
         });
 
         AddChild(chunk);
+        chunk.SetRuntimeCollisionEnabled(_runtimeCollisionEnabled);
         return chunk;
     }
 
@@ -1133,6 +1145,7 @@ public partial class TerrainChunkManager : Node3D
             spec.GenerateCollision,
             spec.StitchMask,
             spec.SkirtMask,
+            _surfaceCurvatureRevision,
             DebugViewMode,
             ShowWorldGrid,
             ShowWireframe,
@@ -1141,6 +1154,47 @@ public partial class TerrainChunkManager : Node3D
             UsePlanetSurfacePresentation,
             PlanetSurfaceBaseColor);
         chunk.VerboseGenerationLogging = VerboseGenerationLogging;
+    }
+
+
+    public void SetRuntimeCollisionEnabled(bool enabled)
+    {
+        _runtimeCollisionEnabled = enabled;
+        foreach (TerrainChunk chunk in _activeChunks.Values)
+        {
+            if (GodotObject.IsInstanceValid(chunk))
+            {
+                chunk.SetRuntimeCollisionEnabled(enabled);
+            }
+        }
+    }
+
+    public void ConfigurePlanetSurfaceCurvature(double radiusKm)
+    {
+        double radiusMeters = Math.Max(0.0, radiusKm * 1000.0);
+        if (Math.Abs(_planetSurfaceRadiusMeters - radiusMeters) < 0.001)
+        {
+            return;
+        }
+
+        _planetSurfaceRadiusMeters = radiusMeters;
+        _surfaceCurvatureRevision++;
+        if (IsInsideTree() && _player is not null)
+        {
+            PlanRefresh(executeImmediately: false);
+        }
+    }
+
+    private PlanetSurfaceCurvedPatchDescriptor? BuildCurvedPatchDescriptor()
+    {
+        if (PlanetSurfaceProfile is null || _planetSurfaceRadiusMeters <= 0.0)
+        {
+            return null;
+        }
+        return new PlanetSurfaceCurvedPatchDescriptor(
+            _planetSurfaceRadiusMeters,
+            _logicalOriginEastMeters,
+            _logicalOriginNorthMeters);
     }
 
 
@@ -1156,6 +1210,10 @@ public partial class TerrainChunkManager : Node3D
 
         _logicalOriginEastMeters = eastMeters;
         _logicalOriginNorthMeters = northMeters;
+        if (_planetSurfaceRadiusMeters > 0.0)
+        {
+            _surfaceCurvatureRevision++;
+        }
 
         foreach ((Vector2I coordinate, TerrainChunk chunk) in _activeChunks)
         {
@@ -1172,8 +1230,13 @@ public partial class TerrainChunkManager : Node3D
         if (nextCenter != _currentChunk)
         {
             _currentChunk = nextCenter;
-            PlanRefresh(executeImmediately: false);
         }
+
+        // TASK-174: curvature is defined relative to the current tangent origin.
+        // A rebase therefore requires mesh/collision updates even when the same
+        // logical chunks remain resident. Old collision stays live until each
+        // asynchronous update is atomically applied.
+        PlanRefresh(executeImmediately: false);
     }
 
     private Vector3 ToLogicalPosition(Vector3 worldPosition)
@@ -1573,7 +1636,8 @@ public partial class TerrainChunkManager : Node3D
                     spec.VisualResolution,
                     spec.GenerateCollision,
                     spec.StitchMask,
-                    spec.SkirtMask))
+                    spec.SkirtMask,
+                    _surfaceCurvatureRevision))
             {
                 failureReason =
                     $"final chunk {entry.Key} does not match the latest " +
@@ -1946,7 +2010,8 @@ public partial class TerrainChunkManager : Node3D
                     entry.Value.VisualResolution,
                     entry.Value.GenerateCollision,
                     entry.Value.StitchMask,
-                    entry.Value.SkirtMask))
+                    entry.Value.SkirtMask,
+                    _surfaceCurvatureRevision))
             {
                 failureReason =
                     $"chunk {entry.Key} does not match current specification";
@@ -2285,7 +2350,10 @@ public partial class TerrainChunkManager : Node3D
             vertices,
             collisions,
             _totalCancelledJobs,
-            _totalDiscardedStaleJobs);
+            _totalDiscardedStaleJobs,
+            _planetSurfaceRadiusMeters > 0.0 && PlanetSurfaceProfile is not null,
+            _planetSurfaceRadiusMeters,
+            _surfaceCurvatureRevision);
     }
 
     private void UpdateHud()

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.174] - 2026-08-16
+
+### Added — TASK-174 True Curved Cube-Sphere Collision & Face-Aware Navigation Tiles
+- Curved the bounded TASK-158 terrain visual **and collision** meshes by exact real-radius spherical sag while preserving the proven 25-active/9-collision residency, logical chunk addressing and asynchronous atomic replacement.
+- Made TASK-124 navigation tiles share the same curvature descriptor as terrain collision and report the active cube face / maximum local sag.
+- Added curvature-aware rebase/frame handoff for the player, surface residents and cached NPC/ship/fauna targets so a 4096 m floating-origin move preserves semantic surface height instead of inheriting the previous tangent sag.
+- Added continuously varying player surface-Up from the curved patch, plus TASK-174 F5 acceptance, three xUnit regression groups and section-37/CI/release gating.
+
+### Fixed — radial atmosphere presentation
+- Fixed the vertical half-screen sky discontinuity exposed by external alpha.172.1 testing by rotating the sky hemisphere into the active radial surface frame and disabling global-Y height fog on a radial planet.
+- Softened procedural sky/ground horizon curves and retained a low-luminance blue atmospheric dome at night on atmosphere-bearing planets instead of showing a near-space-black ground hemisphere at surface altitude.
+- Kept the explicit stellar-disc node as the canonical visible sun while the directional light remains lighting-only.
+
+### External runtime evidence synchronized
+- Alpha.172.1 external Godot 4.7.1 evidence now closes TASK-172/TASK-172.1: TASK-172 reports `roundTrip=1`, `upright=1`, `nav=1`, `bounded25x9=1`; TASK-124/TASK-126 and the rest of the Stage-2 surface acceptance matrix remain PASS.
+
 ## [0.1.0-alpha.172.1] - 2026-08-16
 
 ### Fixed — TASK-172.1 Radial Physics / Navigation Emergency Hotfix

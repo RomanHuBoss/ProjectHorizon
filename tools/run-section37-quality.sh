@@ -42,6 +42,7 @@ python3 tools/validate-task168-planetary-globe-geodesy.py
 python3 tools/validate-task170-radial-surface-frame.py
 python3 tools/validate-task172-physical-radial-surface.py
 python3 tools/validate-task1721-radial-hotfix.py
+python3 tools/validate-task174-curved-surface.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

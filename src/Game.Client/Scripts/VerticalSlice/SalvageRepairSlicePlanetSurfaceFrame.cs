@@ -11,6 +11,23 @@ public partial class SalvageRepairSlice
     private PlanetSurfaceFrameRuntime PlanetSurfaceFrame =>
         _planetSurfaceFrame ??= new PlanetSurfaceFrameRuntime();
 
+    private PlanetSurfaceCurvedPatchDescriptor? CurrentPlanetSurfaceCurvedPatch
+    {
+        get
+        {
+            if (_planetSurfaceContentProfile is null || _planetSurfaceFrame is null)
+            {
+                return null;
+            }
+            return new PlanetSurfaceCurvedPatchDescriptor(
+                Math.Max(
+                    PlanetSurfaceTopologyRuntime.MinimumRadiusMeters,
+                    PlanetSurfaceContentProfile.Environment.RadiusKm * 1000.0),
+                PlanetSurfaceFrame.OriginEastMeters,
+                PlanetSurfaceFrame.OriginNorthMeters);
+        }
+    }
+
     private void EnsurePlanetSurfaceFrameForCurrentPlanet()
     {
         string planetId = GalaxyNavigation.CurrentPlanetId;
@@ -45,9 +62,13 @@ public partial class SalvageRepairSlice
         if (gameplay is not null)
         {
             Vector3 logical = gameplay.ToLocal(_player.GlobalPosition);
+            double logicalHeight = logical.Y +
+                (CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
+                    logical.X,
+                    logical.Z) ?? 0.0);
             return new PlanetSurfaceLogicalPosition(
                 logical.X,
-                logical.Y,
+                logicalHeight,
                 logical.Z);
         }
         return PlanetSurfaceFrame.ToLogical(
@@ -61,7 +82,11 @@ public partial class SalvageRepairSlice
         Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
         if (gameplay is not null)
         {
-            return gameplay.ToLocal(worldPosition);
+            Vector3 logical = gameplay.ToLocal(worldPosition);
+            logical.Y += (float)(CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
+                logical.X,
+                logical.Z) ?? 0.0);
+            return logical;
         }
 
         EnsurePlanetSurfaceFrameForCurrentPlanet();
@@ -80,9 +105,13 @@ public partial class SalvageRepairSlice
         Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
         if (gameplay is not null)
         {
+            double physicalHeight = heightMeters -
+                (CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
+                    eastMeters,
+                    northMeters) ?? 0.0);
             return gameplay.ToGlobal(new Vector3(
                 (float)eastMeters,
-                (float)heightMeters,
+                (float)physicalHeight,
                 (float)northMeters));
         }
         (double east, double north) = PlanetSurfaceFrame.ToLocal(

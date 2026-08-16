@@ -65,6 +65,7 @@ public partial class SalvageRepairSlice
         }
 
         EnsurePlanetSurfaceStreaming(profile);
+        _planetSurfaceStreamer?.SetRuntimeCollisionEnabled(false);
         EnsurePlanetSurfaceDistantTerrain(profile, force: true);
         _npcNavigationSurface?.SetTerrainProfile(profile);
         RepositionSurfaceBoundObjects();
@@ -84,6 +85,34 @@ public partial class SalvageRepairSlice
             $"walkable={walkable.ToString("0.0", CultureInfo.InvariantCulture)}%; " +
             $"waterBasins={(profile.WaterBasinsEnabled ? 1 : 0)}; " +
             $"vertices={vertices}; triangles={triangles}; collision=trimesh; nav=heightfield.");
+    }
+
+    private void ActivateCurvedSurfaceFallbackBridge(
+        double originEastMeters,
+        double originNorthMeters)
+    {
+        PlanetSurfaceTerrainProfile? profile = CurrentTerrainProfile;
+        MeshInstance3D? groundMesh = GetNodeOrNull<MeshInstance3D>(
+            "GroundBody/MeshInstance3D");
+        CollisionShape3D? groundCollision = GetNodeOrNull<CollisionShape3D>(
+            "GroundBody/CollisionShape3D");
+        if (profile is null || groundMesh is null || groundCollision is null)
+        {
+            return;
+        }
+
+        ArrayMesh bridgeMesh = BuildPlanetTerrainMesh(
+            profile,
+            originEastMeters,
+            originNorthMeters);
+        groundMesh.Mesh = bridgeMesh;
+        groundMesh.Visible = true;
+        groundCollision.Shape = bridgeMesh.CreateTrimeshShape();
+        groundCollision.Disabled = false;
+        _planetSurfaceStreamer?.SetRuntimeCollisionEnabled(false);
+        _planetSurfaceFallbackRetired = false;
+        _planetSurfaceStreamingReadyPrinted = false;
+        _planetCurvedSurfaceReadyPrinted = false;
     }
 
     private void EnsurePlanetSurfaceStreaming(
@@ -126,6 +155,8 @@ public partial class SalvageRepairSlice
                 Visible = false
             };
             _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+            _planetSurfaceStreamer.ConfigurePlanetSurfaceCurvature(
+                PlanetSurfaceContentProfile.Environment.RadiusKm);
             _planetSurfaceStreamer.SetLogicalSurfaceOrigin(
                 PlanetSurfaceFrame.OriginEastMeters,
                 PlanetSurfaceFrame.OriginNorthMeters);
@@ -134,6 +165,8 @@ public partial class SalvageRepairSlice
         else
         {
             _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+            _planetSurfaceStreamer.ConfigurePlanetSurfaceCurvature(
+                PlanetSurfaceContentProfile.Environment.RadiusKm);
             _planetSurfaceStreamer.SetLogicalSurfaceOrigin(
                 PlanetSurfaceFrame.OriginEastMeters,
                 PlanetSurfaceFrame.OriginNorthMeters);
@@ -152,6 +185,7 @@ public partial class SalvageRepairSlice
 
         if (!_planetSurfaceFallbackRetired)
         {
+            _planetSurfaceStreamer.SetRuntimeCollisionEnabled(true);
             _planetSurfaceStreamer.Visible = true;
             MeshInstance3D? groundMesh = GetNodeOrNull<MeshInstance3D>(
                 "GroundBody/MeshInstance3D");
@@ -277,7 +311,10 @@ public partial class SalvageRepairSlice
         SurfaceTool surfaceTool = new();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
         double radiusKm = _planetSurfaceContentProfile?.Environment.RadiusKm ?? 44.0;
-        PlanetSurfaceTopologyRuntime topology = new(radiusKm);
+        PlanetSurfaceCurvedPatchDescriptor curvedPatch = new(
+            Math.Max(PlanetSurfaceTopologyRuntime.MinimumRadiusMeters, radiusKm * 1000.0),
+            PlanetSurfaceFrame.OriginEastMeters,
+            PlanetSurfaceFrame.OriginNorthMeters);
 
         for (int zIndex = 0; zIndex < resolution; zIndex++)
         {
@@ -289,22 +326,19 @@ public partial class SalvageRepairSlice
                 double logicalZ = logicalCenterNorth + localZ;
                 PlanetSurfaceTerrainSample sample =
                     PlanetSurfaceTerrainRuntime.Sample(profile, logicalX, logicalZ);
-                Vector3 terrainNormal = SampleTerrainNormal(
+                Vector3 curvedNormal = curvedPatch.TerrainNormalLocal(
                     profile,
                     logicalX,
                     logicalZ);
-                Vector3 curvedNormal = new Vector3(
-                    terrainNormal.X - (float)(localX / topology.RadiusMeters),
-                    terrainNormal.Y,
-                    terrainNormal.Z - (float)(localZ / topology.RadiusMeters)).Normalized();
                 surfaceTool.SetNormal(curvedNormal);
                 surfaceTool.SetColor(TerrainVertexColor(
                     profile,
                     sample,
                     logicalX,
                     logicalZ));
-                double radialDistance = Math.Sqrt(localX * localX + localZ * localZ);
-                double curvatureSag = topology.TangentSagMeters(radialDistance);
+                double curvatureSag = curvedPatch.TangentSagMeters(
+                    logicalX,
+                    logicalZ);
                 surfaceTool.AddVertex(new Vector3(
                     (float)localX,
                     (float)(sample.Height - curvatureSag),
@@ -350,6 +384,11 @@ public partial class SalvageRepairSlice
         double step = size / (resolution - 1);
         SurfaceTool surfaceTool = new();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+        double radiusKm = _planetSurfaceContentProfile?.Environment.RadiusKm ?? 44.0;
+        PlanetSurfaceCurvedPatchDescriptor curvedPatch = new(
+            Math.Max(PlanetSurfaceTopologyRuntime.MinimumRadiusMeters, radiusKm * 1000.0),
+            logicalCenterEastMeters,
+            logicalCenterNorthMeters);
 
         for (int zIndex = 0; zIndex < resolution; zIndex++)
         {
@@ -361,7 +400,7 @@ public partial class SalvageRepairSlice
                 double logicalZ = logicalCenterNorthMeters + z;
                 PlanetSurfaceTerrainSample sample =
                     PlanetSurfaceTerrainRuntime.Sample(profile, logicalX, logicalZ);
-                Vector3 normal = SampleTerrainNormal(
+                Vector3 normal = curvedPatch.TerrainNormalLocal(
                     profile,
                     logicalX,
                     logicalZ);
@@ -376,7 +415,9 @@ public partial class SalvageRepairSlice
                     logicalZ));
                 surfaceTool.AddVertex(new Vector3(
                     (float)x,
-                    (float)sample.Height,
+                    (float)(sample.Height - curvedPatch.TangentSagMeters(
+                        logicalX,
+                        logicalZ)),
                     (float)z));
             }
         }
@@ -487,6 +528,13 @@ public partial class SalvageRepairSlice
             : PlanetSurfaceTerrainRuntime.SampleHeight(profile, x, z);
     }
 
+    private double SamplePlanetSurfacePhysicalHeight(double x, double z)
+    {
+        double semanticHeight = SamplePlanetSurfaceHeight(x, z);
+        double sag = CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(x, z) ?? 0.0;
+        return semanticHeight - sag;
+    }
+
     private double SamplePlanetSurfaceSlope(double x, double z)
     {
         PlanetSurfaceTerrainProfile? profile = CurrentTerrainProfile;
@@ -513,7 +561,8 @@ public partial class SalvageRepairSlice
         return placement with
         {
             PositionX = worldX,
-            PositionY = surfaceY + 0.1 + state.Definition.Size.Y / 2.0,
+            PositionY = SamplePlanetSurfacePhysicalHeight(worldX, worldZ) +
+                0.1 + state.Definition.Size.Y / 2.0,
             PositionZ = worldZ,
             Environment = placement.Environment with
             {
@@ -524,7 +573,7 @@ public partial class SalvageRepairSlice
     }
 
     private double FloraSurfaceY(EcologyFloraPlacement placement) =>
-        SamplePlanetSurfaceHeight(placement.PositionX, placement.PositionZ) + 0.55;
+        SamplePlanetSurfacePhysicalHeight(placement.PositionX, placement.PositionZ) + 0.55;
 
     private void RepositionSurfaceBoundObjects()
     {
@@ -538,7 +587,7 @@ public partial class SalvageRepairSlice
             if (node is Node3D resource)
             {
                 Vector3 position = resource.Position;
-                position.Y = (float)SamplePlanetSurfaceHeight(position.X, position.Z) + 0.70f;
+                position.Y = (float)SamplePlanetSurfacePhysicalHeight(position.X, position.Z) + 0.70f;
                 resource.Position = position;
             }
         }

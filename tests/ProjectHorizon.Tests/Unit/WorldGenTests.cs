@@ -1246,4 +1246,68 @@ public sealed class WorldGenTests
         Assert.Equal(6, report.FacesCovered);
     }
 
+    [Fact]
+    public void PlanetCurvedSurface_UsesRealRadiusSagAndNormals()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments, RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(planet, galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfaceTerrainProfile terrain = PlanetSurfaceTerrainRuntime.BuildProfile(
+            profile,
+            profile.Seed == long.MinValue ? long.MaxValue : Math.Max(1L, Math.Abs(profile.Seed)));
+        PlanetSurfaceCurvedPatchDescriptor patch = new(profile.RadiusKm * 1000.0, 0.0, 0.0);
+
+        Assert.True(patch.TangentSagMeters(64.0, 0.0) > 0.0);
+        Assert.InRange(patch.SurfaceUpLocal(48.0, 32.0).Length(), 0.9999f, 1.0001f);
+        Assert.InRange(patch.TerrainNormalLocal(terrain, 12.0, -9.0).Length(), 0.9999f, 1.0001f);
+    }
+
+    [Fact]
+    public void PlanetCurvedSurface_RebaseMappingPreservesPhysicalPointRoundTrip()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments, RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(planet, galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfacePhysicalFrameRuntime physical = new(new PlanetSurfaceRadialFrameRuntime(profile));
+        PlanetSurfacePhysicalFrameState first = physical.Build(0.0, 0.0);
+        PlanetSurfacePhysicalFrameState second = physical.Build(4096.0, 0.0);
+        PlanetSurfaceCurvedPatchDescriptor firstPatch = new(profile.RadiusKm * 1000.0, 0.0, 0.0);
+        PlanetSurfaceCurvedPatchDescriptor secondPatch = new(profile.RadiusKm * 1000.0, 4096.0, 0.0);
+        Godot.Vector3 world = first.GameplayTransform * firstPatch.ToGameplayLogicalPoint(73.25, 5.5, -28.75);
+        Godot.Vector3 mapped = PlanetSurfacePhysicalFrameRuntime.MapCurvedPoint(
+            first.GameplayTransform, second.GameplayTransform, world, firstPatch, secondPatch);
+        Godot.Vector3 restored = PlanetSurfacePhysicalFrameRuntime.MapCurvedPoint(
+            second.GameplayTransform, first.GameplayTransform, mapped, secondPatch, firstPatch);
+
+        Assert.InRange(restored.DistanceTo(world), 0.0f,
+            (float)PlanetSurfaceCurvedCollisionAcceptanceRunner.RebaseRoundTripToleranceMeters);
+    }
+
+    [Fact]
+    public void PlanetCurvedSurface_AcceptanceCoversAllCubeFaces()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments, RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(planet, galaxy.CurrentSystem.StarType))
+            .Where(profile => profile.Landable)
+            .ToArray();
+
+        PlanetSurfaceCurvedCollisionAcceptanceReport report =
+            PlanetSurfaceCurvedCollisionAcceptanceRunner.Run(profiles);
+
+        Assert.True(report.Passed);
+        Assert.True(report.Curvature);
+        Assert.True(report.Normals);
+        Assert.True(report.RebaseContinuity);
+        Assert.Equal(6, report.FacesCovered);
+    }
+
 }

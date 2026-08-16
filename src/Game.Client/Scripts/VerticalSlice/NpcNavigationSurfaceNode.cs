@@ -51,7 +51,10 @@ public sealed record NpcNavigationSurfaceSnapshot(
     int ObstacleRevision,
     bool ReadyForQueries,
     NpcNavigationTileKey CenterTile,
-    IReadOnlyList<NpcNavigationTileKey> ActiveTiles);
+    IReadOnlyList<NpcNavigationTileKey> ActiveTiles,
+    bool CurvedSurface,
+    string CenterFace,
+    double MaximumCurvatureSagMeters);
 
 public partial class NpcNavigationSurfaceNode : Node3D
 {
@@ -86,6 +89,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
     private Rid _navigationMap;
     private bool _navigationMapCreated;
     private Vector3 _navigationMapUp = Vector3.Up;
+    private PlanetSurfaceCurvedPatchDescriptor? _curvedPatch;
 
     public bool IsConfigured => _player is not null && _worldRoot is not null;
 
@@ -246,12 +250,39 @@ public partial class NpcNavigationSurfaceNode : Node3D
 
     public float GetNavigationHeight(float x, float z)
     {
-        return _terrainProfile is null
-            ? NavigationSurfaceY
-            : (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+        double terrainHeight = _terrainProfile is null
+            ? 0.0
+            : PlanetSurfaceTerrainRuntime.SampleHeight(
                 _terrainProfile,
                 x,
-                z) + NavigationSurfaceY;
+                z);
+        double sag = _curvedPatch?.TangentSagMeters(x, z) ?? 0.0;
+        return (float)(terrainHeight - sag + NavigationSurfaceY);
+    }
+
+    public void SetCurvedSurfaceFrame(
+        double radiusKm,
+        double originEastMeters,
+        double originNorthMeters)
+    {
+        PlanetSurfaceCurvedPatchDescriptor next = new(
+            Math.Max(
+                PlanetSurfaceTopologyRuntime.MinimumRadiusMeters,
+                radiusKm * 1000.0),
+            originEastMeters,
+            originNorthMeters);
+        bool changed = _curvedPatch is null ||
+            Math.Abs(_curvedPatch.RadiusMeters - next.RadiusMeters) > 0.001 ||
+            Math.Abs(_curvedPatch.OriginEastMeters - next.OriginEastMeters) > 0.001 ||
+            Math.Abs(_curvedPatch.OriginNorthMeters - next.OriginNorthMeters) > 0.001;
+        _curvedPatch = next;
+        if (!changed || !IsConfigured)
+        {
+            return;
+        }
+        RebuildCurrentTiles();
+        _hasCenterTile = false;
+        RefreshStreaming(force: true);
     }
 
     public void RefreshObstacleGeometry()
@@ -426,7 +457,12 @@ public partial class NpcNavigationSurfaceNode : Node3D
             ObstacleRevision,
             ReadyForQueries,
             _centerTile,
-            _regions.Keys.OrderBy(key => key.X).ThenBy(key => key.Z).ToArray());
+            _regions.Keys.OrderBy(key => key.X).ThenBy(key => key.Z).ToArray(),
+            _curvedPatch is not null,
+            _curvedPatch?.FaceNameAt(
+                _centerTile.X * TileSizeMeters,
+                _centerTile.Z * TileSizeMeters) ?? "flat",
+            MeasureMaximumActiveCurvatureSag());
     }
 
     private void RefreshStreaming(bool force)
@@ -975,6 +1011,27 @@ public partial class NpcNavigationSurfaceNode : Node3D
             obstacle.HalfX * 2.0f,
             obstacle.HalfZ * 2.0f);
         return bounds.Intersects(_groundXZ, true);
+    }
+
+    private double MeasureMaximumActiveCurvatureSag()
+    {
+        if (_curvedPatch is null || _regions.Count == 0)
+        {
+            return 0.0;
+        }
+        double maximum = 0.0;
+        foreach (NpcNavigationTileKey key in _regions.Keys)
+        {
+            double minX = key.X * TileSizeMeters;
+            double minZ = key.Z * TileSizeMeters;
+            double maxX = minX + TileSizeMeters;
+            double maxZ = minZ + TileSizeMeters;
+            maximum = Math.Max(maximum, _curvedPatch.TangentSagMeters(minX, minZ));
+            maximum = Math.Max(maximum, _curvedPatch.TangentSagMeters(maxX, minZ));
+            maximum = Math.Max(maximum, _curvedPatch.TangentSagMeters(minX, maxZ));
+            maximum = Math.Max(maximum, _curvedPatch.TangentSagMeters(maxX, maxZ));
+        }
+        return maximum;
     }
 
     private void RecountWalkableCells()

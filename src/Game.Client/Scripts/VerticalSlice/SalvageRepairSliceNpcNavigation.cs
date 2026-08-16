@@ -418,7 +418,8 @@ public partial class SalvageRepairSlice
     {
         NpcNavigationSurfaceSnapshot snapshot = _npcNavigationSurface?.CreateSnapshot() ??
             new NpcNavigationSurfaceSnapshot(0, 25, 0, 0, 0, 0, 0, 0, 0, false,
-                new NpcNavigationTileKey(0, 0), Array.Empty<NpcNavigationTileKey>());
+                new NpcNavigationTileKey(0, 0), Array.Empty<NpcNavigationTileKey>(),
+                false, "flat", 0.0);
         _npcNavigationAcceptanceReport = new NpcNavigationAcceptanceReport(
             false,
             snapshot.ActiveRegions,

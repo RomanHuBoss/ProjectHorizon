@@ -67,7 +67,7 @@ need("PlanetPhysicalRadialFrame_MapsLogicalPointsAndVectorsThroughRotatingTangen
      "TASK-172 xUnit regression groups missing", f)
 need("ExpectedActiveChunks" in part and "ExpectedCollisionChunks" in part,
      "25/9 bounded-streamer guard missing from TASK-172 acceptance", f)
-need(version in {"0.1.0-alpha.172", "0.1.0-alpha.172.1"}, "VERSION not alpha.172/172.1", f)
+need(version in {"0.1.0-alpha.172", "0.1.0-alpha.172.1", "0.1.0-alpha.174"}, "VERSION not alpha.172/172.1/174", f)
 
 if f:
     print("TASK-172 PHYSICAL RADIAL SURFACE CONTRACT FAIL:")

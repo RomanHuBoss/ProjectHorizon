@@ -132,7 +132,15 @@ public partial class SalvageRepairSlice
         Color baseTop = ToColor(baseSky.SkyTopColor);
         Color baseHorizon = ToColor(baseSky.SkyHorizonColor);
         Color sunset = ToColor(PlanetSurfaceContentProfile.Environment.SunsetColor);
-        Color night = new(0.008f, 0.014f, 0.032f);
+        double atmosphere = PlanetSurfaceContentProfile.Environment.AtmosphereDensity;
+        // A dense atmosphere does not become space-black at the surface. Keep
+        // a low-luminance Rayleigh-like blue dome through astronomical night;
+        // truly airless bodies retain the near-black vacuum profile.
+        Color night = atmosphere >= 0.25
+            ? new Color(0.055f, 0.085f, 0.155f)
+                .Lerp(baseTop.Darkened(0.42f),
+                    (float)Math.Clamp(atmosphere / 1.6, 0.0, 0.38))
+            : new Color(0.006f, 0.010f, 0.026f);
         float daylight = (float)state.Daylight;
         float sunsetFactor = (float)Math.Clamp(
             1.0 - Math.Abs(state.SunElevationDegrees) / 18.0,
@@ -146,9 +154,17 @@ public partial class SalvageRepairSlice
         {
             _planetSurfaceSkyMaterial.Set("sky_top_color", top);
             _planetSurfaceSkyMaterial.Set("sky_horizon_color", horizon);
+            Color atmosphericGround = atmosphere >= 0.25
+                ? horizon.Lerp(top, 0.14f)
+                : horizon.Darkened(0.48f);
             _planetSurfaceSkyMaterial.Set(
                 "ground_horizon_color",
-                horizon.Darkened(0.48f));
+                atmosphericGround);
+            _planetSurfaceSkyMaterial.Set(
+                "ground_bottom_color",
+                atmosphere >= 0.25
+                    ? atmosphericGround.Lerp(top, 0.12f)
+                    : atmosphericGround.Darkened(0.58f));
             _planetSurfaceSkyMaterial.Set(
                 "sky_energy_multiplier",
                 (float)(0.12 + state.Daylight * 1.02));
@@ -164,8 +180,17 @@ public partial class SalvageRepairSlice
             environment.Set("fog_light_color", horizon.Lightened(0.08f));
             environment.Set(
                 "ambient_light_energy",
-                (float)(0.14 + state.Daylight * 0.76));
+                (float)((atmosphere >= 0.25 ? 0.22 : 0.10) + state.Daylight * 0.70));
             environment.Set("ambient_light_color", horizon);
+        }
+
+        if (_planetSurfacePhysicalFrameState is { } physicalFrame)
+        {
+            Vector3 skyUp = GetCurrentPlanetCurvedWorldUp();
+            Basis skyBasis = PlanetSurfacePhysicalFrameRuntime.BuildUprightBasis(
+                physicalFrame.WorldNorth,
+                skyUp);
+            ApplyPlanetSurfaceAtmosphereFrame(skyBasis);
         }
 
         DirectionalLight3D? sun = GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
@@ -200,7 +225,8 @@ public partial class SalvageRepairSlice
                 _planetSurfaceCloudRoot.Position = new Vector3(
                     (float)logicalPlayer.EastMeters +
                         Mathf.Sin(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18),
-                    0.0f,
+                    -(float)(CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
+                        logicalPlayer.EastMeters, logicalPlayer.NorthMeters) ?? 0.0),
                     (float)logicalPlayer.NorthMeters +
                         Mathf.Cos(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18));
             }

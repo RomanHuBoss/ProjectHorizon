@@ -569,16 +569,18 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
 
     public void ApplyWorldFrameTransform(
         Transform3D previousFrame,
-        Transform3D nextFrame)
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor? previousPatch = null,
+        PlanetSurfaceCurvedPatchDescriptor? nextPatch = null)
     {
-        _lastRequestedTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-            previousFrame, nextFrame, _lastRequestedTarget);
-        _progressAnchor = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-            previousFrame, nextFrame, _progressAnchor);
-        _recoveryTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-            previousFrame, nextFrame, _recoveryTarget);
-        _cachedBehaviorTarget = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-            previousFrame, nextFrame, _cachedBehaviorTarget);
+        Vector3 Map(Vector3 point) => previousPatch is not null && nextPatch is not null
+            ? PlanetSurfacePhysicalFrameRuntime.MapCurvedPoint(
+                previousFrame, nextFrame, point, previousPatch, nextPatch)
+            : PlanetSurfacePhysicalFrameRuntime.MapPoint(previousFrame, nextFrame, point);
+        _lastRequestedTarget = Map(_lastRequestedTarget);
+        _progressAnchor = Map(_progressAnchor);
+        _recoveryTarget = Map(_recoveryTarget);
+        _cachedBehaviorTarget = Map(_cachedBehaviorTarget);
         Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
             previousFrame.Basis.Orthonormalized(),
             nextFrame.Basis.Orthonormalized(),
@@ -586,8 +588,7 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         UpDirection = nextFrame.Basis.Y.Normalized();
         if (_navigationAgent is not null)
         {
-            _navigationAgent.TargetPosition = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-                previousFrame, nextFrame, _navigationAgent.TargetPosition);
+            _navigationAgent.TargetPosition = Map(_navigationAgent.TargetPosition);
         }
         _nextNavigationTargetRefreshAt = 0.0;
         _nextProgressCheckAt = 0.0;

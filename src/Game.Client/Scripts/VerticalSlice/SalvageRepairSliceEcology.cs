@@ -196,7 +196,8 @@ public partial class SalvageRepairSlice
                 spawn,
                 player,
                 _aerialSteeringRuntime,
-                CurrentTerrainProfile);
+                CurrentTerrainProfile,
+                CurrentPlanetSurfaceCurvedPatch);
             faunaNode.Observed += OnEcologyFaunaObserved;
             _ecologyRoot.AddChild(faunaNode);
             _ecologyFaunaNodes.Add(faunaNode);
@@ -277,7 +278,7 @@ public partial class SalvageRepairSlice
             // and z-fighting while keeping the plant harvestable.
             EcologyFloraPlacement terrainPlacement = placement with
             {
-                PositionY = SamplePlanetSurfaceHeight(
+                PositionY = SamplePlanetSurfacePhysicalHeight(
                     placement.PositionX,
                     placement.PositionZ)
             };
@@ -665,6 +666,41 @@ public partial class SalvageRepairSlice
             };
             _ecologyRoot.AddChild(instance);
             _ecologyFloraGroups.Add(new EcologyMultiMeshGroup(instance, placements));
+        }
+    }
+
+    private void AdjustEcologyFloraCurvatureAnchor(
+        PlanetSurfaceCurvedPatchDescriptor previousPatch,
+        PlanetSurfaceCurvedPatchDescriptor nextPatch)
+    {
+        // TASK-174: most flora is rendered through MultiMeshInstance3D rather
+        // than one Node3D per specimen. Those instance transforms therefore do
+        // not participate in the grouped Node3D curvature-anchor remap. Preserve
+        // each specimen's semantic terrain height explicitly when the floating
+        // tangent origin changes.
+        foreach (EcologyMultiMeshGroup group in _ecologyFloraGroups)
+        {
+            if (!GodotObject.IsInstanceValid(group.Node) ||
+                group.Node.Multimesh is not MultiMesh multiMesh)
+            {
+                continue;
+            }
+
+            int count = Math.Min(multiMesh.InstanceCount, group.Placements.Count);
+            for (int index = 0; index < count; index++)
+            {
+                EcologyFloraPlacement placement = group.Placements[index];
+                Transform3D transform = multiMesh.GetInstanceTransform(index);
+                double semanticHeight = transform.Origin.Y +
+                    previousPatch.TangentSagMeters(
+                        placement.PositionX, placement.PositionZ);
+                transform.Origin = new Vector3(
+                    transform.Origin.X,
+                    (float)(semanticHeight - nextPatch.TangentSagMeters(
+                        placement.PositionX, placement.PositionZ)),
+                    transform.Origin.Z);
+                multiMesh.SetInstanceTransform(index, transform);
+            }
         }
     }
 

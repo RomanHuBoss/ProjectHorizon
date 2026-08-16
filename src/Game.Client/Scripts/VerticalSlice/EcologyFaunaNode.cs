@@ -13,6 +13,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private Vector3 _wanderDirection = Vector3.Forward;
     private AerialSteeringRuntime? _aerialSteering;
     private PlanetSurfaceTerrainProfile? _terrainProfile;
+    private PlanetSurfaceCurvedPatchDescriptor? _curvedPatch;
     private float _weatherSpeedMultiplier = 1.0f;
     private Vector3 _weatherWindVelocity = Vector3.Zero;
 
@@ -75,7 +76,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         EcologyFaunaSpawn spawn,
         Node3D player,
         AerialSteeringRuntime? aerialSteering = null,
-        PlanetSurfaceTerrainProfile? terrainProfile = null)
+        PlanetSurfaceTerrainProfile? terrainProfile = null,
+        PlanetSurfaceCurvedPatchDescriptor? curvedPatch = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(spawn);
@@ -84,15 +86,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         _player = player;
         _aerialSteering = aerialSteering;
         _terrainProfile = terrainProfile;
+        _curvedPatch = curvedPatch;
         InstanceId = spawn.InstanceId;
         Name = spawn.InstanceId.Replace('.', '_');
         float initialY = (float)spawn.PositionY;
         float terrainFloorY = _terrainProfile is null
             ? 0.0f
-            : (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+            : (float)(PlanetSurfaceTerrainRuntime.SampleHeight(
                 _terrainProfile,
                 spawn.PositionX,
-                spawn.PositionZ);
+                spawn.PositionZ) -
+                (_curvedPatch?.TangentSagMeters(
+                    spawn.PositionX, spawn.PositionZ) ?? 0.0));
         if (string.Equals(definition.MovementMode, "Ground", StringComparison.Ordinal))
         {
             initialY = terrainFloorY + 0.75f;
@@ -537,8 +542,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
     public void ApplyWorldFrameTransform(
         Transform3D previousFrame,
-        Transform3D nextFrame)
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor? previousPatch = null,
+        PlanetSurfaceCurvedPatchDescriptor? nextPatch = null)
     {
+        if (previousPatch is not null && nextPatch is not null)
+        {
+            double semanticHomeY = _territoryCenter.Y +
+                previousPatch.TangentSagMeters(_territoryCenter.X, _territoryCenter.Z);
+            _territoryCenter.Y = (float)(semanticHomeY -
+                nextPatch.TangentSagMeters(_territoryCenter.X, _territoryCenter.Z));
+            _curvedPatch = nextPatch;
+        }
         Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
             previousFrame.Basis.Orthonormalized(),
             nextFrame.Basis.Orthonormalized(),
@@ -554,10 +569,11 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             return TerritoryCenterGlobal().Y;
         }
 
-        return (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+        return (float)(PlanetSurfaceTerrainRuntime.SampleHeight(
             _terrainProfile,
             Position.X,
-            Position.Z);
+            Position.Z) -
+            (_curvedPatch?.TangentSagMeters(Position.X, Position.Z) ?? 0.0));
     }
 
     private Vector3 TerritoryCenterGlobal() =>

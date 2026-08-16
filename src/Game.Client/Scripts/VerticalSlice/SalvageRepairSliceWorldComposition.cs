@@ -21,6 +21,8 @@ public partial class SalvageRepairSlice
     private string _surfacePresentationHotfixAcceptanceHud = "READY";
     private bool _planetSurfaceWorldCompositionReadyPrinted;
     private double _planetSurfaceCloudDrift;
+    private Vector3 _planetSurfaceSkyFrameUp = Vector3.Up;
+    private bool _planetSurfaceAtmosphereFrameAligned;
 
     private void InitializePlanetSurfaceWorldComposition()
     {
@@ -64,6 +66,7 @@ public partial class SalvageRepairSlice
         ClearStreamedSurfaceResources();
         _lastSurfaceResourceCenter = null;
         _planetSurfaceWorldCompositionReadyPrinted = false;
+        _planetCurvedSurfaceReadyPrinted = false;
         RefreshStreamedSurfaceResources(force: true);
     }
 
@@ -83,10 +86,21 @@ public partial class SalvageRepairSlice
         _planetSurfaceSkyMaterial = skyMaterial;
         skyMaterial.Set("sky_top_color", top);
         skyMaterial.Set("sky_horizon_color", horizon);
-        skyMaterial.Set("ground_bottom_color", groundHorizon.Darkened(0.62f));
-        skyMaterial.Set("ground_horizon_color", groundHorizon);
+        skyMaterial.Set(
+            "ground_bottom_color",
+            profile.AtmosphereEnabled
+                ? horizon.Lerp(top, 0.10f)
+                : groundHorizon.Darkened(0.52f));
+        skyMaterial.Set(
+            "ground_horizon_color",
+            profile.AtmosphereEnabled
+                ? horizon.Lerp(top, 0.16f)
+                : groundHorizon);
         skyMaterial.Set("sun_angle_max", 7.0f);
         skyMaterial.Set("sun_curve", 0.045f);
+        skyMaterial.Set("sky_curve", 0.18f);
+        skyMaterial.Set("ground_curve", 0.08f);
+        skyMaterial.Set("use_debanding", true);
         skyMaterial.Set(
             "sky_energy_multiplier",
             profile.AtmosphereEnabled ? 1.08f : 0.40f);
@@ -112,8 +126,11 @@ public partial class SalvageRepairSlice
         environment.Set("fog_aerial_perspective", 0.72f);
         environment.Set("fog_sun_scatter", (float)profile.FogSunScatter);
         environment.Set("fog_sky_affect", 0.32f);
-        environment.Set("fog_height", 18.0f);
-        environment.Set("fog_height_density", 0.025f);
+        // Height fog is global-Y based. A radial planet rotates local Up, so a
+        // height layer would become a vertical wall on +X/-X/+Z/-Z faces. Use
+        // isotropic exponential/aerial fog for surface atmosphere instead.
+        environment.Set("fog_height", 0.0f);
+        environment.Set("fog_height_density", 0.0f);
 
         double azimuth = profile.SunAzimuthDegrees * Math.PI / 180.0;
         double elevation = profile.SunElevationDegrees * Math.PI / 180.0;
@@ -134,13 +151,40 @@ public partial class SalvageRepairSlice
         sun.LightColor = ToColor(profile.SunColor);
         sun.LightEnergy = (float)profile.SunEnergy;
         sun.ShadowEnabled = true;
-        sun.Set("sky_mode", 0); // LIGHT_AND_SKY: expose the star to ProceduralSkyMaterial.
+        // TASK-174: the procedural sky is rotated with radial Up. Godot rotates
+        // its procedural sun disk with sky_rotation too, which would diverge
+        // from the actual directional light. Keep lighting only here; the
+        // explicit PlanetSurfaceSunVisual is the canonical stellar disc.
+        sun.Set("sky_mode", 1); // LIGHT_ONLY
         sun.Set("light_angular_distance", (float)profile.SunAngularDiameterDegrees);
         sun.Set("directional_shadow_max_distance", 320.0f);
         sun.Set("directional_shadow_fade_start", 0.82f);
         Vector3 lightRay = -SurfaceLocalDirectionToWorld(towardSun).Normalized();
         sun.Position = Vector3.Zero;
         sun.LookAt(lightRay, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
+        Basis surfaceBasis = _planetSurfacePhysicalFrameState?.SurfaceBasis ??
+            (GetNodeOrNull<Node3D>("Gameplay")?.GlobalTransform.Basis ?? Basis.Identity);
+        ApplyPlanetSurfaceAtmosphereFrame(surfaceBasis);
+    }
+
+    private void ApplyPlanetSurfaceAtmosphereFrame(Basis surfaceBasis)
+    {
+        WorldEnvironment? world = GetNodeOrNull<WorldEnvironment>(
+            "WorldEnvironment");
+        if (world?.Environment is not Godot.Environment environment)
+        {
+            return;
+        }
+
+        Basis radialBasis = surfaceBasis.Orthonormalized();
+        Vector3 up = radialBasis.Y.Normalized();
+        // Environment.sky_rotation rotates ProceduralSkyMaterial's sky/ground
+        // hemisphere. Without this, a +X radial surface sees Godot's global-Y
+        // horizon as a vertical half-screen day/night-looking seam.
+        environment.Set("sky_rotation", radialBasis.GetEuler());
+        environment.Set("fog_height_density", 0.0f);
+        _planetSurfaceSkyFrameUp = up;
+        _planetSurfaceAtmosphereFrameAligned = true;
     }
 
     private void EnsurePlanetSurfaceSunVisual(
@@ -359,7 +403,8 @@ public partial class SalvageRepairSlice
                 _planetSurfaceCloudRoot.Position = new Vector3(
                     (float)logicalPlayer.EastMeters +
                         (float)Math.Sin(_planetSurfaceCloudDrift * 0.007) * 8.0f,
-                    0.0f,
+                    -(float)(CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
+                        logicalPlayer.EastMeters, logicalPlayer.NorthMeters) ?? 0.0),
                     (float)logicalPlayer.NorthMeters +
                         (float)Math.Cos(_planetSurfaceCloudDrift * 0.006) * 6.0f);
             }
@@ -510,7 +555,8 @@ public partial class SalvageRepairSlice
             ResourceDefinitionId = definition.ResourceId,
             Position = new Vector3(
                 (float)placement.PositionX,
-                (float)placement.PositionY + 0.38f,
+                (float)SamplePlanetSurfacePhysicalHeight(
+                    placement.PositionX, placement.PositionZ) + 0.38f,
                 (float)placement.PositionZ),
             RotationDegrees = new Vector3(
                 0.0f,

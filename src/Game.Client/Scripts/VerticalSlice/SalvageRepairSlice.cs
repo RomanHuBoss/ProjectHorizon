@@ -793,7 +793,9 @@ public partial class SalvageRepairSlice : Node3D
         UpdateStarSystemSimulation(delta);
         UpdatePlanetSurfaceFrame();
         UpdatePlanetRadialSurfaceRuntime();
+        UpdatePlanetCurvedSurfacePlayerUp();
         UpdatePlanetSurfaceStreaming();
+        UpdatePlanetCurvedSurfaceRuntime();
         UpdatePlanetSurfaceWorldComposition(delta);
         UpdatePlanetWeather(delta);
         UpdateEcology(delta);
@@ -4467,7 +4469,7 @@ public partial class SalvageRepairSlice : Node3D
             gridZ,
             new Vector3(
                 (float)(gridX * gridSize),
-                (float)SamplePlanetSurfaceHeight(
+                (float)SamplePlanetSurfacePhysicalHeight(
                     gridX * gridSize,
                     gridZ * gridSize) + 0.11f,
                 (float)(gridZ * gridSize)));
@@ -4684,7 +4686,7 @@ public partial class SalvageRepairSlice : Node3D
                 BaseConstructionCatalog.GetModule(placement.ModuleId),
                 placement,
                 BaseConstructionCatalog.GridSizeMeters,
-                SamplePlanetSurfaceHeight(moduleX, moduleZ) + 0.11);
+                SamplePlanetSurfacePhysicalHeight(moduleX, moduleZ) + 0.11);
             _baseConstructionModulesRoot.AddChild(node);
         }
         RefreshNpcNavigationObstacles();
@@ -5521,6 +5523,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetaryGlobeAcceptance();
         RunPlanetRadialSurfaceAcceptance();
         RunPlanetSurfacePhysicalFrameAcceptance();
+        RunPlanetCurvedSurfaceAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5531,7 +5534,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7629,6 +7632,7 @@ public partial class SalvageRepairSlice : Node3D
         string planetaryGlobeLine = BuildPlanetaryGlobeHudLine();
         string planetRadialSurfaceLine = BuildPlanetRadialSurfaceHudLine();
         string planetPhysicalSurfaceLine = BuildPlanetSurfacePhysicalFrameHudLine();
+        string planetCurvedSurfaceLine = BuildPlanetCurvedSurfaceHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7674,6 +7678,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-168 (F5): {_planetaryGlobeAcceptanceHud}",
             $"TASK-170 (F5): {_planetRadialSurfaceAcceptanceHud}",
             $"TASK-172 (F5): {_planetSurfacePhysicalFrameAcceptanceHud}",
+            $"TASK-174 (F5): {_planetCurvedSurfaceAcceptanceHud}",
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
@@ -7711,6 +7716,7 @@ public partial class SalvageRepairSlice : Node3D
                 planetaryGlobeLine,
                 planetRadialSurfaceLine,
                 planetPhysicalSurfaceLine,
+                planetCurvedSurfaceLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7764,6 +7770,7 @@ public partial class SalvageRepairSlice : Node3D
             planetaryGlobeLine,
             planetRadialSurfaceLine,
             planetPhysicalSurfaceLine,
+            planetCurvedSurfaceLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

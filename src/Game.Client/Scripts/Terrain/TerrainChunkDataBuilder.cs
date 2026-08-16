@@ -21,7 +21,9 @@ public sealed class TerrainChunkBuildRequest
         bool rebuildCollision,
         TerrainEdgeStitchMask stitchMask,
         TerrainEdgeStitchMask skirtMask,
-        PlanetSurfaceTerrainProfile? planetSurfaceProfile = null)
+        PlanetSurfaceTerrainProfile? planetSurfaceProfile = null,
+        PlanetSurfaceCurvedPatchDescriptor? curvedPatch = null,
+        int curvatureRevision = 0)
     {
         ChunkX = chunkX;
         ChunkZ = chunkZ;
@@ -38,6 +40,8 @@ public sealed class TerrainChunkBuildRequest
         StitchMask = stitchMask;
         SkirtMask = skirtMask;
         PlanetSurfaceProfile = planetSurfaceProfile;
+        CurvedPatch = curvedPatch;
+        CurvatureRevision = Math.Max(0, curvatureRevision);
     }
 
     public int ChunkX { get; }
@@ -69,6 +73,10 @@ public sealed class TerrainChunkBuildRequest
     public TerrainEdgeStitchMask SkirtMask { get; }
 
     public PlanetSurfaceTerrainProfile? PlanetSurfaceProfile { get; }
+
+    public PlanetSurfaceCurvedPatchDescriptor? CurvedPatch { get; }
+
+    public int CurvatureRevision { get; }
 
     private static int NormalizeResolution(int requestedResolution)
     {
@@ -198,7 +206,7 @@ public static class TerrainChunkDataBuilder
                 float sampleZ = request.PlanetSurfaceProfile is null
                     ? (request.ChunkZ * request.ChunkSize) + (z * cellSize)
                     : (request.ChunkZ * request.ChunkSize) + localZ;
-                float height = SampleHeight(
+                float height = SampleSurfaceHeight(
                     request,
                     noise,
                     sampleX,
@@ -346,6 +354,27 @@ public static class TerrainChunkDataBuilder
         return noise.GetNoise2D(sampleX, sampleZ) * request.HeightScale;
     }
 
+
+    private static float SampleSurfaceHeight(
+        TerrainChunkBuildRequest request,
+        FastNoiseLite? noise,
+        float sampleX,
+        float sampleZ)
+    {
+        float terrainHeight = SampleHeight(
+            request,
+            noise,
+            sampleX,
+            sampleZ);
+        if (request.CurvedPatch is null)
+        {
+            return terrainHeight;
+        }
+        return terrainHeight - (float)request.CurvedPatch.TangentSagMeters(
+            sampleX,
+            sampleZ);
+    }
+
     private static Vector3 CalculateGlobalNormal(
         TerrainChunkBuildRequest request,
         FastNoiseLite? noise,
@@ -353,22 +382,22 @@ public static class TerrainChunkDataBuilder
         float sampleZ,
         float sampleStep)
     {
-        float left = SampleHeight(
+        float left = SampleSurfaceHeight(
             request,
             noise,
             sampleX - sampleStep,
             sampleZ);
-        float right = SampleHeight(
+        float right = SampleSurfaceHeight(
             request,
             noise,
             sampleX + sampleStep,
             sampleZ);
-        float north = SampleHeight(
+        float north = SampleSurfaceHeight(
             request,
             noise,
             sampleX,
             sampleZ - sampleStep);
-        float south = SampleHeight(
+        float south = SampleSurfaceHeight(
             request,
             noise,
             sampleX,

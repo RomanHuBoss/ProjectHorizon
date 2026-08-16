@@ -22,7 +22,7 @@ need('class PlanetSurfaceTopologyRuntime' in top and 'CircumferenceMeters' in to
 need('NormalizeLatitudeLongitude' in top and 'WrapLongitudeDegrees' in top, 'pole/longitude normalization missing', f)
 need('CubeSphereMeshBuilder.Build' in globe and 'FaceResolution = 17' in globe and 'AtmosphereShell' in globe, 'detailed cube-sphere globe missing', f)
 need('PreparedDetailedGlobeCount' in star and 'detailedPlanetRequested: true' in star and 'EnsureDetailedGlobe' in star, 'single detailed live globe integration missing', f)
-need('TangentSagMeters(radialDistance)' in terrain, 'distant terrain curvature missing', f)
+need(('TangentSagMeters(radialDistance)' in terrain or 'PlanetSurfaceCurvedPatchDescriptor' in terrain), 'distant terrain curvature missing', f)
 need('GreatCircleDistanceMeters' in mapcs and 'Lat/Lon:' in mapcs, 'planet map geodesy missing', f)
 need('PlanetSurfaceTopologyRuntime topology = new(planetRadiusKm)' in stream, 'streaming geodesic address not promoted', f)
 need('RunPlanetaryGlobeAcceptance();' in main and 'TASK-168 (F5)' in main and 'planetaryGlobeLine' in main, 'TASK-168 F5/HUD wiring missing', f)

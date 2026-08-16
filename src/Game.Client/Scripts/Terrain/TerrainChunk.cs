@@ -88,6 +88,8 @@ public partial class TerrainChunk : StaticBody3D
     public TerrainEdgeStitchMask SkirtMask { get; private set; } =
         TerrainEdgeStitchMask.All;
 
+    public int CurvatureRevision { get; private set; }
+
     public bool HasGeneratedVisualMesh => _meshInstance?.Mesh is not null;
 
     public bool HasGeneratedCollisionShape =>
@@ -102,6 +104,7 @@ public partial class TerrainChunk : StaticBody3D
     private MeshInstance3D? _meshInstance;
     private MeshInstance3D? _debugOverlay;
     private CollisionShape3D? _collisionShape;
+    private bool _runtimeCollisionEnabled = true;
     private TerrainMeshData? _lastTopSurface;
 
     public override void _Ready()
@@ -135,6 +138,7 @@ public partial class TerrainChunk : StaticBody3D
         bool generateCollision,
         TerrainEdgeStitchMask stitchMask,
         TerrainEdgeStitchMask skirtMask,
+        int curvatureRevision,
         TerrainDebugViewMode debugViewMode,
         bool showWorldGrid,
         bool showWireframe,
@@ -156,6 +160,7 @@ public partial class TerrainChunk : StaticBody3D
         GenerateCollision = generateCollision;
         StitchMask = stitchMask;
         SkirtMask = skirtMask;
+        CurvatureRevision = Math.Max(0, curvatureRevision);
         DebugViewMode = debugViewMode;
         ShowWorldGrid = showWorldGrid;
         ShowWireframe = showWireframe;
@@ -202,7 +207,8 @@ public partial class TerrainChunk : StaticBody3D
         int visualResolution,
         bool generateCollision,
         TerrainEdgeStitchMask stitchMask,
-        TerrainEdgeStitchMask skirtMask)
+        TerrainEdgeStitchMask skirtMask,
+        int curvatureRevision)
     {
         int normalizedResolution = NormalizeResolution(visualResolution);
 
@@ -210,7 +216,8 @@ public partial class TerrainChunk : StaticBody3D
             EffectiveResolution != normalizedResolution ||
             GenerateCollision != generateCollision ||
             StitchMask != stitchMask ||
-            SkirtMask != skirtMask;
+            SkirtMask != skirtMask ||
+            CurvatureRevision != Math.Max(0, curvatureRevision);
     }
 
     public void ApplyGeneratedData(
@@ -292,7 +299,17 @@ public partial class TerrainChunk : StaticBody3D
         ConcavePolygonShape3D collisionShape = collisionMesh.CreateTrimeshShape();
         collisionShape.BackfaceCollision = true;
         _collisionShape.Shape = collisionShape;
-        _collisionShape.Disabled = false;
+        _collisionShape.Disabled = !_runtimeCollisionEnabled;
+    }
+
+    public void SetRuntimeCollisionEnabled(bool enabled)
+    {
+        _runtimeCollisionEnabled = enabled;
+        if (_collisionShape is not null)
+        {
+            _collisionShape.Disabled = !enabled || !GenerateCollision ||
+                _collisionShape.Shape is null;
+        }
     }
 
     private void PopulateDiagnosticColors(TerrainMeshData data)

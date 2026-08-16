@@ -76,6 +76,21 @@ public sealed class PlanetSurfacePhysicalFrameRuntime
         return nextFrame * logical;
     }
 
+    public static Vector3 MapCurvedPoint(
+        Transform3D previousFrame,
+        Transform3D nextFrame,
+        Vector3 worldPoint,
+        PlanetSurfaceCurvedPatchDescriptor previousPatch,
+        PlanetSurfaceCurvedPatchDescriptor nextPatch)
+    {
+        Vector3 logical = previousFrame.AffineInverse() * worldPoint;
+        double semanticHeight = logical.Y + previousPatch.TangentSagMeters(
+            logical.X, logical.Z);
+        logical.Y = (float)(semanticHeight - nextPatch.TangentSagMeters(
+            logical.X, logical.Z));
+        return nextFrame * logical;
+    }
+
     public static Vector3 MapVector(
         Basis previousBasis,
         Basis nextBasis,

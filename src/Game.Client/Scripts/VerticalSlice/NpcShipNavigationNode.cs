@@ -133,12 +133,17 @@ public partial class NpcShipNavigationNode : CharacterBody3D
 
     public void ApplyWorldFrameTransform(
         Transform3D previousFrame,
-        Transform3D nextFrame)
+        Transform3D nextFrame,
+        PlanetSurfaceCurvedPatchDescriptor? previousPatch = null,
+        PlanetSurfaceCurvedPatchDescriptor? nextPatch = null)
     {
         for (int index = 0; index < _route.Length; index++)
         {
-            _route[index] = PlanetSurfacePhysicalFrameRuntime.MapPoint(
-                previousFrame, nextFrame, _route[index]);
+            _route[index] = previousPatch is not null && nextPatch is not null
+                ? PlanetSurfacePhysicalFrameRuntime.MapCurvedPoint(
+                    previousFrame, nextFrame, _route[index], previousPatch, nextPatch)
+                : PlanetSurfacePhysicalFrameRuntime.MapPoint(
+                    previousFrame, nextFrame, _route[index]);
         }
         Velocity = PlanetSurfacePhysicalFrameRuntime.MapVector(
             previousFrame.Basis.Orthonormalized(),
