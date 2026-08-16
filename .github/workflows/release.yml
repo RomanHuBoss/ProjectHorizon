@@ -88,6 +88,7 @@ jobs:
           python3 tools/validate-task1761-aerial-altitude-runtime-hotfix.py
           python3 tools/validate-task178-spaceflight-navigation-subsystem.py
           python3 tools/validate-task1781-pilot-input-ownership-hotfix.py
+          python3 tools/validate-task1782-orbital-navigation-presentation.py
 
       - name: Unit tests and coverage
         run: >-

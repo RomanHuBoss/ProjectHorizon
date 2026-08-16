@@ -19,7 +19,7 @@ aerial = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAerialNav
 tests = text("tests/ProjectHorizon.Tests/Architecture/Section38ArchitectureTests.cs")
 version = text("VERSION").strip()
 
-need(version in {"0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1"}, "VERSION must be alpha.176.1/178", failures)
+need(version in {"0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2"}, "VERSION must be alpha.176.1/178", failures)
 need("ClampHorizontalAndVerticalSpeed" in steering and
      "horizontal = horizontal.Normalized() * maximumHorizontalSpeed" in steering and
      "Math.Clamp(localVelocity.Y, -maximumVerticalSpeed, maximumVerticalSpeed)" in steering,

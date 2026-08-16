@@ -596,8 +596,8 @@ public partial class SalvageRepairSlice : Node3D
             "journal on foot, I for exosuit/multitool and U for ship management. " +
             "Shift sprints, Ctrl crouches and holding Space airborne uses the jetpack. Station Services keeps " +
             "Q for its legacy quest tab. After starter repair press E on the ship to board; " +
-            "T launches or undocks, K toggles navigation assist, Enter docks " +
-            "or lands, and E opens services or disembarks. Press M for the " +
+            "T launches or undocks, K toggles navigation assist with automatic docking/landing, Enter docks " +
+            "or lands manually, and E opens services or disembarks. Press M for the " +
             "system/galaxy map.");
         GD.Print(
             "TASK-090 production queue READY: " +
@@ -668,7 +668,7 @@ public partial class SalvageRepairSlice : Node3D
             "loop=repair>board>takeoff>orbital_station>return>land; " +
             "shipStats=live-derived; fuel=takeoff+dock+undock+landing; " +
             "readiness=ship-systems; persistence=enabled; F5=acceptance; " +
-            "controls=E board/services/disembark,Enter dock/land,T launch/undock,K assist,F2 camera.");
+            "controls=E board/services/disembark,Enter manual-dock/land,T launch/undock,K auto-assist,F2 camera.");
         GD.Print(
             "TASK-114 galaxy navigation READY: " +
             $"galaxy={GalaxyNavigation.CurrentSystem.GalaxyId}; " +
@@ -798,8 +798,10 @@ public partial class SalvageRepairSlice : Node3D
         UpdatePlanetCurvedSurfaceRuntime();
         UpdatePlanetSurfaceWorldComposition(delta);
         UpdatePlanetWeather(delta);
+        UpdateWorldSceneEnvironmentPresentation();
         UpdatePlanetSurfaceSubsystemRuntime();
         UpdateSpaceflightNavigationSubsystemRuntime();
+        UpdateOrbitalNavigationPresentationRuntime();
         UpdateSpaceflightNavigationSubsystemAcceptance();
         UpdateEcology(delta);
         UpdateAerialNavigation(delta);
@@ -5532,6 +5534,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetSurfaceFrameAcceptance();
         RunPlanetSurfaceSubsystemAcceptance();
         RunWorldSceneCoordinatorAcceptance();
+        RunOrbitalNavigationPresentationAcceptance();
         RequestSpaceflightNavigationSubsystemAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5541,7 +5544,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6727,7 +6730,8 @@ public partial class SalvageRepairSlice : Node3D
             _npcFactionAcceptanceReport is null ||
             _npcNavigationAcceptanceReport is null ||
             _aerialNavigationAcceptanceReport is null ||
-            _spaceflightNavigationSubsystemAcceptancePassed is null)
+            _spaceflightNavigationSubsystemAcceptancePassed is null ||
+            _orbitalNavigationPresentationAcceptancePassed is null)
         {
             return;
         }
@@ -6742,13 +6746,14 @@ public partial class SalvageRepairSlice : Node3D
             _npcFactionAcceptanceReport.Passed &&
             _npcNavigationAcceptanceReport.Passed &&
             _aerialNavigationAcceptanceReport.Passed &&
-            _spaceflightNavigationSubsystemAcceptancePassed == true;
+            _spaceflightNavigationSubsystemAcceptancePassed == true &&
+            _orbitalNavigationPresentationAcceptancePassed == true;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7692,6 +7697,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-178 (F5): {_spaceflightNavigationSubsystemAcceptanceHud}",
+            $"TASK-178.2 (F5): {_orbitalNavigationPresentationAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",

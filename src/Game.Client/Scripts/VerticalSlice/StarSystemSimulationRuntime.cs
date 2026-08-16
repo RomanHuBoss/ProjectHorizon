@@ -72,9 +72,18 @@ public sealed record StarSystemSimulationSnapshot(
 
 public sealed class StarSystemSimulationRuntime
 {
-    public const double OrbitTimeScale = 120.0;
-    public const double ProxyDistance = 180.0;
-    public const double MarkerDistance = 420.0;
+    // TASK-178.2: the previous 120x clock made a 110 s moon complete an
+    // apparent orbit in under one real second. The runtime clock now advances
+    // at real time; authored orbital periods provide the deliberate gameplay
+    // compression without turning the system into a centrifuge.
+    public const double OrbitTimeScale = 1.0;
+    public const double ProxyDistance = 4200.0;
+    public const double MarkerDistance = 8000.0;
+    public const double MinimumPlanetOrbitRadius = 1800.0;
+    public const double PlanetOrbitSpacing = 1200.0;
+    public const double MinimumMoonOrbitRadius = 520.0;
+    public const double MoonOrbitSpacing = 320.0;
+    public const double MinimumMoonOrbitPeriodSeconds = 1800.0;
     public const int MaximumShipContacts = 16;
 
     private readonly GalaxySystemDefinition _system;
@@ -287,25 +296,26 @@ public sealed class StarSystemSimulationRuntime
             0.0,
             0.0,
             0.0,
-            10.0,
+            420.0,
             starSeed);
 
         foreach (GalaxyPlanetDefinition planet in system.Planets
                      .OrderBy(item => item.OrbitIndex))
         {
             ulong hash = Mix((ulong)Math.Max(1L, planet.Seed));
-            double orbitRadius = 90.0 + ((planet.OrbitIndex - 1) * 86.0) +
-                ((hash & 0xFUL) * 1.25);
-            double period = 950.0 + (planet.OrbitIndex * 620.0) +
-                ((hash >> 8) % 400UL);
+            double orbitRadius = MinimumPlanetOrbitRadius +
+                ((planet.OrbitIndex - 1) * PlanetOrbitSpacing) +
+                ((hash & 0xFUL) * 12.0);
+            double period = 7200.0 + (planet.OrbitIndex * 4200.0) +
+                ((hash >> 8) % 1800UL);
             double phase = ToUnit(hash >> 16) * Math.PI * 2.0;
-            double inclination = (ToUnit(hash >> 24) - 0.5) * 0.14;
+            double inclination = (ToUnit(hash >> 24) - 0.5) * 0.10;
             double visualRadius = string.Equals(
                     planet.Archetype,
                     "gas_giant",
                     StringComparison.Ordinal)
-                ? 7.0
-                : 3.2 + ((hash >> 32) % 18UL) / 10.0;
+                ? 300.0
+                : 150.0 + ((hash >> 32) % 61UL);
             yield return new StarSystemBodyDefinition(
                 planet.PlanetId,
                 starId,
@@ -328,11 +338,13 @@ public sealed class StarSystemSimulationRuntime
                     planet.PlanetId,
                     StarSystemBodyKind.Moon,
                     "moon",
-                    9.0 + (moonIndex * 5.5) + ((moonHash & 0x3UL) * 0.5),
-                    110.0 + (moonIndex * 55.0) + ((moonHash >> 9) % 40UL),
+                    MinimumMoonOrbitRadius + (moonIndex * MoonOrbitSpacing) +
+                        ((moonHash & 0x3UL) * 8.0),
+                    MinimumMoonOrbitPeriodSeconds + (moonIndex * 900.0) +
+                        ((moonHash >> 9) % 420UL),
                     ToUnit(moonHash >> 17) * Math.PI * 2.0,
-                    (ToUnit(moonHash >> 25) - 0.5) * 0.32,
-                    0.8 + ((moonHash >> 31) % 8UL) / 10.0,
+                    (ToUnit(moonHash >> 25) - 0.5) * 0.20,
+                    28.0 + ((moonHash >> 31) % 15UL),
                     (long)(moonHash & 0x7FFF_FFFF_FFFF_FFFFUL));
             }
         }
@@ -356,11 +368,11 @@ public sealed class StarSystemSimulationRuntime
                 stationPlanet.PlanetId,
                 StarSystemBodyKind.Station,
                 stationArchetypes[index % stationArchetypes.Length],
-                18.0 + (index * 7.0),
-                80.0 + (index * 30.0),
+                82.0 + (index * 30.0),
+                480.0 + (index * 180.0),
                 ToUnit(stationHash) * Math.PI * 2.0,
                 0.04 + (index * 0.02),
-                2.4 + index,
+                7.5 + (index * 1.5),
                 (long)(stationHash & 0x7FFF_FFFF_FFFF_FFFFUL));
         }
 
@@ -379,11 +391,11 @@ public sealed class StarSystemSimulationRuntime
                 StarSystemBodyKind.ShipContact,
                 index % 4 == 0 ? "security" :
                 index % 3 == 0 ? "trader" : "civilian",
-                6.0 + ((shipHash >> 8) % 14UL),
-                35.0 + ((shipHash >> 15) % 45UL),
+                24.0 + ((shipHash >> 8) % 22UL),
+                120.0 + ((shipHash >> 15) % 120UL),
                 ToUnit(shipHash >> 23) * Math.PI * 2.0,
                 (ToUnit(shipHash >> 31) - 0.5) * 0.5,
-                0.45,
+                0.85,
                 (long)(shipHash & 0x7FFF_FFFF_FFFF_FFFFUL));
         }
     }

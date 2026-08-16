@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.178.2] - 2026-08-16
+
+### Fixed — orbital navigation and presentation
+- `K` navigation assist now completes the docking/landing transaction once capture range and safe speed are reached instead of braking indefinitely just outside the capture sphere; manual `Enter` docking/landing remains available.
+- Orbital-station docking now transitions into a populated, lit hangar shell and opens station services; the physical station has explicit approach guides and a dock light.
+- The system simulation no longer runs moons at the former 120x clock. Orbit simulation advances at 1x, moon periods are measured in tens of minutes, and moon/planet orbit radii are separated by hundreds/thousands of gameplay metres.
+- Planet/star/moon presentation scale is rebuilt so a ~6 m ship cannot read as a planet-scale object; the focused planet is positioned as a large orbital backdrop rather than a small sphere near the station.
+- Statistical station and ship-contact proxies are suppressed whenever the corresponding physical orbital station/NPC traffic is resident, eliminating duplicate local objects.
+- Orbit/interplanetary/station/hyperspace contexts now override the surface weather sky with explicit dark, fog-free environment profiles and restore the atmospheric sky when returning to Surface.
+
+### Added — TASK-178.2
+- Added aggregate orbital-navigation/presentation acceptance for orbital cadence, planet/moon spacing, visual hierarchy, automatic dock capture, local-proxy policy, non-surface environment and station interior.
+- Added xUnit and section-37/CI/release regression gates.
+
+### External evidence synchronized
+- Alpha.178.1 manual-control hotfix is verified by the owner run: boarding reports `parked=1; physics=0`; takeoff reports `navigationAssist=0; manualControl=1; externalControl=0`, and the ship was manually flown to the orbital station.
+
 ## [0.1.0-alpha.178.1] - 2026-08-16
 
 ### Fixed

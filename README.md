@@ -15,6 +15,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.2 — Orbital Navigation & Presentation Repair
+
+Alpha.178.2 fixes the first real orbital-flight defects exposed after manual control was restored. `K` is now a complete navigation assist: it approaches the Stage-1 station/landing target, sheds excess speed, creeps into the capture envelope and automatically executes docking/landing; `Enter` remains the manual transaction key. Successful station docking switches the world coordinator into a lit hangar shell and opens station services.
+
+The star-system view is rescaled as a deliberate compressed astronomical presentation instead of the former metre-scale toy model. The simulation clock is 1x rather than 120x, moons have much larger orbit radii and multi-minute periods, planets are separated by kilometre-scale gameplay distances, and star/planet/moon visual radii maintain an explicit hierarchy. Both ship cameras now retain a 12 km far plane so the expanded system presentation remains visible. The focused planet is placed behind/below the local flight scene as a large orbital backdrop. Statistical station/traffic proxies are hidden while the physical station and NPC ships are resident, preventing duplicate local objects. Orbit, interplanetary, station-interior and hyperspace contexts also get explicit dark fog-free environment profiles so the planetary blue atmosphere cannot leak into space. F5 now includes `TASK-178.2 orbital navigation/presentation acceptance`.
+
 ## TASK-178.1 — Pilot Input Ownership Hotfix
 
 Alpha.178.1 fixes the player-facing control regression discovered after TASK-178. Boarding a repaired ship on the planet previously set a neutral **external** command while leaving ship physics and atmospheric safety active. External control overrides `ReadManualCommand()`, so mouse/WASD were ignored while atmosphere recovery/minimum-speed logic could still move the ship. Parked/docked states now use an explicit physics-off control lock. Press `T` to launch/undock; after the transition the player owns mouse/keyboard control immediately. `K` toggles navigation assist explicitly. TASK-178 F5 acceptance now reports and requires `pilotControl=1`.

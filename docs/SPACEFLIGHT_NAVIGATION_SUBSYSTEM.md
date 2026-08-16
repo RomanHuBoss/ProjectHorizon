@@ -47,3 +47,16 @@ For manual cross-system smoke after F5: repair/commission the ship, reach the or
 ## TASK-178.1 pilot-control ownership
 
 The live closure additionally requires `pilotControl=1`. Unpiloted ships must have pilot control disabled; piloted surface/station ships must be parked with physics off and no external command; manual flight must expose `ManualInputOwnershipActive`; navigation assist may own external control only when explicitly enabled by the player.
+
+
+## TASK-178.2 orbital navigation and presentation
+
+External manual flight exposed three presentation/integration gaps that the original TASK-178 closure did not measure: navigation assist could stop outside the station capture sphere without executing `TryDock`, the star-system model used a 120x simulation clock with metre-scale planetary/moon orbits, and non-surface world shells inherited the surface atmospheric `WorldEnvironment`.
+
+TASK-178.2 makes `K` a complete assist transaction for the Stage-1 station/planet target. It brakes only while speed must be shed, then applies low forward thrust until the existing range+speed capture contract is true and invokes docking/landing automatically. `Enter` still performs the same transaction manually. Docking switches to `StationInterior`, parks the ship at the canonical dock pose, loads a lit hangar shell and opens the station-services UI.
+
+The system presentation now uses a 1x simulation clock, kilometre-scale compressed planet spacing, moon orbits measured in hundreds of metres and periods measured in tens of minutes, and explicit star/planet/moon visual-size hierarchy. The focused planet is presented as an orbital backdrop; local station/ship statistical proxies are suppressed because physical counterparts already exist.
+
+Finally, `WorldSceneEnvironmentPresentationRuntime` owns non-surface environment profiles. Orbit, interplanetary transit, hyperspace and station interior are dark/fog-free and can no longer inherit the blue surface atmosphere. Returning to Surface reconstructs the atmospheric sky and reapplies the current deterministic weather state.
+
+F5 `TASK-178.2` requires: `orbitClock=1`, `planetSpacing=1`, `moonCadence=1`, `visualHierarchy=1`, `assistDock=1`, `localProxyPolicy=1`, `spaceEnvironment=1`, and `stationInterior=1`.

@@ -69,10 +69,37 @@ roughness = 0.34
 
 [sub_resource type="BoxMesh" id="OrbitalStationMesh"]
 material = SubResource("OrbitalStationMaterial")
-size = Vector3(36, 10, 24)
+size = Vector3(54, 16, 38)
 
 [sub_resource type="BoxShape3D" id="OrbitalStationShape"]
-size = Vector3(36, 10, 24)
+size = Vector3(54, 16, 38)
+
+[sub_resource type="StandardMaterial3D" id="OrbitalStationAccentMaterial"]
+albedo_color = Color(0.08, 0.58, 0.92, 1)
+emission_enabled = true
+emission = Color(0.04, 0.38, 0.88, 1)
+emission_energy_multiplier = 2.2
+metallic = 0.42
+roughness = 0.24
+
+[sub_resource type="BoxMesh" id="OrbitalStationArmMesh"]
+material = SubResource("OrbitalStationMaterial")
+size = Vector3(34, 2.2, 11)
+
+[sub_resource type="BoxMesh" id="OrbitalStationSpineMesh"]
+material = SubResource("OrbitalStationMaterial")
+size = Vector3(10, 28, 58)
+
+[sub_resource type="BoxMesh" id="OrbitalStationGuideMesh"]
+material = SubResource("OrbitalStationAccentMaterial")
+size = Vector3(16, 0.55, 0.7)
+
+[sub_resource type="BoxMesh" id="OrbitalStationTunnelWallMesh"]
+material = SubResource("OrbitalStationMaterial")
+size = Vector3(2.2, 12, 38)
+
+[sub_resource type="BoxShape3D" id="OrbitalStationTunnelWallShape"]
+size = Vector3(2.2, 12, 38)
 
 [sub_resource type="StandardMaterial3D" id="DockBeaconMaterial"]
 albedo_color = Color(0.08, 0.72, 1, 1)
@@ -81,12 +108,12 @@ emission = Color(0.05, 0.65, 1, 1)
 emission_energy_multiplier = 5.0
 roughness = 0.18
 
-[sub_resource type="SphereMesh" id="DockBeaconMesh"]
+[sub_resource type="TorusMesh" id="DockBeaconMesh"]
 material = SubResource("DockBeaconMaterial")
-radius = 2.2
-height = 4.4
-radial_segments = 20
-rings = 12
+inner_radius = 3.8
+outer_radius = 4.5
+rings = 32
+ring_segments = 16
 
 [sub_resource type="StandardMaterial3D" id="PlanetApproachMaterial"]
 albedo_color = Color(0.18, 1, 0.42, 0.75)
@@ -192,7 +219,7 @@ StartPilotEnabled = false
 AllowRuntimeReset = false
 
 [node name="OrbitalStation" type="StaticBody3D" parent="Gameplay"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, -145)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 35, -155)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
 mesh = SubResource("OrbitalStationMesh")
@@ -200,14 +227,51 @@ mesh = SubResource("OrbitalStationMesh")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
 shape = SubResource("OrbitalStationShape")
 
+[node name="LeftArm" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-43, 0, 1)
+mesh = SubResource("OrbitalStationArmMesh")
+
+[node name="RightArm" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(43, 0, 1)
+mesh = SubResource("OrbitalStationArmMesh")
+
+[node name="Spine" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, 0, -3)
+mesh = SubResource("OrbitalStationSpineMesh")
+
+[node name="DockGuideUpper" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, 7.6, 23.5)
+mesh = SubResource("OrbitalStationGuideMesh")
+
+[node name="DockGuideLower" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(0, -7.6, 23.5)
+mesh = SubResource("OrbitalStationGuideMesh")
+
+[node name="DockTunnelLeft" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-8.2, 0, 20)
+mesh = SubResource("OrbitalStationTunnelWallMesh")
+
+[node name="DockTunnelLeftCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(-8.2, 0, 20)
+shape = SubResource("OrbitalStationTunnelWallShape")
+
+[node name="DockTunnelRight" type="MeshInstance3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(8.2, 0, 20)
+mesh = SubResource("OrbitalStationTunnelWallMesh")
+
+[node name="DockTunnelRightCollision" type="CollisionShape3D" parent="Gameplay/OrbitalStation"]
+position = Vector3(8.2, 0, 20)
+shape = SubResource("OrbitalStationTunnelWallShape")
+
 [node name="DockLight" type="OmniLight3D" parent="Gameplay/OrbitalStation"]
-position = Vector3(0, 0, 13)
+position = Vector3(0, 0, 27)
 light_color = Color(0.18, 0.72, 1, 1)
 light_energy = 5.0
 omni_range = 34.0
 
 [node name="OrbitalDockMarker" type="MeshInstance3D" parent="Gameplay"]
 position = Vector3(0, 35, -124)
+rotation = Vector3(1.5708, 0, 0)
 mesh = SubResource("DockBeaconMesh")
 
 [node name="PlanetApproachMarker" type="MeshInstance3D" parent="Gameplay"]

@@ -228,17 +228,52 @@ public partial class SalvageRepairSlice
                     _voyageShip.LookAt(target, SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
                 }
 
-                float approachRange = StageOneVoyage.Location ==
-                        StageOneVoyageLocation.OutboundFlight
+                bool outbound = StageOneVoyage.Location ==
+                    StageOneVoyageLocation.OutboundFlight;
+                float approachRange = outbound
                     ? (float)StageOneVoyageRuntime.DockingRangeMeters
                     : (float)StageOneVoyageRuntime.LandingRangeMeters;
-                float speedLimit = StageOneVoyage.Location ==
-                        StageOneVoyageLocation.OutboundFlight
+                float speedLimit = outbound
                     ? (float)StageOneVoyageRuntime.MaximumDockingSpeed
                     : (float)StageOneVoyageRuntime.MaximumLandingSpeed;
-                bool braking = distance <= approachRange + 8.0f ||
-                    _voyageShip.Speed > speedLimit * 0.88f;
-                float forward = braking ? 0.0f : 0.78f;
+
+                bool captureReady = outbound
+                    ? StageOneVoyageRuntime.IsDockingCaptureReady(
+                        distance,
+                        _voyageShip.Speed)
+                    : StageOneVoyageRuntime.IsLandingCaptureReady(
+                        distance,
+                        _voyageShip.Speed);
+                if (captureReady)
+                {
+                    if (outbound)
+                    {
+                        TryDockStageOneVoyage(automatic: true);
+                    }
+                    else
+                    {
+                        TryLandStageOneVoyage(automatic: true);
+                    }
+                    return;
+                }
+
+                // TASK-178.2: the previous assist began braking at
+                // approachRange+8 and then never applied forward thrust again,
+                // so it could park permanently outside the capture sphere.
+                // Brake only while excess speed needs to be shed; once slow,
+                // creep into the capture envelope and complete the transaction.
+                float captureBuffer = outbound ? 6.0f : 8.0f;
+                bool overspeed = _voyageShip.Speed > speedLimit * 0.82f;
+                bool closeAndFast = distance <= approachRange + captureBuffer &&
+                    _voyageShip.Speed > speedLimit * 0.28f;
+                bool braking = overspeed || closeAndFast;
+                float forward = distance <= approachRange
+                    ? 0.0f
+                    : braking
+                        ? 0.0f
+                        : distance > approachRange + 35.0f
+                            ? 0.78f
+                            : 0.32f;
                 _voyageShip.SetExternalCommand(new ShipControlCommand(
                     forward,
                     0.0f,
@@ -246,7 +281,7 @@ public partial class SalvageRepairSlice
                     0.0f,
                     0.0f,
                     0.0f,
-                    distance > 45.0f,
+                    distance > 90.0f && !braking,
                     braking));
             }
         }
@@ -311,6 +346,13 @@ public partial class SalvageRepairSlice
                     CancelInterplanetaryCruiseForManualControl();
                     _voyageShip?.ClearExternalCommand();
                 }
+
+                GD.Print(
+                    "TASK-178.2 navigation assist PASS: " +
+                    $"enabled={(_voyageNavigationAssist ? 1 : 0)}; " +
+                    $"leg={StageOneVoyage.Location}; " +
+                    $"target={(StageOneVoyage.Location == StageOneVoyageLocation.OutboundFlight ? "station-dock" : "planet-pad")}; " +
+                    "autoCapture=1; manualEnter=1.");
             }
             else
             {
@@ -465,7 +507,7 @@ public partial class SalvageRepairSlice
             $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
 
-    private void TryDockStageOneVoyage()
+    private void TryDockStageOneVoyage(bool automatic = false)
     {
         if (_voyageShip is null)
         {
@@ -496,7 +538,8 @@ public partial class SalvageRepairSlice
             $"distance={distance.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"speed={_voyageShip.Speed.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"dockings={StageOneVoyage.DockingCount}.");
+            $"dockings={StageOneVoyage.DockingCount}; " +
+            $"mode={(automatic ? "navigation-assist" : "manual")}.");
         OpenOrbitalStationServices();
         QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
     }
@@ -550,7 +593,7 @@ public partial class SalvageRepairSlice
             $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
 
-    private void TryLandStageOneVoyage()
+    private void TryLandStageOneVoyage(bool automatic = false)
     {
         if (_voyageShip is null)
         {
@@ -583,7 +626,8 @@ public partial class SalvageRepairSlice
             $"distance={distance.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"speed={_voyageShip.Speed.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"landings={StageOneVoyage.LandingCount}; loops={StageOneVoyage.CompletedLoops}.");
+            $"landings={StageOneVoyage.LandingCount}; loops={StageOneVoyage.CompletedLoops}; " +
+            $"mode={(automatic ? "navigation-assist" : "manual")}.");
         if (StageOneVoyage.CompletedLoops > 0)
         {
             GD.Print(

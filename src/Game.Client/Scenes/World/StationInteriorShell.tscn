@@ -1,8 +1,91 @@
-[gd_scene load_steps=2 format=3 uid="uid://w148stationscn"]
+[gd_scene load_steps=9 format=3 uid="uid://w148stationscn"]
 
 [ext_resource type="Script" uid="uid://w148shell00001" path="res://Scripts/VerticalSlice/WorldSceneShell.cs" id="1_shell"]
+
+[sub_resource type="StandardMaterial3D" id="HangarWallMaterial"]
+albedo_color = Color(0.055, 0.075, 0.11, 1)
+metallic = 0.58
+roughness = 0.38
+
+[sub_resource type="StandardMaterial3D" id="HangarFloorMaterial"]
+albedo_color = Color(0.07, 0.09, 0.12, 1)
+metallic = 0.72
+roughness = 0.3
+
+[sub_resource type="StandardMaterial3D" id="HangarGuideMaterial"]
+albedo_color = Color(0.03, 0.55, 0.95, 1)
+emission_enabled = true
+emission = Color(0.02, 0.42, 1, 1)
+emission_energy_multiplier = 3.8
+roughness = 0.18
+
+[sub_resource type="BoxMesh" id="HangarFloorMesh"]
+material = SubResource("HangarFloorMaterial")
+size = Vector3(52, 0.8, 64)
+
+[sub_resource type="BoxMesh" id="HangarWallMesh"]
+material = SubResource("HangarWallMaterial")
+size = Vector3(1.2, 18, 64)
+
+[sub_resource type="BoxMesh" id="HangarCeilingMesh"]
+material = SubResource("HangarWallMaterial")
+size = Vector3(52, 1.0, 64)
+
+[sub_resource type="BoxMesh" id="HangarBackMesh"]
+material = SubResource("HangarWallMaterial")
+size = Vector3(52, 18, 1.2)
+
+[sub_resource type="BoxMesh" id="HangarGuideMesh"]
+material = SubResource("HangarGuideMaterial")
+size = Vector3(0.45, 0.12, 52)
 
 [node name="StationInteriorShell" type="Node3D" groups=["world_scene_shell"]]
 script = ExtResource("1_shell")
 Kind = 2
 EnvironmentProfile = "interior"
+
+[node name="HangarFloor" type="MeshInstance3D" parent="."]
+position = Vector3(0, 33.35, -137)
+mesh = SubResource("HangarFloorMesh")
+
+[node name="HangarCeiling" type="MeshInstance3D" parent="."]
+position = Vector3(0, 47.5, -137)
+mesh = SubResource("HangarCeilingMesh")
+
+[node name="HangarLeftWall" type="MeshInstance3D" parent="."]
+position = Vector3(-25.5, 38, -137)
+mesh = SubResource("HangarWallMesh")
+
+[node name="HangarRightWall" type="MeshInstance3D" parent="."]
+position = Vector3(25.5, 38, -137)
+mesh = SubResource("HangarWallMesh")
+
+[node name="HangarBackWall" type="MeshInstance3D" parent="."]
+position = Vector3(0, 38, -168.5)
+mesh = SubResource("HangarBackMesh")
+
+[node name="GuideLeft" type="MeshInstance3D" parent="."]
+position = Vector3(-5.5, 33.82, -136)
+mesh = SubResource("HangarGuideMesh")
+
+[node name="GuideRight" type="MeshInstance3D" parent="."]
+position = Vector3(5.5, 33.82, -136)
+mesh = SubResource("HangarGuideMesh")
+
+[node name="HangarLightA" type="OmniLight3D" parent="."]
+position = Vector3(-12, 42, -118)
+light_color = Color(0.36, 0.66, 1, 1)
+light_energy = 4.2
+omni_range = 34.0
+
+[node name="HangarLightB" type="OmniLight3D" parent="."]
+position = Vector3(12, 42, -142)
+light_color = Color(0.36, 0.66, 1, 1)
+light_energy = 4.2
+omni_range = 34.0
+
+[node name="HangarLightC" type="OmniLight3D" parent="."]
+position = Vector3(0, 40, -160)
+light_color = Color(0.55, 0.78, 1, 1)
+light_energy = 3.4
+omni_range = 28.0

@@ -33,8 +33,13 @@ public partial class StarSystemSimulationNode : Node3D
     private bool _surfaceRuntimeActive = true;
     private string _focusPlanetId = string.Empty;
 
+    // TASK-178.2: keep the focused world visually dominant and far enough from
+    // the third-person ship camera that the player never reads a 6 m ship as a
+    // planet-scale object. Local station/traffic have separate physical nodes.
     public Vector3 DisplayAnchor { get; set; } =
-        new(0.0f, 115.0f, -390.0f);
+        new(0.0f, -180.0f, 900.0f);
+
+    public const bool LocalTrafficProxiesSuppressed = true;
 
     public string CurrentSystemId => _runtime?.SystemId ?? string.Empty;
 
@@ -198,9 +203,13 @@ public partial class StarSystemSimulationNode : Node3D
                 (float)relative.X,
                 (float)relative.Y,
                 (float)relative.Z);
-            visual.Visible = state.Representation is
-                StarSystemRepresentation.Proxy or
-                StarSystemRepresentation.Marker;
+            bool localPhysicalTraffic = state.Definition.Kind is
+                StarSystemBodyKind.Station or
+                StarSystemBodyKind.ShipContact;
+            visual.Visible = !localPhysicalTraffic &&
+                (state.Representation is
+                    StarSystemRepresentation.Proxy or
+                    StarSystemRepresentation.Marker);
             float representationScale = state.Representation ==
                     StarSystemRepresentation.Marker
                 ? 0.28f

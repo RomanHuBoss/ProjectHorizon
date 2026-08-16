@@ -227,11 +227,11 @@ collision_mask = 1
 current = true
 fov = 66.0
 near = 0.1
-far = 6000.0
+far = 12000.0
 
 [node name="CockpitCamera3D" type="Camera3D" parent="."]
 position = Vector3(0, 0.72, -2.05)
 current = false
 fov = 72.0
 near = 0.05
-far = 6000.0
+far = 12000.0

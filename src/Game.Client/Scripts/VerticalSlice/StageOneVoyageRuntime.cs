@@ -54,6 +54,23 @@ public sealed class StageOneVoyageRuntime
     public const double StationDockPositionY = 35.0;
     public const double StationDockPositionZ = -124.0;
     public const double StationUndockPositionZ = -112.0;
+
+    public static bool IsDockingCaptureReady(
+        double distanceMeters,
+        double speedMetersPerSecond) =>
+        IsFiniteNonNegative(distanceMeters) &&
+        distanceMeters <= DockingRangeMeters &&
+        IsFiniteNonNegative(speedMetersPerSecond) &&
+        speedMetersPerSecond <= MaximumDockingSpeed;
+
+    public static bool IsLandingCaptureReady(
+        double distanceMeters,
+        double speedMetersPerSecond) =>
+        IsFiniteNonNegative(distanceMeters) &&
+        distanceMeters <= LandingRangeMeters &&
+        IsFiniteNonNegative(speedMetersPerSecond) &&
+        speedMetersPerSecond <= MaximumLandingSpeed;
+
     public const double PlanetApproachPositionY = 42.0;
     public const double PlanetApproachPositionZ = -38.0;
 

@@ -2,18 +2,57 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.1-pilot-input-ownership-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.2-orbital-navigation-presentation.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.1 Pilot Input Ownership Hotfix
+## 0. Текущая emergency/mega-итерация 2026-08-16 — TASK-178.2 Orbital Navigation & Presentation Repair
+
+**Исходный снимок:** `ProjectHorizon-main-task178.1-pilot-input-ownership-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.2-orbital-navigation-presentation.zip`.  
+**Версия:** `0.1.0-alpha.178.2`.  
+**Статус:** TASK-178.1 `VERIFIED` по внешнему manual Godot 4.7.1 evidence; TASK-178 остаётся `IMPLEMENTED / PENDING EXTERNAL F5`; TASK-178.2 `IMPLEMENTED / PENDING EXTERNAL BUILD+ORBIT/DOCK SMOKE+F5`.
+
+### Внешнее evidence и найденные дефекты
+
+Пользовательский run подтверждает предыдущий control hotfix: boarding выдаёт `parked=1; physics=0`, а после `T` — `navigationAssist=0; manualControl=1; externalControl=0`; корабль фактически был вручную доведён до орбитальной станции. Следовательно TASK-178.1 закрыт как VERIFIED.
+
+После восстановления ручного полёта проявились следующие системные дефекты:
+
+- `K` включал guidance, но мог тормозить корабль в нескольких метрах за пределами `DockingRangeMeters` и никогда не вызывал docking transaction; поэтому прибытие к станции не переводило игрока в `StationInterior`;
+- orbital model использовал `OrbitTimeScale=120`: короткий moon period ~110 s превращался в визуальный оборот менее чем за секунду;
+- planet/moon orbit radii были фактически десятками метров, а planet proxies — единицами метров, поэтому корабль визуально конкурировал с планетами по масштабу;
+- одновременно существовали физические `Gameplay/OrbitalStation` / `NpcShipTraffic` и их статистические StarSystem proxies, создавая дубли и ломая восприятие масштаба;
+- `OrbitWorldShell` декларировал `EnvironmentProfile=space`, но профиль не применялся к root `WorldEnvironment`; surface weather продолжал окрашивать orbit в голубой атмосферный фон;
+- `StationInteriorShell` был фактически пустым world shell и не давал визуального ощущения попадания внутрь станции.
+
+### Исправлено
+
+- `K` теперь завершает Stage-1 auto-dock/auto-land: assist сбрасывает excess speed, затем медленно входит в capture sphere и автоматически вызывает `TryDockStageOneVoyage(automatic:true)` / `TryLandStageOneVoyage(automatic:true)`; ручной `Enter` сохранён;
+- orbital clock переведён на `1x`; planet orbits разнесены до минимум 1.8 km с 1.2 km шагом, moon orbits — от 520 m, minimum moon period — 1800 s;
+- визуальная иерархия увеличена: planets >=150 m proxy radius, gas giant 300 m, moons 28..42 m, star 140 m; focused planet перенесён behind/below local flight scene как крупный orbital backdrop;
+- physical local station/ship traffic остаются единственными локальными объектами; StarSystem station/ship-contact proxies подавляются;
+- для Orbit/Interplanetary/Hyperspace/StationInterior введены explicit dark fog-free `WorldEnvironment` profiles; Surface при возврате восстанавливает procedural atmosphere и текущую deterministic weather state;
+- physical station получила docking guides/light; `StationInteriorShell` теперь содержит lit hangar geometry; успешный dock переключает world context и открывает station services;
+- новый TASK-178.2 aggregate F5 contract проверяет orbit clock, planet spacing, moon cadence, visual hierarchy, assist dock capture, local-proxy policy, space environment и station interior; добавлены xUnit/static/local/CI/release gates.
+
+### Acceptance TASK-178.2
+
+1. `tools\run-section37-quality.cmd`: clean build `0 errors / 0 warnings`, все tests и `TASK-178.2 ... CONTRACT PASS`.
+2. New Game → repair/board → `T`; в Orbit фон должен быть тёмным/космическим, без surface-blue fog.
+3. Не включая `K`, ручное управление остаётся активным. Затем нажать `K`: assist должен самостоятельно довести до станции, затормозить, выдать `TASK-112 player orbital docking PASS ... mode=navigation-assist` и `TASK-112 player station visit PASS`.
+4. После docking должен быть world transition `kind=StationInterior`; визуально должен отображаться освещённый hangar, ship parked/physics-off, services открыты.
+5. Оценить system presentation: планеты не образуют тесную группу, moons не совершают заметно быстрых оборотов, current planet читается как крупное небесное тело, локальная станция/traffic не дублируются proxy-объектами.
+6. F5: `TASK-178.2 orbital navigation/presentation acceptance PASS` с `orbitClock=1; planetSpacing=1; moonCadence=1; visualHierarchy=1; assistDock=1; localProxyPolicy=1; spaceEnvironment=1; stationInterior=1`. TASK-178/TASK-176/TASK-126 должны оставаться зелёными.
+
+## 0. Предыдущая emergency-итерация 2026-08-16 — TASK-178.1 Pilot Input Ownership Hotfix
 
 **Исходный снимок:** `ProjectHorizon-main-task178-spaceflight-navigation-subsystem.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task178.1-pilot-input-ownership-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.178.1`.  
-**Статус:** TASK-178 остаётся `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; обнаруженный gameplay blocker вынесен в TASK-178.1 `IMPLEMENTED / PENDING EXTERNAL BUILD+MANUAL CONTROL SMOKE`.
+**Статус:** TASK-178 остаётся `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-178.1 `VERIFIED` по последующему external manual-flight evidence (`parked=1; physics=0`, затем `manualControl=1; externalControl=0`).
 
 ### Внешнее evidence / корневая причина
 
@@ -2241,12 +2280,15 @@ Galaxy/System map и hyperspace. TASK-128 закрывает именно vertic
   `star → planet → moon/station → traffic`; никакой второй galaxy generator и
   параллельный universe-state не создаются;
 - движение небесных тел задаётся аналитическими круговыми орбитами в наклонённых
-  плоскостях с постоянным радиусом и `OrbitTimeScale=120`; N-body, взаимная
-  гравитация и численное интегрирование намеренно отсутствуют в соответствии §15.1;
+  плоскостях с постоянным радиусом; исходный TASK-128 использовал
+  `OrbitTimeScale=120`, но TASK-178.2 перевёл live runtime на `OrbitTimeScale=1` и
+  увеличенные authored orbital periods, устранив визуально сверхбыстрые спутники;
+  N-body, взаимная гравитация и численное интегрирование намеренно отсутствуют в
+  соответствии §15.1;
 - добавлены четыре representation states: `DetailedPlanet`, `Proxy`, `Marker`,
-  `Statistical`; границы дальнего представления bounded (`180/420 m` в локальном
-  vertical-slice scale), ship contacts никогда не создаются как тяжёлые physics
-  bodies в system runtime;
+  `Statistical`; после TASK-178.2 границы дальнего представления bounded
+  (`4200/8000 m` в локальном vertical-slice scale), ship contacts никогда не
+  создаются как тяжёлые physics bodies в system runtime;
 - `Gameplay/StarSystemSimulation` создаёт lightweight non-colliding sphere/box
   visuals для текущей системы, обновляет их из аналитического snapshot и скрывает
   statistical/detailed representation; одновременно detailed может быть только
