@@ -28,6 +28,7 @@ python3 tools/validate-task150-planet-environment.py
 python3 tools/validate-task152-interplanetary-travel.py
 python3 tools/validate-task154-multi-planet-surface-content.py
 python3 tools/validate-task1541-runtime-acceptance-hotfix.py
+python3 tools/validate-task156-planet-surface-terrain.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"
@@ -35,3 +36,4 @@ python3 tools/verify-section36-coverage.py --results-dir "$RESULTS"
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests"
 echo "TASK-140 LOCAL QUALITY PASS: warningsAsErrors=1; tests=1; json=1; migrations=1; coverage=1; architecture=1."
+

@@ -278,7 +278,6 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         if (!_navigationSnapped)
         {
             Vector3 closest = _navigationSurface.GetClosestNavigationPoint(GlobalPosition);
-            closest.Y = _home.Y;
             if (GlobalPosition.DistanceTo(closest) <= 4.0f)
             {
                 if (GlobalPosition.DistanceTo(closest) > 0.04f)
@@ -309,7 +308,6 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
                 _cachedBehaviorTarget = ClampTargetToTerritory(_cachedBehaviorTarget);
                 _cachedBehaviorTarget = _navigationSurface.GetClosestNavigationPoint(
                     _cachedBehaviorTarget);
-                _cachedBehaviorTarget.Y = _home.Y;
                 _behaviorDecisionCount++;
             }
             behaviorTarget = _cachedBehaviorTarget;
@@ -421,7 +419,10 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             LookAt(look, Vector3.Up, true);
         }
         MoveAndSlide();
-        Position = new Vector3(Position.X, _home.Y, Position.Z);
+        Position = new Vector3(
+            Position.X,
+            _navigationSurface.GetNavigationHeight(Position.X, Position.Z),
+            Position.Z);
         ClampToTerritory();
     }
 
@@ -457,7 +458,10 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
             LookAt(look, Vector3.Up, true);
         }
         MoveAndSlide();
-        Position = new Vector3(Position.X, _home.Y, Position.Z);
+        float surfaceY = _navigationSurface is null
+            ? _home.Y
+            : _navigationSurface.GetNavigationHeight(Position.X, Position.Z);
+        Position = new Vector3(Position.X, surfaceY, Position.Z);
         ClampToTerritory();
     }
 
@@ -504,16 +508,19 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         offset.Y = 0.0f;
         if (offset.Length() <= maximum)
         {
-            return new Vector3(target.X, _home.Y, target.Z);
+            return target;
         }
         Vector3 clamped = offset.Normalized() * maximum;
-        return new Vector3(_home.X + clamped.X, _home.Y, _home.Z + clamped.Z);
+        return new Vector3(_home.X + clamped.X, target.Y, _home.Z + clamped.Z);
     }
 
     private void ClampToTerritory()
     {
         Vector3 clamped = ClampTargetToTerritory(Position);
-        Position = new Vector3(clamped.X, _home.Y, clamped.Z);
+        float surfaceY = _navigationSurface is null
+            ? clamped.Y
+            : _navigationSurface.GetNavigationHeight(clamped.X, clamped.Z);
+        Position = new Vector3(clamped.X, surfaceY, clamped.Z);
     }
 
     private static float HorizontalDistance(Vector3 left, Vector3 right)

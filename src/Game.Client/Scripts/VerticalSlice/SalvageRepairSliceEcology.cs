@@ -175,7 +175,7 @@ public partial class SalvageRepairSlice
                         basis,
                         new Vector3(
                             (float)placement.PositionX,
-                            0.55f,
+                            (float)FloraSurfaceY(placement),
                             (float)placement.PositionZ)));
             }
 
@@ -195,7 +195,8 @@ public partial class SalvageRepairSlice
                 EcologyCatalog.GetFauna(spawn.FaunaId),
                 spawn,
                 player,
-                _aerialSteeringRuntime);
+                _aerialSteeringRuntime,
+                CurrentTerrainProfile);
             faunaNode.Observed += OnEcologyFaunaObserved;
             _ecologyRoot.AddChild(faunaNode);
             _ecologyFaunaNodes.Add(faunaNode);
@@ -239,7 +240,7 @@ public partial class SalvageRepairSlice
                 Placement = placement,
                 Distance = observer.DistanceTo(new Vector3(
                     (float)placement.PositionX,
-                    0.55f,
+                    (float)FloraSurfaceY(placement),
                     (float)placement.PositionZ))
             })
             .Where(item => item.Distance <= 5.0f)
@@ -273,9 +274,15 @@ public partial class SalvageRepairSlice
             // The MultiMesh remains the visual representation. Promotion adds
             // only an interactive physics proxy, avoiding duplicate geometry
             // and z-fighting while keeping the plant harvestable.
+            EcologyFloraPlacement terrainPlacement = placement with
+            {
+                PositionY = SamplePlanetSurfaceHeight(
+                    placement.PositionX,
+                    placement.PositionZ)
+            };
             specimen.Configure(
                 EcologyCatalog.GetFlora(placement.FloraId),
-                placement,
+                terrainPlacement,
                 renderMesh: false);
             specimen.HarvestRequested += OnEcologyFloraHarvestRequested;
             _ecologyRoot.AddChild(specimen);
@@ -646,7 +653,7 @@ public partial class SalvageRepairSlice
                         basis,
                         new Vector3(
                             (float)placement.PositionX,
-                            0.55f,
+                            (float)FloraSurfaceY(placement),
                             (float)placement.PositionZ)));
             }
             MultiMeshInstance3D instance = new()

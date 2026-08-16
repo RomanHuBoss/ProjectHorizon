@@ -969,6 +969,8 @@
     "ui.hud.planet_environment.unavailable": "Planet environment: unavailable",
     "ui.hud.planet_surface.summary": "Surface {archetype}: biomes={biomes}; flora={flora}; fauna={fauna}; water={water}",
     "ui.hud.planet_surface.unavailable": "Planet surface: unavailable",
+    "ui.hud.planet_terrain.summary": "Terrain {archetype}: height={height} m; slope={slope}°; mesh={resolution}²",
+    "ui.hud.planet_terrain.unavailable": "Planet terrain: unavailable",
     "ui.hud.progress": "Progress: salvage={salvage}/{required} • components={crafted}/{total} • rev={revision}",
     "ui.hud.recipe_progress": "{recipe} [{inputs} → {state}, {seconds}s, {station}]",
     "ui.hud.recipe_state.locked": "LOCKED:{technology}",

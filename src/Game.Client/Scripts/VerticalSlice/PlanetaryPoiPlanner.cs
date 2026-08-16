@@ -42,7 +42,8 @@ public static class PlanetaryPoiPlanner
             catalog.RegionKey,
             activeQuestTags,
             environmentRuntime: null,
-            environmentProfile: null);
+            environmentProfile: null,
+            terrainProfile: null);
     }
 
     public static IReadOnlyList<PlanetaryPoiPlacement> PlanPlanet(
@@ -51,6 +52,7 @@ public static class PlanetaryPoiPlanner
         string regionKey,
         PlanetEnvironmentRuntime environmentRuntime,
         PlanetEnvironmentProfile environmentProfile,
+        PlanetSurfaceTerrainProfile? terrainProfile = null,
         IReadOnlyCollection<string>? activeQuestTags = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
@@ -71,7 +73,8 @@ public static class PlanetaryPoiPlanner
             regionKey,
             activeQuestTags,
             environmentRuntime,
-            environmentProfile);
+            environmentProfile,
+            terrainProfile);
     }
 
     private static IReadOnlyList<PlanetaryPoiPlacement> PlanInternal(
@@ -80,7 +83,8 @@ public static class PlanetaryPoiPlanner
         string regionKey,
         IReadOnlyCollection<string>? activeQuestTags,
         PlanetEnvironmentRuntime? environmentRuntime,
-        PlanetEnvironmentProfile? environmentProfile)
+        PlanetEnvironmentProfile? environmentProfile,
+        PlanetSurfaceTerrainProfile? terrainProfile)
     {
         HashSet<string> questTags = activeQuestTags is null
             ? new HashSet<string>(StringComparer.Ordinal)
@@ -109,7 +113,8 @@ public static class PlanetaryPoiPlanner
                     catalog,
                     worldSeed,
                     environmentRuntime,
-                    environmentProfile))
+                    environmentProfile,
+                    terrainProfile))
                 .OrderBy(candidate => CandidateScore(
                     worldSeed,
                     regionKey,
@@ -133,7 +138,8 @@ public static class PlanetaryPoiPlanner
                 selected.X,
                 selected.Z,
                 environmentRuntime,
-                environmentProfile);
+                environmentProfile,
+                terrainProfile);
             ulong hash = StableHash(
                 $"{worldSeed}|{regionKey}|" +
                 $"{definition.PoiTypeId}|rotation");
@@ -141,7 +147,7 @@ public static class PlanetaryPoiPlanner
                 $"poi.instance.{index + 1:000000}",
                 definition.PoiTypeId,
                 selected.X,
-                0.1 + definition.Size.Y / 2.0,
+                environment.Height + 0.1 + definition.Size.Y / 2.0,
                 selected.Z,
                 (hash % 4UL) * 90.0,
                 environment,
@@ -250,7 +256,8 @@ public static class PlanetaryPoiPlanner
         PlanetaryPoiCatalog catalog,
         long worldSeed,
         PlanetEnvironmentRuntime? environmentRuntime,
-        PlanetEnvironmentProfile? environmentProfile)
+        PlanetEnvironmentProfile? environmentProfile,
+        PlanetSurfaceTerrainProfile? terrainProfile)
     {
         if (!ClearsVerticalSliceInfrastructure(definition, x, z))
         {
@@ -262,7 +269,8 @@ public static class PlanetaryPoiPlanner
             x,
             z,
             environmentRuntime,
-            environmentProfile);
+            environmentProfile,
+            terrainProfile);
         if (!MeetsDefinitionConstraints(definition, environment))
         {
             return false;
@@ -293,7 +301,8 @@ public static class PlanetaryPoiPlanner
         double x,
         double z,
         PlanetEnvironmentRuntime? environmentRuntime = null,
-        PlanetEnvironmentProfile? environmentProfile = null)
+        PlanetEnvironmentProfile? environmentProfile = null,
+        PlanetSurfaceTerrainProfile? terrainProfile = null)
     {
         ulong hash = StableHash(string.Format(
             CultureInfo.InvariantCulture,
@@ -301,8 +310,21 @@ public static class PlanetaryPoiPlanner
             worldSeed,
             x,
             z));
-        double height = ((long)(hash % 401UL) - 200L) / 100.0;
-        double slope = ((hash / 401UL) % 1201UL) / 100.0;
+        double syntheticHeight = ((long)(hash % 401UL) - 200L) / 100.0;
+        double syntheticSlope = ((hash / 401UL) % 1201UL) / 100.0;
+        PlanetSurfaceTerrainSample terrain = terrainProfile is null
+            ? new PlanetSurfaceTerrainSample(
+                syntheticHeight,
+                syntheticSlope,
+                0.5)
+            : PlanetSurfaceTerrainRuntime.Sample(terrainProfile, x, z);
+        // POI catalog height is a local-relief constraint band rather than a
+        // world-space Y coordinate. Terrain-backed planning therefore keeps
+        // it inside the historical [-2, 2] band while slope is physical.
+        double height = terrainProfile is null
+            ? terrain.Height
+            : Math.Clamp(terrain.Height, -2.0, 2.0);
+        double slope = terrain.SlopeDegrees;
         int localDanger = (int)((hash / 481601UL) % 31UL);
         if (environmentRuntime is null || environmentProfile is null)
         {
@@ -320,7 +342,10 @@ public static class PlanetaryPoiPlanner
             ? 80.0
             : Math.Clamp(Math.Abs(x - shorelineX), 0.0, 80.0);
         double latitude = Math.Clamp(z / CandidateMaximum * 58.0, -58.0, 58.0);
-        double elevation01 = Math.Clamp((height + 2.0) / 4.0, 0.0, 1.0);
+        double elevation01 = Math.Clamp(
+            (syntheticHeight + 2.0) / 4.0,
+            0.0,
+            1.0);
         double localNoise = (((hash >> 23) & 0xFFFFUL) / 32767.5) - 1.0;
         PlanetEnvironmentSample climate = environmentRuntime.SampleBiome(
             environmentProfile,

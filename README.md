@@ -4,6 +4,10 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-156 — Planet-Specific Terrain & Surface Geometry
+
+The active landable planet now owns deterministic local relief rather than only a different surface color/content set. The 80x80 m bounded gameplay surface is rebuilt as a 65x65 mesh with matching trimesh collision, archetype-specific morphology, a gameplay-safe central terrace, wet-world basins, terrain-grounded ecology/POIs/base placement and heightfield NPC navigation. F5 includes `TASK-156 planet terrain acceptance`; see `docs/PLANET_SURFACE_TERRAIN.md` for the subsystem contract and manual acceptance procedure.
+
 ## Технологический стек
 
 - **Godot Engine 4.7.1 .NET**
@@ -28,9 +32,18 @@
 
 ## Текущее состояние
 
-Stage 1 vertical slice и принятая TASK-150 planetary-environment foundation сохранены. После подтверждения владельца продукта «всё работает» TASK-150/TASK-151 считаются `VERIFIED` без реконструкции отсутствующих численных метрик. `TASK-152` реализовал реальный same-system planetary transfer; его формальный Windows/Godot runtime-tail `TASK-153` остаётся `IN_PROGRESS`. Текущая кодовая mega-итерация `TASK-154` закрывает следующий связанный Stage 2 разрыв — **Planet-Scoped Surface Content**: после физического перелёта меняются не только environment metadata, но и реальные биомы, флора/фауна, POI, вода и presentation поверхности, а прогресс каждой планеты сохраняется независимо.
+Stage 1 vertical slice и принятая TASK-150 planetary-environment foundation сохранены. После подтверждения владельца продукта «всё работает» TASK-150/TASK-151 считаются `VERIFIED` без реконструкции отсутствующих численных метрик. `TASK-152` реализовал реальный same-system planetary transfer; его формальный Windows/Godot runtime-tail `TASK-153` остаётся `IN_PROGRESS`. `TASK-154` уже связал физический перелёт с planet-scoped biome/ecology/POI/persistence. Текущая кодовая mega-итерация `TASK-156` закрывает следующий Stage 2 разрыв — **Planet-Specific Terrain & Surface Geometry**: активная поверхность получает детерминированный архетип-специфичный рельеф, matching trimesh collision, terrain-aware POI/ecology, heightfield NavigationServer3D и корректное grounding NPC/resources/base construction. Runtime/manual tail оформлен как `TASK-157`.
 
-### TASK-154 Planet-Scoped Surface Content mega-iteration — `IMPLEMENTED`, runtime acceptance — `IN_PROGRESS`
+### TASK-156 Planet-Specific Terrain & Surface Geometry mega-iteration — `IMPLEMENTED`, runtime acceptance — `IN_PROGRESS`
+
+- deterministic terrain profile строится из `PlanetId/archetype/seed`; temperate/desert/frozen/volcanic имеют разные morphology signatures;
+- bounded `80 x 80 m` active surface заменяет плоский ground на `65 x 65` mesh (`4,225` vertices / `8,192` triangles) и matching trimesh collision;
+- центральная tutorial terrace сохраняет starter gameplay, wet-world basins согласованы с водой, dry-world aquatic suppression TASK-154 сохраняется;
+- flora/fauna, POI, resources и base construction получают реальную surface Y; POI constraints используют физический slope; legacy IDs/XZ не меняются;
+- NPC NavigationServer regions становятся heightfield/slope-aware, ground agents больше не принудительно возвращаются на плоский Y;
+- `F5` включает `TASK-156 planet terrain acceptance`; section-37 quality включает новый static gate и 3 xUnit regressions.
+
+### TASK-154 Planet-Scoped Surface Content mega-iteration — `IMPLEMENTED`, runtime acceptance — `VERIFIED`
 
 - четыре стартовые планеты (`temperate/desert/frozen/volcanic`) получают собственные deterministic surface profiles и region identity;
 - ecology density/species выбираются из активных биомов текущей планеты; на сухих планетах aquatic fauna/habitat выключаются;

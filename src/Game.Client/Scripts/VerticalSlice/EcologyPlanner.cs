@@ -49,7 +49,8 @@ public static class EcologyPlanner
             GameplayFloraInstanceCount,
             catalog.ActiveFaunaLimit,
             catalog.SimplifiedFaunaLimit,
-            allowAquatic: true);
+            allowAquatic: true,
+            terrainProfile: null);
     }
 
     public static EcologyPlan PlanPlanet(
@@ -57,7 +58,8 @@ public static class EcologyPlanner
         long worldSeed,
         IReadOnlyList<string> activeBiomeIds,
         double waterCoverage,
-        double habitability)
+        double habitability,
+        PlanetSurfaceTerrainProfile? terrainProfile = null)
     {
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(activeBiomeIds);
@@ -91,7 +93,8 @@ public static class EcologyPlanner
             floraCount,
             activeFauna,
             simplifiedFauna,
-            allowAquatic: waterCoverage >= 0.12);
+            allowAquatic: waterCoverage >= 0.12,
+            terrainProfile);
     }
 
     private static EcologyPlan BuildPlan(
@@ -101,27 +104,31 @@ public static class EcologyPlanner
         int floraCount,
         int activeFaunaCount,
         int simplifiedFaunaCount,
-        bool allowAquatic)
+        bool allowAquatic,
+        PlanetSurfaceTerrainProfile? terrainProfile)
     {
         List<EcologyFloraPlacement> flora = BuildFlora(
             catalog,
             floraCount,
             worldSeed,
-            activeBiomeIds);
+            activeBiomeIds,
+            terrainProfile);
         List<EcologyFaunaSpawn> active = BuildFauna(
             catalog,
             activeFaunaCount,
             simplified: false,
             worldSeed ^ 0x5D39B1A7L,
             activeBiomeIds,
-            allowAquatic);
+            allowAquatic,
+            terrainProfile);
         List<EcologyFaunaSpawn> simplified = BuildFauna(
             catalog,
             simplifiedFaunaCount,
             simplified: true,
             worldSeed ^ 0x2F77C4D9L,
             activeBiomeIds,
-            allowAquatic);
+            allowAquatic,
+            terrainProfile);
         return new EcologyPlan(flora, active, simplified);
     }
 
@@ -222,7 +229,8 @@ public static class EcologyPlanner
         EcologyCatalog catalog,
         int count,
         long seed,
-        IReadOnlyList<string> activeBiomeIds)
+        IReadOnlyList<string> activeBiomeIds,
+        PlanetSurfaceTerrainProfile? terrainProfile)
     {
         StableRandom random = new(unchecked((ulong)seed));
         List<EcologyFloraPlacement> placements = new(count);
@@ -288,7 +296,9 @@ public static class EcologyPlanner
                 definition.FloraId,
                 biomeId,
                 x,
-                0.0,
+                terrainProfile is null
+                    ? 0.0
+                    : PlanetSurfaceTerrainRuntime.SampleHeight(terrainProfile, x, z),
                 z,
                 random.NextRange(0.0, 360.0),
                 random.NextRange(definition.ScaleMin, definition.ScaleMax)));
@@ -303,7 +313,8 @@ public static class EcologyPlanner
         bool simplified,
         long seed,
         IReadOnlyList<string> activeBiomeIds,
-        bool allowAquatic)
+        bool allowAquatic,
+        PlanetSurfaceTerrainProfile? terrainProfile)
     {
         StableRandom random = new(unchecked((ulong)seed));
         HashSet<string> activeBiomes = activeBiomeIds.ToHashSet(
@@ -342,6 +353,15 @@ public static class EcologyPlanner
                 random,
                 definition.MovementMode,
                 simplified);
+            if (terrainProfile is not null &&
+                !string.Equals(definition.MovementMode, "Aquatic", StringComparison.Ordinal))
+            {
+                double terrainY = PlanetSurfaceTerrainRuntime.SampleHeight(
+                    terrainProfile,
+                    x,
+                    z);
+                y += terrainY;
+            }
             spawns.Add(new EcologyFaunaSpawn(
                 $"ecology.fauna.{StableToken(definition.FaunaId)}.{index:000}",
                 definition.FaunaId,

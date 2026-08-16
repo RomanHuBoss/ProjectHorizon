@@ -70,6 +70,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
 
     private PlayerController? _player;
     private Node3D? _worldRoot;
+    private PlanetSurfaceTerrainProfile? _terrainProfile;
     private Rect2 _groundXZ;
     private NpcNavigationTileKey _centerTile;
     private bool _hasCenterTile;
@@ -109,12 +110,16 @@ public partial class NpcNavigationSurfaceNode : Node3D
 
     public int ObstacleRevision => _obstacleRevision;
 
-    public void Configure(PlayerController player, Node3D worldRoot)
+    public void Configure(
+        PlayerController player,
+        Node3D worldRoot,
+        PlanetSurfaceTerrainProfile? terrainProfile = null)
     {
         ArgumentNullException.ThrowIfNull(player);
         ArgumentNullException.ThrowIfNull(worldRoot);
         _player = player;
         _worldRoot = worldRoot;
+        _terrainProfile = terrainProfile;
         Name = "NpcNavigation";
         AddToGroup("npc_navigation_surface");
         Rid navigationMap = GetWorld3D().NavigationMap;
@@ -145,6 +150,31 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             _syncFramesRemaining--;
         }
+    }
+
+    public void SetTerrainProfile(PlanetSurfaceTerrainProfile? terrainProfile)
+    {
+        _terrainProfile = terrainProfile;
+        if (!IsConfigured)
+        {
+            return;
+        }
+        ResolveGroundBounds();
+        CaptureStaticObstacles();
+        RebuildAvoidanceObstacles();
+        RebuildCurrentTiles();
+        _hasCenterTile = false;
+        RefreshStreaming(force: true);
+    }
+
+    public float GetNavigationHeight(float x, float z)
+    {
+        return _terrainProfile is null
+            ? NavigationSurfaceY
+            : (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+                _terrainProfile,
+                x,
+                z) + NavigationSurfaceY;
     }
 
     public void RefreshObstacleGeometry()
@@ -508,7 +538,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
         NavigationRegion3D region = new()
         {
             Name = $"Tile_{key.X}_{key.Z}",
-            Position = new Vector3(originX, NavigationSurfaceY, originZ),
+            Position = new Vector3(originX, 0.0f, originZ),
             NavigationMesh = navigationMesh,
             NavigationLayers = NavigationLayer,
             UseEdgeConnections = true,
@@ -525,9 +555,11 @@ public partial class NpcNavigationSurfaceNode : Node3D
                 return existing;
             }
             int index = vertices.Count;
+            float worldX = originX + x * CellSizeMeters;
+            float worldZ = originZ + z * CellSizeMeters;
             vertices.Add(new Vector3(
                 x * CellSizeMeters,
-                0.0f,
+                GetNavigationHeight(worldX, worldZ),
                 z * CellSizeMeters));
             vertexIndices.Add(vertexKey, index);
             return index;
@@ -548,6 +580,19 @@ public partial class NpcNavigationSurfaceNode : Node3D
             minimumZ < groundMinZ || maximumZ > groundMaxZ)
         {
             return false;
+        }
+        if (_terrainProfile is not null)
+        {
+            double centerX = (minimumX + maximumX) * 0.5;
+            double centerZ = (minimumZ + maximumZ) * 0.5;
+            PlanetSurfaceTerrainSample terrain = PlanetSurfaceTerrainRuntime.Sample(
+                _terrainProfile,
+                centerX,
+                centerZ);
+            if (terrain.SlopeDegrees > _terrainProfile.MaximumWalkableSlopeDegrees)
+            {
+                return false;
+            }
         }
         return !_obstacles.Any(obstacle => obstacle.IntersectsCell(
             minimumX,
@@ -575,12 +620,19 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             throw new InvalidOperationException("Navigation world root is unavailable.");
         }
+        if (_terrainProfile is not null)
+        {
+            float extent = (float)_terrainProfile.HalfExtent;
+            _groundXZ = new Rect2(-extent, -extent, extent * 2.0f, extent * 2.0f);
+            return;
+        }
+
         CollisionShape3D? groundShape = _worldRoot.GetNodeOrNull<CollisionShape3D>(
             "GroundBody/CollisionShape3D");
         if (groundShape?.Shape is not BoxShape3D box)
         {
             throw new InvalidOperationException(
-                "TASK-124 requires a BoxShape3D GroundBody collision for local navigation bounds.");
+                "TASK-124 requires terrain bounds or a BoxShape3D GroundBody collision.");
         }
         Vector3 center = groundShape.GlobalPosition;
         Vector3 size = box.Size;
@@ -634,7 +686,10 @@ public partial class NpcNavigationSurfaceNode : Node3D
             NavigationObstacle3D obstacle = new()
             {
                 Name = "Obstacle_" + SanitizeNodeName(bounds.Id),
-                Position = new Vector3(bounds.Center.X, NavigationSurfaceY, bounds.Center.Z),
+                Position = new Vector3(
+                    bounds.Center.X,
+                    GetNavigationHeight(bounds.Center.X, bounds.Center.Z),
+                    bounds.Center.Z),
                 Radius = Math.Max(bounds.HalfX, bounds.HalfZ) + AgentRadiusMeters * 0.35f,
                 Height = Math.Max(1.0f, bounds.Height),
                 AvoidanceEnabled = true,

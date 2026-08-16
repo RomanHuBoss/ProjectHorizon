@@ -14,7 +14,8 @@ public partial class BaseConstructionModuleNode : StaticBody3D
     public void Configure(
         BaseModuleDefinition definition,
         BaseModulePlacement placement,
-        double gridSizeMeters)
+        double gridSizeMeters,
+        double surfaceHeight = 0.11)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(placement);
@@ -30,7 +31,7 @@ public partial class BaseConstructionModuleNode : StaticBody3D
         Name = ToNodeName(placement.InstanceId);
         Position = new Vector3(
             (float)(placement.GridX * gridSizeMeters),
-            (float)(definition.Size.Y * 0.5 + 0.11),
+            (float)(definition.Size.Y * 0.5 + surfaceHeight),
             (float)(placement.GridZ * gridSizeMeters));
         Rotation = new Vector3(
             0.0f,

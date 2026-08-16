@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.156] - 2026-08-15
+
+### Added — TASK-156 Planet-Specific Terrain & Surface Geometry
+
+- Replaced the flat vertical-slice GroundBody at runtime with deterministic 65x65 planet-specific terrain and matching trimesh collision.
+- Added distinct temperate/desert/frozen/volcanic morphology plus bounded profiles for all other landable archetypes.
+- Preserved a central tutorial terrace and added deterministic wet-world basin floors for existing water interactions/aquatic habitat.
+- Grounded ecology, POI presentation, resource nodes and base-construction placement on the shared terrain sampler while preserving legacy stable IDs.
+- Upgraded tiled NavigationServer3D regions to heightfield vertices/slope filtering and removed flat-Y forcing from ground NPC movement.
+- Added TASK-156 F5 acceptance, three xUnit regressions, RU/EN terrain HUD strings and a repository quality gate.
+
 ## [0.1.0-alpha.154.1] - 2026-08-15
 
 ### Fixed

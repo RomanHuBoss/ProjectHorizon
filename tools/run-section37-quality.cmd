@@ -35,9 +35,11 @@ dotnet build "%PROJECT%" -c Debug --no-restore -p:ContinuousIntegrationBuild=tru
 %PY% "%ROOT%\tools\validate-task152-interplanetary-travel.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task154-multi-planet-surface-content.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task1541-runtime-acceptance-hotfix.py" || exit /b 1
+%PY% "%ROOT%\tools\validate-task156-planet-surface-terrain.py" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --collect:"XPlat Code Coverage" --settings "%ROOT%\tests\coverlet.runsettings" --results-directory "%RESULTS%" --logger "trx;LogFileName=section36.trx" || exit /b 1
 %PY% "%ROOT%\tools\verify-section36-coverage.py" --results-dir "%RESULTS%" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests" || exit /b 1
 
 echo TASK-140 LOCAL QUALITY PASS: warningsAsErrors=1; tests=1; json=1; migrations=1; coverage=1; architecture=1.
 exit /b 0
+

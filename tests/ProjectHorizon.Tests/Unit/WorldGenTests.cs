@@ -434,4 +434,113 @@ public sealed class WorldGenTests
         Assert.Equal(1, ecologyRestore.DiscoveredFloraCount);
     }
 
+    [Fact]
+    public void PlanetSurfaceTerrain_FourStarterPlanetsHaveDistinctDeterministicMorphology()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetSurfaceContentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => surface.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .ToArray();
+
+        Assert.Equal(4, profiles.Length);
+        Assert.Equal(4, profiles.Select(profile =>
+                PlanetSurfaceTerrainRuntime.MorphologySignature(profile.Terrain))
+            .Distinct(StringComparer.Ordinal).Count());
+        Assert.All(profiles, profile =>
+        {
+            PlanetSurfaceTerrainSample first = PlanetSurfaceTerrainRuntime.Sample(
+                profile.Terrain,
+                27.25,
+                -18.75);
+            PlanetSurfaceTerrainSample second = PlanetSurfaceTerrainRuntime.Sample(
+                profile.Terrain,
+                27.25,
+                -18.75);
+            Assert.Equal(first, second);
+            Assert.InRange(first.SlopeDegrees, 0.0, 89.0);
+        });
+    }
+
+    [Fact]
+    public void PlanetSurfaceTerrain_PreservesCentralTerraceAndWetWorldBasins()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+
+        foreach (GalaxyPlanetDefinition planet in galaxy.CurrentSystem.Planets)
+        {
+            PlanetSurfaceContentProfile profile = surface.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType);
+            Assert.InRange(
+                Math.Abs(PlanetSurfaceTerrainRuntime.SampleHeight(
+                    profile.Terrain,
+                    10.0,
+                    -7.0)),
+                0.0,
+                0.001);
+            if (profile.WaterHabitatEnabled)
+            {
+                Assert.True(PlanetSurfaceTerrainRuntime.SampleHeight(
+                    profile.Terrain,
+                    -25.5,
+                    25.5) <= -0.35);
+            }
+            else
+            {
+                Assert.False(profile.Terrain.WaterBasinsEnabled);
+            }
+        }
+    }
+
+    [Fact]
+    public void PlanetSurfaceTerrain_GroundsEcologyAndTerrainAwarePois()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetSurfaceContentProfile profile = surface.BuildProfile(
+            galaxy.CurrentSystem.Planets[1],
+            galaxy.CurrentSystem.StarType);
+
+        EcologyPlan ecology = surface.BuildEcologyPlan(profile);
+        Assert.All(ecology.Flora.Take(24), placement => Assert.InRange(
+            Math.Abs(placement.PositionY - PlanetSurfaceTerrainRuntime.SampleHeight(
+                profile.Terrain,
+                placement.PositionX,
+                placement.PositionZ)),
+            0.0,
+            0.000001));
+
+        IReadOnlyList<PlanetaryPoiPlacement> pois = surface.BuildPoiPlan(profile);
+        Assert.Equal(PlanetaryPoiCatalog.ExpectedPoiTypeCount, pois.Count);
+        Assert.All(pois, placement =>
+        {
+            Assert.True(double.IsFinite(placement.Environment.SlopeDegrees));
+            Assert.True(PlanetaryPoiPlanner.MeetsDefinitionConstraints(
+                RepositoryFixture.Pois.GetDefinition(placement.PoiTypeId),
+                placement.Environment));
+        });
+    }
+
 }

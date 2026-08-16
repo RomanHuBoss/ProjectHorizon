@@ -9,7 +9,8 @@ public sealed record PlanetSurfaceContentProfile(
     PlanetEnvironmentProfile Environment,
     double Habitability,
     bool WaterHabitatEnabled,
-    IReadOnlyList<string> ActiveBiomeIds);
+    IReadOnlyList<string> ActiveBiomeIds,
+    PlanetSurfaceTerrainProfile Terrain);
 
 public sealed class PlanetSurfaceContentRuntime
 {
@@ -61,14 +62,19 @@ public sealed class PlanetSurfaceContentRuntime
             0.15,
             1.0);
 
+        long worldSeed = NormalizeSeed(planet.Seed);
+        PlanetSurfaceTerrainProfile terrain =
+            PlanetSurfaceTerrainRuntime.BuildProfile(environment, worldSeed);
+
         return new PlanetSurfaceContentProfile(
             planet.PlanetId,
-            NormalizeSeed(planet.Seed),
+            worldSeed,
             BuildRegionKey(planet.PlanetId),
             environment,
             habitability,
             environment.WaterCoverage >= 0.12,
-            environment.ActiveBiomeIds.ToArray());
+            environment.ActiveBiomeIds.ToArray(),
+            terrain);
     }
 
     public EcologyPlan BuildEcologyPlan(PlanetSurfaceContentProfile profile)
@@ -79,7 +85,8 @@ public sealed class PlanetSurfaceContentRuntime
             profile.WorldSeed,
             profile.ActiveBiomeIds,
             profile.Environment.WaterCoverage,
-            profile.Habitability);
+            profile.Habitability,
+            profile.Terrain);
     }
 
     public IReadOnlyList<PlanetaryPoiPlacement> BuildPoiPlan(
@@ -93,6 +100,7 @@ public sealed class PlanetSurfaceContentRuntime
             profile.RegionKey,
             _environment,
             profile.Environment,
+            profile.Terrain,
             activeQuestTags);
     }
 

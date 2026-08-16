@@ -12,6 +12,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private double _nextAttackAtAge;
     private Vector3 _wanderDirection = Vector3.Forward;
     private AerialSteeringRuntime? _aerialSteering;
+    private PlanetSurfaceTerrainProfile? _terrainProfile;
 
     public string InstanceId { get; private set; } = string.Empty;
 
@@ -41,7 +42,8 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         EcologyFaunaDefinition definition,
         EcologyFaunaSpawn spawn,
         Node3D player,
-        AerialSteeringRuntime? aerialSteering = null)
+        AerialSteeringRuntime? aerialSteering = null,
+        PlanetSurfaceTerrainProfile? terrainProfile = null)
     {
         ArgumentNullException.ThrowIfNull(definition);
         ArgumentNullException.ThrowIfNull(spawn);
@@ -49,11 +51,21 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         _definition = definition;
         _player = player;
         _aerialSteering = aerialSteering;
+        _terrainProfile = terrainProfile;
         InstanceId = spawn.InstanceId;
         Name = spawn.InstanceId.Replace('.', '_');
+        float initialY = (float)spawn.PositionY;
+        if (_terrainProfile is not null &&
+            string.Equals(definition.MovementMode, "Ground", StringComparison.Ordinal))
+        {
+            initialY = (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+                _terrainProfile,
+                spawn.PositionX,
+                spawn.PositionZ) + 0.75f;
+        }
         Position = new Vector3(
             (float)spawn.PositionX,
-            (float)spawn.PositionY,
+            initialY,
             (float)spawn.PositionZ);
         Rotation = new Vector3(
             0.0f,
@@ -313,7 +325,13 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 "Aquatic",
                 StringComparison.Ordinal))
         {
-            Position = new Vector3(Position.X, 0.75f, Position.Z);
+            float terrainY = _terrainProfile is null
+                ? 0.0f
+                : (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+                    _terrainProfile,
+                    Position.X,
+                    Position.Z);
+            Position = new Vector3(Position.X, terrainY + 0.75f, Position.Z);
         }
 
         Vector3 horizontal = new(Velocity.X, 0.0f, Velocity.Z);

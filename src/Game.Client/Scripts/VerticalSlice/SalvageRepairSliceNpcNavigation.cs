@@ -42,7 +42,7 @@ public partial class SalvageRepairSlice
         {
             return;
         }
-        _npcNavigationSurface.Configure(_player, this);
+        _npcNavigationSurface.Configure(_player, this, CurrentTerrainProfile);
         AttachNpcNavigationAgents();
     }
 

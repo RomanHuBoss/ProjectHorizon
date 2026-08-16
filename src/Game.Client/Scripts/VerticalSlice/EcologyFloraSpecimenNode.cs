@@ -24,7 +24,7 @@ public partial class EcologyFloraSpecimenNode : StaticBody3D, IInteractable, IHi
         Name = placement.InstanceId.Replace('.', '_');
         Position = new Vector3(
             (float)placement.PositionX,
-            0.55f,
+            (float)placement.PositionY + 0.55f,
             (float)placement.PositionZ);
         Rotation = new Vector3(
             0.0f,

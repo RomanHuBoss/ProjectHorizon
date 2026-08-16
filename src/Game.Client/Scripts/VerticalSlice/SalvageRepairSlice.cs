@@ -508,6 +508,7 @@ public partial class SalvageRepairSlice : Node3D
         InitializeArchitectureRuntime();
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
+        RepositionSurfaceBoundObjects();
 
         foreach (Node node in GetTree().GetNodesInGroup(
             "vertical_slice_resource"))
@@ -4451,7 +4452,9 @@ public partial class SalvageRepairSlice : Node3D
             gridZ,
             new Vector3(
                 (float)(gridX * gridSize),
-                0.11f,
+                (float)SamplePlanetSurfaceHeight(
+                    gridX * gridSize,
+                    gridZ * gridSize) + 0.11f,
                 (float)(gridZ * gridSize)));
     }
 
@@ -4574,7 +4577,7 @@ public partial class SalvageRepairSlice : Node3D
         EnsureBaseBuildPreviewMesh(definition);
         _baseBuildPreview.GlobalPosition = new Vector3(
             worldPosition.X,
-            (float)(definition.Size.Y * 0.5 + 0.11),
+            worldPosition.Y + (float)(definition.Size.Y * 0.5),
             worldPosition.Z);
         _baseBuildPreview.Rotation = new Vector3(
             0.0f,
@@ -4660,10 +4663,13 @@ public partial class SalvageRepairSlice : Node3D
         foreach (BaseModulePlacement placement in BaseConstruction.Placements)
         {
             BaseConstructionModuleNode node = new();
+            double moduleX = placement.GridX * BaseConstructionCatalog.GridSizeMeters;
+            double moduleZ = placement.GridZ * BaseConstructionCatalog.GridSizeMeters;
             node.Configure(
                 BaseConstructionCatalog.GetModule(placement.ModuleId),
                 placement,
-                BaseConstructionCatalog.GridSizeMeters);
+                BaseConstructionCatalog.GridSizeMeters,
+                SamplePlanetSurfaceHeight(moduleX, moduleZ) + 0.11);
             _baseConstructionModulesRoot.AddChild(node);
         }
         RefreshNpcNavigationObstacles();
@@ -4689,7 +4695,9 @@ public partial class SalvageRepairSlice : Node3D
         foreach (PlanetaryPoiRuntimeState state in PlanetaryExploration.States)
         {
             PlanetaryPoiNode node = new();
-            node.Configure(state.Definition, state.Placement);
+            PlanetaryPoiPlacement terrainPlacement =
+                ProjectPoiPlacementToTerrain(state);
+            node.Configure(state.Definition, terrainPlacement);
             _planetaryPoisRoot.AddChild(node);
             node.ApplyState(state.Discovered, state.Resolved);
             _planetaryPoiNodes.Add(node);
@@ -5485,6 +5493,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetEnvironmentAcceptance();
         RunInterplanetaryTravelAcceptance();
         RunPlanetSurfaceContentAcceptance();
+        RunPlanetSurfaceTerrainAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5494,7 +5503,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7551,6 +7560,7 @@ public partial class SalvageRepairSlice : Node3D
         string starSystemLine = BuildStarSystemSimulationHudLine();
         string planetEnvironmentLine = BuildPlanetEnvironmentHudLine();
         string planetSurfaceContentLine = BuildPlanetSurfaceContentHudLine();
+        string planetTerrainLine = BuildPlanetTerrainHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7587,6 +7597,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-150 (F5): {_planetEnvironmentAcceptanceHud}",
             $"TASK-152 (F5): {_interplanetaryTravelAcceptanceHud}",
             $"TASK-154 (F5): {_planetSurfaceContentAcceptanceHud}",
+            $"TASK-156 (F5): {_planetSurfaceTerrainAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7615,6 +7626,7 @@ public partial class SalvageRepairSlice : Node3D
                 starSystemLine,
                 planetEnvironmentLine,
                 planetSurfaceContentLine,
+                planetTerrainLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,
@@ -7660,6 +7672,7 @@ public partial class SalvageRepairSlice : Node3D
             starSystemLine,
             planetEnvironmentLine,
             planetSurfaceContentLine,
+            planetTerrainLine,
             worldSceneLine,
             audioLine,
             ecologyLine,

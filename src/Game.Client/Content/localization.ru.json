@@ -969,6 +969,8 @@
     "ui.hud.planet_environment.unavailable": "Окружение планеты: недоступно",
     "ui.hud.planet_surface.summary": "Поверхность {archetype}: биомы={biomes}; флора={flora}; фауна={fauna}; вода={water}",
     "ui.hud.planet_surface.unavailable": "Поверхность планеты: недоступна",
+    "ui.hud.planet_terrain.summary": "Рельеф {archetype}: высота={height} м; уклон={slope}°; сетка={resolution}²",
+    "ui.hud.planet_terrain.unavailable": "Рельеф планеты: недоступен",
     "ui.hud.progress": "Прогресс: лом={salvage}/{required} • компоненты={crafted}/{total} • рев={revision}",
     "ui.hud.recipe_progress": "{recipe} [{inputs} → {state}, {seconds}с, {station}]",
     "ui.hud.recipe_state.locked": "ЗАБЛОКИРОВАНО:{technology}",

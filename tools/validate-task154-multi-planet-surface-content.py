@@ -17,6 +17,7 @@ def need(condition: bool, message: str, failures: list[str]) -> None:
 failures: list[str] = []
 surface = text('src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceContentRuntime.cs')
 slice_surface = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetSurfaceContent.cs')
+slice_terrain = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetTerrain.cs')
 ecology_planner = text('src/Game.Client/Scripts/VerticalSlice/EcologyPlanner.cs')
 poi_planner = text('src/Game.Client/Scripts/VerticalSlice/PlanetaryPoiPlanner.cs')
 ecology_runtime = text('src/Game.Client/Scripts/VerticalSlice/EcologyRuntime.cs')
@@ -83,8 +84,8 @@ need('CaptureCurrentPlanetSurfaceState();' in galaxy_slice and
      'hyperspace lifecycle does not preserve/switch surface state', failures)
 need('WaterHabitatEnabled' in ec_slice and 'AquaticHabitat' in ec_slice,
      'dry-world aquatic scene policy missing', failures)
-need('Gameplay/WaterPool' in slice_surface and 'GroundBody/MeshInstance3D' in slice_surface and
-     'WorldEnvironment' in slice_surface,
+need('Gameplay/WaterPool' in slice_surface and 'WorldEnvironment' in slice_surface and
+     'GroundBody/MeshInstance3D' in slice_terrain and 'ApplyPlanetSurfaceTerrain' in slice_terrain,
      'surface visual presentation is not planet-aware', failures)
 
 need('TASK-154 multi-planet surface content acceptance' in acceptance and

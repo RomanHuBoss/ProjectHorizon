@@ -170,6 +170,7 @@ public partial class SalvageRepairSlice
             _ecologyCatalogPanel.Visible = false;
         }
 
+        ApplyPlanetSurfaceTerrain();
         ApplyPlanetSurfacePresentation();
         if (rebuildScene)
         {
@@ -276,18 +277,6 @@ public partial class SalvageRepairSlice
 
         PlanetEnvironmentProfile environment =
             _planetSurfaceContentProfile.Environment;
-        MeshInstance3D? ground = GetNodeOrNull<MeshInstance3D>(
-            "GroundBody/MeshInstance3D");
-        if (ground is not null)
-        {
-            Color groundColor = BuildGroundColor(environment.Archetype);
-            ground.MaterialOverride = new StandardMaterial3D
-            {
-                AlbedoColor = groundColor,
-                Roughness = 0.94f
-            };
-        }
-
         Area3D? waterPool = GetNodeOrNull<Area3D>("Gameplay/WaterPool");
         if (waterPool is not null)
         {

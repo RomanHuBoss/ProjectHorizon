@@ -2,9 +2,62 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task156-planet-specific-terrain.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая mega-итерация 2026-08-15 — TASK-156 Planet-Specific Terrain & Surface Geometry
+
+**Исходный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task156-planet-specific-terrain.zip`.  
+**Версия:** `0.1.0-alpha.156`.  
+**Статус:** TASK-156 `IMPLEMENTED`; runtime/manual acceptance TASK-157 `IN_PROGRESS`.
+
+### Основание для следующей mega-итерации
+
+Повторный внешний F5 пользователя подтвердил, что hotfix TASK-154.1 сработал: `TASK-138 verification suite acceptance PASS` показывает `generatorVersion=2; goldenSystems=4/4; checksums=1`, а `TASK-124 NPC navigation acceptance PASS` показывает реальный cross-tile path (`tilesTouched=4; pathPoints=56; probeAttempts=3; recoveryProbe=1; sync=1`). Одновременно TASK-152 и TASK-154 снова PASS. Поэтому следующая кодовая итерация не тратится на ещё один acceptance-only hotfix.
+
+После TASK-150/TASK-154 планеты уже различались environment/biome/ecology/POI, но playable `GroundBody` оставался единым плоским `80 x 80 m` BoxMesh/BoxShape. Это стало главным системным и визуальным разрывом Stage 2. TASK-156 закрывает одну связанную подсистему: **planet archetype/seed → deterministic relief → mesh/collision → ecology/POI projection → NPC navigation → base/resource grounding → F5 acceptance**.
+
+### Реализовано
+
+- добавлен `PlanetSurfaceTerrainRuntime` и `PlanetSurfaceTerrainProfile`: единый deterministic sampler для всех landable archetypes; starter temperate/desert/frozen/volcanic имеют разные morphology algorithms/amplitude/frequency budgets;
+- active bounded surface сохраняет существующий footprint `80 x 80 m`, но runtime заменяет плоский ground на `65 x 65` grid (`4,225` vertices / `8,192` triangles) через `SurfaceTool`; collision заменяется на `CreateTrimeshShape()`;
+- центральная tutorial/infrastructure зона имеет deterministic terrace: relief подавлен внутри 16 m и плавно выходит на полный профиль к 23 m, чтобы не ломать starter repair/crafting/building loop;
+- wet profiles получают гарантированные terrain basins под существующий `Gameplay/WaterPool` и `AquaticHabitat`; dry profiles сохраняют TASK-154 aquatic suppression;
+- `EcologyPlanner.PlanPlanet` принимает terrain profile: flora получает surface Y; ground fauna привязывается к surface height и во время движения больше не возвращается на фиксированную `Y=0.75`; legacy starter ecology IDs/XZ не меняются — scene projection меняет только Y;
+- `PlanetaryPoiPlanner.PlanPlanet` использует физический terrain slope как часть constraint evaluation; POI scene всегда проецируется на exact terrain Y. Historical starter POI instance IDs и X/Z сохранены;
+- `NpcNavigationSurfaceNode` больше не требует BoxShape ground при активном terrain profile: каждая вершина `NavigationRegion3D` получает sampled Y, слишком крутые cells исключаются, avoidance obstacles ставятся на локальную высоту;
+- `NpcFactionAgentNode` больше не форсирует `_home.Y`; после движения NPC возвращается на navigation/terrain height;
+- generated resource nodes и base construction preview/modules проецируются на terrain; persistent base grid остаётся X/Z-only и не требует save migration;
+- F5 matrix дополнена `TASK-156 planet terrain acceptance`; добавлены 3 xUnit regressions и `tools/validate-task156-planet-surface-terrain.py`; quality cmd/sh запускают новый gate; RU/EN HUD parity сохранена;
+- документация: `docs/PLANET_SURFACE_TERRAIN.md`, README, CHANGELOG, VERSION и этот журнал.
+
+### Детерминированная проверка planner compatibility
+
+Помимо repository static gates, morphology/slope math воспроизведена отдельно для фактических stable seeds четырёх starter planets из reviewed golden fixture. Центральная терраса остаётся `0.0 m`; temperate/frozen basin centers гарантированно опускаются до `-1.20/-1.05 m`; dry desert/volcanic basin policy не применяется. Terrain-aware POI planner на тех же четырёх seed сохраняет полный результат `20/20` POI для каждой планеты, включая строгие low-slope объекты вроде landing pad/trading outpost.
+
+### Фактические проверки в среде подготовки
+
+Все repository `validate-*.py` gates проходят после интеграции TASK-156. Новый gate выдаёт:
+
+`TASK-156 PLANET SURFACE TERRAIN CONTRACT PASS: starterMorphology=4/4; deterministic=1; mesh=65x65; trimesh=1; centralTerrace=1; waterBasins=1; ecologyProjection=1; poiTerrain=1; navHeightfield=1; npcGrounding=1; legacyIds=1; f5=1; xunit=3/3; localization=2/2.`
+
+В среде подготовки по-прежнему нет `dotnet`, `csc/msbuild` и Godot, а внешний network недоступен, поэтому реальная компиляция/xUnit/Godot TASK-156 здесь не заявляются. Нормативные PDF в исходном архиве остаются Git LFS pointer files; новые требования не реконструируются сверх уже зафиксированных §9.1–9.8/Stage 2 и существующей terrain/quadtree architecture.
+
+### Критерии runtime-приёмки TASK-157
+
+1. `tools\clean-build-windows10.cmd` → `0 warnings / 0 errors`; затем `tools\run-section37-quality.cmd`.
+2. F5 → обязательна `TASK-156 planet terrain acceptance PASS` с `starterPlanets=4/4; distinctMorphology=4/4; deterministic=1; centralTerrace=1; geometryBounds=1; walkableCoverage=1; waterBasinPolicy=1; ecologyGrounded=1; poiTerrainAware=1; legacyIdentitySafe=1; vertices=4225; triangles=8192`.
+3. В стартовом temperate мире визуально проверить, что центр вокруг корабля/станций остаётся пригодной террасой, а за её границей появляется реальный relief; NPC и ground fauna не должны парить/проваливаться.
+4. Перелететь минимум на desert и volcanic: профиль terrain должен заметно отличаться; volcanic должен быть самым резким и оставаться dry.
+5. На frozen/temperate проверить водную впадину и отсутствие пересечения воды с поднятым грунтом; на volcanic water habitat должен отсутствовать.
+6. Проверить cross-tile движение NPC на relief и построить base module вне центра на умеренном склоне: preview/module должны стоять на surface Y.
+7. Прислать clean build `0/0`, полный `TASK-156 ... PASS`, одну `TASK-156 planet terrain READY` для temperate и volcanic и 2 screenshots (temperate/frozen + volcanic). При FAIL — первая compile/runtime error, полный FAIL output и ближайшие TASK-124/TASK-156 diagnostics.
+
+**Known boundary:** TASK-156 делает bounded active surface геометрически planet-specific и интегрирует его с gameplay. Он не заменяет Stage 2 bounded residency на бесшовный whole-planet streamer: существующая cube-sphere/quadtree architecture остаётся следующим уровнем масштабирования, а не параллельно resident full planet.
 
 ---
 
@@ -13,7 +66,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task154-multi-planet-surface-content.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.154.1`.  
-**Статус:** hotfix `IMPLEMENTED`; требуется повторный Windows/Godot F5. TASK-153 и TASK-155 остаются `IN_PROGRESS`, но их F5-пункты теперь подтверждены внешним runtime evidence.
+**Статус:** hotfix `VERIFIED` по повторному Godot F5 evidence пользователя: TASK-138 и TASK-124 после исправлений PASS. TASK-153 и TASK-155 формально сохраняют отдельные manual/build acceptance-tail пункты.
 
 ### Внешнее runtime evidence пользователя
 
@@ -44,7 +97,7 @@ Godot 4.7.1 .NET / Forward Mobile / Vulkan реально запустил F5 ma
 - `TASK-153`: остаётся `IN_PROGRESS` — нет присланного clean-build/section-37 и manual target→cruise→landing→cold-restore evidence.
 - `TASK-155`: остаётся `IN_PROGRESS` — нет manual multi-planet variation + independent cold-restore evidence.
 - TASK-124 navigation implementation не откатывается: runtime diagnostics/последующие recovery подтверждают живую подсистему; исправляется ложный negative acceptance race.
-- TASK-138 golden verification contract требует повторного F5 после hotfix; до него новая редакция не объявляется runtime-verified.
+- TASK-138 golden verification contract повторно подтверждён: `generatorVersion=2; goldenSystems=4/4; checksums=1`. TASK-124 также повторно PASS (`tilesTouched=4; pathPoints=56; probeAttempts=3; recoveryProbe=1; sync=1`).
 
 ### Фактические проверки в среде подготовки
 
@@ -5402,7 +5455,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `ENV-109` | Developer Planet Preview визуализирует environment profile | `VERIFIED` | cube-sphere preview + water/atmosphere/cloud shells |
 | `ENV-110` | Current planet сохраняется backward-compatible без SQLite schema bump | `VERIFIED` | optional `GalaxyNavigationSaveData.CurrentPlanetId`; legacy fallback |
 | `ENV-111` | Environment детерминирован от stable planet seed, без global sequential RNG | `VERIFIED` | stable hash/mix; repeated-profile acceptance |
-| `ENV-112` | Existing cube-sphere/quadtree terrain остаётся source geometry | `VERIFIED` | presentation shells layered over `CubeSpherePrototype`; terrain pipeline unchanged |
+| `ENV-112` | Existing cube-sphere/quadtree terrain остаётся planet-scale source geometry | `VERIFIED` | `CubeSpherePrototype`/quadtree architecture retained; TASK-156 adds a bounded active-surface heightfield mesh without removing the planet-scale terrain pipeline |
 | `ENV-ACC-100` | Clean build новой редакции `0/0` | `VERIFIED` | выполнить TASK-151 на Windows/Godot .NET  + product-owner «всё работает» acceptance 2026-08-15 |
 | `ENV-ACC-101` | Section-37 quality + xUnit environment tests green | `VERIFIED` | static gates PASS; actual `dotnet test` unavailable in preparation environment |
 | `ENV-ACC-102` | F5 выдаёт TASK-150 PASS с exact 4/4, 9/9 и samples=16 | `VERIFIED` | выполнить TASK-151 runtime acceptance  + product-owner «всё работает» acceptance 2026-08-15 |
@@ -5447,6 +5500,26 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `SURFACE-ACC-102` | F5 TASK-154 PASS | `VERIFIED` | внешний Godot 4.7.1 F5: 4/4 profiles/regions + ecology/aquatic/POI/persistence/legacy = 1 |
 | `SURFACE-ACC-103` | Manual 4-planet variation + independent cold restore | `IN_PROGRESS` | выполнить gameplay smoke по критериям §0 |
 
+### 8.27. Planet-Specific Terrain & Surface Geometry
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `TERRAIN-100` | Current landable planet имеет deterministic terrain profile от archetype + stable seed | `IMPLEMENTED` | `PlanetSurfaceTerrainRuntime`; profile stored in `PlanetSurfaceContentProfile.Terrain` |
+| `TERRAIN-101` | Starter 4 planets имеют различимую morphology | `IMPLEMENTED` | temperate/desert/frozen/volcanic dedicated shaping; morphology signature acceptance |
+| `TERRAIN-102` | Bounded surface создаёт реальный mesh + physics collision | `IMPLEMENTED` | 65x65 `SurfaceTool` mesh; `CreateTrimeshShape()` |
+| `TERRAIN-103` | Starter infrastructure защищена central terrace | `IMPLEMENTED` | 16 m flat core → full relief at 23 m |
+| `TERRAIN-104` | Wet worlds имеют terrain basins, dry worlds их не создают | `IMPLEMENTED` | protected basin floors at gameplay/aquatic water volumes |
+| `TERRAIN-105` | Ecology визуально/физически следует surface Y без смены legacy IDs | `IMPLEMENTED` | planner Y + scene projection + ground-fauna re-grounding |
+| `TERRAIN-106` | POI учитывают terrain slope и стоят на exact surface Y | `IMPLEMENTED` | terrain-aware `PlanPlanet`; identity-safe runtime projection |
+| `TERRAIN-107` | NPC NavMesh повторяет terrain и исключает чрезмерные склоны | `IMPLEMENTED` | per-vertex Y; slope filter; terrain-height avoidance obstacles |
+| `TERRAIN-108` | Ground NPC не форсятся на flat `_home.Y` | `IMPLEMENTED` | `GetNavigationHeight` after movement and territory clamp |
+| `TERRAIN-109` | Base/resource surface objects проецируются на terrain | `IMPLEMENTED` | build target/preview/module + generated resource grounding |
+| `TERRAIN-110` | Static/F5/xUnit acceptance проверяет подсистему целиком | `IMPLEMENTED` | TASK-156 validator; F5 acceptance; xUnit 3/3 source coverage |
+| `TERRAIN-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-157 Windows/Godot .NET acceptance |
+| `TERRAIN-ACC-101` | Section-37 + xUnit execution green | `IN_PROGRESS` | static gates PASS; actual dotnet unavailable in preparation environment |
+| `TERRAIN-ACC-102` | F5 TASK-156 PASS | `IN_PROGRESS` | выполнить TASK-157 |
+| `TERRAIN-ACC-103` | Manual visual relief + NPC/base/water smoke across starter planets | `IN_PROGRESS` | выполнить TASK-157 |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -5455,10 +5528,11 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 |---:|---|---|---|
 | 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются clean build `0/0`, quality/xUnit и manual target→cruise→landing→cold restore |
 | 2 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются quality/build evidence, manual variation on starter 4 planets и independent discovery/ecology cold restore |
-| 3 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 3 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | clean build + section-37 + F5 TASK-156 + visual relief/NPC/base/water smoke |
+| 4 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
 **Принято владельцем продукта:** TASK-149 technical foundation и TASK-150/TASK-151 Multi-Planet Environment acceptance.  
-**Текущая кодовая реализация:** TASK-154.1 F5 Runtime Acceptance Regression Closure (`IMPLEMENTED`) поверх TASK-154 Planet-Scoped Surface Content.  
+**Текущая кодовая реализация:** TASK-156 Planet-Specific Terrain & Surface Geometry (`IMPLEMENTED`) поверх verified F5 foundation TASK-154.1/TASK-154.  
 **Формально первая незакрытая приёмочная задача:** TASK-153; TASK-155 следует сразу после неё.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
