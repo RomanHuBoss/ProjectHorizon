@@ -57,6 +57,7 @@ public partial class PlayerController : CharacterBody3D
     public bool IsCrouching { get; private set; }
     public bool IsJetpacking { get; private set; }
     public bool IsSwimming { get; private set; }
+    public float WaterImmersionDepthMeters { get; private set; }
     public float ActiveGravityAcceleration => _gravity;
     public double ActivePlanetGravityG { get; private set; } = 1.0;
     public Vector3 ActiveSurfaceUp => _surfaceUp;
@@ -180,7 +181,19 @@ public partial class PlayerController : CharacterBody3D
     public void SetSwimming(bool swimming)
     {
         IsSwimming = swimming;
+        if (!swimming)
+        {
+            WaterImmersionDepthMeters = 0.0f;
+        }
         MovementResources?.SetSwimming(swimming);
+    }
+
+    public void SetWaterImmersion(bool swimming, double bodyDepthMeters)
+    {
+        SetSwimming(swimming);
+        WaterImmersionDepthMeters = swimming && double.IsFinite(bodyDepthMeters)
+            ? (float)Math.Clamp(bodyDepthMeters, -2.0, 12.0)
+            : 0.0f;
     }
 
     public void SetPlanetSurfaceGravity(double surfaceGravityG)
@@ -302,9 +315,14 @@ public partial class PlayerController : CharacterBody3D
 
         if (IsSwimming)
         {
+            float neutralDepth = 0.72f;
+            float buoyancyTarget = Mathf.Clamp(
+                (WaterImmersionDepthMeters - neutralDepth) * 1.8f,
+                -SwimSpeed * 0.55f,
+                SwimSpeed * 0.85f);
             verticalSpeed = Mathf.MoveToward(
                 verticalSpeed,
-                0.0f,
+                buoyancyTarget,
                 SwimSpeed * dt * 3.0f);
             if (jumpHeld)
             {

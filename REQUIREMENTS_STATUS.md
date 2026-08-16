@@ -44,6 +44,44 @@ Static/F5 проверяют, что redesigned hard-surface assets действ
 Owner build-log подтвердил единственный compile blocker: `SalvageRepairSliceProductionAssetPipeline.cs(40,54) CS1503`, где overloaded `ResourceLoader.Exists` передавался напрямую как method group в `Enumerable.Count(Func<string,bool>)`. `Game.Domain` и restore прошли, итог `warnings=0 / errors=1`; до Godot import/F5 TASK-184 выполнение не дошло. Исправление использует явный адаптер `ProductionGlbResources.Count(path => ResourceLoader.Exists(path))`. Добавлен dedicated static gate, запрещающий возврат к compile-breaking форме; GLB/LOD/collision/docking contracts TASK-184 не изменены.
 
 
+## 0A. Мега-итерация 2026-08-16 — TASK-188 Planetary Water, Swimming & Underwater Rendering
+
+**Исходный снимок:** `ProjectHorizon-main-task186-hard-surface-visual-redesign.zip` (`0.1.0-alpha.186`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task188-planetary-water.zip`.  
+**Версия:** `0.1.0-alpha.188`.  
+**Статус:** `IMPLEMENTED / OWNER CLEAN RUNTIME BASELINE ALPHA.186 PASSED / TASK-188 BUILD+F5+WATER SMOKE PENDING`.
+
+### Основание
+
+Owner Output alpha.186 подтверждает стабильную базу: приложение проходит new-game startup, surface runtime, takeoff, длительный terrain streaming, atmosphere handoff, физический station collision, navigation-assist docking, StationInterior и graceful-exit autosave без видимых ERROR/Exception. TASK-186 visual quality остаётся ручным art-acceptance item, но пользователь разрешил переход к следующей мега-итерации. Gap-analysis ТЗ выбрал §9.6 Water: до TASK-188 существовали только water-coverage metadata, orbit shell и legacy локальный WaterPool trigger, но не единый surface-water/swimming/underwater runtime.
+
+### Реализация TASK-188
+
+- `PlanetaryWaterRuntime`: fixed semantic radial water level; ocean policy by water coverage; deterministic local simplified lakes; signed body/camera depth; independent swimming and underwater Schmitt hysteresis.
+- `PlanetaryWaterSurfaceNode`: bounded curved ocean patch and curved lake discs using the same `PlanetSurfaceCurvedPatchDescriptor` sag as terrain; no global resident ocean collision mesh.
+- Water shader: two TIME-driven wave bands, Fresnel/environment specular response, depth-texture shallow/deep darkening and transparent depth prepass.
+- `UnderwaterPostEffect`: full-screen screen-texture tint/refraction/vignette enabled only when camera depth is below water. HUD renders above the effect.
+- Player swimming: WASD tangential swim, Space ascend, Ctrl descend, neutral bounded buoyancy-like depth controller. This is movement assistance, not fluid simulation.
+- Survival: `Swimming` and `Underwater` are separate; forced oxygen drain occurs only when underwater/head-submerged.
+- Legacy `Gameplay/WaterPool` is hidden and `Monitoring/Monitorable=false`; analytic planet water is authoritative.
+- Added F5 TASK-188, xUnit, static validator, section-37/CI/release enforcement and `docs/PLANETARY_WATER_RUNTIME.md`.
+
+### Acceptance
+
+1. `tools\run-section37-quality.cmd`: clean build, `0 errors / 0 warnings`, all tests/validators green, `TASK-188 PLANETARY WATER CONTRACT PASS`.
+2. Startup: `TASK-188 planetary water READY ... fluidSimulation=0`. No shader compile/import errors.
+3. On foot, enter the ocean/lake and cross the surface repeatedly: swimming state changes once per real crossing, without frame-by-frame chatter.
+4. Swimming controls: WASD horizontal/tangential movement, Space ascend, Ctrl descend; with no vertical input the player trends toward shallow immersion rather than sinking indefinitely.
+5. Submerge camera/head: underwater post-effect appears and oxygen begins draining. Raise head above surface while still swimming: effect clears and underwater oxygen penalty stops.
+6. F5 HUD: `TASK-188 (F5): PASS fixed=1 ocean=1 lakes=1 swim=1 post=1`; Output: `TASK-188 planetary water acceptance PASS ...`.
+7. Regression: surface terrain/streaming, takeoff/orbit, station collision+docking, save/load remain operational.
+
+### Граница итерации
+
+ТЗ прямо не требует вычислительной fluid simulation; TASK-188 её не вводит. Волны визуальные shader-based, ocean/lake geometry bounded, gameplay interaction analytic. Финальные foam/shoreline decals, caustics, authored water audio assets и art polish могут расширять subsystem позднее без смены water-state contract.
+
+---
+
 ## 0A. Мега-итерация 2026-08-16 — TASK-184 Production 3D Asset Pipeline & LOD Integration
 
 **Исходный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip` (`0.1.0-alpha.182`).  

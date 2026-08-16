@@ -308,6 +308,8 @@ public partial class SalvageRepairSlice
             }
         }
 
+        ApplyPlanetaryWaterProfile(environment);
+
         WorldEnvironment? world = GetNodeOrNull<WorldEnvironment>(
             "WorldEnvironment");
         if (world?.Environment is not null)

@@ -13,7 +13,7 @@ terrain=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetTerr
 spawn=text('src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceSpawnSafetyRuntime.cs')
 main=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs')
 tests=text('tests/ProjectHorizon.Tests/Unit/WorldGenTests.cs')
-need(version in {'0.1.0-alpha.174.1','0.1.0-alpha.176','0.1.0-alpha.176.1','0.1.0-alpha.178','0.1.0-alpha.178.1','0.1.0-alpha.178.2','0.1.0-alpha.178.3','0.1.0-alpha.178.4','0.1.0-alpha.178.5','0.1.0-alpha.178.6','0.1.0-alpha.178.7','0.1.0-alpha.180','0.1.0-alpha.180.1','0.1.0-alpha.180.2','0.1.0-alpha.180.3','0.1.0-alpha.182','0.1.0-alpha.184','0.1.0-alpha.184.1','0.1.0-alpha.186'},'VERSION not alpha.174.1/176',f)
+need(version in {'0.1.0-alpha.174.1','0.1.0-alpha.176','0.1.0-alpha.176.1','0.1.0-alpha.178','0.1.0-alpha.178.1','0.1.0-alpha.178.2','0.1.0-alpha.178.3','0.1.0-alpha.178.4','0.1.0-alpha.178.5','0.1.0-alpha.178.6','0.1.0-alpha.178.7','0.1.0-alpha.180','0.1.0-alpha.180.1','0.1.0-alpha.180.2','0.1.0-alpha.180.3','0.1.0-alpha.182','0.1.0-alpha.184','0.1.0-alpha.184.1','0.1.0-alpha.186','0.1.0-alpha.188'},'VERSION not alpha.174.1/176',f)
 need('MinimumBodyCenterClearanceMeters = 1.02' in spawn and 'RequiredSemanticHeight' in spawn,'shared spawn safety policy missing',f)
 need('ApplyPlanetSurfaceStartupClearanceGuard("terrain-bootstrap")' in terrain,'cold-start clearance is not applied synchronously during terrain bootstrap',f)
 need('ApplyPlanetSurfaceStartupClearanceGuard("streamer-handoff")' in terrain,'async streamer handoff clearance guard missing',f)

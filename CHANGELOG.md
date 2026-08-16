@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.0-alpha.188] - 2026-08-16
+
+### Added
+- TASK-188 planetary water runtime with fixed spherical water level, bounded ocean patch and deterministic local lakes.
+- Curved water rendering aligned to the existing planet-radius sag model, animated shader waves, Fresnel/specular response and depth-buffer shallow/deep darkening.
+- Full-screen underwater post-process and signed-depth swimming/underwater hysteresis.
+- Buoyancy-assisted swim movement plus underwater-only oxygen consumption.
+- TASK-188 F5 acceptance, xUnit tests, static validator, section-37/CI/release gates and water runtime documentation.
+
+### Changed
+- Retired the legacy WaterPool Area3D as the authoritative swim trigger.
+- Player survival now distinguishes body swimming from head/camera submersion.
+
 ## [0.1.0-alpha.186] - 2026-08-16
 
 ### Changed — TASK-186 hard-surface visual redesign

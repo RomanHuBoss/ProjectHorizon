@@ -71,6 +71,7 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     private const double MultitoolRegenerationPerSecond = 8.0;
     private const double SprintStaminaCostPerSecond = 17.0;
     private const double JetpackEnergyCostPerSecond = 24.0;
+    public const double UnderwaterMinimumOxygenDrainPerSecond = 1.6;
 
     private readonly PlayerSurvivalCatalog _catalog;
     private readonly HashSet<string> _installedSuitModules = new(StringComparer.Ordinal);
@@ -112,6 +113,7 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     public double JetpackEnergy { get; private set; }
     public double MultitoolEnergy { get; private set; }
     public bool Swimming { get; private set; }
+    public bool Underwater { get; private set; }
     public PlayerMultitoolFunction ActiveMultitoolFunction { get; private set; }
     public bool IsAlive => Health > 0.0001;
 
@@ -396,9 +398,9 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
             }
 
             double oxygenRate = environment.OxygenDrainPerSecond;
-            if (Swimming)
+            if (Underwater)
             {
-                oxygenRate = Math.Max(oxygenRate, 1.6);
+                oxygenRate = Math.Max(oxygenRate, UnderwaterMinimumOxygenDrainPerSecond);
             }
             else if (!environment.Breathable)
             {
@@ -519,6 +521,15 @@ public sealed class PlayerSurvivalRuntime : IPlayerMovementResourceProvider
     public void SetSwimming(bool swimming)
     {
         Swimming = swimming;
+        if (!swimming)
+        {
+            Underwater = false;
+        }
+    }
+
+    public void SetUnderwater(bool underwater)
+    {
+        Underwater = Swimming && underwater;
     }
 
     public PlayerSurvivalSaveData CreateSaveData()

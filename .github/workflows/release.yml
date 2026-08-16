@@ -102,6 +102,7 @@ jobs:
           python3 tools/validate-task184-production-asset-pipeline.py
           python3 tools/validate-task1841-production-asset-build-hotfix.py
           python3 tools/validate-task186-hard-surface-visual-redesign.py
+          python3 tools/validate-task188-planetary-water.py
 
       - name: Unit tests and coverage
         run: >-

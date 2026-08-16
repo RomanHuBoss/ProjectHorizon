@@ -66,8 +66,8 @@ def nodes(doc):
     return {node.get('name', '') for node in doc.get('nodes', [])}
 
 
-if VERSION.read_text().strip() != '0.1.0-alpha.186':
-    fail('VERSION must be 0.1.0-alpha.186')
+if VERSION.read_text().strip() not in {'0.1.0-alpha.186', '0.1.0-alpha.188'}:
+    fail('VERSION must preserve alpha.186 visual redesign or later accepted revision')
 
 gen = text(GEN)
 for token in ['loft_hull(', 'prism_polygon(', 'tapered_nacelle(', 'ring_module(', 'beam_between(']:

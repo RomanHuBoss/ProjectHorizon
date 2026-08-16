@@ -11,6 +11,11 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-188 — Planetary Water, Swimming & Underwater Rendering
+
+Alpha.188 implements Technical Specification §9.6 as a real surface-water gameplay stack. Landable planets now resolve a fixed semantic radial water level into either a bounded spherical ocean patch or deterministic local lakes. The water shader adds animated waves, environment/Fresnel specular response and depth-buffer-based shallow/deep darkening; camera submersion enables a screen-texture underwater post-effect. On-foot movement gains signed-depth swimming with hysteresis and bounded buoyancy assistance: WASD swims tangentially, Space ascends and Ctrl descends. `PlayerSurvivalRuntime` distinguishes `Swimming` from `Underwater`, so the underwater oxygen penalty applies only while the camera/head is submerged. The legacy WaterPool trigger is retired and no liquid/fluid solver is introduced. F5 includes TASK-188 acceptance; see `docs/PLANETARY_WATER_RUNTIME.md`.
+
+
 ## TASK-186 — Hard-Surface Visual Redesign
 
 Alpha.186 keeps the working TASK-184 GLB/LOD/collision pipeline but replaces its primitive-looking geometry. Player explorer and NPC interceptor now use lofted/faceted pressure hulls, swept hard-surface wings, polygonal nacelles and integrated canopy/armor details; the orbital station is rebuilt as a segmented industrial ring with structural trusses, utility pylons, radiator arrays, a dedicated docking collar/tunnel and approach lights. The old sphere/torus-dominant construction is explicitly prohibited by `tools/validate-task186-hard-surface-visual-redesign.py`.
