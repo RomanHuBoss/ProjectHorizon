@@ -47,18 +47,18 @@ public static class FlightFeelHotfixAcceptanceRunner
             !PlanetaryImpactRuntime.IsLethalSurfaceImpact(5.0f, 18.0f) &&
             PlanetaryImpactRuntime.IsLethalSurfaceImpact(18.0f, 32.0f);
 
-        Vector3 horizontal = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
-            new Vector2(0.0f, -0.8f),
-            0.62f);
-        Vector3 vertical = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
-            new Vector2(0.75f, 0.0f),
-            0.62f);
+        Vector3 horizontal = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
+            new Vector2(0.0f, -0.8f));
+        Vector3 vertical = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
+            new Vector2(0.75f, 0.0f));
         bool mouseNoseFirst =
-            Math.Abs(horizontal.Y) >= 0.75f &&
+            Math.Abs(horizontal.Y) >= 0.08f &&
+            Math.Abs(horizontal.Y) <= 0.25f &&
+            Math.Abs(horizontal.Z) >= Math.Abs(horizontal.Y) * 4.0f &&
             Math.Abs(horizontal.X) <= 0.001f &&
-            Math.Abs(vertical.X) >= 0.70f &&
+            Math.Abs(vertical.X) >= 0.60f &&
             Math.Abs(vertical.Y) <= 0.001f;
-        bool mouseBanking = Math.Abs(horizontal.Z) >= 0.35f;
+        bool mouseBanking = Math.Abs(horizontal.Z) >= 0.60f;
         bool fullAttitudeRotation =
             ArcadeShipController.FullAttitudeRotationEnabled &&
             !ArcadeShipController.MouseTranslationCouplingEnabled;

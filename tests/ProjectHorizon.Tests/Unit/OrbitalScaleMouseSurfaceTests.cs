@@ -6,32 +6,26 @@ namespace ProjectHorizon.Tests.Unit;
 public sealed class OrbitalScaleMouseSurfaceTests
 {
     [Fact]
-    public void MouseSteering_SurvivesOnePhysicsTickAndThenSettles()
+    public void MouseSteering_StatefulVirtualStickRetainsDeflectionWithoutMotion()
     {
-        Vector2 impulse = ArcadeFlightAssistRuntime.AccumulateMouseSteering(
+        Vector2 stick = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
             Vector2.Zero,
             new Vector2(64.0f, -48.0f),
             0.0035f,
             2.25f,
             invertPitch: false,
-            invertYaw: false);
-        Vector2 afterOneTick = ArcadeFlightAssistRuntime.DecayMouseSteering(
-            impulse,
-            7.5f,
-            1.0f / 60.0f);
+            invertHorizontal: false);
+        Vector2 afterOneTick = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
+            stick,
+            Vector2.Zero,
+            0.0035f,
+            2.25f,
+            invertPitch: false,
+            invertHorizontal: false);
 
-        Assert.True(impulse.Length() > 0.4f);
-        Assert.True(afterOneTick.Length() >= impulse.Length() * 0.80f);
-
-        Vector2 settled = impulse;
-        for (int i = 0; i < 90; i++)
-        {
-            settled = ArcadeFlightAssistRuntime.DecayMouseSteering(
-                settled,
-                7.5f,
-                1.0f / 60.0f);
-        }
-        Assert.True(settled.Length() <= 0.01f);
+        Assert.True(stick.Length() > 0.4f);
+        Assert.Equal(stick, afterOneTick);
+        Assert.True(ArcadeShipController.StatefulVirtualFlightStickEnabled);
     }
 
     [Fact]

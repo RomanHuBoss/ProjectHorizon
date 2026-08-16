@@ -117,6 +117,28 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        if (_worldSceneCoordinatorRuntime is not null)
+        {
+            WorldSceneKind kind = WorldScenes.Current.Kind;
+            double altitude = _voyageShip?.AltitudeAboveSurface ??
+                double.PositiveInfinity;
+            bool surfacePresentationOwned = kind == WorldSceneKind.Surface ||
+                (kind == WorldSceneKind.Orbit &&
+                    OrbitalHandoffPresentationRuntime.Evaluate(altitude).SurfaceSkyOwned);
+            if (!surfacePresentationOwned)
+            {
+                if (_planetSurfaceCloudRoot is not null)
+                {
+                    _planetSurfaceCloudRoot.Visible = false;
+                }
+                if (_planetWeatherFxRoot is not null)
+                {
+                    _planetWeatherFxRoot.Visible = false;
+                }
+                return;
+            }
+        }
+
         PlanetSurfaceSkyProfile baseSky = _planetSurfaceSkyProfile;
         double azimuth = state.SunAzimuthDegrees * Math.PI / 180.0;
         double elevation = state.SunElevationDegrees * Math.PI / 180.0;

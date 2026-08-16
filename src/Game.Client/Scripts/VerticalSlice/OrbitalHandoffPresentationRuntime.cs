@@ -23,7 +23,7 @@ public static class OrbitalHandoffPresentationRuntime
     public const double StarfieldRevealAltitudeMeters = 145.0;
     public const double MinimumStationTravelMeters = 1200.0;
     public const int StarCount = 420;
-    public const float StarfieldRadiusMeters = 900000.0f;
+    public const float StarfieldRadiusMeters = 760000.0f;
 
     public static double ComputeVacuumBlend(double altitudeMeters)
     {

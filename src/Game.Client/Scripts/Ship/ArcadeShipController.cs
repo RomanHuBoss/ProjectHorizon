@@ -46,6 +46,9 @@ public partial class ArcadeShipController : CharacterBody3D
 {
     public const bool FullAttitudeRotationEnabled = true;
     public const bool MouseTranslationCouplingEnabled = false;
+    public const bool StatefulVirtualFlightStickEnabled = true;
+    public const float DefaultFlightCameraNearMeters = 0.25f;
+    public const float DefaultFlightCameraFarMeters = 900000.0f;
 
     [Export]
     public bool StartPilotEnabled { get; set; } = true;
@@ -109,7 +112,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public bool InvertYawLook { get; set; }
 
     [Export(PropertyHint.Range, "0.5,20.0,0.1")]
-    public float MouseInputDecay { get; set; } = 7.5f;
+    public float MouseInputDecay { get; set; } = 7.5f; // legacy impulse controller only
 
     [Export(PropertyHint.Range, "0.5,4.0,0.05")]
     public float MouseFlightGain { get; set; } = 2.25f;
@@ -120,10 +123,28 @@ public partial class ArcadeShipController : CharacterBody3D
     [Export(PropertyHint.Range, "1.0,6.0,0.1")]
     public float MouseAngularResponseMultiplier { get; set; } = 3.2f;
 
+    [Export(PropertyHint.Range, "0.0,0.25,0.005")]
+    public float MouseVirtualStickDeadZone { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultVirtualStickDeadZone;
+
+    [Export(PropertyHint.Range, "1.0,3.0,0.05")]
+    public float MouseVirtualStickResponseExponent { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultVirtualStickResponseExponent;
+
+    [Export(PropertyHint.Range, "0.0,0.45,0.01")]
+    public float MouseCoordinatedYawFactor { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultCoordinatedYawFactor;
+
+    [Export(PropertyHint.Range, "0.05,2.0,0.05")]
+    public float FlightCameraNearMeters { get; set; } = DefaultFlightCameraNearMeters;
+
+    [Export(PropertyHint.Range, "100000.0,1000000.0,1000.0")]
+    public float FlightCameraFarMeters { get; set; } = DefaultFlightCameraFarMeters;
+
     private Camera3D? _chaseCamera;
     private Camera3D? _cockpitCamera;
     private Transform3D _spawnTransform;
-    private Vector2 _mouseLookInput;
+    private Vector2 _mouseVirtualStick;
     private ShipControlCommand _externalCommand = ShipControlCommand.Neutral;
     private float _externalMaxSpeedOverride;
     private bool _externalControlActive;
@@ -162,6 +183,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public int CollisionEvents => _collisionEvents;
     public int MouseSteeringSampleCount => _mouseSteeringSamples;
     public float LastMouseSteeringMagnitude => _lastMouseSteeringMagnitude;
+    public Vector2 MouseVirtualStick => _mouseVirtualStick;
 
     public bool TryConsumeCollisionImpact(out ShipCollisionImpact impact)
     {
@@ -198,6 +220,7 @@ public partial class ArcadeShipController : CharacterBody3D
         InitializeLandingSystem();
         InitializeTouchdownSystem();
         GameUserSettingsService.ApplyToShip(this);
+        ApplyStableCameraClipEnvelope();
         SetCameraMode(ShipCameraMode.Chase, false);
         SetPilotEnabled(StartPilotEnabled);
         UpdateDiagnostics();
@@ -222,26 +245,36 @@ public partial class ArcadeShipController : CharacterBody3D
         if (inputEvent is InputEventMouseMotion mouseMotion &&
             Input.MouseMode == Input.MouseModeEnum.Captured)
         {
-            _mouseLookInput = ArcadeFlightAssistRuntime.AccumulateMouseSteering(
-                _mouseLookInput,
+            _mouseVirtualStick = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
+                _mouseVirtualStick,
                 mouseMotion.Relative,
                 MouseSensitivity,
                 MouseFlightGain,
                 InvertPitchLook,
                 InvertYawLook);
             _mouseSteeringSamples++;
-            _lastMouseSteeringMagnitude = _mouseLookInput.Length();
+            _lastMouseSteeringMagnitude = _mouseVirtualStick.Length();
             if (_mouseSteeringSamples == 1)
             {
                 GD.Print(
-                    "TASK-178.6 ship mouse steering INPUT PASS: " +
-                    $"relative={mouseMotion.Relative}; signal={_mouseLookInput}; " +
+                    "TASK-180.3 ship virtual flight stick INPUT PASS: " +
+                    $"relative={mouseMotion.Relative}; stick={_mouseVirtualStick}; " +
                     $"sensitivity={MouseSensitivity:0.0000}; gain={MouseFlightGain:0.00}; " +
-                    "ownership=manual; path=_Input.");
+                    "stateful=1; horizontal=roll-dominant; vertical=pitch; path=_Input.");
             }
             // While the pilot owns the ship, mouse motion is a flight-control
             // event, not UI hover input. Marking it handled prevents a full-
             // screen HUD Control from stealing the same movement downstream.
+            GetViewport().SetInputAsHandled();
+            return;
+        }
+
+        if (inputEvent is InputEventMouseButton recenterButton &&
+            recenterButton.Pressed &&
+            recenterButton.ButtonIndex == MouseButton.Middle &&
+            Input.MouseMode == Input.MouseModeEnum.Captured)
+        {
+            _mouseVirtualStick = Vector2.Zero;
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -251,6 +284,7 @@ public partial class ArcadeShipController : CharacterBody3D
             mouseButton.ButtonIndex == MouseButton.Left &&
             Input.MouseMode == Input.MouseModeEnum.Visible)
         {
+            _mouseVirtualStick = Vector2.Zero;
             Input.MouseMode = Input.MouseModeEnum.Captured;
         }
     }
@@ -303,6 +337,7 @@ public partial class ArcadeShipController : CharacterBody3D
 
         if (inputEvent.IsActionPressed("ui_cancel"))
         {
+            _mouseVirtualStick = Vector2.Zero;
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
 
@@ -318,7 +353,6 @@ public partial class ArcadeShipController : CharacterBody3D
         UpdateAtmosphereContext();
         if (ProcessTouchdownPhysics(deltaSeconds))
         {
-            DecayMouseFlightInput(deltaSeconds);
             UpdateAtmosphereContext();
             UpdateDiagnostics();
             return;
@@ -335,7 +369,6 @@ public partial class ArcadeShipController : CharacterBody3D
                 }
             }
 
-            DecayMouseFlightInput(deltaSeconds);
             UpdateAtmosphereContext();
             UpdateDiagnostics();
             return;
@@ -371,7 +404,6 @@ public partial class ArcadeShipController : CharacterBody3D
 
         ApplyAtmosphericSurfaceCorrection();
 
-        DecayMouseFlightInput(deltaSeconds);
         UpdateDiagnostics();
     }
 
@@ -401,7 +433,7 @@ public partial class ArcadeShipController : CharacterBody3D
         _manualControlEnabled = enabled;
         if (!enabled)
         {
-            _mouseLookInput = Vector2.Zero;
+            _mouseVirtualStick = Vector2.Zero;
         }
     }
 
@@ -411,7 +443,7 @@ public partial class ArcadeShipController : CharacterBody3D
         ClearExternalCommand();
         Velocity = Vector3.Zero;
         AngularVelocityLocal = Vector3.Zero;
-        _mouseLookInput = Vector2.Zero;
+        _mouseVirtualStick = Vector2.Zero;
 
         if (locked)
         {
@@ -446,7 +478,7 @@ public partial class ArcadeShipController : CharacterBody3D
             SetManualControlEnabled(false);
             Velocity = Vector3.Zero;
             AngularVelocityLocal = Vector3.Zero;
-            _mouseLookInput = Vector2.Zero;
+            _mouseVirtualStick = Vector2.Zero;
             if (_chaseCamera is not null)
             {
                 _chaseCamera.Current = false;
@@ -513,7 +545,7 @@ public partial class ArcadeShipController : CharacterBody3D
         GlobalTransform = _spawnTransform;
         Velocity = Vector3.Zero;
         AngularVelocityLocal = Vector3.Zero;
-        _mouseLookInput = Vector2.Zero;
+        _mouseVirtualStick = Vector2.Zero;
         _pendingCollisionImpact = null;
         _collisionEvents = 0;
         SetManualControlEnabled(true);
@@ -556,18 +588,31 @@ public partial class ArcadeShipController : CharacterBody3D
         AngularVelocityLocal = state.AngularVelocityLocal;
         AutoStabilizationEnabled = state.AutoStabilizationEnabled;
         SetCameraMode(state.CameraMode, false);
-        _mouseLookInput = Vector2.Zero;
+        _mouseVirtualStick = Vector2.Zero;
         _pendingCollisionImpact = null;
         UpdateAtmosphereContext();
         UpdateDiagnostics();
     }
 
-    private void DecayMouseFlightInput(float deltaSeconds)
+    private void ApplyStableCameraClipEnvelope()
     {
-        _mouseLookInput = ArcadeFlightAssistRuntime.DecayMouseSteering(
-            _mouseLookInput,
-            MouseInputDecay,
-            deltaSeconds);
+        float nearPlane = Mathf.Clamp(FlightCameraNearMeters, 0.20f, 2.0f);
+        float farPlane = Mathf.Clamp(FlightCameraFarMeters, 100000.0f, 900000.0f);
+        if (farPlane <= nearPlane * 1000.0f)
+        {
+            farPlane = Math.Max(100000.0f, nearPlane * 1000.0f);
+        }
+
+        if (_chaseCamera is not null)
+        {
+            _chaseCamera.Near = nearPlane;
+            _chaseCamera.Far = farPlane;
+        }
+        if (_cockpitCamera is not null)
+        {
+            _cockpitCamera.Near = nearPlane;
+            _cockpitCamera.Far = farPlane;
+        }
     }
 
     private ShipControlCommand ReadManualCommand()
@@ -586,9 +631,11 @@ public partial class ArcadeShipController : CharacterBody3D
         float rollKeyboard = Input.GetAxis("ship_roll_left", "ship_roll_right");
         float pitchKeyboard = Input.GetAxis("ship_pitch_down", "ship_pitch_up");
         float yawKeyboard = Input.GetAxis("ship_yaw_right", "ship_yaw_left");
-        Vector3 mouseAttitude = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
-            _mouseLookInput,
-            MouseBankFactor);
+        Vector3 mouseAttitude = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
+            _mouseVirtualStick,
+            MouseVirtualStickDeadZone,
+            MouseVirtualStickResponseExponent,
+            MouseCoordinatedYawFactor);
 
         return new ShipControlCommand(
             forward,
@@ -689,7 +736,8 @@ public partial class ArcadeShipController : CharacterBody3D
 
         if (hasRotationInput)
         {
-            bool mouseAttitudeActive = _mouseLookInput.LengthSquared() > 0.000004f &&
+            bool mouseAttitudeActive =
+                _mouseVirtualStick.Length() > MouseVirtualStickDeadZone &&
                 ManualInputOwnershipActive;
             float angularResponse = AngularAcceleration *
                 (mouseAttitudeActive ? MouseAngularResponseMultiplier : 1.0f);

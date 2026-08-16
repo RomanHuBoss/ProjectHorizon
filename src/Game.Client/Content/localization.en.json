@@ -893,6 +893,7 @@
     "ui.game.frontier_exchange": "FRONTIER EXCHANGE",
     "ui.game.galaxy_map": "GALAXY MAP",
     "ui.game.hud_hidden": "HUD hidden — press H",
+    "ui.game.flight_stick_cursor": "○",
     "ui.game.hud_initializing": "VERTICAL SLICE 1 — initializing",
     "ui.game.industry_terminal": "INDUSTRY TERMINAL",
     "ui.game.mission_journal": "PROCEDURAL MISSION JOURNAL",

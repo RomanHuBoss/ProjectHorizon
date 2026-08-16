@@ -43,7 +43,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2"}, "VERSION must be alpha.178.6 or later", f)
+need(version in {"0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3"}, "VERSION must be alpha.178.6 or later", f)
 
 # Scale: large bodies, large orbital gaps, and focused planet angular dominance.
 need(number(sim, "MinimumPlanetOrbitRadius") >= 110000.0 and
@@ -57,25 +57,28 @@ need("Math.Clamp(resolvedVisualRadius, 9000.0, 28000.0)" in sim and
      "FocusedPlanetSurfaceClearanceMeters" in node and
      "focusState.Definition.VisualRadius * 1.12" in node,
      "planet visual radius / focused angular-size contract missing", f)
-need(number(scene, "far") >= 1000000.0 and scene.count("far = ") >= 2 and
-     number(handoff, "StarfieldRadiusMeters") >= 500000.0,
-     "camera/starfield range does not cover expanded system scale", f)
+need(200000.0 <= number(scene, "far") <= 900000.0 and scene.count("far = ") >= 2 and
+     0.20 <= number(scene, "near") <= 2.0 and
+     500000.0 <= number(handoff, "StarfieldRadiusMeters") <= number(scene, "far") * 0.90,
+     "camera/starfield range is not a bounded large-world frustum", f)
 
-# Mouse steering: capture before UI, retain normal deltas across physics tick.
+# Mouse steering: input owns a persistent virtual flight stick, not FPS-style mouse deltas.
 need("public override void _Input(InputEvent inputEvent)" in controller and
      "ManualInputOwnershipActive" in controller and
      "InputEventMouseMotion" in controller and
-     "AccumulateMouseSteering" in controller and
+     "AccumulateVirtualFlightStick" in controller and
      "GetViewport().SetInputAsHandled();" in controller and
      "SetProcessInput(enabled);" in controller and
      "MouseSteeringSampleCount" in controller and
-     "TASK-178.6 ship mouse steering INPUT PASS" in controller,
-     "ship mouse steering is not captured as owned flight input before HUD", f)
-need("AccumulateMouseSteering" in assist and "DecayMouseSteering" in assist and
-     "MathF.Exp" in assist and
-     number(scene, "MouseInputDecay") >= 5.0 and
-     number(scene, "MouseFlightGain") >= 2.0,
-     "mouse steering signal/decay response is too weak or frame-dependent", f)
+     "TASK-180.3 ship virtual flight stick INPUT PASS" in controller,
+     "ship virtual flight stick is not captured as owned flight input before HUD", f)
+need("AccumulateVirtualFlightStick" in assist and
+     "BuildVirtualStickAttitudeCommand" in assist and
+     "DefaultVirtualStickDeadZone" in assist and
+     "DefaultCoordinatedYawFactor" in assist and
+     "DecayMouseFlightInput" not in controller and
+     0.75 <= number(scene, "MouseFlightGain") <= 1.75,
+     "mouse input is not a stateful bounded virtual-stick controller", f)
 
 # Every landable planet entry must preserve the strict world graph and activate content before surface handoff.
 need("TryGetFirstPlanetEntryShellHit" in node and
@@ -121,7 +124,7 @@ need("RunOrbitalScaleMouseSurfaceAcceptance();" in slice_cs and
      "TASK-178.6 (F5)" in slice_cs,
      "TASK-178.6 is not wired into F5/final gate", f)
 
-need("MouseSteering_SurvivesOnePhysicsTickAndThenSettles" in tests and
+need("MouseSteering_StatefulVirtualStickRetainsDeflectionWithoutMotion" in tests and
      "ExpandedSystem_UsesPlayableScaleAwareCruiseSpeed" in tests and
      "StarterSystem_UsesLargeBodiesAndWideOrbitalSeparation" in tests and
      "EveryLandableStarterPlanet_HasEcologyPoisAndResources" in tests and

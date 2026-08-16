@@ -12,7 +12,7 @@ public partial class SalvageRepairSlice
             "TASK-180.2 flight feel READY: stellarVisual=system-only-in-orbit; " +
             $"manualEntrySafe<={PlanetaryApproachRuntime.MaximumManualOrbitalEntrySpeed:0}m/s; " +
             $"surfaceLethalNormal>={PlanetaryImpactRuntime.LethalNormalImpactSpeed:0}m/s; " +
-            "mouse=X:yaw+bank/Y:pitch; fullAttitude=1; strafe=keyboard-only; F5=acceptance.");
+            "mouse=virtual-stick-roll-dominant/Y:pitch; fullAttitude=1; strafe=keyboard-only; superseded-by=TASK-180.3; F5=acceptance.");
     }
 
     private void RunFlightFeelHotfixAcceptance()
@@ -41,7 +41,7 @@ public partial class SalvageRepairSlice
             FlightFeelHotfixAcceptanceRunner.Evaluate(angularDiameter);
         _flightFeelHotfixAcceptancePassed = report.Passed;
         _flightFeelHotfixAcceptanceHud = report.Passed
-            ? $"PASS sun={report.StarAngularDiameterDegrees:0.0}deg crash=1 mouse=nose+bank"
+            ? $"PASS sun={report.StarAngularDiameterDegrees:0.0}deg crash=1 mouse=roll-dominant"
             : $"FAIL {report.Result}";
         if (report.Passed)
         {

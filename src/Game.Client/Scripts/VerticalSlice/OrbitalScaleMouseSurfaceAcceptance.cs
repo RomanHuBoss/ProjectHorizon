@@ -107,29 +107,24 @@ public static class OrbitalScaleMouseSurfaceAcceptanceRunner
                 minMoonClearance = double.PositiveInfinity;
             }
 
-            Vector2 mouseImpulse = ArcadeFlightAssistRuntime.AccumulateMouseSteering(
+            Vector2 mouseImpulse = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
                 Vector2.Zero,
                 new Vector2(64.0f, -48.0f),
                 0.0035f,
                 2.25f,
                 invertPitch: false,
-                invertYaw: false);
+                invertHorizontal: false);
             bool mouseSteering = Math.Abs(mouseImpulse.X) >= 0.30f &&
                 Math.Abs(mouseImpulse.Y) >= 0.35f;
-            Vector2 oneTick = ArcadeFlightAssistRuntime.DecayMouseSteering(
+            Vector2 oneTick = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
                 mouseImpulse,
-                7.5f,
-                1.0f / 60.0f);
-            Vector2 settled = mouseImpulse;
-            for (int index = 0; index < 90; index++)
-            {
-                settled = ArcadeFlightAssistRuntime.DecayMouseSteering(
-                    settled,
-                    7.5f,
-                    1.0f / 60.0f);
-            }
-            bool mouseRetention = oneTick.Length() >= mouseImpulse.Length() * 0.80f &&
-                settled.Length() <= 0.01f;
+                Vector2.Zero,
+                0.0035f,
+                2.25f,
+                invertPitch: false,
+                invertHorizontal: false);
+            bool mouseRetention = oneTick.DistanceTo(mouseImpulse) <= 0.000001f &&
+                ArcadeShipController.StatefulVirtualFlightStickEnabled;
 
             double farCruiseSpeed =
                 InterplanetaryTravelRuntime.CalculateSafeCruiseSpeed(120000.0);

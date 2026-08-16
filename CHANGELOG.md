@@ -1,3 +1,18 @@
+# Changelog
+
+## [0.1.0-alpha.180.3] - 2026-08-16
+
+### Fixed
+- Replaced live FPS-style relative mouse steering with a stateful virtual flight stick: mouse motion changes a persistent bounded control position, horizontal input is roll-dominant with only modest coordinated yaw, vertical input is pitch, and middle mouse recenters the stick.
+- Added a flight-stick HUD marker (`○`) around the fixed nose reticle (`+`) so persistent stick deflection is visible; middle mouse recenters both state and marker.
+- Removed live mouse-state decay; A/D remain independent lateral thrusters and full local-axis 360-degree attitude integration is preserved.
+- Reduced virtual-stick gain to a controllable screen-scale deflection and added dead-zone/non-linear response tuning.
+- Bounded flight-camera clipping to 0.25 m .. 900 km and moved the orbital starfield inside the stable far-plane envelope to address repeated Godot `create_frustum_points` errors from the owner log.
+- Prevented surface weather/directional-shadow ownership from mutating orbital presentation after PlanetRuntime release.
+- Added hysteresis and a larger recovery pad to the 3.2 m ship surface floor, eliminating frame-by-frame contact/recovery warning chatter seen in the owner log.
+- Retained the alpha.180.1 Int64/saturated terrain-distance fix as a regression contract for the historical `ChebyshevDistance` overflow.
+- Added TASK-180.3 model/F5/xUnit/static acceptance and section-37/CI/release enforcement.
+
 ## [0.1.0-alpha.180.2] - 2026-08-16
 
 ### Fixed — TASK-180.2 stellar/crash/mouse-flight feel hotfix
@@ -7,8 +22,6 @@
 - Added recoverable-vs-lethal planetary impact policy, physical `MoveAndSlide` impact capture, lethal surface crash/death handling, and a stricter 55 m/s manual-entry capture envelope.
 - Reworked mouse flight into pitch/yaw nose steering with coordinated bank and faster angular response; lateral strafe remains keyboard/thruster-only and full attitude rotation remains unclamped.
 - Added TASK-180.2 F5/model/xUnit/static gates and section-37/CI/release enforcement.
-
-# Changelog
 
 ## [0.1.0-alpha.180.1] - 2026-08-16
 

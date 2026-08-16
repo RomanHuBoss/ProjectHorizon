@@ -893,6 +893,7 @@
     "ui.game.frontier_exchange": "FRONTIER EXCHANGE",
     "ui.game.galaxy_map": "КАРТА ГАЛАКТИКИ",
     "ui.game.hud_hidden": "HUD скрыт — нажмите H",
+    "ui.game.flight_stick_cursor": "○",
     "ui.game.hud_initializing": "VERTICAL SLICE 1 — инициализация",
     "ui.game.industry_terminal": "ПРОМЫШЛЕННЫЙ ТЕРМИНАЛ",
     "ui.game.mission_journal": "ЖУРНАЛ ПРОЦЕДУРНЫХ ЗАДАНИЙ",

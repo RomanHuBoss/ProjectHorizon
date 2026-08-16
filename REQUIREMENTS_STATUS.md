@@ -2,9 +2,45 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task180.2-flight-feel-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая emergency hotfix-итерация 2026-08-16 — TASK-180.3 Stateful Virtual Flight Stick / Log Integrity
+
+**Исходный снимок:** `ProjectHorizon-main-task180.2-flight-feel-hotfix.zip` (`0.1.0-alpha.180.2`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.180.3`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`; функциональная очередь не продвигается до owner-проверки управления и чистого Output.
+
+### Основание: повторная owner-неприёмка и полный разбор лога
+
+Owner подтвердил, что alpha.180.2 всё ещё неверно ощущается на мыши, и отдельно указал, что предыдущий лог был разобран неполно. Повторный полный анализ `Вставленный текст(1).txt` разделяет файл на три Godot-запуска. В последнем запуске нет нового C# exception/TASK FAIL, но присутствуют `554` повторения Godot `create_frustum_points` после release PlanetRuntime и `31` near-floor correction/recovery события. В первом историческом запуске также присутствует `TerrainChunkManager.ChebyshevDistance` `OverflowException`; его alpha.180.1 fix сохраняется как обязательная регрессия.
+
+### Реализация
+
+- **Stateful virtual flight stick:** `MouseMotion.Relative` больше не является мгновенной angular-rate командой. Delta только изменяет bounded `_mouseVirtualStick`; при отсутствии новых mouse events состояние сохраняется. Middle mouse recenter -> `Vector2.Zero`.
+- **Visible stick feedback:** fixed `+` remains ship-nose reticle; `○` displays current virtual-stick deflection while piloting and follows the stored state.
+- **Flight axes:** horizontal stick -> full roll + `0.18` coordinated yaw; vertical stick -> pitch. Response curve имеет dead-zone `0.045` и exponent `1.55`; scene gain снижен до `1.45`, чтобы full-scale требовал осмысленного физического перемещения мыши, а не нескольких десятков пикселей. A/D остаются lateral thrusters.
+- **No decay / full attitude:** live controller не вызывает старый `DecayMouseSteering`; `RotateObjectLocal` по локальным pitch/yaw/roll сохраняет 360-degree loops.
+- **Light-culler/frustum guard:** camera near/far нормализованы до `0.25 m / 900 km`; starfield `760 km`, то есть находится внутри 90% far-plane. Surface weather and directional shadows работают только когда surface presentation действительно владеет кадром; после release PlanetRuntime они не могут повторно включать surface-lighting в Orbit.
+- **Surface contact hysteresis:** hard floor остаётся `3.2 m`, но correction начинается ниже `3.08 m`; recovery pad увеличен до `0.65 m`. Обычная floor correction больше не печатает frame-by-frame Warning. Lethal planet-impact envelope TASK-180.2 остаётся отдельным и не смягчается.
+- **Overflow regression:** `ChebyshevDistance` вычисляет subtraction/abs в `Int64` и saturates to `int.MaxValue`; sentinel arithmetic не допускается.
+- Добавлены `FlightControlLogIntegrityAcceptanceRunner`, F5 `TASK-180.3`, xUnit `FlightControlLogIntegrityTests`, `validate-task1803-flight-control-log-integrity.py`; старые TASK-178.6/180.2 validators обновлены так, чтобы запрещать возврат к delta+decay модели.
+
+### Runtime-приёмка TASK-180.3
+
+1. `tools\run-section37-quality.cmd`: clean build `0 errors / 0 warnings`, все validators/tests green.
+2. F5: `TASK-180.3 (F5): PASS stick=stateful roll>yaw frustum=bounded logguards=1`.
+3. В полёте сдвинуть мышь вправо и прекратить физическое движение: корабль продолжает roll-dominant манёвр, пока stick не возвращён к центру; middle click мгновенно обнуляет stick.
+4. Вертикальная мышь даёт continuous pitch и допускает полный loop; A/D отдельно strafes.
+5. Выполнить surface -> orbit -> surface и продолжительный orbital flight. FAIL: любая новая `create_frustum_points`, `OverflowException`, frame-by-frame `surface penetration BLOCKED/RECOVERED` chatter или TASK-180.3 FAIL.
+
+### Ограничение проверки в контейнере
+
+При отсутствии `dotnet`/Godot executable здесь доступны static/resource/version/archive gates, но runtime `VERIFIED` устанавливается только по owner clean build/F5/Output.
 
 ---
 

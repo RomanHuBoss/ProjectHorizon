@@ -150,7 +150,13 @@ public partial class SalvageRepairSlice
 
         sun.LightColor = ToColor(profile.SunColor);
         sun.LightEnergy = (float)profile.SunEnergy;
-        sun.ShadowEnabled = true;
+        bool surfaceLightingOwned = _worldSceneCoordinatorRuntime is null ||
+            WorldScenes.Current.Kind == WorldSceneKind.Surface ||
+            (WorldScenes.Current.Kind == WorldSceneKind.Orbit &&
+                OrbitalHandoffPresentationRuntime.Evaluate(
+                    _voyageShip?.AltitudeAboveSurface ?? double.PositiveInfinity)
+                    .SurfaceSkyOwned);
+        sun.ShadowEnabled = surfaceLightingOwned;
         // TASK-174: the procedural sky is rotated with radial Up. Godot rotates
         // its procedural sun disk with sky_rotation too, which would diverge
         // from the actual directional light. Keep lighting only here; the

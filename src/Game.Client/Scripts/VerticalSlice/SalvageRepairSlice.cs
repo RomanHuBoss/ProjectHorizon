@@ -109,6 +109,7 @@ public partial class SalvageRepairSlice : Node3D
     private PanelContainer? _shipManagementPanel;
     private Label? _shipManagementLabel;
     private Label? _playerCoordinatesLabel;
+    private Label? _flightStickCursor;
     private Node3D? _baseConstructionModulesRoot;
     private Node3D? _planetaryPoisRoot;
     private MeshInstance3D? _baseBuildPreview;
@@ -351,6 +352,8 @@ public partial class SalvageRepairSlice : Node3D
             "Hud/MarginContainer/PanelContainer/Label");
         _hudHiddenHint = GetNodeOrNull<PanelContainer>(
             "Hud/HiddenHint");
+        _flightStickCursor = GetNodeOrNull<Label>(
+            "Hud/FlightStickCursor");
         _recipeSelectorPanel = GetNodeOrNull<PanelContainer>(
             "Hud/RecipeSelector");
         _recipeSelectorLabel = GetNodeOrNull<Label>(
@@ -503,6 +506,7 @@ public partial class SalvageRepairSlice : Node3D
         PrintProductionVisualLanguageReady();
         PrintRuntimeIntegrityReady();
         PrintFlightFeelHotfixReady();
+        PrintFlightControlLogIntegrityReady();
         InitializeAerialSteeringRuntime();
         InitializeNpcFactionRuntime(saveData: null);
         InitializeProceduralQuestRuntime(saveData: null);
@@ -5551,6 +5555,7 @@ public partial class SalvageRepairSlice : Node3D
         RunProductionVisualLanguageAcceptance();
         RunRuntimeIntegrityAcceptance();
         RunFlightFeelHotfixAcceptance();
+        RunFlightControlLogIntegrityAcceptance();
         RequestSpaceflightNavigationSubsystemAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5560,7 +5565,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6755,7 +6760,8 @@ public partial class SalvageRepairSlice : Node3D
             _surfaceFlightSafetyAcceptancePassed is null ||
             _productionVisualLanguageAcceptancePassed is null ||
             _runtimeIntegrityAcceptancePassed is null ||
-            _flightFeelHotfixAcceptancePassed is null)
+            _flightFeelHotfixAcceptancePassed is null ||
+            _flightControlLogIntegrityAcceptancePassed is null)
         {
             return;
         }
@@ -6779,13 +6785,14 @@ public partial class SalvageRepairSlice : Node3D
             _surfaceFlightSafetyAcceptancePassed == true &&
             _productionVisualLanguageAcceptancePassed == true &&
             _runtimeIntegrityAcceptancePassed == true &&
-            _flightFeelHotfixAcceptancePassed == true;
+            _flightFeelHotfixAcceptancePassed == true &&
+            _flightControlLogIntegrityAcceptancePassed == true;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7446,12 +7453,46 @@ public partial class SalvageRepairSlice : Node3D
         }
     }
 
+    private void UpdateFlightStickCursor()
+    {
+        if (_flightStickCursor is null)
+        {
+            return;
+        }
+
+        bool active = (_stageOneVoyageRuntime?.Piloted ?? false) &&
+            _voyageShip is not null &&
+            Input.MouseMode == Input.MouseModeEnum.Captured &&
+            _hudMode != SalvageRepairHudMode.Hidden;
+        _flightStickCursor.Visible = active;
+        if (!active || _voyageShip is null)
+        {
+            return;
+        }
+
+        Vector2 stick = _voyageShip.MouseVirtualStick;
+        Vector2 viewportSize = GetViewport().GetVisibleRect().Size;
+        float radius = Mathf.Clamp(
+            Math.Min(viewportSize.X, viewportSize.Y) * 0.19f,
+            110.0f,
+            230.0f);
+        // Stick.Y is screen-horizontal/right-roll command. Stick.X is positive
+        // pitch-up, so screen Y is inverted for the visual control marker.
+        Vector2 offset = new(stick.Y * radius, -stick.X * radius);
+        _flightStickCursor.OffsetLeft = -10.0f + offset.X;
+        _flightStickCursor.OffsetRight = 10.0f + offset.X;
+        _flightStickCursor.OffsetTop = -14.0f + offset.Y;
+        _flightStickCursor.OffsetBottom = 14.0f + offset.Y;
+    }
+
     private void UpdateHud()
     {
         if (_hudLabel is null)
         {
             return;
         }
+
+        UpdateFlightStickCursor();
 
         if (_playerCoordinatesLabel is not null)
         {
@@ -7738,6 +7779,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-180 (F5): {_productionVisualLanguageAcceptanceHud}",
             $"TASK-180.1 (F5): {_runtimeIntegrityAcceptanceHud}",
             $"TASK-180.2 (F5): {_flightFeelHotfixAcceptanceHud}",
+            $"TASK-180.3 (F5): {_flightControlLogIntegrityAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",

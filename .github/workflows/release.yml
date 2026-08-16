@@ -97,6 +97,7 @@ jobs:
           python3 tools/validate-task180-production-visual-language.py
           python3 tools/validate-task1801-runtime-integrity-hotfix.py
           python3 tools/validate-task1802-flight-feel-hotfix.py
+          python3 tools/validate-task1803-flight-control-log-integrity.py
 
       - name: Unit tests and coverage
         run: >-

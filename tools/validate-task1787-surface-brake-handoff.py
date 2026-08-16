@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2"}, "VERSION must be alpha.178.7 or later", f)
+need(version in {"0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3"}, "VERSION must be alpha.178.7 or later", f)
 need("ArcadeShipBrakeRuntime.ApplyMonotonicBrake" in controller and
      "if (command.Brake)" in controller and
      "BoostActive = false" in controller and
@@ -65,7 +65,7 @@ need("SetRuntimeObserver" in manager and "UpdatePlanetSurfaceStreamingObserver" 
      "? _voyageShip" in terrain,
      "terrain streamer does not follow the piloted ship near the surface", f)
 need("PilotedShipMinimumTerrainClearanceMeters = 3.2" in safety and
-     "surface penetration BLOCKED" in safety and
+     ("surface penetration BLOCKED" in safety or "TASK-180.3 surface floor correction" in safety) and
      "SurfaceLogicalToLocalPosition" in safety and
      "Velocity.Dot(normal)" in safety and
      "previous.Lerp(current, t)" in safety and

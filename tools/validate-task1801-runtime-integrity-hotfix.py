@@ -35,7 +35,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180.1", "0.1.0-alpha.180.2"}, "VERSION must be alpha.180.1", f)
+need(version in {"0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3"}, "VERSION must be alpha.180.1", f)
 need('PlanetRuntimeOutboundDeactivationAltitudeMeters = 680.0f' in surface_residency and
      'residencyAltitude' in surface_residency and
      'StageOneVoyageLocation.OutboundFlight' in surface_residency,
@@ -64,13 +64,15 @@ need('TrySweepExpandedAabb' in station_sweep and
      'TryBlockOrbitalStationSweep(previous, current)' in orbital and
      'TASK-180.1 orbital station collision BLOCKED' in orbital,
      "continuous station anti-tunneling sweep missing", f)
-need('PilotedShipRecoveryPaddingMeters = 0.18' in safety and
-     'surface contact RECOVERED' in safety and
-     safety.count('GD.PushWarning(') <= 1,
-     "surface-contact de-chatter/debounce missing", f)
+need(('PilotedShipRecoveryPaddingMeters = 0.18' in safety or
+      'PilotedShipRecoveryPaddingMeters = 0.65' in safety) and
+     'PilotedShipClearanceToleranceMeters' in safety and
+     'TASK-180.3 surface floor correction' in safety and
+     'GD.PushWarning("TASK-178.7 surface penetration BLOCKED' not in safety,
+     "surface-contact hysteresis/de-chatter missing", f)
 need('directional_shadow_max_distance = 320.0' in station_scene and
      'directional.ShadowEnabled = false' in environment and
-     'surfaceDirectional.ShadowEnabled = true' in environment,
+     'surfaceDirectional.ShadowEnabled = _surfaceRuntimeActive' in environment,
      "bounded surface/orbit shadow-frustum policy missing", f)
 need('MinimumStationCollisionShapes' in acceptance and
      'planetClosed' in acceptance and 'terrainObserverResolved' in acceptance,

@@ -71,7 +71,7 @@ public partial class SalvageRepairSlice
                 GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
             if (surfaceDirectional is not null)
             {
-                surfaceDirectional.ShadowEnabled = true;
+                surfaceDirectional.ShadowEnabled = _surfaceRuntimeActive;
                 surfaceDirectional.Set("directional_shadow_max_distance", 320.0f);
             }
 

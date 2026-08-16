@@ -30,20 +30,21 @@ public sealed class FlightFeelHotfixTests
     }
 
     [Fact]
-    public void MouseAttitude_HorizontalTurnsNoseAndBanks_VerticalPitches()
+    public void MouseAttitude_HorizontalRollDominatesYaw_VerticalPitches()
     {
-        Vector3 right = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
-            new Vector2(0.0f, -0.8f), 0.62f);
-        Vector3 up = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand(
-            new Vector2(0.75f, 0.0f), 0.62f);
+        Vector3 right = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
+            new Vector2(0.0f, -0.8f));
+        Vector3 up = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
+            new Vector2(0.75f, 0.0f));
 
-        Assert.InRange(Math.Abs(right.Y), 0.79f, 0.81f);
-        Assert.InRange(Math.Abs(right.Z), 0.49f, 0.51f);
+        Assert.True(Math.Abs(right.Z) >= 0.60f);
+        Assert.True(Math.Abs(right.Z) >= Math.Abs(right.Y) * 4.0f);
         Assert.InRange(Math.Abs(right.X), 0.0f, 0.001f);
-        Assert.InRange(Math.Abs(up.X), 0.74f, 0.76f);
+        Assert.True(Math.Abs(up.X) >= 0.60f);
         Assert.InRange(Math.Abs(up.Y), 0.0f, 0.001f);
         Assert.InRange(Math.Abs(up.Z), 0.0f, 0.001f);
         Assert.True(ArcadeShipController.FullAttitudeRotationEnabled);
+        Assert.True(ArcadeShipController.StatefulVirtualFlightStickEnabled);
         Assert.False(ArcadeShipController.MouseTranslationCouplingEnabled);
     }
 

@@ -58,6 +58,7 @@ python3 tools/validate-task1787-surface-brake-handoff.py
 python3 tools/validate-task180-production-visual-language.py
 python3 tools/validate-task1801-runtime-integrity-hotfix.py
 python3 tools/validate-task1802-flight-feel-hotfix.py
+python3 tools/validate-task1803-flight-control-log-integrity.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

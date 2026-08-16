@@ -133,10 +133,13 @@ MaxRollRateDegrees = 110.0
 AngularAcceleration = 5.5
 StabilizationAcceleration = 8.0
 MouseSensitivity = 0.0035
-MouseInputDecay = 5.2
-MouseFlightGain = 2.55
-MouseBankFactor = 0.62
+MouseFlightGain = 1.45
 MouseAngularResponseMultiplier = 3.2
+MouseVirtualStickDeadZone = 0.045
+MouseVirtualStickResponseExponent = 1.55
+MouseCoordinatedYawFactor = 0.18
+FlightCameraNearMeters = 0.25
+FlightCameraFarMeters = 900000.0
 LandingGearVisualPath = NodePath("Visuals/LandingGear")
 LandingGearProbesPath = NodePath("LandingGearProbes")
 TouchdownGearHeight = 1.55
@@ -351,12 +354,12 @@ collision_mask = 1
 [node name="Camera3D" type="Camera3D" parent="ChaseCameraRig/SpringArm3D"]
 current = true
 fov = 66.0
-near = 0.1
-far = 1200000.0
+near = 0.25
+far = 900000.0
 
 [node name="CockpitCamera3D" type="Camera3D" parent="."]
 position = Vector3(0, 0.72, -2.05)
 current = false
 fov = 72.0
-near = 0.05
-far = 1200000.0
+near = 0.25
+far = 900000.0

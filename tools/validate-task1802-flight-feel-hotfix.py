@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.180.2", "VERSION must be alpha.180.2", f)
+need(version in {"0.1.0-alpha.180.2", "0.1.0-alpha.180.3"}, "VERSION must be alpha.180.2 or later hotfix", f)
 need('ShouldRenderSurfaceSun' in world_runtime and
      'worldKind == WorldSceneKind.Surface' in world_runtime and
      'ShouldRenderSurfaceSun(' in world and
@@ -73,12 +73,13 @@ need('ShipCollisionImpact' in controller and
      'CaptureStrongestCollisionImpact' in controller and
      'velocityBeforeMove' in controller,
      "physical MoveAndSlide impact energy is not captured", f)
-need('BuildMouseAttitudeCommand' in assist and
-     'float roll = Mathf.Clamp(yaw *' in assist and
-     'mouseAttitude = ArcadeFlightAssistRuntime.BuildMouseAttitudeCommand' in controller and
-     'MouseBankFactor' in controller and
+need('BuildVirtualStickAttitudeCommand' in assist and
+     'float roll = Mathf.Clamp(horizontal' in assist and
+     'float yaw = Mathf.Clamp(' in assist and '-horizontal * Mathf.Clamp(coordinatedYawFactor' in assist and
+     'mouseAttitude = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand' in controller and
+     'StatefulVirtualFlightStickEnabled = true' in controller and
      'MouseAngularResponseMultiplier' in controller,
-     "mouse does not drive pitch/yaw plus coordinated bank", f)
+     "mouse does not drive the superseding stateful roll-dominant attitude controller", f)
 need('float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right")' in controller and
      'MouseTranslationCouplingEnabled = false' in controller,
      "mouse is still coupled to lateral strafe", f)
@@ -86,11 +87,12 @@ need(controller.count('RotateObjectLocal(') >= 3 and
      'FullAttitudeRotationEnabled = true' in controller and
      'Mathf.Clamp(Rotation' not in controller,
      "full pitch/yaw/roll attitude rotation (including loops) is not preserved", f)
-need(number(scene, 'MouseInputDecay') <= 5.5 and
-     number(scene, 'MouseFlightGain') >= 2.5 and
-     number(scene, 'MouseBankFactor') >= 0.55 and
+need(0.75 <= number(scene, 'MouseFlightGain') <= 1.75 and
+     0.03 <= number(scene, 'MouseVirtualStickDeadZone') <= 0.08 and
+     1.2 <= number(scene, 'MouseVirtualStickResponseExponent') <= 2.0 and
+     number(scene, 'MouseCoordinatedYawFactor') <= 0.25 and
      number(scene, 'MouseAngularResponseMultiplier') >= 3.0,
-     "ship scene mouse attitude response is too weak", f)
+     "ship scene virtual-stick response envelope is invalid", f)
 need('MinimumStarAngularDiameterDegrees' in acceptance and
      'surfaceSunIsolation' in acceptance and
      'manualCrashEnvelope' in acceptance and
@@ -102,7 +104,7 @@ need('RunFlightFeelHotfixAcceptance' in live and
      '_flightFeelHotfixAcceptancePassed == true' in slice_cs and
      'TASK-180.2 (F5)' in slice_cs,
      "TASK-180.2 is not wired into final F5 gate", f)
-need('MouseAttitude_HorizontalTurnsNoseAndBanks_VerticalPitches' in tests and
+need('MouseAttitude_HorizontalRollDominatesYaw_VerticalPitches' in tests and
      'PlanetImpactPolicy_AllowsPilotErrorRecoveryButKillsHardDive' in tests and
      'SurfaceSun_IsOwnedOnlyBySurfaceWorld' in tests,
      "TASK-180.2 xUnit coverage missing", f)
@@ -121,5 +123,5 @@ if f:
 print(
     "TASK-180.2 FLIGHT FEEL HOTFIX CONTRACT PASS: "
     "surfaceSun=surface-only; systemStar=emissive; manualCrash=boosted; "
-    "surfaceImpact=lethal-envelope; mouse=nose+yaw/pitch+bank; fullRotation=1; f5=1; xunit=1."
+    "surfaceImpact=lethal-envelope; mouse=stateful-roll-dominant/pitch; fullRotation=1; f5=1; xunit=1."
 )

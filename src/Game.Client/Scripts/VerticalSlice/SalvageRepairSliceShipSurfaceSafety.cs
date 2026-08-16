@@ -5,7 +5,8 @@ using Godot;
 public partial class SalvageRepairSlice
 {
     private const double PilotedShipMinimumTerrainClearanceMeters = 3.2;
-    private const double PilotedShipRecoveryPaddingMeters = 0.18;
+    private const double PilotedShipClearanceToleranceMeters = 0.12;
+    private const double PilotedShipRecoveryPaddingMeters = 0.65;
     private int _pilotedShipSurfaceRecoveryCount;
     private int _pilotedShipSurfaceSweepBlockCount;
     private int _pilotedShipSurfaceSweepSamples;
@@ -90,7 +91,9 @@ public partial class SalvageRepairSlice
             _pilotedShipMinimumObservedTerrainClearance = Math.Min(
                 _pilotedShipMinimumObservedTerrainClearance,
                 clearance);
-            if (clearance < PilotedShipMinimumTerrainClearanceMeters)
+            if (clearance <
+                PilotedShipMinimumTerrainClearanceMeters -
+                    PilotedShipClearanceToleranceMeters)
             {
                 hitLogical = logical;
                 hitTerrainHeight = terrainHeight;
@@ -107,6 +110,7 @@ public partial class SalvageRepairSlice
                 "TASK-178.7 piloted surface solidity READY: " +
                 $"clearance={PilotedShipMinimumTerrainClearanceMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
                 $"activationAltitude={PlanetRuntimeActivationAltitudeMeters.ToString("0", CultureInfo.InvariantCulture)}m; " +
+                $"tolerance={PilotedShipClearanceToleranceMeters.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
                 "streamerObserver=ship-while-piloted; hardFloor=terrain-aware; sweep=1.25m/96.");
         }
 
@@ -167,8 +171,8 @@ public partial class SalvageRepairSlice
         if (!_pilotedShipSurfaceContactActive)
         {
             _pilotedShipSurfaceContactActive = true;
-            GD.PushWarning(
-                "TASK-178.7 surface penetration BLOCKED (TASK-180.1 debounced): " +
+            GD.Print(
+                "TASK-180.3 surface floor correction: " +
                 $"clearance={hitClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
                 $"terrain={hitTerrainHeight.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
                 $"samples={samples}; swept=1; padding={PilotedShipRecoveryPaddingMeters.ToString("0.00", CultureInfo.InvariantCulture)}m; blocked=1.");
