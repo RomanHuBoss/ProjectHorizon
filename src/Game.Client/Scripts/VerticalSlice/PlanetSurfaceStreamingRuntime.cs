@@ -256,7 +256,8 @@ public static class PlanetSurfaceStreamingRuntime
     {
         if (specs.TryGetValue(
                 new PlanetSurfaceChunkCoordinate(neighborX, neighborZ),
-                out PlanetSurfaceStreamingSpec neighbor) &&
+                out PlanetSurfaceStreamingSpec? neighbor) &&
+            neighbor is not null &&
             neighbor.LodLevel > lodLevel)
         {
             mask |= edge;

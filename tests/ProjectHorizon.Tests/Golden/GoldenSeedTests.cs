@@ -46,6 +46,14 @@ public sealed class GoldenSeedTests
         Assert.Equal(20, manifest.PoiFixture.ExpectedCount);
         Assert.Contains(manifest.PoiFixture.Placements, item => Math.Abs(item.ControlHeight) > 0.01);
         Assert.Contains(manifest.PoiFixture.Placements, item => Math.Abs(item.PositionX) >= 20.0);
+        foreach (GoldenPoiExpectation item in manifest.PoiFixture.Placements)
+        {
+            PlanetaryPoiDefinition definition = RepositoryFixture.Pois.GetDefinition(item.PoiTypeId);
+            double expectedY = item.ControlHeight + 0.1 + definition.Size.Y / 2.0;
+            Assert.True(
+                Math.Abs(item.PositionY - expectedY) <= 0.000_001,
+                $"{item.InstanceId} golden Y must remain terrain-projected");
+        }
     }
 
     [Fact]

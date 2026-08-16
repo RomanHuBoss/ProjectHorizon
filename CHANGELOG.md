@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.0-alpha.158.1] - 2026-08-16
+
+### Fixed — TASK-158.1 Runtime Acceptance / Golden POI closure
+
+- Bumped `ProjectHorizonGenerator.Version` from 2 to 3 because TASK-156 intentionally changed deterministic POI world-space Y through terrain projection; refreshed the reviewed 20-POI golden fixture to the actual deterministic checksum `6e229717a6faad6043f963d825ba8b13a2af9dbf2335c161e6a24fca450ddfcc`.
+- Preserved all POI stable IDs, X/Z coordinates, control heights, slopes, rotations, water distances and danger values; only the deterministic world-space Y expectation changes to `controlHeight + 0.1 + sizeY/2`.
+- Removed the two nullable compiler warnings observed in the external Windows build: the NPC navigation callback now requires a bound navigation surface, and the surface-streaming neighbor lookup handles nullable `TryGetValue` output explicitly.
+- Added a TASK-158.1 regression gate that independently reconstructs the golden POI checksum and verifies the terrain-projected Y contract, generator-version binding and warning fixes.
+
+
 ## [0.1.0-alpha.158] - 2026-08-16
 
 ### Added — TASK-158 Planetary Surface Streaming & Traversal Foundation

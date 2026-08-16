@@ -4,6 +4,10 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-158.1 — Runtime acceptance hotfix
+
+External Godot 4.7.1 evidence confirms TASK-158 live streaming (`25/25` resident chunks, `9/9` collision chunks and F5 PASS), while TASK-138 exposed a stale POI golden fixture left behind by the earlier TASK-156 terrain projection change. Alpha.158.1 versions that deterministic POI change correctly (`ProjectHorizonGenerator.Version = 3`), refreshes the reviewed 20-POI golden checksum and removes the two nullable warnings reported by the Windows build. No TASK-158 streaming behavior or save schema is changed.
+
 ## TASK-158 — Planetary Surface Streaming & Traversal Foundation
 
 The live landable-planet surface now uses the verified terrain chunk pipeline as a moving bounded gameplay window instead of ending at the TASK-156 80x80 m mesh. A 5x5 / 25-chunk residency follows the player (9 high-detail collision chunks plus 16 low-detail visual chunks), samples the current planet's deterministic morphology in background workers, retains LOD stitching/cancellation/safe unload, extends TASK-124 terrain-aware navigation with traversal, and retires the old local mesh only after the first streaming plan settles. F5 includes `TASK-158 planet surface streaming acceptance`; see `docs/PLANET_SURFACE_STREAMING.md`.

@@ -407,7 +407,8 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
 
     private void OnNavigationVelocityComputed(Vector3 safeVelocity)
     {
-        if (!_navigationActive || _definition is null || _navigationAgent is null)
+        if (!_navigationActive || _definition is null || _navigationAgent is null ||
+            _navigationSurface is null)
         {
             return;
         }
