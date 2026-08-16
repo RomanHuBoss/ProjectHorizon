@@ -491,8 +491,8 @@ public partial class SalvageRepairSlice : Node3D
             repairRecipe,
             technologyProgression.IsUnlocked,
             stationRecipes);
-        InitializeStageOneVoyageRuntime(saveData: null);
         InitializeGalaxyNavigationRuntime(saveData: null);
+        InitializeStageOneVoyageRuntime(saveData: null);
         InitializePlanetEnvironmentRuntime();
         InitializePlanetSurfaceContentArchives(null, null);
         ActivateCurrentPlanetSurfaceContent();
@@ -5774,8 +5774,8 @@ public partial class SalvageRepairSlice : Node3D
                 ShipSystemsCatalog,
                 snapshot?.ShipSystems,
                 commissioned: Session.ShipRepaired);
-            InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializeGalaxyNavigationRuntime(snapshot?.GalaxyNavigation);
+            InitializeStageOneVoyageRuntime(snapshot?.StageOneVoyage);
             InitializePlanetSurfaceContentArchives(
                 snapshot?.PlanetaryExploration,
                 snapshot?.Ecology);
@@ -5996,8 +5996,8 @@ public partial class SalvageRepairSlice : Node3D
             _baseConstructionRuntime = new BaseConstructionRuntime(
                 BaseConstructionCatalog);
             _shipSystemsRuntime = new ShipSystemsRuntime(ShipSystemsCatalog);
-            InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
+            InitializeStageOneVoyageRuntime(saveData: null);
             InitializePlanetSurfaceContentArchives(null, null);
             ResetPlanetSurfaceFrameForCurrentPlanet();
             ActivateCurrentPlanetSurfaceContent();

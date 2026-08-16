@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.0-alpha.162.1] - 2026-08-16
+
+### Fixed — TASK-162.1 Runtime Bootstrap Order
+
+- Fixed a TASK-162 startup regression where `InitializeStageOneVoyageRuntime()` called `SurfaceLogicalToLocalPosition()` before `GalaxyNavigationRuntime` existed, throwing `InvalidOperationException: Galaxy navigation runtime is unavailable`.
+- Galaxy navigation now initializes before Stage-1 voyage in all three lifecycle paths: initial `_Ready()`, save-slot load, and new-game/reset.
+- This allows initialization to continue into planet environment, star-system simulation, terrain/world composition and the rest of the vertical-slice runtime instead of stopping on the scene's fallback `GroundBody`.
+- Added a static bootstrap-order regression gate and wired it into the Windows/Linux section-37 quality runners.
+
+### Runtime evidence that triggered the hotfix
+
+- External Godot 4.7.1 log stopped in `SalvageRepairSlicePlanetSurfaceFrame.cs` while resolving `GalaxyNavigation.CurrentPlanetId` from `InitializeStageOneVoyageRuntime`.
+- The accompanying screenshot showed the expected consequence of the aborted bootstrap: fallback square terrain, no initialized sun/atmosphere/world composition, and unavailable player-position HUD.
+
 ## [0.1.0-alpha.162] - 2026-08-16
 
 ### Added

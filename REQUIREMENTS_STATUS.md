@@ -2,9 +2,46 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task162.1-runtime-bootstrap-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая hotfix-итерация 2026-08-16 — TASK-162.1 Runtime Bootstrap Order
+
+**Исходный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task162.1-runtime-bootstrap-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.162.1`.  
+**Статус:** TASK-162.1 `IMPLEMENTED`; TASK-162 остаётся `IMPLEMENTED`, TASK-163 runtime/manual acceptance остаётся `IN_PROGRESS`.
+
+### Внешнее runtime evidence пользователя
+
+Godot 4.7.1 фактически дошёл до запуска сцены, после чего `_Ready()` оборвался исключением:
+
+`GalaxyNavigationRuntime SalvageRepairSlice.get_GalaxyNavigation(): System.InvalidOperationException: Galaxy navigation runtime is unavailable.`
+
+Stack trace фиксирует точный путь: `InitializeStageOneVoyageRuntime` → `ApplyStageOneVoyageToScene` → `SurfaceLogicalToLocalPosition` → `EnsurePlanetSurfaceFrameForCurrentPlanet` → `GalaxyNavigation.CurrentPlanetId`. Сопутствующий скриншот соответствует раннему обрыву bootstrap: вместо streamed terrain остаётся fallback `GroundBody`, planet environment/star/world composition не успевают инициализироваться, HUD показывает недоступную позицию игрока.
+
+### Причина
+
+TASK-162 добавил зависимость frame-conversion от `GalaxyNavigation.CurrentPlanetId`, но в трёх lifecycle-путях старый порядок оставался `InitializeStageOneVoyageRuntime()` → `InitializeGalaxyNavigationRuntime()`. Stage-1 voyage немедленно применяет позицию корабля и тем самым впервые обращается к planet-surface frame до создания galaxy runtime.
+
+### Исправлено
+
+- `_Ready()`: Galaxy navigation теперь создаётся до Stage-1 voyage.
+- `PollLoadTask()`: saved Galaxy navigation восстанавливается до применения saved voyage position.
+- `PollResetTask()`: fresh Galaxy navigation создаётся до fresh voyage runtime.
+- Добавлен `validate-task1621-runtime-bootstrap-hotfix.py`, который извлекает все три method body и запрещает регрессию порядка инициализации.
+- Новый gate включён в Windows/Linux section-37 runners.
+
+### Acceptance TASK-162.1
+
+1. Clean build: `0 warnings / 0 errors`.
+2. New Game: исключение `Galaxy navigation runtime is unavailable` отсутствует; после строк TASK-152/TASK-150 startup продолжается до terrain/world-composition READY.
+3. На экране нет прежнего fallback-only состояния: streamed landscape загружен, planet sky/sun/atmosphere присутствуют согласно TASK-160/TASK-150.
+4. Load существующего slot и New Game/reset также не воспроизводят исключение.
+5. После успешного bootstrap выполнить F5 TASK-162 и дальнейший TASK-163 traversal/cold-restore acceptance.
 
 ---
 
@@ -5742,6 +5779,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FRAME-1627` | Save/cold restore сохраняет logical player X/Z без schema bump | `IMPLEMENTED` | snapshot uses logical coordinates; cold load restores exact logical origin and local-zero player |
 | `FRAME-1628` | F5/static/xUnit проверяют long-traversal frame contract | `IMPLEMENTED` | TASK-162 F5 runner; static gate; 3 xUnit tests |
 | `FRAME-1629` | Live rebase синхронизирует absolute AI/navigation caches | `IMPLEMENTED` | ground-NPC targets; NPC-ship routes; fauna/aerial environment shifted/refreshed |
+| `FRAME-162A` | Frame-aware voyage bootstrap не обращается к GalaxyNavigation до его создания | `IMPLEMENTED` | TASK-162.1: galaxy-before-voyage in Ready/load/reset + static gate |
 | `FRAME-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-163 external Windows verification |
 | `FRAME-ACC-101` | F5 TASK-162 PASS + prior F5 matrix no regressions | `IN_PROGRESS` | TASK-163 external Godot evidence |
 | `FRAME-ACC-102` | Live >2048 m rebase bounded/no gap/no world jump | `IN_PROGRESS` | TASK-163 manual traversal |
@@ -5753,17 +5791,19 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + F5 TASK-162; live >2048 m rebase; distant cold restore/persistence |
-| 2 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | может быть закрыт тем же F5: `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
-| 3 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
-| 4 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
-| 5 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 6 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
-| 7 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
-| 8 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-162.1` | Runtime bootstrap hotfix rerun | new-game/load/reset без `Galaxy navigation runtime is unavailable`; terrain+sun+atmosphere/world composition initialize |
+| 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + F5 TASK-162; live >2048 m rebase; distant cold restore/persistence |
+| 3 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | может быть закрыт тем же F5: `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
+| 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
+| 5 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
+| 6 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
+| 7 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
+| 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
+| 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-162 Planet-Global Surface Frame & Floating Origin `IMPLEMENTED`.  
-**Формально ближайший шаг:** TASK-163 Windows/Godot runtime acceptance; его F5 одновременно должен подтвердить TASK-160.1 regression. Затем остаются TASK-161/TASK-159 manual tails.
+**Текущая разрабатываемая реализация:** TASK-162.1 Runtime Bootstrap Order hotfix `IMPLEMENTED`; TASK-162 остаётся `IMPLEMENTED`.  
+**Формально ближайший шаг:** повторный Windows/Godot bootstrap smoke; после него TASK-163 F5/traversal acceptance. Тот же F5 может одновременно подтвердить TASK-160.1 regression.
+
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
