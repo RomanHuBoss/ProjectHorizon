@@ -43,6 +43,7 @@ public partial class PlayerController : CharacterBody3D
     private CapsuleShape3D _capsuleShape = null!;
     private HitscanWeapon _weapon = null!;
     private float _gravity;
+    private float _defaultGravity;
     private float _standingCapsuleHeight;
     private float _standingHeadY;
 
@@ -54,6 +55,8 @@ public partial class PlayerController : CharacterBody3D
     public bool IsCrouching { get; private set; }
     public bool IsJetpacking { get; private set; }
     public bool IsSwimming { get; private set; }
+    public float ActiveGravityAcceleration => _gravity;
+    public double ActivePlanetGravityG { get; private set; } = 1.0;
 
     public override void _Ready()
     {
@@ -72,6 +75,7 @@ public partial class PlayerController : CharacterBody3D
         _gravity = ProjectSettings
             .GetSetting("physics/3d/default_gravity")
             .AsSingle();
+        _defaultGravity = _gravity;
 
         GameUserSettingsService.ApplyToPlayer(this);
         Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -171,6 +175,32 @@ public partial class PlayerController : CharacterBody3D
     {
         IsSwimming = swimming;
         MovementResources?.SetSwimming(swimming);
+    }
+
+    public void SetPlanetSurfaceGravity(double surfaceGravityG)
+    {
+        if (!double.IsFinite(surfaceGravityG) || surfaceGravityG <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(surfaceGravityG),
+                "Planet gravity must be finite and positive.");
+        }
+
+        ActivePlanetGravityG = surfaceGravityG;
+        _gravity = (float)(
+            surfaceGravityG *
+            PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared);
+        // The live surface is a moving tangent frame. In local physics space
+        // +Y is, by definition, the current planet-radial up direction.
+        UpDirection = Vector3.Up;
+    }
+
+    public void RestoreDefaultGravity()
+    {
+        ActivePlanetGravityG = _defaultGravity /
+            PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared;
+        _gravity = _defaultGravity;
+        UpDirection = Vector3.Up;
     }
 
     public void SetFieldOfView(float degrees)

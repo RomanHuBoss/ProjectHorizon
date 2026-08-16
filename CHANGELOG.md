@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-alpha.170] - 2026-08-16
+
+### Added — TASK-170 Radial Planetary Physics & Cube-Face Surface Traversal Foundation
+- Added a planet-radial surface-frame runtime that projects the existing persistent logical East/North cover into a normalized global tangent basis (`East/Up/North`), six cube-sphere face addresses and planet-scaled gravity.
+- Added exact geodesic stepping and canonical geographic warp targets, plus developer `surface_warp <lat> <lon>` for deterministic face/seam traversal without requiring a multi-hour on-foot trip.
+- Bound the live on-foot controller's local gravity magnitude to the current planet (`surfaceGravityG * 9.80665`) while explicitly retaining local `+Y` as radial-up inside the moving bounded tangent patch.
+- Added TASK-170 F5 acceptance, three xUnit regression groups, HUD face/lat/lon/gravity diagnostics and section-37/CI/release gating.
+
+### Preserved boundaries
+- Gameplay terrain/collision/navigation remain the proven 25-active/9-collision floating-origin tangent streamer; TASK-170 does not yet claim a globally curved physical collision mesh, radial CharacterBody orientation, cube-face NavigationServer remeshing or physical circumnavigation.
+- Persistence remains logical X/Z with no SQLite schema migration.
+
+### External runtime evidence carried forward
+- Godot 4.7.1 F5 evidence from alpha.168 confirms TASK-154/156/158/160/162.2/164/166/168/162 and TASK-126 (`altitude=1`) PASS; TASK-164, TASK-166 and TASK-168 are therefore synchronized as `VERIFIED`.
+
 ## [0.1.0-alpha.168] - 2026-08-16
 
 ### Added

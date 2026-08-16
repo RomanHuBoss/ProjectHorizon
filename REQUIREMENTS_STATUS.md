@@ -2,19 +2,55 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task170-radial-surface-frame.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
+## 0. Текущая mega-итерация 2026-08-16 — TASK-170 Radial Planetary Physics & Cube-Face Surface Traversal Foundation
+
+**Исходный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task170-radial-surface-frame.zip`.  
+**Версия:** `0.1.0-alpha.170`.  
+**Статус:** TASK-170 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`; TASK-164/TASK-166/TASK-168 синхронизированы как `VERIFIED` по внешнему Godot 4.7.1 F5 evidence; TASK-163 остаётся `IN_PROGRESS`.
+
+### Внешнее evidence, синхронизированное перед итерацией
+
+Пользовательский alpha.168 runtime-log подтверждает одновременно TASK-154/156/158/160/162.2/164/166/168/162 PASS и TASK-126 aerial navigation `altitude=1`. Для TASK-168 зафиксированы `globeFaces=6/6`, `sphericalAddressing=1`, `circumnavigation=1`, `poleNormalization=1`, `cubeSphereSeams=1`, `detailedGlobe=1`, `boundedGameplayStreamer=1`. Это снимает acceptance-блокировку с TASK-164/166/168.
+
+### TASK-170 — закрываемая подсистема
+
+- `PlanetSurfaceTopologyRuntime` расширен global tangent-frame, canonical geographic/logical bridge, cube-face addressing и exact geodesic step;
+- `PlanetSurfaceRadialFrameRuntime` связывает planet environment radius/gravity с global radial Up и cube-face state;
+- `PlayerController` получает реальную величину гравитации активной планеты, сохраняя local `+Y` как radial-up moving tangent frame;
+- runtime диагностирует cube-face transitions без изменения logical chunk/resource/POI identity;
+- developer `surface_warp <lat> <lon>` проверяет центры faces, seam crossing, floating-origin restore и повторный settle 25/9 streamer;
+- F5 TASK-170 проверяет 6/6 faces, orthonormal tangent bases, gravity scaling, seam continuity, 1 km geodesic displacement, warp round-trip и bounded 25/9 residency;
+- persistence остаётся logical X/Z, schema migration отсутствует;
+- 3 xUnit regression groups + section-37/CI/release static gate добавлены.
+
+### Граница итерации
+
+TASK-170 — foundation, а не заявление о полностью сферической физической поверхности. Collision terrain, CharacterBody orientation и NavigationServer остаются локальным tangent patch; не заявляются global curved collision, radial rotation всего physics world или физический обход планеты через face seams. Следующий физический слой должен мигрировать collision/navigation отдельно и сохранить verified TASK-124/158/162 contracts.
+
+### Acceptance TASK-170
+
+1. Clean Windows/Godot build: `0 errors / 0 warnings`.
+2. New Game: `TASK-170 radial surface frame READY` с `face`, `lat/lon`, planet gravity и `streamer=25/9-bounded`.
+3. F5: `TASK-170 radial surface frame acceptance PASS`; `gravity=1`, `tangentFrames=1`, `faces=6/6`, `faceUv=1`, `seamContinuity=1`, `geodesicStep=1`, `warpRoundTrip=1`, `boundedStreamer=1`.
+4. Debug Console: `surface_warp 0 0`, `0 90`, `0 179`, `89 0`, `-89 0`, `0 -90`; после каждого warp streamer снова settles `25/25`, collisions `9/9`, игрок не проваливается.
+5. Seam smoke: `surface_warp 0 44.9` → `surface_warp 0 45.1`; Output должен показать `TASK-170 cube-face transition`, без скачка terrain identity/save state.
+6. Старые F5 TASK-154/158/160/162/164/166/168/126 остаются PASS.
+
+---
 
 ## 0. Текущая mega-итерация 2026-08-16 — TASK-168 Planetary Globe & Geodesic Surface Topology
 
 **Исходный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`.  
 **Версия:** `0.1.0-alpha.168`.  
-**Статус:** TASK-168 `IMPLEMENTED`; TASK-166 принят product-owner как «более-менее всё», но без полного build/F5 evidence остаётся `IMPLEMENTED`; TASK-163 остаётся `IN_PROGRESS`.
+**Статус (синхронизирован после внешнего alpha.168 F5):** TASK-168 `VERIFIED`; TASK-166 `VERIFIED`; TASK-164 `VERIFIED`; TASK-163 остаётся `IN_PROGRESS`.
 
 ### Выбор mega-итерации
 

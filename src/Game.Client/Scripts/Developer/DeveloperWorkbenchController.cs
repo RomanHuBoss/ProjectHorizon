@@ -451,7 +451,7 @@ public partial class DeveloperWorkbenchController : Control
     {
         ClearContent("Debug Console", "Launch the vertical slice with developer console opened. Public builds keep this disabled unless --developer is explicitly supplied.");
         RichTextLabel commands = ReportBox();
-        commands.Text = "Commands\nteleport x y z\nspawn <definitionId> [count]\ngive <itemId> [qty]\ndamage [amount]\nheal [amount]\n" +
+        commands.Text = "Commands\nteleport x y z\nsurface_warp <latitudeDeg> <longitudeDeg>\nspawn <definitionId> [count]\ngive <itemId> [qty]\ndamage [amount]\nheal [amount]\n" +
             "set_time <0..24>\nset_weather <clear|wind|storm|toxic>\nload_system <x> <y> <z>\nload_planet <index>\n" +
             "show_chunks\nshow_navmesh\nshow_ai\nprofile_worldgen\nsave\nreload_content";
         _content!.AddChild(commands);

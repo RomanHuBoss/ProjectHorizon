@@ -1008,4 +1008,111 @@ public sealed class WorldGenTests
         Assert.InRange(build.MaximumSeamNormalError, 0.0f, 0.0001f);
     }
 
+    [Fact]
+    public void PlanetRadialSurfaceFrame_CoversCubeFacesWithOrthonormalTangentBases()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfaceRadialFrameRuntime runtime = new(profile);
+        (double Latitude, double Longitude)[] probes =
+        {
+            (0.0, 0.0), (0.0, 179.0), (89.0, 0.0),
+            (-89.0, 0.0), (0.0, 90.0), (0.0, -90.0)
+        };
+
+        PlanetSurfaceRadialFrameState[] states = probes
+            .Select(probe => runtime.Build(
+                runtime.Topology.FromGeographic(
+                    probe.Latitude,
+                    probe.Longitude)))
+            .ToArray();
+
+        Assert.Equal(6, states.Select(state => state.CubeFace.Face).Distinct().Count());
+        Assert.All(states, state =>
+        {
+            Assert.InRange(state.GlobalFrame.MaximumOrthogonalityError, 0.0, 1e-9);
+            Assert.InRange(state.GlobalFrame.MaximumUnitLengthError, 0.0, 1e-9);
+            Assert.InRange(Math.Abs(state.GlobalFrame.Handedness - 1.0), 0.0, 1e-9);
+            Assert.InRange(Math.Abs(state.CubeFace.U), 0.0, 1.000000001);
+            Assert.InRange(Math.Abs(state.CubeFace.V), 0.0, 1.000000001);
+        });
+        Assert.Equal(
+            profile.SurfaceGravityG * PlanetSurfaceRadialFrameRuntime.StandardGravityMetersPerSecondSquared,
+            states[0].GravityMetersPerSecondSquared,
+            6);
+    }
+
+    [Fact]
+    public void PlanetRadialSurfaceFrame_GeodesicWarpAndFaceSeamRemainContinuous()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile profile = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .First(value => value.Landable);
+        PlanetSurfaceRadialFrameRuntime runtime = new(profile);
+        PlanetSurfaceGeographicAddress origin = runtime.Topology.FromGeographic(0.0, 0.0);
+        PlanetSurfaceGeographicAddress destination = runtime.Topology.GeodesicStep(
+            origin,
+            600.0,
+            800.0);
+
+        Assert.Equal(
+            1000.0,
+            runtime.Topology.GreatCircleDistanceMeters(origin, destination),
+            3);
+
+        PlanetSurfaceCanonicalLogicalAddress target = runtime.WarpTarget(34.5, -122.25);
+        PlanetSurfaceGeographicAddress restored = runtime.Topology.FromLogical(
+            target.EastMeters,
+            target.NorthMeters);
+        Assert.Equal(34.5, restored.LatitudeDegrees, 6);
+        Assert.Equal(-122.25, restored.LongitudeDegrees, 6);
+
+        PlanetSurfaceRadialFrameState left = runtime.Build(
+            runtime.Topology.FromGeographic(0.0, 44.999));
+        PlanetSurfaceRadialFrameState right = runtime.Build(
+            runtime.Topology.FromGeographic(0.0, 45.001));
+        Assert.NotEqual(left.CubeFace.Face, right.CubeFace.Face);
+        Assert.InRange(runtime.MeasureUpDeltaDegrees(left, right), 0.0, 0.01);
+    }
+
+    [Fact]
+    public void PlanetRadialSurfaceFrame_AcceptanceClosesGravityFaceAndBoundedStreamingContract()
+    {
+        PlanetEnvironmentRuntime environments = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetEnvironmentProfile[] profiles = galaxy.CurrentSystem.Planets
+            .Select(planet => environments.BuildProfile(
+                planet,
+                galaxy.CurrentSystem.StarType))
+            .ToArray();
+
+        PlanetSurfaceRadialFrameAcceptanceReport report =
+            PlanetSurfaceRadialFrameAcceptanceRunner.Run(profiles);
+
+        Assert.True(report.Passed, report.BuildOutputLine());
+        Assert.True(report.GravityScaled);
+        Assert.True(report.TangentFramesOrthonormal);
+        Assert.True(report.FaceCoverage);
+        Assert.True(report.SeamContinuous);
+        Assert.True(report.GeodesicStepExact);
+        Assert.True(report.WarpRoundTrip);
+        Assert.True(report.BoundedGameplayStreamer);
+        Assert.Equal(6, report.FacesCovered);
+    }
+
 }

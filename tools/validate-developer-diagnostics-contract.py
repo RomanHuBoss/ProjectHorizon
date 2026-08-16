@@ -32,7 +32,7 @@ for tool in required_tools:
     need(tool in workbench, f"missing tool: {tool}")
 
 required_commands = [
-    "teleport", "spawn", "give", "damage", "heal", "set_time", "set_weather",
+    "teleport", "surface_warp", "spawn", "give", "damage", "heal", "set_time", "set_weather",
     "load_system", "load_planet", "show_chunks", "show_navmesh", "show_ai",
     "profile_worldgen", "save", "reload_content",
 ]
@@ -77,7 +77,7 @@ need("StructuredGameLogger.UpdateContext" in bridge, "runtime logger context upd
 status = "PASS" if not failures else "FAIL"
 print(
     f"TASK-136 DEVELOPER DIAGNOSTICS CONTRACT {status}: "
-    f"tools={len(required_tools)}/5; commands={len(required_commands)}/15; "
+    f"tools={len(required_tools)}/5; commands={len(required_commands)}/16; "
     f"logCategories={len(required_categories)}/14; logFields=10/10; devGate={int(not any('gate' in f for f in failures))}; "
     f"seedExplorer={int('Seed Explorer' in workbench)}; planetPreview={int('Planet Preview' in workbench)}; "
     f"chunkProfiler={int('CaptureProfilerSnapshot' in terrain)}; saveInspector={int('Save Inspector' in workbench)}; "

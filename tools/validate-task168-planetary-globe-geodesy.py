@@ -28,7 +28,12 @@ need('RunPlanetaryGlobeAcceptance();' in main and 'TASK-168 (F5)' in main and 'p
 need('TASK-168 planetary globe READY' in part and 'PlanetaryGlobeAcceptanceRunner.Run' in part, 'TASK-168 runtime wiring missing', f)
 need('planetary globe and geodesy acceptance' in accept and 'ExpectedActiveChunks == 25' in accept, 'TASK-168 acceptance/bounded-streamer guard missing', f)
 need('PlanetSurfaceTopology_CircumnavigationWrapsAndPolesNormalize' in tests and 'PlanetaryGlobe_CubeSphereGeometryRemainsSeamless' in tests, 'TASK-168 xUnit regressions missing', f)
-need(text('VERSION').strip() == '0.1.0-alpha.168', 'VERSION not alpha.168', f)
+version = text('VERSION').strip()
+try:
+    revision = int(version.rsplit('.', 1)[1])
+except (ValueError, IndexError):
+    revision = -1
+need(version.startswith('0.1.0-alpha.') and revision >= 168, 'VERSION older than alpha.168', f)
 if f:
     print('TASK-168 PLANETARY GLOBE/GEODESY CONTRACT FAIL:')
     for x in f: print('- '+x)

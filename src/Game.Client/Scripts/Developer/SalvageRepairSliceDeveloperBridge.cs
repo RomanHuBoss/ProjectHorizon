@@ -28,7 +28,7 @@ public partial class SalvageRepairSlice
             AddChild(_developerDiagnosticsSuite);
         }
         GD.Print(
-            "TASK-136 developer diagnostics READY: tools=5; commands=15; " +
+            "TASK-136 developer diagnostics READY: tools=5; commands=16; " +
             "loggingCategories=14; consoleGate=debug-or---developer; structuredJsonl=1; redaction=1.");
     }
 
@@ -68,6 +68,7 @@ public partial class SalvageRepairSlice
             return parts[0].ToLowerInvariant() switch
             {
                 "teleport" => DeveloperTeleport(parts),
+                "surface_warp" => DeveloperSurfaceWarp(parts),
                 "spawn" => DeveloperSpawn(parts),
                 "give" => DeveloperGive(parts),
                 "damage" => DeveloperDamage(parts),
@@ -349,7 +350,7 @@ public partial class SalvageRepairSlice
             planetPreview = build.TotalVertices > 0 && build.TotalTriangles > 0 && stopwatch.Elapsed.TotalMilliseconds >= 0.0;
             chunkProfiler = typeof(TerrainChunkManager).GetMethod("CaptureProfilerSnapshot") is not null;
             saveInspector = _database is not null && File.Exists(GameProfilePaths.PrimaryDatabasePath);
-            debugConsole = _developerDiagnosticsSuite is not null && DeveloperDiagnosticsSuite.RequiredCommands.Length == 15;
+            debugConsole = _developerDiagnosticsSuite is not null && DeveloperDiagnosticsSuite.RequiredCommands.Length == 16;
             StructuredGameLogger.EnsureInitialized(GetTree());
             foreach (GameLogCategory category in Enum.GetValues<GameLogCategory>())
                 StructuredGameLogger.Log(GameLogLevel.Debug, category, "TASK-136 category acceptance sample");
@@ -367,7 +368,7 @@ public partial class SalvageRepairSlice
             _task136AcceptanceHud = passed ? "PASS" : "FAIL";
             string line =
                 $"TASK-136 developer diagnostics acceptance {(passed ? "PASS" : "FAIL")}: " +
-                "tools=5/5; commands=15/15; " +
+                "tools=5/5; commands=16/16; " +
                 $"devGate={(devGate ? 1 : 0)}; seedExplorer={(seedExplorer ? 1 : 0)}; planetPreview={(planetPreview ? 1 : 0)}; " +
                 $"chunkProfiler={(chunkProfiler ? 1 : 0)}; saveInspector={(saveInspector ? 1 : 0)}; debugConsole={(debugConsole ? 1 : 0)}; " +
                 $"logCategories={logger.CategoriesSeen.Count}/14; utc=1; session={(string.IsNullOrWhiteSpace(logger.SessionId) ? 0 : 1)}; " +
