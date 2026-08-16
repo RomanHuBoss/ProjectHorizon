@@ -11,6 +11,13 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-190 — Atmospheric Scattering & Spherical Cloud Layers
+
+Alpha.190 implements Technical Specification §§9.7–9.8 as a bounded low-cost atmosphere/cloud rendering stack. Surface presentation now adds a radial-up spherical atmosphere shell with star-direction scattering, horizon amplification, density-controlled opacity and sunset tint; there is no volumetric multi-step ray marching. The previous local `CloudCluster/Lobe` ellipsoids are retired and replaced by at most two spherical cloud shells using deterministic scrolling PNG noise textures. Weather controls cloud density/wind drift, while a bounded cloud-shadow factor dims the directional surface light instead of rendering an expensive projected volumetric shadow field.
+
+The same iteration closes the owner-observed low-altitude log chatter from alpha.188: one terrain-contact correction episode stays latched until the ship has at least 4.35 m clearance for 12 consecutive physics frames, while TASK-180.2 lethal impact thresholds remain unchanged. F5 includes TASK-190 acceptance; see `docs/PLANETARY_ATMOSPHERE_CLOUDS.md`.
+
+
 ## TASK-188 — Planetary Water, Swimming & Underwater Rendering
 
 Alpha.188 implements Technical Specification §9.6 as a real surface-water gameplay stack. Landable planets now resolve a fixed semantic radial water level into either a bounded spherical ocean patch or deterministic local lakes. The water shader adds animated waves, environment/Fresnel specular response and depth-buffer-based shallow/deep darkening; camera submersion enables a screen-texture underwater post-effect. On-foot movement gains signed-depth swimming with hysteresis and bounded buoyancy assistance: WASD swims tangentially, Space ascends and Ctrl descends. `PlayerSurvivalRuntime` distinguishes `Swimming` from `Underwater`, so the underwater oxygen penalty applies only while the camera/head is submerged. The legacy WaterPool trigger is retired and no liquid/fluid solver is introduced. F5 includes TASK-188 acceptance; see `docs/PLANETARY_WATER_RUNTIME.md`.

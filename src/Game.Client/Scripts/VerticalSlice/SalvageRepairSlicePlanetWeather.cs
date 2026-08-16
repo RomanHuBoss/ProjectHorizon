@@ -225,8 +225,10 @@ public partial class SalvageRepairSlice
                 PlanetWeatherKind.Wind => 0.90,
                 _ => 1.0
             };
-            sun.LightEnergy = (float)(baseSky.SunEnergy *
-                Math.Max(0.02, state.Daylight) * weatherDim);
+            double cloudShadow = CurrentCloudShadowFactor();
+            sun.LightEnergy = (float)PlanetAtmosphereCloudRuntime.ApplyCloudShadow(
+                baseSky.SunEnergy * Math.Max(0.02, state.Daylight) * weatherDim,
+                cloudShadow);
             sun.LightColor = state.Kind == PlanetWeatherKind.Toxic
                 ? ToColor(baseSky.SunColor).Lerp(new Color(0.68f, 0.90f, 0.38f), 0.24f)
                 : ToColor(baseSky.SunColor);
@@ -237,39 +239,8 @@ public partial class SalvageRepairSlice
 
         if (_planetSurfaceCloudRoot is not null)
         {
-            _planetSurfaceCloudRoot.Visible = _surfaceRuntimeActive &&
-                baseSky.CloudClusterCount > 0;
-            float windAngle = Mathf.DegToRad((float)state.WindDirectionDegrees);
-            if (_player is not null)
-            {
-                PlanetSurfaceLogicalPosition logicalPlayer =
-                    GetPlanetSurfaceLogicalPlayerPosition();
-                _planetSurfaceCloudRoot.Position = new Vector3(
-                    (float)logicalPlayer.EastMeters +
-                        Mathf.Sin(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18),
-                    -(float)(CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
-                        logicalPlayer.EastMeters, logicalPlayer.NorthMeters) ?? 0.0),
-                    (float)logicalPlayer.NorthMeters +
-                        Mathf.Cos(windAngle) * (float)(_planetSurfaceCloudDrift * 0.18));
-            }
-        }
-        if (_planetSurfaceCloudMaterial is not null)
-        {
-            Color cloud = ToColor(baseSky.SkyHorizonColor).Lightened(0.62f);
-            float alpha = (float)Math.Clamp(
-                baseSky.CloudOpacity * state.CloudMultiplier,
-                0.04,
-                0.86);
-            if (state.Kind == PlanetWeatherKind.Storm)
-            {
-                cloud = cloud.Darkened(0.42f);
-            }
-            else if (state.Kind == PlanetWeatherKind.Toxic)
-            {
-                cloud = cloud.Lerp(new Color(0.42f, 0.62f, 0.18f), 0.42f);
-            }
-            _planetSurfaceCloudMaterial.AlbedoColor = new Color(
-                cloud.R, cloud.G, cloud.B, alpha);
+            // TASK-190: old local sphere-lobe cloud clusters are retired.
+            _planetSurfaceCloudRoot.Visible = false;
         }
 
         UpdatePlanetSurfaceSunVisual();

@@ -17,6 +17,7 @@ terrain_runtime = text("src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceTerra
 terrain_scene = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetTerrain.cs")
 world_runtime = text("src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceWorldCompositionRuntime.cs")
 world_scene = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceWorldComposition.cs")
+atmosphere_clouds = text("src/Game.Client/Scripts/VerticalSlice/PlanetAtmosphereCloudNode.cs")
 main = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs")
 star_system = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceStarSystem.cs")
 terrain_manager = text("src/Game.Client/Scripts/Terrain/TerrainChunkManager.cs")
@@ -45,9 +46,15 @@ need('PlanetSurfaceSunVisual' in world_scene and
      'UpdatePlanetSurfaceSunVisual();' in world_scene and
      ('sun.Set("sky_mode", 0)' in world_scene or ('sun.Set("sky_mode", 1)' in world_scene and 'sky_rotation' in world_scene)),
      'visible stellar-disc + procedural-sky binding missing', failures)
-need('random.RandfRange(105.0f, 165.0f)' in world_scene and
-     'random.RandfRange(1.4f, 3.2f)' in world_scene,
-     'cloud layer still uses near-camera spherical blobs', failures)
+need((
+        'random.RandfRange(105.0f, 165.0f)' in world_scene and
+        'random.RandfRange(1.4f, 3.2f)' in world_scene
+     ) or (
+        'SphericalCloudLayer' in atmosphere_clouds and
+        'sampler2D noise_a' in atmosphere_clouds and
+        'RetireLegacyCloudClusters();' in world_scene
+     ),
+     'cloud presentation is neither legacy high-flat nor TASK-190 spherical noise-layer', failures)
 need('Gameplay/PlanetSurfaceDistantTerrain' in star_system and
      'Gameplay/PlanetSurfaceSunVisual' in star_system,
      'new presentation nodes are not part of surface residency', failures)
@@ -69,6 +76,6 @@ if failures:
 print(
     'TASK-162.2 SURFACE PRESENTATION HOTFIX CONTRACT PASS: '
     'relief=macro; gameplayStreamer=25; distantProxy=840m; proxyHole=116m; '
-    'atmosphere=edge-hiding; sunDisc=emissive+sky-bound; clouds=high-flat; '
+    'atmosphere=edge-hiding; sunDisc=emissive+sky-bound; clouds=high-flat-or-spherical-noise; '
     'playerClearance=guarded; terrainLogs=summary-only; surfaceResidency=1; f5=1.'
 )

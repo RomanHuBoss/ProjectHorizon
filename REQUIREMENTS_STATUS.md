@@ -2,9 +2,50 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task186-hard-surface-visual-redesign.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task190-atmosphere-clouds.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Мега-итерация 2026-08-16 — TASK-190 Atmospheric Scattering & Spherical Cloud Layers
+
+**Исходный снимок:** `ProjectHorizon-main-task188-planetary-water.zip` (`0.1.0-alpha.188`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task190-atmosphere-clouds.zip`.  
+**Версия:** `0.1.0-alpha.190`.  
+**Статус:** `IMPLEMENTED / OWNER TASK-188 WATER RUNTIME SMOKE PASSED / TASK-190 CLEAN BUILD+VISUAL+F5 PENDING`.
+
+### Основание и owner evidence
+
+Owner runtime alpha.188 подтвердил новый water stack фактически: многократно наблюдаются корректные переходы `swimming=1/underwater=0 -> swimming=1/underwater=1 -> underwater=0 -> swimming=0`, terrain streaming остаётся `failed=0`, затем выполняются starter repair, boarding/takeoff и дальнейший flight runtime. Это позволяет считать TASK-188 materially passed как runtime smoke и перейти к следующему соседнему gap ТЗ.
+
+Тот же лог выявил regression-tail: при низком пролёте перед реальным lethal planet crash повторялись пары `TASK-180.3 surface floor correction` / `TASK-180.1 surface contact RECOVERED`. Это не отменяет правильный финальный `TASK-180.2 planetary crash ... death=1`, но создаёт log/physics chatter. TASK-190 включает latch-fix без изменения порогов смертельного столкновения.
+
+Gap-analysis PDF-ТЗ v2.0 выбирает §§9.7–9.8. До TASK-190 surface presentation использовала `ProceduralSkyMaterial` и локальные растянутые `SphereMesh` cloud lobes. Физика атмосферы, weather/day-night и world handoff уже существовали, но требуемые spherical atmosphere/cloud rendering contracts не были реализованы полностью.
+
+### Реализация TASK-190
+
+- `PlanetAtmosphereCloudRuntime`: bounded profile/frame model; max 2 cloud layers; atmosphere density, sunset factor, weather-driven cloud density/opacity and simplified cloud-shadow factor.
+- `PlanetAtmosphereCloudNode`: observer-centred spherical atmosphere shell aligned to radial Up; single-pass shader with zenith/horizon gradient, star-direction response, horizon amplification and sunset tint.
+- Cloud presentation: 0..2 spherical shells using `cloud_noise_1.png`/`cloud_noise_2.png`; UV scroll uses shader `TIME` plus live wind direction/speed; weather changes density/opacity.
+- Old `CloudCluster_XX/Lobe_XX` local primitive clouds are retired and never rebuilt.
+- Simplified surface cloud shadow is implemented by bounded attenuation of `DirectionalLight3D` energy; no projected volumetric shadow map or multi-step ray marching is introduced.
+- `SurfaceContactLatchRuntime`: contact episode releases only after clearance >=4.35 m for 12 consecutive frames; correction remains silent while latched; lethal `PlanetaryImpactRuntime` path is preserved.
+- Added TASK-190 F5, xUnit, static validator, section-37/CI/release gate and `docs/PLANETARY_ATMOSPHERE_CLOUDS.md`.
+
+### Acceptance
+
+1. Clean build: `0 warnings / 0 errors`; `TASK-190 ATMOSPHERE/CLOUD CONTRACT PASS`.
+2. Startup: `TASK-190 planetary atmosphere/clouds READY ... volumetricRayMarch=0`. No shader/import errors.
+3. Surface morning/noon/sunset: radial horizon remains coherent, sunset warms the star-facing horizon, zenith/horizon remain visibly distinct.
+4. Clouded planet: broad spherical noise layers drift with weather wind; no discrete ellipsoid `CloudCluster/Lobe` blobs. Clear/Wind/Storm changes density and directional surface brightness.
+5. Surface -> Orbit: shells disappear when vacuum presentation owns the frame; existing TASK-178.3 handoff remains clean.
+6. Terrain skim: one contact episode logs one initial correction and only one recovery after stable clearance; deliberate lethal dive still reaches TASK-180.2 death.
+7. F5 HUD: `TASK-190 (F5): PASS shell=1 clouds=<0..2> noise=1 shadow=1 noRayMarch=1`; Output includes `TASK-190 planetary atmosphere/cloud acceptance PASS`.
+
+### Граница итерации
+
+TASK-190 intentionally does not add volumetric cloud ray marching, physically-based multi-scattering integration, global dynamic cloud-shadow textures or weather fluid simulation. These are outside the low-profile v1.0 requirement. Existing weather, atmosphere flight dynamics, water, terrain, docking and save contracts remain authoritative.
 
 ---
 
@@ -49,7 +90,7 @@ Owner build-log подтвердил единственный compile blocker: `
 **Исходный снимок:** `ProjectHorizon-main-task186-hard-surface-visual-redesign.zip` (`0.1.0-alpha.186`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task188-planetary-water.zip`.  
 **Версия:** `0.1.0-alpha.188`.  
-**Статус:** `IMPLEMENTED / OWNER CLEAN RUNTIME BASELINE ALPHA.186 PASSED / TASK-188 BUILD+F5+WATER SMOKE PENDING`.
+**Статус:** `IMPLEMENTED / OWNER WATER RUNTIME SMOKE PASSED / F5 TASK-188 PENDING`.
 
 ### Основание
 

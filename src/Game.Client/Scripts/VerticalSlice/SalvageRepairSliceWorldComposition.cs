@@ -63,6 +63,7 @@ public partial class SalvageRepairSlice
                 GalaxyNavigation.CurrentSystem.StarType);
         ApplyPlanetSurfaceSky(_planetSurfaceSkyProfile);
         RebuildPlanetSurfaceClouds(_planetSurfaceSkyProfile);
+        ApplyPlanetAtmosphereCloudProfile(PlanetSurfaceContentProfile.Environment);
         ClearStreamedSurfaceResources();
         _lastSurfaceResourceCenter = null;
         _planetSurfaceWorldCompositionReadyPrinted = false;
@@ -295,86 +296,11 @@ public partial class SalvageRepairSlice
 
     private void RebuildPlanetSurfaceClouds(PlanetSurfaceSkyProfile profile)
     {
-        if (_planetSurfaceCloudRoot is null)
-        {
-            return;
-        }
-
-        foreach (Node child in _planetSurfaceCloudRoot.GetChildren())
-        {
-            child.QueueFree();
-        }
-        _planetSurfaceCloudRoot.Visible =
-            _surfaceRuntimeActive && profile.CloudClusterCount > 0;
-        if (profile.CloudClusterCount <= 0)
-        {
-            return;
-        }
-
-        RandomNumberGenerator random = new()
-        {
-            Seed = unchecked((ulong)profile.Seed) ^ 0xC10D5EEDUL
-        };
-        Color cloudColor = ToColor(profile.SkyHorizonColor)
-            .Lightened(0.62f);
-        StandardMaterial3D cloudMaterial = new()
-        {
-            AlbedoColor = new Color(
-                cloudColor.R,
-                cloudColor.G,
-                cloudColor.B,
-                (float)profile.CloudOpacity),
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            NoDepthTest = false
-        };
-        _planetSurfaceCloudMaterial = cloudMaterial;
-
-        for (int clusterIndex = 0;
-             clusterIndex < profile.CloudClusterCount;
-             clusterIndex++)
-        {
-            Node3D cluster = new()
-            {
-                Name = $"CloudCluster_{clusterIndex:00}",
-                Position = new Vector3(
-                    random.RandfRange(-260.0f, 260.0f),
-                    random.RandfRange(105.0f, 165.0f),
-                    random.RandfRange(-260.0f, 260.0f)),
-                RotationDegrees = new Vector3(
-                    0.0f,
-                    random.RandfRange(0.0f, 360.0f),
-                    0.0f)
-            };
-            _planetSurfaceCloudRoot.AddChild(cluster);
-            int lobes = random.RandiRange(3, 6);
-            for (int lobeIndex = 0; lobeIndex < lobes; lobeIndex++)
-            {
-                SphereMesh mesh = new()
-                {
-                    Radius = 1.0f,
-                    Height = 2.0f,
-                    RadialSegments = 12,
-                    Rings = 6
-                };
-                MeshInstance3D lobe = new()
-                {
-                    Name = $"Lobe_{lobeIndex:00}",
-                    Mesh = mesh,
-                    MaterialOverride = cloudMaterial,
-                    Position = new Vector3(
-                        random.RandfRange(-20.0f, 20.0f),
-                        random.RandfRange(-1.4f, 1.4f),
-                        random.RandfRange(-10.0f, 10.0f)),
-                    Scale = new Vector3(
-                        random.RandfRange(12.0f, 28.0f),
-                        random.RandfRange(1.4f, 3.2f),
-                        random.RandfRange(8.0f, 20.0f))
-                };
-                cluster.AddChild(lobe);
-            }
-        }
+        _ = profile;
+        // TASK-190 supersedes the old local lobe-cloud placeholder with one or
+        // two spherical noise-texture layers. Keep the root only as a stable
+        // legacy scene anchor, but never repopulate it.
+        RetireLegacyCloudClusters();
     }
 
     private void SuppressLegacyResourceFixtures()
@@ -400,23 +326,8 @@ public partial class SalvageRepairSlice
 
         if (_planetSurfaceCloudRoot is not null)
         {
-            _planetSurfaceCloudRoot.Visible =
-                _surfaceRuntimeActive &&
-                (_planetSurfaceSkyProfile?.CloudClusterCount ?? 0) > 0;
-            if (_planetWeatherRuntime is null &&
-                _surfaceRuntimeActive && _player is not null)
-            {
-                _planetSurfaceCloudDrift += delta * 0.55;
-                PlanetSurfaceLogicalPosition logicalPlayer =
-                    GetPlanetSurfaceLogicalPlayerPosition();
-                _planetSurfaceCloudRoot.Position = new Vector3(
-                    (float)logicalPlayer.EastMeters +
-                        (float)Math.Sin(_planetSurfaceCloudDrift * 0.007) * 8.0f,
-                    -(float)(CurrentPlanetSurfaceCurvedPatch?.TangentSagMeters(
-                        logicalPlayer.EastMeters, logicalPlayer.NorthMeters) ?? 0.0),
-                    (float)logicalPlayer.NorthMeters +
-                        (float)Math.Cos(_planetSurfaceCloudDrift * 0.006) * 6.0f);
-            }
+            // TASK-190 legacy cloud root remains empty and hidden.
+            _planetSurfaceCloudRoot.Visible = false;
         }
 
         if (_planetSurfaceResourceRoot is not null)

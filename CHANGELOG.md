@@ -1,3 +1,14 @@
+## [0.1.0-alpha.190] - 2026-08-16
+
+### Added
+- Added TASK-190 low-cost spherical atmosphere shell with directional star scattering, horizon amplification, density response and sunset tint.
+- Replaced local primitive cloud blobs with one or two spherical cloud layers driven by deterministic scrolling noise textures and live weather wind/density.
+- Added simplified cloud-shadow attenuation of the surface directional light without volumetric ray marching.
+- Added TASK-190 F5/xUnit/static/section-37/CI/release acceptance and runtime documentation.
+
+### Fixed
+- Added a stable-clearance surface-contact latch so one low-altitude recovery episode no longer alternates `surface floor correction` / `RECOVERED` every few frames; lethal planet-impact thresholds are unchanged.
+
 # Changelog
 
 ## [0.1.0-alpha.188] - 2026-08-16

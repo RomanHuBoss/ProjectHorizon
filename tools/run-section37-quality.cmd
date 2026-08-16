@@ -71,6 +71,7 @@ dotnet build "%PROJECT%" -c Debug --no-restore -p:ContinuousIntegrationBuild=tru
 %PY% "%ROOT%\tools\validate-task1841-production-asset-build-hotfix.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task186-hard-surface-visual-redesign.py" || exit /b 1
 %PY% "%ROOT%\tools\validate-task188-planetary-water.py" || exit /b 1
+%PY% "%ROOT%\tools\validate-task190-atmosphere-clouds.py" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --collect:"XPlat Code Coverage" --settings "%ROOT%\tests\coverlet.runsettings" --results-directory "%RESULTS%" --logger "trx;LogFileName=section36.trx" || exit /b 1
 %PY% "%ROOT%\tools\verify-section36-coverage.py" --results-dir "%RESULTS%" || exit /b 1
 dotnet test "%PROJECT%" -c Debug --no-build --no-restore --filter "FullyQualifiedName~ProjectHorizon.Tests.Persistence.PersistenceTests" || exit /b 1

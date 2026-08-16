@@ -14,6 +14,7 @@ public partial class SalvageRepairSlice
     private bool _pilotedShipSurfaceSweepInitialized;
     private bool _pilotedShipSurfaceContactActive;
     private int _pilotedShipSurfaceContactRecoveries;
+    private int _pilotedShipSurfaceContactReleaseFrames;
     private Vector3 _pilotedShipSurfaceSweepPreviousPosition;
     private double _pilotedShipMinimumObservedTerrainClearance = double.PositiveInfinity;
 
@@ -28,6 +29,9 @@ public partial class SalvageRepairSlice
                 StageOneVoyageLocation.InboundFlight))
         {
             _pilotedShipSurfaceSweepInitialized = false;
+            _pilotedShipSurfaceContactActive = false;
+            _pilotedShipSurfaceContactRecoveries = 0;
+            _pilotedShipSurfaceContactReleaseFrames = 0;
             return;
         }
 
@@ -118,12 +122,28 @@ public partial class SalvageRepairSlice
         {
             if (_pilotedShipSurfaceContactActive)
             {
-                GD.Print(
-                    "TASK-180.1 surface contact RECOVERED: " +
-                    $"recoveries={_pilotedShipSurfaceContactRecoveries}; " +
-                    $"total={_pilotedShipSurfaceRecoveryCount}.");
-                _pilotedShipSurfaceContactActive = false;
-                _pilotedShipSurfaceContactRecoveries = 0;
+                Vector3 currentLogical = WorldToPlanetSurfaceLogicalPosition(current);
+                double currentTerrain = SamplePlanetSurfaceHeight(
+                    currentLogical.X,
+                    currentLogical.Z);
+                double currentClearance = currentLogical.Y - currentTerrain;
+                _pilotedShipSurfaceContactReleaseFrames =
+                    SurfaceContactLatchRuntime.UpdateReleaseFrames(
+                        _pilotedShipSurfaceContactReleaseFrames,
+                        currentClearance);
+
+                if (SurfaceContactLatchRuntime.ShouldRelease(
+                    _pilotedShipSurfaceContactReleaseFrames))
+                {
+                    GD.Print(
+                        "TASK-180.1 surface contact RECOVERED: " +
+                        $"corrections={_pilotedShipSurfaceContactRecoveries}; " +
+                        $"total={_pilotedShipSurfaceRecoveryCount}; " +
+                        $"releaseClearance={currentClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; latch=TASK-190.");
+                    _pilotedShipSurfaceContactActive = false;
+                    _pilotedShipSurfaceContactRecoveries = 0;
+                    _pilotedShipSurfaceContactReleaseFrames = 0;
+                }
             }
             _pilotedShipSurfaceSweepPreviousPosition = current;
             return;
@@ -166,6 +186,7 @@ public partial class SalvageRepairSlice
 
         _pilotedShipSurfaceRecoveryCount++;
         _pilotedShipSurfaceContactRecoveries++;
+        _pilotedShipSurfaceContactReleaseFrames = 0;
         _pilotedShipSurfaceSweepBlockCount++;
         _pilotedShipSurfaceSweepPreviousPosition = corrected;
         if (!_pilotedShipSurfaceContactActive)
@@ -175,7 +196,7 @@ public partial class SalvageRepairSlice
                 "TASK-180.3 surface floor correction: " +
                 $"clearance={hitClearance.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
                 $"terrain={hitTerrainHeight.ToString("0.00", CultureInfo.InvariantCulture)}m; " +
-                $"samples={samples}; swept=1; padding={PilotedShipRecoveryPaddingMeters.ToString("0.00", CultureInfo.InvariantCulture)}m; blocked=1.");
+                $"samples={samples}; swept=1; padding={PilotedShipRecoveryPaddingMeters.ToString("0.00", CultureInfo.InvariantCulture)}m; blocked=1; latch=TASK-190.");
         }
     }
 

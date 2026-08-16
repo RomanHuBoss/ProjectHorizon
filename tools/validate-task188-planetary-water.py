@@ -11,7 +11,7 @@ def need(cond,msg):
 def text(path): return (ROOT/path).read_text(encoding='utf-8')
 
 version=text('VERSION').strip()
-need(version=='0.1.0-alpha.188', f'VERSION must be 0.1.0-alpha.188, got {version}')
+need(version in {'0.1.0-alpha.188','0.1.0-alpha.190'}, f'VERSION must preserve alpha.188 or later accepted revision, got {version}')
 
 runtime=text('src/Game.Client/Scripts/VerticalSlice/PlanetaryWaterRuntime.cs')
 surface=text('src/Game.Client/Scripts/VerticalSlice/PlanetaryWaterSurfaceNode.cs')
