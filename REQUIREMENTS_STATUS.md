@@ -2,14 +2,51 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
 
-## 0. Текущая mega-итерация 2026-08-16 — TASK-166 Dynamic Planetary Weather & Diurnal Cycle
+## 0. Текущая mega-итерация 2026-08-16 — TASK-168 Planetary Globe & Geodesic Surface Topology
+
+**Исходный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task168-planetary-globe-geodesy.zip`.  
+**Версия:** `0.1.0-alpha.168`.  
+**Статус:** TASK-168 `IMPLEMENTED`; TASK-166 принят product-owner как «более-менее всё», но без полного build/F5 evidence остаётся `IMPLEMENTED`; TASK-163 остаётся `IN_PROGRESS`.
+
+### Выбор mega-итерации
+
+После стабилизации surface presentation, procedural visuals и weather следующий архитектурный предел — разрыв между локальной плоской tangent-поверхностью и глобальной планетой. TASK-168 закрывает общий spherical/geodesic contract и live detailed globe, не ломая проверенный bounded gameplay streamer. PDF v2.0 в snapshot по-прежнему Git-LFS pointer без payload; отсутствующий текст ТЗ не реконструируется.
+
+### TASK-168 — закрываемая подсистема
+
+- единый `PlanetSurfaceTopologyRuntime`: planet radius, circumference, normalized latitude/longitude, pole crossing, longitude wrap, great-circle distance;
+- logical east/north остаются persistence-compatible unbounded cover над сферой; schema migration не требуется;
+- verified Prototype-C `CubeSphereMeshBuilder` переведён в live Orbit/Interplanetary representation: ровно один detailed current-planet globe, шесть seam-safe faces, atmosphere/water/cloud shells;
+- остальные тела системы остаются proxy/marker/statistical — whole-system full-detail residency не допускается;
+- 840 m distant surface proxy получает точную tangent-sphere curvature sag по реальному радиусу планеты; gameplay collision/nav и 25/9 chunk streamer остаются локальными;
+- Planet Map показывает lat/lon и считает nearest discovered POI по great-circle distance;
+- F5 `TASK-168 planetary globe and geodesy acceptance` проверяет circumnavigation, poles, distance symmetry, cube-sphere seams, curvature, one detailed globe и bounded streamer;
+- xUnit/static/CI/release gates расширены TASK-168.
+
+### Граница итерации
+
+TASK-168 не включает radial player gravity, физический cube-face collision streamer или переходы через cube faces. Это следующий physics/topology layer. Здесь закрывается глобальная география, orbit globe и curvature contract при сохранении работающей локальной surface-физики.
+
+### Acceptance TASK-168
+
+1. Clean build `0 warnings / 0 errors`, section-37/xUnit green.
+2. New Game выводит `TASK-168 planetary globe READY` с `globeFaces=6/6`.
+3. F5: `TASK-168 planetary globe and geodesy acceptance PASS` и все ключевые invariants =1.
+4. В Orbit/Interplanetary текущая планета показывается detailed globe; Surface не получает второй глобус поверх gameplay terrain.
+5. Planet Map показывает корректные lat/lon; traversal не меняет 25 active / 9 collision chunk budget.
+6. Старые TASK-154/126/164/166 не должны регрессировать.
+
+---
+
+## 0.1. Предыдущая mega-итерация — TASK-166 Dynamic Planetary Weather & Diurnal Cycle
 
 **Исходный снимок:** `ProjectHorizon-main-task164-surface-visual-language.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task166-planetary-weather.zip`.  
@@ -5939,6 +5976,20 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WEATHER-1669` | RU/EN HUD and F5/static/xUnit acceptance | `IMPLEMENTED` | localized weather line; TASK-166 F5; validator; tests |
 | `WEATHER-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required; current environment has no dotnet/Godot |
 | `WEATHER-ACC-101` | F5 TASK-166 PASS with all invariants =1 | `IN_PROGRESS` | user runtime evidence required |
+
+### 8.33. Planetary Globe & Geodesic Surface Topology — TASK-168
+
+| ID | Требование | Статус | Доказательство |
+|---|---|---:|---|
+| `GLOBE-1680` | Global spherical address with normalized lat/lon and pole wrapping | `IMPLEMENTED` | `PlanetSurfaceTopologyRuntime` |
+| `GLOBE-1681` | Great-circle distance shared by map/navigation diagnostics | `IMPLEMENTED` | topology + Planet Map |
+| `GLOBE-1682` | One detailed current-planet cube-sphere globe | `IMPLEMENTED` | `DetailedPlanetGlobeNode`; 6 faces; resolution 17 |
+| `GLOBE-1683` | Detailed globe bounded to Orbit/Interplanetary representation | `IMPLEMENTED` | `StarSystemSimulationNode`; one prepared globe; parent context visibility |
+| `GLOBE-1684` | Distant surface visually follows real planetary curvature | `IMPLEMENTED` | tangent sag in 840 m distant proxy |
+| `GLOBE-1685` | Local gameplay streamer remains bounded and physics-compatible | `IMPLEMENTED` | 25 active / 9 collision unchanged |
+| `GLOBE-1686` | Persistence remains logical X/Z without schema migration | `IMPLEMENTED` | TASK-162 save contract reused |
+| `GLOBE-1687` | F5/static/xUnit regression contract | `IMPLEMENTED` | TASK-168 acceptance + validator + 3 unit groups |
+| `GLOBE-ACC-101` | F5 TASK-168 PASS and orbit visual smoke | `IN_PROGRESS` | user runtime evidence required |
 | `WEATHER-ACC-102` | Manual midnight/noon/storm/toxic presentation smoke | `IN_PROGRESS` | developer console scenario |
 | `WEATHER-ACC-103` | Save/restart preserves local time | `IN_PROGRESS` | manual persistence smoke |
 

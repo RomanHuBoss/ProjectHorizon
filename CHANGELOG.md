@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.0-alpha.168] - 2026-08-16
+
+### Added
+- TASK-168 Planetary Globe & Geodesic Surface Topology: normalized planet-global latitude/longitude, great-circle distance, exact tangent curvature, and a bounded six-face cube-sphere detailed current-planet globe for Orbit/Interplanetary contexts.
+- Planet-map geographic coordinates and great-circle nearest-POI distance; TASK-168 F5 acceptance, xUnit regressions, documentation and quality gate.
+
+### Changed
+- The 840 m distant surface visual now bends by the real current-planet radius while the 25-chunk/9-collision gameplay streamer remains a stable floating-origin tangent patch.
+- Star-system presentation prepares exactly one detailed current planet instead of representing every body at full detail.
+
 ## [0.1.0-alpha.166] - 2026-08-16
 
 ### Added — TASK-166 Dynamic Planetary Weather & Diurnal Cycle

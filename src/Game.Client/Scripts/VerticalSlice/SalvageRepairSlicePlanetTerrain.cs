@@ -276,6 +276,8 @@ public partial class SalvageRepairSlice
         double step = (half * 2.0) / (resolution - 1);
         SurfaceTool surfaceTool = new();
         surfaceTool.Begin(Mesh.PrimitiveType.Triangles);
+        double radiusKm = _planetSurfaceContentProfile?.Environment.RadiusKm ?? 44.0;
+        PlanetSurfaceTopologyRuntime topology = new(radiusKm);
 
         for (int zIndex = 0; zIndex < resolution; zIndex++)
         {
@@ -287,18 +289,25 @@ public partial class SalvageRepairSlice
                 double logicalZ = logicalCenterNorth + localZ;
                 PlanetSurfaceTerrainSample sample =
                     PlanetSurfaceTerrainRuntime.Sample(profile, logicalX, logicalZ);
-                surfaceTool.SetNormal(SampleTerrainNormal(
+                Vector3 terrainNormal = SampleTerrainNormal(
                     profile,
                     logicalX,
-                    logicalZ));
+                    logicalZ);
+                Vector3 curvedNormal = new Vector3(
+                    terrainNormal.X - (float)(localX / topology.RadiusMeters),
+                    terrainNormal.Y,
+                    terrainNormal.Z - (float)(localZ / topology.RadiusMeters)).Normalized();
+                surfaceTool.SetNormal(curvedNormal);
                 surfaceTool.SetColor(TerrainVertexColor(
                     profile,
                     sample,
                     logicalX,
                     logicalZ));
+                double radialDistance = Math.Sqrt(localX * localX + localZ * localZ);
+                double curvatureSag = topology.TangentSagMeters(radialDistance);
                 surfaceTool.AddVertex(new Vector3(
                     (float)localX,
-                    (float)sample.Height,
+                    (float)(sample.Height - curvatureSag),
                     (float)localZ));
             }
         }

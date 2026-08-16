@@ -955,4 +955,57 @@ public sealed class WorldGenTests
         Assert.True(report.GeodesicStable);
     }
 
+    [Theory]
+    [InlineData(20.0)]
+    [InlineData(44.3)]
+    [InlineData(80.0)]
+    public void PlanetSurfaceTopology_CircumnavigationWrapsAndPolesNormalize(double radiusKm)
+    {
+        PlanetSurfaceTopologyRuntime topology = new(radiusKm);
+        PlanetSurfaceGeographicAddress origin = topology.FromLogical(0.0, 0.0);
+        PlanetSurfaceGeographicAddress wrapped = topology.FromLogical(
+            topology.CircumferenceMeters,
+            0.0);
+        PlanetSurfaceGeographicAddress poleCrossing = topology.FromLogical(
+            topology.CircumferenceMeters * 0.17,
+            topology.CircumferenceMeters * 0.73);
+
+        Assert.Equal(origin.LatitudeDegrees, wrapped.LatitudeDegrees, 6);
+        Assert.Equal(origin.LongitudeDegrees, wrapped.LongitudeDegrees, 6);
+        Assert.InRange(poleCrossing.LatitudeDegrees, -90.0, 90.0);
+        Assert.InRange(poleCrossing.LongitudeDegrees, -180.0, 180.0);
+    }
+
+    [Fact]
+    public void PlanetSurfaceTopology_GreatCircleIsSymmetricAndCurvatureUsesPlanetRadius()
+    {
+        PlanetSurfaceTopologyRuntime small = new(20.0);
+        PlanetSurfaceTopologyRuntime large = new(80.0);
+        double forward = small.GreatCircleDistanceMeters(
+            12_000.0, -8_000.0, -31_000.0, 22_000.0);
+        double reverse = small.GreatCircleDistanceMeters(
+            -31_000.0, 22_000.0, 12_000.0, -8_000.0);
+
+        Assert.Equal(forward, reverse, 6);
+        Assert.InRange(forward, 0.0, Math.PI * small.RadiusMeters);
+        Assert.True(small.TangentSagMeters(420.0) > large.TangentSagMeters(420.0));
+        Assert.True(large.TangentSagMeters(420.0) > 0.0);
+    }
+
+    [Fact]
+    public void PlanetaryGlobe_CubeSphereGeometryRemainsSeamless()
+    {
+        CubeSphereBuildData build = CubeSphereMeshBuilder.Build(
+            DetailedPlanetGlobeNode.FaceResolution,
+            8.0f,
+            0.32f,
+            0.21f,
+            20260816);
+
+        Assert.Equal(6, build.Faces.Count);
+        Assert.Equal(build.ExpectedSeamComparisons, build.SeamComparisons);
+        Assert.InRange(build.MaximumSeamPositionError, 0.0f, 0.0001f);
+        Assert.InRange(build.MaximumSeamNormalError, 0.0f, 0.0001f);
+    }
+
 }

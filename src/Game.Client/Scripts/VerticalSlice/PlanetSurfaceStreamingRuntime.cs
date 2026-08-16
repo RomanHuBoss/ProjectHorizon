@@ -140,26 +140,20 @@ public static class PlanetSurfaceStreamingRuntime
         double eastMeters,
         double northMeters)
     {
-        double radiusMeters = Math.Max(1_000.0, planetRadiusKm * 1_000.0);
+        PlanetSurfaceTopologyRuntime topology = new(planetRadiusKm);
+        PlanetSurfaceGeographicAddress address = topology.FromLogical(
+            eastMeters,
+            northMeters);
+        // Keep SurfaceDistanceMeters as the unwrapped logical traversal distance
+        // for backward-compatible streamer diagnostics; latitude/longitude are now
+        // globally periodic and pole-safe through TASK-168 spherical topology.
         double distance = Math.Sqrt(
             eastMeters * eastMeters + northMeters * northMeters);
-        double angle = distance / radiusMeters;
-        double tangentEast = distance <= 0.000001 ? 0.0 : eastMeters / distance;
-        double tangentNorth = distance <= 0.000001 ? 0.0 : northMeters / distance;
-
-        // Starter landing origin is the +X equatorial point. The exponential map
-        // produces a deterministic spherical address without requiring the live
-        // scene to keep a 20-80 km radius planet resident around the player.
-        double x = Math.Cos(angle);
-        double y = Math.Sin(angle) * tangentNorth;
-        double z = Math.Sin(angle) * tangentEast;
-        double latitude = Math.Asin(Math.Clamp(y, -1.0, 1.0));
-        double longitude = Math.Atan2(z, x);
         return new PlanetSurfaceGeodesicAddress(
-            latitude * 180.0 / Math.PI,
-            longitude * 180.0 / Math.PI,
+            address.LatitudeDegrees,
+            address.LongitudeDegrees,
             distance,
-            2.0 * Math.PI * radiusMeters);
+            topology.CircumferenceMeters);
     }
 
     public static string BuildChunkSignature(

@@ -5515,6 +5515,7 @@ public partial class SalvageRepairSlice : Node3D
         RunSurfacePresentationHotfixAcceptance();
         RunSurfaceVisualLanguageAcceptance();
         RunPlanetWeatherAcceptance();
+        RunPlanetaryGlobeAcceptance();
         RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
@@ -5525,7 +5526,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -7615,6 +7616,7 @@ public partial class SalvageRepairSlice : Node3D
         string planetStreamingLine = BuildPlanetSurfaceStreamingHudLine();
         string worldCompositionLine = BuildPlanetSurfaceWorldCompositionHudLine();
         string surfaceFrameLine = BuildPlanetSurfaceFrameHudLine();
+        string planetaryGlobeLine = BuildPlanetaryGlobeHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7657,6 +7659,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-162.2 (F5): {_surfacePresentationHotfixAcceptanceHud}",
             $"TASK-164 (F5): {_surfaceVisualLanguageAcceptanceHud}",
             $"TASK-166 (F5): {_planetWeatherAcceptanceHud}",
+            $"TASK-168 (F5): {_planetaryGlobeAcceptanceHud}",
             $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
@@ -7691,6 +7694,7 @@ public partial class SalvageRepairSlice : Node3D
                 planetStreamingLine,
                 worldCompositionLine,
                 surfaceFrameLine,
+                planetaryGlobeLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,

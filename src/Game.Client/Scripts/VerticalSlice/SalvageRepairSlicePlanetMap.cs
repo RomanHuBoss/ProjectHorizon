@@ -100,6 +100,13 @@ public partial class SalvageRepairSlice
 
         PlanetSurfaceLogicalPosition logicalPlayer =
             GetPlanetSurfaceLogicalPlayerPosition();
+        PlanetEnvironmentProfile environment = PlanetEnvironment.BuildProfile(
+            GalaxyNavigation.CurrentPlanet,
+            GalaxyNavigation.CurrentSystem.StarType);
+        PlanetSurfaceTopologyRuntime topology = new(environment.RadiusKm);
+        PlanetSurfaceGeographicAddress geographic = topology.FromLogical(
+            logicalPlayer.EastMeters,
+            logicalPlayer.NorthMeters);
         const int width = 33;
         const int height = 19;
         const double mapHalfExtentMeters = 40.0;
@@ -143,21 +150,23 @@ public partial class SalvageRepairSlice
 
         string nearest = PlanetaryExploration.States
             .Where(state => state.Discovered)
-            .OrderBy(state =>
-            {
-                double dx = state.Placement.PositionX - logicalPlayer.EastMeters;
-                double dz = state.Placement.PositionZ - logicalPlayer.NorthMeters;
-                return dx * dx + dz * dz;
-            })
+            .OrderBy(state => topology.GreatCircleDistanceMeters(
+                logicalPlayer.EastMeters,
+                logicalPlayer.NorthMeters,
+                state.Placement.PositionX,
+                state.Placement.PositionZ))
             .Select(state =>
                 $"{PlanetaryExploration.DisplayName(state)} " +
-                $"({state.Placement.PositionX:0.0}, {state.Placement.PositionZ:0.0})")
+                $"({state.Placement.PositionX:0.0}, {state.Placement.PositionZ:0.0}) " +
+                $"{topology.GreatCircleDistanceMeters(logicalPlayer.EastMeters, logicalPlayer.NorthMeters, state.Placement.PositionX, state.Placement.PositionZ):0}m")
             .FirstOrDefault() ?? "none discovered";
 
         _planetMapLabel.Text =
             "PLANET MAP • LOCAL SURFACE REGION\n" +
             $"Planet: {GalaxyNavigation.CurrentPlanetId} • " +
             $"Player X/Z: {logicalPlayer.EastMeters:0.0}/{logicalPlayer.NorthMeters:0.0}\n" +
+            $"Lat/Lon: {geographic.LatitudeDegrees:0.0000}°/{geographic.LongitudeDegrees:0.0000}° • " +
+            $"R={environment.RadiusKm:0.0}km • C={topology.CircumferenceMeters / 1000.0:0.0}km\n" +
             "Legend: @ player • ? unknown POI • O discovered • X resolved • * overlap\n" +
             map +
             $"Discovery: {PlanetaryExploration.DiscoveredCount}/{PlanetaryExploration.States.Count} • " +

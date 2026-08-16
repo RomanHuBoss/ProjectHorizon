@@ -1,3 +1,8 @@
+
+## Alpha 0.1.0-alpha.168 — Planetary Globe & Geodesic Surface Topology
+
+TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world as a bounded detailed current-planet globe in Orbit/Interplanetary contexts. Surface gameplay keeps the stable 25-chunk floating-origin tangent streamer, but now shares a planet-global spherical address model with normalized latitude/longitude, great-circle distance and radius-derived distant-horizon curvature. See `docs/PLANETARY_GLOBE.md`. Full radial player gravity and physical cube-face collision transitions remain a later physics layer.
+
 # Project Horizon
 
 **Project Horizon** — процедурный космический симулятор на Godot Engine с исследованием планет, космическими полётами, добычей ресурсов, крафтом, торговлей, заданиями и строительством баз.

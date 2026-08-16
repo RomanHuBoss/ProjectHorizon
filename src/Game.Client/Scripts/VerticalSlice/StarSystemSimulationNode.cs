@@ -28,6 +28,8 @@ public partial class StarSystemSimulationNode : Node3D
     private StarSystemSimulationSnapshot? _snapshot;
     private int _runtimeSamples;
     private int _rebuilds;
+    private DetailedPlanetGlobeNode? _detailedGlobe;
+    private string _detailedGlobePlanetId = string.Empty;
     private bool _surfaceRuntimeActive = true;
     private string _focusPlanetId = string.Empty;
 
@@ -51,6 +53,16 @@ public partial class StarSystemSimulationNode : Node3D
             }
         }
         _visuals.Clear();
+        if (_detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe))
+        {
+            if (_detailedGlobe.GetParent() == this)
+            {
+                RemoveChild(_detailedGlobe);
+            }
+            _detailedGlobe.QueueFree();
+        }
+        _detailedGlobe = null;
+        _detailedGlobePlanetId = string.Empty;
         _runtime = runtime;
         _snapshot = null;
         _runtimeSamples = 0;
@@ -77,10 +89,14 @@ public partial class StarSystemSimulationNode : Node3D
         _focusPlanetId = focusPlanetId;
         _surfaceRuntimeActive = surfaceRuntimeActive;
         _runtime.Advance(delta);
+        // TASK-168 keeps exactly one bounded detailed globe prepared for the
+        // focused planet in every world context. The parent node is only visible
+        // in Orbit/InterplanetaryTransit, so Surface does not double-render the
+        // globe while preserving an instant no-rebuild orbit handoff.
         _snapshot = _runtime.CreateSnapshot(
             focusPlanetId,
             focusPlanetId,
-            surfaceRuntimeActive);
+            detailedPlanetRequested: true);
         _runtimeSamples++;
         Visible = renderSystemProxies;
         RenderSnapshot(_snapshot);
@@ -102,6 +118,19 @@ public partial class StarSystemSimulationNode : Node3D
         globalPosition = Vector3.Zero;
         return false;
     }
+
+
+    public int PreparedDetailedGlobeCount =>
+        _detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe)
+            ? 1
+            : 0;
+
+    public DetailedPlanetGlobeDiagnostics CreateDetailedGlobeDiagnostics() =>
+        _detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe)
+            ? _detailedGlobe.Diagnostics
+            : new DetailedPlanetGlobeDiagnostics(
+                string.Empty, 0, 0, 0, 0, 0, 0.0f, 0.0f,
+                false, false, false, 0.0f);
 
     public StarSystemSimulationDiagnostics CreateDiagnostics()
     {
@@ -177,7 +206,54 @@ public partial class StarSystemSimulationNode : Node3D
                 ? 0.28f
                 : 1.0f;
             visual.Scale = Vector3.One * representationScale;
+
+            if (state.Representation == StarSystemRepresentation.DetailedPlanet)
+            {
+                EnsureDetailedGlobe(state.Definition);
+                if (_detailedGlobe is not null)
+                {
+                    _detailedGlobe.Position = visual.Position;
+                    _detailedGlobe.Visible = true;
+                }
+            }
         }
+
+        if (!snapshot.Bodies.Any(state =>
+                state.Representation == StarSystemRepresentation.DetailedPlanet) &&
+            _detailedGlobe is not null)
+        {
+            _detailedGlobe.Visible = false;
+        }
+    }
+
+    private void EnsureDetailedGlobe(StarSystemBodyDefinition definition)
+    {
+        if (_detailedGlobe is not null &&
+            GodotObject.IsInstanceValid(_detailedGlobe) &&
+            string.Equals(
+                _detailedGlobePlanetId,
+                definition.BodyId,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (_detailedGlobe is not null && GodotObject.IsInstanceValid(_detailedGlobe))
+        {
+            if (_detailedGlobe.GetParent() == this)
+            {
+                RemoveChild(_detailedGlobe);
+            }
+            _detailedGlobe.QueueFree();
+        }
+
+        _detailedGlobe = new DetailedPlanetGlobeNode
+        {
+            Name = "DetailedPlanetGlobe"
+        };
+        _detailedGlobe.Configure(definition);
+        AddChild(_detailedGlobe);
+        _detailedGlobePlanetId = definition.BodyId;
     }
 
     private static MeshInstance3D CreateVisual(

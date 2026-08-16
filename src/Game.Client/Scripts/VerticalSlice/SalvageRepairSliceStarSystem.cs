@@ -63,6 +63,7 @@ public partial class SalvageRepairSlice
             $"surfaceActive={(_surfaceRuntimeActive ? 1 : 0)}; " +
             "model=analytic-orbits; representation=detail/proxy/marker/statistical; " +
             "singleDetailedPlanet=1.");
+        InitializePlanetaryGlobeRuntime();
     }
 
     private void UpdateStarSystemSimulation(double delta)
