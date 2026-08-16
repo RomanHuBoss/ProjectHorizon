@@ -4,6 +4,12 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-162 — Planet-Global Surface Frame & Floating Origin
+
+The live planet surface now has a dedicated two-space coordinate model: deterministic double-precision planet-logical East/North coordinates drive terrain chunks, resources, POIs, ecology placements, base placement, maps and persistence, while Godot player/physics/rendering coordinates are automatically rebased in 4096 m cells once local X/Z exceeds 2048 m. `TerrainChunkManager` keeps its 25-chunk bounded residency but selects/samples chunks in logical space and places chunk nodes relative to the current frame origin. Ground-NPC navigation targets, NPC-ship routes, flying-fauna territory/aerial steering caches, Stage-1 voyage targets/state, procedural world composition and cold restore use the same frame contract. F5 includes `TASK-162 planet-global surface frame acceptance`; see `docs/PLANET_GLOBAL_SURFACE_FRAME.md`.
+
+TASK-162 closes the **floating-origin / planet-global coordinate subsystem**, not the physical curved-surface renderer: terrain remains a tangent heightfield and does not yet claim cube-face transitions, radial gravity or a true cube-sphere collision mesh.
+
 ## TASK-160 — Planet Surface World Composition & Persistence
 
 The live TASK-158 terrain is now composed as a planet rather than a technical test field. Surface presentation uses the active planet atmosphere plus the current system star to build a procedural sky, visible sun, sky ambient/reflections, aerial haze and lightweight deterministic clouds. The legacy 58-node resource showcase is hidden from normal gameplay (the three starter salvage nodes remain), while the active 5x5 terrain window receives deterministic chunk-scoped deposits with stable planet+chunk+slot IDs and delta-only depletion persistence. Existing POIs keep their reviewed stable identities but are spread through a 78–420 m live exploration annulus instead of being piled around the landing pad. F5 includes `TASK-160 planet surface world composition acceptance`; see `docs/PLANET_SURFACE_WORLD_COMPOSITION.md`.
@@ -40,7 +46,7 @@ The live landable-planet surface now uses the verified terrain chunk pipeline as
 
 ## Текущее состояние
 
-Stage 1 remains intact and the Stage 2 planet stack now runs through environment → interplanetary travel → planet-scoped content → planet-specific relief → bounded live surface streaming → **surface-world composition and delta-persistent procedural resources**. The product owner reported the TASK-156 revision as working and requested the next mega-iteration; TASK-156/TASK-157 are therefore recorded as accepted by owner waiver without reconstructing missing numeric build metrics. `TASK-158` promotes the already verified Prototype-B async terrain-chunk architecture into `SalvageRepairSlice`: 25-chunk bounded residency, 33/17 LODs, 3x3 collision, exact TASK-156 terrain sampling, safe fallback handoff, moving terrain-aware NPC navigation and planet-radius surface addressing. `TASK-159` remains the Windows/Godot runtime/manual acceptance tail. The live gameplay frame is still tangent-plane based; physical cube-sphere/floating-origin traversal is the next scaling layer, not claimed by TASK-158.
+Stage 1 remains intact and the Stage 2 planet stack now runs through environment → interplanetary travel → planet-scoped content → planet-specific relief → bounded live surface streaming → **surface-world composition and delta-persistent procedural resources**. The product owner reported the TASK-156 revision as working and requested the next mega-iteration; TASK-156/TASK-157 are therefore recorded as accepted by owner waiver without reconstructing missing numeric build metrics. `TASK-158` promotes the already verified Prototype-B async terrain-chunk architecture into `SalvageRepairSlice`: 25-chunk bounded residency, 33/17 LODs, 3x3 collision, exact TASK-156 terrain sampling, safe fallback handoff, moving terrain-aware NPC navigation and planet-radius surface addressing. `TASK-159` remains the Windows/Godot runtime/manual acceptance tail. TASK-162 now adds a planet-global logical coordinate frame plus live floating-origin rebasing on top of the tangent heightfield. Physical cube-sphere topology, radial gravity and cube-face transitions remain a later rendering/physics layer; the coordinate/persistence scaling layer itself is now implemented.
 
 ### TASK-156 Planet-Specific Terrain & Surface Geometry mega-iteration — `VERIFIED` (product-owner acceptance)
 
@@ -89,7 +95,7 @@ Technical_Specification/2.0/Project_Horizon_Recipe_Catalog_v2.0.csv
 Technical_Specification/2.0/Project_Horizon_Industry_Content_Schema_v2.0.json
 ```
 
-В подготовленном архиве `Project_Horizon_Technical_Specification_v2.0.pdf` и `.docx` хранятся как полные исходные бинарные документы, а не как Git LFS pointer-файлы. Также восстановлен точный LFS payload `Technical_Specification/1.0/Project_Horizon_Technical_Specification_v1.0.pdf`; v1.0 DOCX оставлен pointer-файлом, поскольку точный исходный payload в доступных материалах отсутствует и реконструированный документ не подменяет оригинал.
+В переданном GitHub snapshot этой редакции PDF/DOCX ТЗ 1.0 и 2.0 представлены Git LFS pointer-файлами, а не бинарными payload. Поэтому локальная preparation/валидация не выдаёт pointer за прочитанный PDF; для полного просмотра ТЗ требуется материализованный LFS payload из репозитория/артефакта. JSON/CSV v2.0 в snapshot присутствуют обычными файлами.
 
 Каталог статических данных:
 

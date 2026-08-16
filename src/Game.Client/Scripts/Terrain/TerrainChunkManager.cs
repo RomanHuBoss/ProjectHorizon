@@ -217,6 +217,8 @@ public partial class TerrainChunkManager : Node3D
     private int _soakTestLastVertexCount;
     private double _lastWorkerCpuMilliseconds;
     private double _lastMainThreadApplyMilliseconds;
+    private double _logicalOriginEastMeters;
+    private double _logicalOriginNorthMeters;
 
     public override void _Ready()
     {
@@ -224,7 +226,7 @@ public partial class TerrainChunkManager : Node3D
         _statusLabel = EnablePrototypeHud
             ? GetNodeOrNull<Label>(StatusLabelPath)
             : null;
-        _currentChunk = WorldToChunkWithoutHysteresis(_player.GlobalPosition);
+        _currentChunk = WorldToChunkWithoutHysteresis(ToLogicalPosition(_player.GlobalPosition));
         _workerLimit = Math.Max(
             1,
             Math.Min(4, System.Environment.ProcessorCount - 2));
@@ -355,7 +357,7 @@ public partial class TerrainChunkManager : Node3D
         else
         {
             Vector2I nextCenter =
-                CalculateHystereticCenter(_player.GlobalPosition);
+                CalculateHystereticCenter(ToLogicalPosition(_player.GlobalPosition));
 
             if (nextCenter != _currentChunk)
             {
@@ -1082,10 +1084,7 @@ public partial class TerrainChunkManager : Node3D
         TerrainChunk chunk = new()
         {
             Name = $"TerrainChunk_{coordinate.X}_{coordinate.Y}",
-            Position = new Vector3(
-                coordinate.X * ChunkSize,
-                0.0f,
-                coordinate.Y * ChunkSize)
+            Position = BuildLocalChunkPosition(coordinate)
         };
 
         ConfigureChunk(chunk, coordinate, spec);
@@ -1130,6 +1129,49 @@ public partial class TerrainChunkManager : Node3D
             UsePlanetSurfacePresentation,
             PlanetSurfaceBaseColor);
     }
+
+
+    public void SetLogicalSurfaceOrigin(
+        double eastMeters,
+        double northMeters)
+    {
+        if (Math.Abs(_logicalOriginEastMeters - eastMeters) < 0.000001 &&
+            Math.Abs(_logicalOriginNorthMeters - northMeters) < 0.000001)
+        {
+            return;
+        }
+
+        _logicalOriginEastMeters = eastMeters;
+        _logicalOriginNorthMeters = northMeters;
+
+        foreach ((Vector2I coordinate, TerrainChunk chunk) in _activeChunks)
+        {
+            chunk.Position = BuildLocalChunkPosition(coordinate);
+        }
+
+        if (!IsInsideTree() || _player is null)
+        {
+            return;
+        }
+
+        Vector2I nextCenter = WorldToChunkWithoutHysteresis(
+            ToLogicalPosition(_player.GlobalPosition));
+        if (nextCenter != _currentChunk)
+        {
+            _currentChunk = nextCenter;
+            PlanRefresh(executeImmediately: false);
+        }
+    }
+
+    private Vector3 ToLogicalPosition(Vector3 localWorldPosition) => new(
+        localWorldPosition.X + (float)_logicalOriginEastMeters,
+        localWorldPosition.Y,
+        localWorldPosition.Z + (float)_logicalOriginNorthMeters);
+
+    private Vector3 BuildLocalChunkPosition(Vector2I coordinate) => new(
+        (float)(coordinate.X * (double)ChunkSize - _logicalOriginEastMeters),
+        0.0f,
+        (float)(coordinate.Y * (double)ChunkSize - _logicalOriginNorthMeters));
 
     private Vector2I CalculateHystereticCenter(Vector3 worldPosition)
     {
@@ -2192,7 +2234,7 @@ public partial class TerrainChunkManager : Node3D
 
         _activeChunks.Clear();
         _desiredSpecs.Clear();
-        _currentChunk = WorldToChunkWithoutHysteresis(_player.GlobalPosition);
+        _currentChunk = WorldToChunkWithoutHysteresis(ToLogicalPosition(_player.GlobalPosition));
         _completedRevision = 0;
         _failedJobs = 0;
         _cancelledJobs = 0;

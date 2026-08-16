@@ -31,7 +31,10 @@ public partial class SalvageRepairSlice
                 "TASK-156 requires GroundBody mesh and collision nodes.");
         }
 
-        ArrayMesh mesh = BuildPlanetTerrainMesh(profile);
+        ArrayMesh mesh = BuildPlanetTerrainMesh(
+            profile,
+            PlanetSurfaceFrame.OriginEastMeters,
+            PlanetSurfaceFrame.OriginNorthMeters);
         StandardMaterial3D material = new()
         {
             AlbedoColor = Colors.White,
@@ -115,11 +118,17 @@ public partial class SalvageRepairSlice
                 Visible = false
             };
             _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+            _planetSurfaceStreamer.SetLogicalSurfaceOrigin(
+                PlanetSurfaceFrame.OriginEastMeters,
+                PlanetSurfaceFrame.OriginNorthMeters);
             AddChild(_planetSurfaceStreamer);
         }
         else
         {
             _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+            _planetSurfaceStreamer.SetLogicalSurfaceOrigin(
+                PlanetSurfaceFrame.OriginEastMeters,
+                PlanetSurfaceFrame.OriginNorthMeters);
         }
     }
 
@@ -163,11 +172,13 @@ public partial class SalvageRepairSlice
         {
             return;
         }
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceGeodesicAddress address =
             PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
                 PlanetSurfaceContentProfile.Environment.RadiusKm,
-                _player?.GlobalPosition.X ?? 0.0,
-                _player?.GlobalPosition.Z ?? 0.0);
+                logicalPlayer.EastMeters,
+                logicalPlayer.NorthMeters);
         GD.Print(
             "TASK-158 planet surface streaming READY: " +
             $"planet={profile.PlanetId}; archetype={profile.Archetype}; " +
@@ -182,7 +193,10 @@ public partial class SalvageRepairSlice
         _planetSurfaceStreamingReadyPrinted = true;
     }
 
-    private ArrayMesh BuildPlanetTerrainMesh(PlanetSurfaceTerrainProfile profile)
+    private ArrayMesh BuildPlanetTerrainMesh(
+        PlanetSurfaceTerrainProfile profile,
+        double logicalCenterEastMeters,
+        double logicalCenterNorthMeters)
     {
         int resolution = profile.Resolution;
         double size = profile.HalfExtent * 2.0;
@@ -196,9 +210,14 @@ public partial class SalvageRepairSlice
             for (int xIndex = 0; xIndex < resolution; xIndex++)
             {
                 double x = -profile.HalfExtent + xIndex * step;
+                double logicalX = logicalCenterEastMeters + x;
+                double logicalZ = logicalCenterNorthMeters + z;
                 PlanetSurfaceTerrainSample sample =
-                    PlanetSurfaceTerrainRuntime.Sample(profile, x, z);
-                Vector3 normal = SampleTerrainNormal(profile, x, z);
+                    PlanetSurfaceTerrainRuntime.Sample(profile, logicalX, logicalZ);
+                Vector3 normal = SampleTerrainNormal(
+                    profile,
+                    logicalX,
+                    logicalZ);
                 surfaceTool.SetNormal(normal);
                 surfaceTool.SetUV(new Vector2(
                     xIndex / (float)(resolution - 1),
@@ -364,10 +383,12 @@ public partial class SalvageRepairSlice
         {
             return L("ui.hud.planet_terrain.unavailable");
         }
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceTerrainSample sample = PlanetSurfaceTerrainRuntime.Sample(
             profile,
-            _player?.GlobalPosition.X ?? 0.0,
-            _player?.GlobalPosition.Z ?? 0.0);
+            logicalPlayer.EastMeters,
+            logicalPlayer.NorthMeters);
         return LF(
             "ui.hud.planet_terrain.summary",
             ("archetype", LocalizeGalaxyPlanetArchetype(profile.Archetype)),
@@ -386,11 +407,13 @@ public partial class SalvageRepairSlice
 
         TerrainChunkProfilerSnapshot snapshot =
             _planetSurfaceStreamer.CaptureProfilerSnapshot();
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceGeodesicAddress address =
             PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
                 PlanetSurfaceContentProfile.Environment.RadiusKm,
-                _player?.GlobalPosition.X ?? 0.0,
-                _player?.GlobalPosition.Z ?? 0.0);
+                logicalPlayer.EastMeters,
+                logicalPlayer.NorthMeters);
         return LF(
             "ui.hud.planet_streaming.summary",
             ("loaded", snapshot.LoadedChunks),

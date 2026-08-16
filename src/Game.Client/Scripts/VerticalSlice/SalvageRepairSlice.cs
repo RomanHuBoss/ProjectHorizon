@@ -789,6 +789,7 @@ public partial class SalvageRepairSlice : Node3D
         UpdateStageOneVoyage(delta);
         SynchronizeWorldSceneCoordinator();
         UpdateStarSystemSimulation(delta);
+        UpdatePlanetSurfaceFrame();
         UpdatePlanetSurfaceStreaming();
         UpdatePlanetSurfaceWorldComposition(delta);
         UpdateEcology(delta);
@@ -4442,7 +4443,13 @@ public partial class SalvageRepairSlice : Node3D
             forward = forward.Normalized();
         }
 
-        Vector3 target = player.GlobalPosition + forward * 4.5f;
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
+        Vector3 target = new(
+            (float)logicalPlayer.EastMeters,
+            player.GlobalPosition.Y,
+            (float)logicalPlayer.NorthMeters);
+        target += forward * 4.5f;
         double gridSize = BaseConstructionCatalog.GridSizeMeters;
         int gridX = (int)Math.Round(
             target.X / gridSize,
@@ -4578,7 +4585,7 @@ public partial class SalvageRepairSlice : Node3D
             out _);
         bool valid = previewResult == BasePlacementResult.Placed;
         EnsureBaseBuildPreviewMesh(definition);
-        _baseBuildPreview.GlobalPosition = new Vector3(
+        _baseBuildPreview.Position = new Vector3(
             worldPosition.X,
             worldPosition.Y + (float)(definition.Size.Y * 0.5),
             worldPosition.Z);
@@ -5503,6 +5510,7 @@ public partial class SalvageRepairSlice : Node3D
         RunPlanetSurfaceTerrainAcceptance();
         RunPlanetSurfaceStreamingAcceptance();
         RunPlanetSurfaceWorldCompositionAcceptance();
+        RunPlanetSurfaceFrameAcceptance();
         RunWorldSceneCoordinatorAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5512,7 +5520,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162/TASK-148/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -5537,14 +5545,15 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _revision++;
-        Vector3 playerPosition = _player.GlobalPosition;
+        PlanetSurfaceLogicalPosition playerPosition =
+            GetPlanetSurfaceLogicalPlayerPosition();
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
             Session,
-            playerPosition.X,
-            playerPosition.Y,
-            playerPosition.Z,
+            playerPosition.EastMeters,
+            playerPosition.HeightMeters,
+            playerPosition.NorthMeters,
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
@@ -5638,14 +5647,15 @@ public partial class SalvageRepairSlice : Node3D
         }
 
         _revision++;
-        Vector3 playerPosition = _player.GlobalPosition;
+        PlanetSurfaceLogicalPosition playerPosition =
+            GetPlanetSurfaceLogicalPlayerPosition();
         SaveGameSnapshot snapshot = StarterRepairSnapshotFactory.Create(
             SlotId,
             _revision,
             Session,
-            playerPosition.X,
-            playerPosition.Y,
-            playerPosition.Z,
+            playerPosition.EastMeters,
+            playerPosition.HeightMeters,
+            playerPosition.NorthMeters,
             technologyProgress: TechnologyProgress.ToSaveData(),
             productionQueue: null,
             productionQueueNetwork:
@@ -5769,6 +5779,24 @@ public partial class SalvageRepairSlice : Node3D
             InitializePlanetSurfaceContentArchives(
                 snapshot?.PlanetaryExploration,
                 snapshot?.Ecology);
+            if (snapshot is null)
+            {
+                ResetPlanetSurfaceFrameForCurrentPlanet();
+            }
+            else if (StageOneVoyage.Piloted)
+            {
+                StageOneVoyageSaveData voyagePosition =
+                    StageOneVoyage.CreateSaveData();
+                RestorePlanetSurfaceFrameAtLogicalPosition(
+                    voyagePosition.PositionX,
+                    voyagePosition.PositionZ);
+            }
+            else
+            {
+                RestorePlanetSurfaceFrameAtLogicalPosition(
+                    snapshot.Player.PositionX,
+                    snapshot.Player.PositionZ);
+            }
             ActivateCurrentPlanetSurfaceContent();
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
@@ -5780,10 +5808,10 @@ public partial class SalvageRepairSlice : Node3D
             if (snapshot is not null && _player is not null &&
                 !StageOneVoyage.Piloted)
             {
-                _player.GlobalPosition = new Vector3(
-                    (float)snapshot.Player.PositionX,
-                    (float)snapshot.Player.PositionY,
-                    (float)snapshot.Player.PositionZ);
+                _player.GlobalPosition = SurfaceLogicalToLocalPosition(
+                    snapshot.Player.PositionX,
+                    snapshot.Player.PositionY,
+                    snapshot.Player.PositionZ);
             }
 
             CloseRecipeSelector();
@@ -5971,6 +5999,7 @@ public partial class SalvageRepairSlice : Node3D
             InitializeStageOneVoyageRuntime(saveData: null);
             InitializeGalaxyNavigationRuntime(saveData: null);
             InitializePlanetSurfaceContentArchives(null, null);
+            ResetPlanetSurfaceFrameForCurrentPlanet();
             ActivateCurrentPlanetSurfaceContent();
             InitializeStarSystemSimulationRuntime();
             InitializeWorldSceneCoordinator();
@@ -7573,6 +7602,7 @@ public partial class SalvageRepairSlice : Node3D
         string planetTerrainLine = BuildPlanetTerrainHudLine();
         string planetStreamingLine = BuildPlanetSurfaceStreamingHudLine();
         string worldCompositionLine = BuildPlanetSurfaceWorldCompositionHudLine();
+        string surfaceFrameLine = BuildPlanetSurfaceFrameHudLine();
         string worldSceneLine = BuildWorldSceneCoordinatorHudLine();
         string ecologyLine = BuildEcologyHudLine();
         string npcFactionLine = BuildNpcFactionHudLine();
@@ -7612,6 +7642,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-156 (F5): {_planetSurfaceTerrainAcceptanceHud}",
             $"TASK-158 (F5): {_planetSurfaceStreamingAcceptanceHud}",
             $"TASK-160 (F5): {_planetSurfaceWorldCompositionAcceptanceHud}",
+            $"TASK-162 (F5): {_planetSurfaceFrameAcceptanceHud}",
             $"TASK-148 (F5): {_worldSceneCoordinatorAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
@@ -7643,6 +7674,7 @@ public partial class SalvageRepairSlice : Node3D
                 planetTerrainLine,
                 planetStreamingLine,
                 worldCompositionLine,
+                surfaceFrameLine,
                 worldSceneLine,
                 audioLine,
                 ecologyLine,

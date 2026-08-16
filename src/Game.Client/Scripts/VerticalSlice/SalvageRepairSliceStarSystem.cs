@@ -120,10 +120,10 @@ public partial class SalvageRepairSlice
             return false;
         }
 
-        Vector3 surface = new(
-            (float)StageOneVoyageRuntime.SurfacePositionX,
-            (float)StageOneVoyageRuntime.SurfacePositionY,
-            (float)StageOneVoyageRuntime.SurfacePositionZ);
+        Vector3 surface = SurfaceLogicalToLocalPosition(
+            StageOneVoyageRuntime.SurfacePositionX,
+            StageOneVoyageRuntime.SurfacePositionY,
+            StageOneVoyageRuntime.SurfacePositionZ);
         return _voyageShip.GlobalPosition.DistanceTo(surface) <=
             PlanetRuntimeActivationRadiusMeters;
     }

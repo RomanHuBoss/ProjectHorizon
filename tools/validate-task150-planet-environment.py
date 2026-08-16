@@ -110,7 +110,8 @@ need("Godot.FileAccess.GetFileAsString" in workbench and
 need("_exitTransitionCommitted" in slice_main and
      "if (PollGracefulExitTask())" in slice_main and
      "!_player.IsInsideTree()" in slice_main and
-     "Vector3 playerPosition = _player.GlobalPosition;" in slice_main and
+     ("Vector3 playerPosition = _player.GlobalPosition;" in slice_main or
+      "GetPlanetSurfaceLogicalPlayerPosition();" in slice_main) and
      "_exitTransitionCommitted = true;" in slice_main,
      "graceful-exit scene transition is not guarded against same-frame re-entry", failures)
 need("GalaxyNavigation.CurrentPlanetId" in planet_map and

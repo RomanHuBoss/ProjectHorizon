@@ -28,12 +28,14 @@ public partial class SalvageRepairSlice
         {
             Name = "PlanetSurfaceClouds"
         };
-        AddChild(_planetSurfaceCloudRoot);
+        (GetNodeOrNull<Node3D>("Gameplay") ?? this).AddChild(
+            _planetSurfaceCloudRoot);
         _planetSurfaceResourceRoot = new Node3D
         {
             Name = "PlanetSurfaceResources"
         };
-        AddChild(_planetSurfaceResourceRoot);
+        (GetNodeOrNull<Node3D>("Gameplay") ?? this).AddChild(
+            _planetSurfaceResourceRoot);
 
         SuppressLegacyResourceFixtures();
         _planetSurfaceWorldCompositionInitialized = true;
@@ -276,10 +278,12 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceChunkCoordinate center =
             PlanetSurfaceStreamingRuntime.WorldToChunk(
-                _player.GlobalPosition.X,
-                _player.GlobalPosition.Z);
+                logicalPlayer.EastMeters,
+                logicalPlayer.NorthMeters);
         if (!force && _lastSurfaceResourceCenter is { } previous &&
             previous == center)
         {
@@ -350,16 +354,20 @@ public partial class SalvageRepairSlice
         {
             return;
         }
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         PlanetSurfaceChunkCoordinate center =
             PlanetSurfaceStreamingRuntime.WorldToChunk(
-                _player.GlobalPosition.X,
-                _player.GlobalPosition.Z);
+                logicalPlayer.EastMeters,
+                logicalPlayer.NorthMeters);
         foreach (PlanetaryPoiNode poi in _planetaryPoiNodes)
         {
+            Vector3 poiLogical =
+                WorldToPlanetSurfaceLogicalPosition(poi.GlobalPosition);
             PlanetSurfaceChunkCoordinate poiChunk =
                 PlanetSurfaceStreamingRuntime.WorldToChunk(
-                    poi.GlobalPosition.X,
-                    poi.GlobalPosition.Z);
+                    poiLogical.X,
+                    poiLogical.Z);
             int distance = Math.Max(
                 Math.Abs(poiChunk.X - center.X),
                 Math.Abs(poiChunk.Z - center.Z));

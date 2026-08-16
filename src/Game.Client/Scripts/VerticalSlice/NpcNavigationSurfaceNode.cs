@@ -203,7 +203,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
 
     public bool IsPointInActiveArea(Vector3 point)
     {
-        NpcNavigationTileKey key = ToTileKey(point);
+        NpcNavigationTileKey key = ToTileKey(ToSurfaceLogical(point));
         return _regions.ContainsKey(key);
     }
 
@@ -292,7 +292,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             for (int sample = 0; sample <= samples; sample++)
             {
                 float weight = sample / (float)samples;
-                Vector3 point = start.Lerp(end, weight);
+                Vector3 point = ToSurfaceLogical(start.Lerp(end, weight));
                 if (_obstacles.Any(obstacle => obstacle.ContainsXZ(point, margin)))
                 {
                     return false;
@@ -311,7 +311,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
         }
         if (path.Count == 1)
         {
-            touched.Add(ToTileKey(path[0]));
+            touched.Add(ToTileKey(ToSurfaceLogical(path[0])));
             return touched.Count;
         }
         for (int index = 0; index < path.Count - 1; index++)
@@ -322,7 +322,8 @@ public partial class NpcNavigationSurfaceNode : Node3D
             int samples = Math.Max(1, (int)Math.Ceiling(distance / 1.0f));
             for (int sample = 0; sample <= samples; sample++)
             {
-                touched.Add(ToTileKey(start.Lerp(end, sample / (float)samples)));
+                touched.Add(ToTileKey(ToSurfaceLogical(
+                    start.Lerp(end, sample / (float)samples))));
             }
         }
         return touched.Count;
@@ -351,7 +352,8 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             return;
         }
-        Vector3 center = _acceptanceCenterOverride ?? _player.GlobalPosition;
+        Vector3 center = ToSurfaceLogical(
+            _acceptanceCenterOverride ?? _player.GlobalPosition);
         NpcNavigationTileKey nextCenter = ToTileKey(center);
         if (!force && _hasCenterTile && nextCenter.Equals(_centerTile))
         {
@@ -626,7 +628,9 @@ public partial class NpcNavigationSurfaceNode : Node3D
             // to the same moving traversal envelope as streamed terrain. The
             // height sampler is global/deterministic, while only 5x5 nav tiles
             // remain resident around the player.
-            float extent = (float)PlanetSurfaceStreamingRuntime.NavigationTraversalExtentMeters;
+            float extent = (float)Math.Max(
+                PlanetSurfaceStreamingRuntime.NavigationTraversalExtentMeters,
+                PlanetSurfaceFrameRuntime.PlanetLogicalHalfExtentMeters);
             _groundXZ = new Rect2(-extent, -extent, extent * 2.0f, extent * 2.0f);
             return;
         }
@@ -669,6 +673,10 @@ public partial class NpcNavigationSurfaceNode : Node3D
             {
                 continue;
             }
+            obstacle = obstacle with
+            {
+                Center = ToSurfaceLogical(obstacle.Center)
+            };
             if (!ObstacleIntersectsGround(obstacle))
             {
                 continue;
@@ -796,6 +804,13 @@ public partial class NpcNavigationSurfaceNode : Node3D
         {
             _walkableCells += region.NavigationMesh?.GetPolygonCount() ?? 0;
         }
+    }
+
+    private Vector3 ToSurfaceLogical(Vector3 worldPosition)
+    {
+        return GetParent() is Node3D surfaceRoot
+            ? surfaceRoot.ToLocal(worldPosition)
+            : worldPosition;
     }
 
     private static NpcNavigationTileKey ToTileKey(Vector3 position)

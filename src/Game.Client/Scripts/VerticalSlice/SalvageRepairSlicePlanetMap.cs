@@ -98,10 +98,15 @@ public partial class SalvageRepairSlice
             return;
         }
 
+        PlanetSurfaceLogicalPosition logicalPlayer =
+            GetPlanetSurfaceLogicalPlayerPosition();
         const int width = 33;
         const int height = 19;
-        const double min = -40.0;
-        const double max = 40.0;
+        const double mapHalfExtentMeters = 40.0;
+        double minX = logicalPlayer.EastMeters - mapHalfExtentMeters;
+        double maxX = logicalPlayer.EastMeters + mapHalfExtentMeters;
+        double minZ = logicalPlayer.NorthMeters - mapHalfExtentMeters;
+        double maxZ = logicalPlayer.NorthMeters + mapHalfExtentMeters;
         char[,] cells = new char[height, width];
         for (int y = 0; y < height; y++)
         {
@@ -113,16 +118,16 @@ public partial class SalvageRepairSlice
 
         foreach (PlanetaryPoiRuntimeState state in PlanetaryExploration.States)
         {
-            int x = MapCoordinate(state.Placement.PositionX, min, max, width);
-            int y = MapCoordinate(state.Placement.PositionZ, min, max, height);
+            int x = MapCoordinate(state.Placement.PositionX, minX, maxX, width);
+            int y = MapCoordinate(state.Placement.PositionZ, minZ, maxZ, height);
             char marker = state.Resolved ? 'X' : state.Discovered ? 'O' : '?';
             cells[height - 1 - y, x] = cells[height - 1 - y, x] is '@' or 'O' or 'X' or '?'
                 ? '*'
                 : marker;
         }
 
-        int playerX = MapCoordinate(_player.GlobalPosition.X, min, max, width);
-        int playerY = MapCoordinate(_player.GlobalPosition.Z, min, max, height);
+        int playerX = MapCoordinate(logicalPlayer.EastMeters, minX, maxX, width);
+        int playerY = MapCoordinate(logicalPlayer.NorthMeters, minZ, maxZ, height);
         cells[height - 1 - playerY, playerX] = '@';
 
         StringBuilder map = new();
@@ -140,8 +145,8 @@ public partial class SalvageRepairSlice
             .Where(state => state.Discovered)
             .OrderBy(state =>
             {
-                double dx = state.Placement.PositionX - _player.GlobalPosition.X;
-                double dz = state.Placement.PositionZ - _player.GlobalPosition.Z;
+                double dx = state.Placement.PositionX - logicalPlayer.EastMeters;
+                double dz = state.Placement.PositionZ - logicalPlayer.NorthMeters;
                 return dx * dx + dz * dz;
             })
             .Select(state =>
@@ -152,7 +157,7 @@ public partial class SalvageRepairSlice
         _planetMapLabel.Text =
             "PLANET MAP • LOCAL SURFACE REGION\n" +
             $"Planet: {GalaxyNavigation.CurrentPlanetId} • " +
-            $"Player X/Z: {_player.GlobalPosition.X:0.0}/{_player.GlobalPosition.Z:0.0}\n" +
+            $"Player X/Z: {logicalPlayer.EastMeters:0.0}/{logicalPlayer.NorthMeters:0.0}\n" +
             "Legend: @ player • ? unknown POI • O discovered • X resolved • * overlap\n" +
             map +
             $"Discovery: {PlanetaryExploration.DiscoveredCount}/{PlanetaryExploration.States.Count} • " +

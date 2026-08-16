@@ -2,11 +2,69 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task160.1-aerial-acceptance-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-162 Planet-Global Surface Frame & Floating Origin
+
+**Исходный снимок:** `ProjectHorizon-main(20260816-033933).zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task162-planet-global-surface-frame.zip`.  
+**Версия:** `0.1.0-alpha.162`.  
+**Статус:** TASK-162 `IMPLEMENTED`; runtime/manual acceptance TASK-163 `IN_PROGRESS`. Предыдущие manual tails TASK-160.1/161/159 не перепроверялись и не повышались до `VERIFIED`.
+
+### Почему выбрана целая подсистема
+
+TASK-158 уже дал bounded 25-chunk terrain streaming, а TASK-160 — chunk-scoped world composition/persistence. Следующим архитектурным пределом был единый координатный слой: streamer мог детерминированно адресовать удалённые chunks, но Godot player/physics и ряд потребителей всё ещё использовали абсолютный tangent-plane `GlobalPosition`. Поэтому TASK-162 закрывает не набор визуальных фиксов, а **planet-global logical coordinates + floating origin + persistence integration** как одну подсистему.
+
+### Реализовано
+
+- новый Godot-independent `PlanetSurfaceFrameRuntime`: double-precision East/North, cell `4096 m`, rebase threshold `2048 m`;
+- player/physics остаются в bounded local frame, а logical position непрерывна через rebase;
+- `TerrainChunkManager` выбирает chunks по logical player coordinate, но размещает `TerrainChunk` относительно current origin — worker sampling/chunk identity не меняются;
+- `Gameplay` переводится frame origin; fallback `GroundBody` остаётся local-zero, но mesh/collision строятся вокруг текущего logical origin; procedural cloud/resource roots переведены под `Gameplay`;
+- TASK-160 resource-window/POI residency, ecology flora proximity, terrain/geodesic HUD, planet map, base placement/preview и NPC navigation переведены на logical surface coordinates;
+- live rebase синхронизирует absolute runtime caches: ground-NPC path/home targets, NPC-ship route waypoints, flying-fauna territory/aerial entries и aerial obstacle/POI environment;
+- Stage-1 voyage state/landing/docking targets нормализуются через тот же frame, чтобы rebase не записывал local scene offset в доменное состояние корабля;
+- autosave/graceful exit сохраняют player X/Z как planet-logical coordinates; cold load использует saved logical X/Z как initial origin и восстанавливает bounded local position около нуля; SQLite schema не менялась;
+- F5 добавлен `TASK-162 planet-global surface frame acceptance`: >150 km synthetic route, bounded local, logical continuity, chunk identity, cold restore, planet reset, geodesic bounds;
+- добавлены 3 xUnit regression tests, `tools/validate-task162-planet-global-surface-frame.py`, Windows/Linux section-37 integration и `docs/PLANET_GLOBAL_SURFACE_FRAME.md`.
+
+### Нормативный источник / PDF-ТЗ
+
+В переданном GitHub ZIP `Technical_Specification/2.0/Project_Horizon_Technical_Specification_v2.0.pdf` является Git LFS pointer (`size 1774256`), а не PDF payload. Поэтому PDF в этой итерации **не реконструировался и не цитировался как прочитанный**; использована уже зафиксированная в этом журнале Stage-2 mapping и ограничения TASK-158/TASK-160. Это сохраняет правило не выдумывать требования отсутствующего payload.
+
+### Изменённые ключевые файлы
+
+- `src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceFrameRuntime.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/PlanetSurfaceFrameAcceptance.cs`;
+- `src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetSurfaceFrame.cs`;
+- `src/Game.Client/Scripts/Terrain/TerrainChunkManager.cs`;
+- `SalvageRepairSlice.cs`, `...PlanetTerrain.cs`, `...WorldComposition.cs`, `...PlanetMap.cs`, `...Voyage.cs`, `...StarSystem.cs`, `...PlanetSurfaceContent.cs`;
+- `NpcNavigationSurfaceNode.cs`, `NpcFactionAgentNode.cs`, `NpcShipNavigationNode.cs`, `EcologyFaunaNode.cs`, `...AerialNavigation.cs`, `...Ecology.cs`;
+- `tests/ProjectHorizon.Tests/Unit/WorldGenTests.cs`;
+- section-37 runners, TASK-150 compatibility gate, README/CHANGELOG/VERSION/docs.
+
+### Проверки при подготовке
+
+- TASK-146/148/149/150/152/154/154.1/156/158/158.1/160/160.1/162 static contract gates: `PASS`;
+- TASK-162 standalone static gate: `PASS`;
+- `dotnet` и Godot executable в текущем Linux preparation environment отсутствуют, поэтому build/xUnit/Godot runtime **не заявляются как выполненные здесь**; Windows clean build/F5/manual evidence требуется в TASK-163.
+
+### Граница TASK-162
+
+TASK-162 закрывает coordinate/floating-origin scaling, но не заявляет физическую cube-sphere поверхность: tangent heightfield topology сохранена; radial gravity, curved collision, cube-face transitions и seamless spherical topology — отдельная будущая подсистема.
+
+### Acceptance TASK-163
+
+1. Windows/Godot 4.7.1 .NET clean build: `0 warnings / 0 errors`; section-37 all green.
+2. F5: новый `TASK-162 ... PASS`; для deterministic TASK-162 probe ожидаются `rebases=48; traversalSamples=49; maxLocal=2030.709m; logicalContinuity=1; chunkIdentity=1; coldRestore=1; planetReset=1; geodesic=1`. Сам TASK-162 probe занимает <1 s; общий F5 matrix включает более долгие прежние acceptance-задачи. TASK-160/158/138/124 и TASK-126 (с hotfix 160.1) не регрессируют.
+3. Live traversal более `2048 m` по X или Z: Output содержит `TASK-162 planet surface REBASE`; `continuityError` близок к `0`; HUD `surface frame` держит local X/Z в пределах примерно `±2048 m`, logical X/Z продолжает расти.
+4. Во время/после rebase terrain остаётся `25/25`, collision `9/9`; нет gap/fall; resource/POI/base/nav, ground NPC, flying fauna и NPC-ship traffic не прыгают и не стремятся к старым координатам.
+5. Штатно сохранить на удалённой logical позиции, перезапустить: logical X/Z восстанавливаются, local frame остаётся bounded.
+6. Добытый `surface_resource.*` после distant save/restart не респавнится; Stage-1 takeoff/landing после возврата в район корабля не ломается.
 
 ## 0. Текущая hotfix-итерация 2026-08-16 — TASK-160.1 Traversal-Safe Aerial Acceptance
 
@@ -5670,22 +5728,42 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `WORLD-ACC-102` | Manual visual sky/terrain/declutter smoke | `IN_PROGRESS` | TASK-161 screenshot/runtime evidence |
 | `WORLD-ACC-103` | Mine → chunk unload → save/restart → planet return preserves depletion | `IN_PROGRESS` | TASK-161 persistence scenario |
 
+### 8.30. Planet-Global Surface Frame & Floating Origin
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `FRAME-1620` | Planet surface имеет отдельные double-precision logical East/North coordinates | `IMPLEMENTED` | `PlanetSurfaceFrameRuntime`; Godot-independent |
+| `FRAME-1621` | Local Godot X/Z автоматически rebased и остаются bounded | `IMPLEMENTED` | 4096 m cells; 2048 m threshold; live `UpdatePlanetSurfaceFrame` |
+| `FRAME-1622` | Rebase сохраняет logical continuity без смены chunk identity | `IMPLEMENTED` | F5 acceptance + xUnit round-trip/chunk tests |
+| `FRAME-1623` | TASK-158 terrain streamer использует logical center, local chunk transforms | `IMPLEMENTED` | `SetLogicalSurfaceOrigin`, `ToLogicalPosition`, `BuildLocalChunkPosition` |
+| `FRAME-1624` | TASK-160 resources/POI/world composition используют logical surface window | `IMPLEMENTED` | logical player center; resource roots under Gameplay; POI conversion |
+| `FRAME-1625` | Base placement/map/navigation не зависят от rebased `GlobalPosition` | `IMPLEMENTED` | logical base target/map; frame-aware nav center/obstacles/path tiles |
+| `FRAME-1626` | Voyage domain position/targets остаются stable через surface rebase | `IMPLEMENTED` | logical↔local conversion in voyage/activation paths |
+| `FRAME-1627` | Save/cold restore сохраняет logical player X/Z без schema bump | `IMPLEMENTED` | snapshot uses logical coordinates; cold load restores exact logical origin and local-zero player |
+| `FRAME-1628` | F5/static/xUnit проверяют long-traversal frame contract | `IMPLEMENTED` | TASK-162 F5 runner; static gate; 3 xUnit tests |
+| `FRAME-1629` | Live rebase синхронизирует absolute AI/navigation caches | `IMPLEMENTED` | ground-NPC targets; NPC-ship routes; fauna/aerial environment shifted/refreshed |
+| `FRAME-ACC-100` | Clean build/section-37 `0/0` + tests green | `IN_PROGRESS` | TASK-163 external Windows verification |
+| `FRAME-ACC-101` | F5 TASK-162 PASS + prior F5 matrix no regressions | `IN_PROGRESS` | TASK-163 external Godot evidence |
+| `FRAME-ACC-102` | Live >2048 m rebase bounded/no gap/no world jump | `IN_PROGRESS` | TASK-163 manual traversal |
+| `FRAME-ACC-103` | Distant logical save/restart + resource depletion persistence | `IN_PROGRESS` | TASK-163 cold restore scenario |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | clean build; F5 from >160 m; `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
-| 2 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return; F5 contract already PASS |
-| 3 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke (F5 already PASS) |
-| 4 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
-| 5 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
-| 6 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke where not covered by owner acceptance |
-| 7 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | clean build + F5 TASK-162; live >2048 m rebase; distant cold restore/persistence |
+| 2 | `TASK-160.1` | Traversal-safe TASK-126 acceptance rerun | может быть закрыт тем же F5: `faunaProbeSamples=4`, `sharedRuntime=1`, `runtimeSamples=1` |
+| 3 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | visual sky/terrain/declutter; resource depletion across unload/restart/planet return |
+| 4 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming + TASK-158.1 closure | manual >160 m/diagonal traversal + planet-switch smoke |
+| 5 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются manual target→cruise→landing→cold restore |
+| 6 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются manual variation on starter planets и independent discovery/ecology cold restore |
+| 7 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 уже PASS; остаётся manual visual relief/NPC/base/water smoke |
+| 8 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-160.1 Traversal-Safe Aerial Acceptance hotfix поверх runtime-подтверждённого TASK-160 F5 contract.  
-**Формально ближайший шаг:** повторный far-traversal F5 для TASK-160.1, затем TASK-161 visual/persistence acceptance TASK-160; TASK-159 manual planet-switch tail остаётся отдельным незакрытым доказательством.
+**Текущая разрабатываемая реализация:** TASK-162 Planet-Global Surface Frame & Floating Origin `IMPLEMENTED`.  
+**Формально ближайший шаг:** TASK-163 Windows/Godot runtime acceptance; его F5 одновременно должен подтвердить TASK-160.1 regression. Затем остаются TASK-161/TASK-159 manual tails.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 

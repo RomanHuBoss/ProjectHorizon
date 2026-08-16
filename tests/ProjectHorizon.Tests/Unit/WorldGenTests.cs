@@ -791,4 +791,75 @@ public sealed class WorldGenTests
             item => item.ItemId.StartsWith("item.surface_resource.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void PlanetSurfaceFrame_RebaseKeepsLocalCoordinatesBoundedAndLogicalPositionContinuous()
+    {
+        PlanetSurfaceFrameRuntime frame = new();
+        frame.Reset("planet.test");
+        double logicalEast = 73_125.25;
+        double logicalNorth = -51_876.75;
+        (double localEast, double localNorth) = frame.ToLocal(
+            logicalEast,
+            logicalNorth);
+        PlanetSurfaceFrameRebase rebase = frame.PlanRebase(localEast, localNorth);
+
+        Assert.True(rebase.Required);
+        frame.Apply(rebase);
+        (localEast, localNorth) = frame.ToLocal(logicalEast, logicalNorth);
+        PlanetSurfaceLogicalPosition roundTrip = frame.ToLogical(
+            localEast,
+            12.5,
+            localNorth);
+
+        Assert.InRange(
+            Math.Abs(localEast),
+            0.0,
+            PlanetSurfaceFrameRuntime.LocalCoordinateToleranceMeters);
+        Assert.InRange(
+            Math.Abs(localNorth),
+            0.0,
+            PlanetSurfaceFrameRuntime.LocalCoordinateToleranceMeters);
+        Assert.Equal(logicalEast, roundTrip.EastMeters, 6);
+        Assert.Equal(logicalNorth, roundTrip.NorthMeters, 6);
+    }
+
+    [Fact]
+    public void PlanetSurfaceFrame_ColdRestorePreservesChunkIdentity()
+    {
+        const double east = 128_333.75;
+        const double north = -94_201.5;
+        PlanetSurfaceChunkCoordinate expected =
+            PlanetSurfaceStreamingRuntime.WorldToChunk(east, north);
+        PlanetSurfaceFrameRuntime frame = new();
+        frame.RestoreAtLogicalPosition("planet.restore", east, north);
+        (double localEast, double localNorth) = frame.ToLocal(east, north);
+        PlanetSurfaceLogicalPosition roundTrip = frame.ToLogical(
+            localEast,
+            0.0,
+            localNorth);
+
+        Assert.Equal(
+            expected,
+            PlanetSurfaceStreamingRuntime.WorldToChunk(
+                roundTrip.EastMeters,
+                roundTrip.NorthMeters));
+        Assert.Equal(0.0, localEast, 6);
+        Assert.Equal(0.0, localNorth, 6);
+    }
+
+    [Fact]
+    public void PlanetSurfaceFrame_AcceptanceCoversLongTraversalRestoreAndPlanetReset()
+    {
+        PlanetSurfaceFrameAcceptanceReport report =
+            PlanetSurfaceFrameAcceptanceRunner.Run();
+
+        Assert.True(report.Passed, report.BuildOutputLine());
+        Assert.True(report.RebaseCount >= 8);
+        Assert.True(report.LogicalContinuity);
+        Assert.True(report.ChunkIdentityStable);
+        Assert.True(report.ColdRestoreStable);
+        Assert.True(report.PlanetResetStable);
+        Assert.True(report.GeodesicStable);
+    }
+
 }

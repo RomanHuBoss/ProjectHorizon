@@ -230,7 +230,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 Thirst(),
                 Fatigue(),
                 4.0,
-                GlobalPosition.DistanceTo(_territoryCenter),
+                GlobalPosition.DistanceTo(TerritoryCenterGlobal()),
                 IsAtWater(),
                 true));
         GD.Print(
@@ -265,7 +265,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 Thirst(),
                 Fatigue(),
                 6.0 + (3.0 * Math.Sin(_ageSeconds * 0.17)),
-                GlobalPosition.DistanceTo(_territoryCenter),
+                GlobalPosition.DistanceTo(TerritoryCenterGlobal()),
                 IsAtWater(),
                 hitRecently));
         DecisionCount++;
@@ -303,7 +303,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 speedFactor = 0.42f;
                 break;
             case "ReturnToTerritory":
-                desiredDirection = DirectionTo(_territoryCenter);
+                desiredDirection = DirectionTo(TerritoryCenterGlobal());
                 speedFactor = 0.75f;
                 break;
             case "Sleep":
@@ -313,7 +313,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 speedFactor = 0.0f;
                 break;
             case "FollowGroup":
-                desiredDirection = DirectionTo(_territoryCenter);
+                desiredDirection = DirectionTo(TerritoryCenterGlobal());
                 speedFactor = 0.55f;
                 break;
         }
@@ -460,6 +460,27 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         }
         return desired;
     }
+
+    public void ApplyWorldOriginShift()
+    {
+        if (_definition is null || _aerialSteering is null ||
+            !Visible || Health <= 0.0 ||
+            !string.Equals(MovementMode, "Flying", StringComparison.Ordinal))
+        {
+            return;
+        }
+        _aerialSteering.UpsertEntity(
+            InstanceId,
+            "flying_fauna",
+            GlobalPosition,
+            Velocity,
+            (float)Math.Clamp(0.55 * _definition.Scale, 0.42, 1.15));
+    }
+
+    private Vector3 TerritoryCenterGlobal() =>
+        GetParent() is Node3D parent
+            ? parent.ToGlobal(_territoryCenter)
+            : _territoryCenter;
 
     private Vector3 DirectionTo(Vector3 target)
     {

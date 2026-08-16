@@ -233,12 +233,13 @@ public partial class SalvageRepairSlice
         }
 
         Vector3 observer = _player.GlobalPosition;
+        Vector3 logicalObserver = WorldToPlanetSurfaceLogicalPosition(observer);
         EcologyFloraPlacement[] desired = EcologyPlan.Flora
             .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))
             .Select(placement => new
             {
                 Placement = placement,
-                Distance = observer.DistanceTo(new Vector3(
+                Distance = logicalObserver.DistanceTo(new Vector3(
                     (float)placement.PositionX,
                     (float)FloraSurfaceY(placement),
                     (float)placement.PositionZ))
@@ -462,6 +463,7 @@ public partial class SalvageRepairSlice
 
         const float scanRange = 16.0f;
         Vector3 observer = _player.GlobalPosition;
+        Vector3 logicalObserver = WorldToPlanetSurfaceLogicalPosition(observer);
         EcologyFaunaNode? fauna = _ecologyFaunaNodes
             .Where(node => node.Visible)
             .OrderBy(node => node.GlobalPosition.DistanceSquaredTo(observer))
@@ -471,14 +473,14 @@ public partial class SalvageRepairSlice
             : fauna.GlobalPosition.DistanceTo(observer);
         EcologyFloraPlacement? flora = EcologyPlan.Flora
             .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))
-            .OrderBy(placement => observer.DistanceSquaredTo(new Vector3(
+            .OrderBy(placement => logicalObserver.DistanceSquaredTo(new Vector3(
                 (float)placement.PositionX,
                 0.55f,
                 (float)placement.PositionZ)))
             .FirstOrDefault();
         float floraDistance = flora is null
             ? float.PositiveInfinity
-            : observer.DistanceTo(new Vector3(
+            : logicalObserver.DistanceTo(new Vector3(
                 (float)flora.PositionX,
                 0.55f,
                 (float)flora.PositionZ));

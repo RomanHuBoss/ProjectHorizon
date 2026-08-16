@@ -286,7 +286,7 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
                     _navigationAgent.SetVelocityForced(Vector3.Zero);
                     _forcedSnaps++;
                 }
-                _home = closest;
+                _home = SurfaceGlobalToLocal(closest);
             }
             _navigationSnapped = true;
             _progressAnchor = GlobalPosition;
@@ -399,10 +399,11 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         }
 
         double phase = _ageSeconds * 0.33 + StablePhase(_definition.NpcId);
-        return _home + new Vector3(
-            (float)Math.Cos(phase) * (float)_definition.PatrolRadius,
-            0.0f,
-            (float)Math.Sin(phase) * (float)_definition.PatrolRadius);
+        return SurfaceLocalToGlobal(
+            _home + new Vector3(
+                (float)Math.Cos(phase) * (float)_definition.PatrolRadius,
+                0.0f,
+                (float)Math.Sin(phase) * (float)_definition.PatrolRadius));
     }
 
     private void OnNavigationVelocityComputed(Vector3 safeVelocity)
@@ -498,31 +499,63 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         }
     }
 
-    private Vector3 ClampTargetToTerritory(Vector3 target)
+    private Vector3 ClampTargetToTerritory(Vector3 globalTarget)
     {
         if (_definition is null)
         {
-            return target;
+            return globalTarget;
         }
+        Vector3 localTarget = SurfaceGlobalToLocal(globalTarget);
         float maximum = (float)Math.Max(2.0, _definition.PatrolRadius + 4.0);
-        Vector3 offset = target - _home;
+        Vector3 offset = localTarget - _home;
         offset.Y = 0.0f;
         if (offset.Length() <= maximum)
         {
-            return target;
+            return globalTarget;
         }
         Vector3 clamped = offset.Normalized() * maximum;
-        return new Vector3(_home.X + clamped.X, target.Y, _home.Z + clamped.Z);
+        Vector3 clampedLocal = new(
+            _home.X + clamped.X,
+            localTarget.Y,
+            _home.Z + clamped.Z);
+        return SurfaceLocalToGlobal(clampedLocal);
     }
 
     private void ClampToTerritory()
     {
-        Vector3 clamped = ClampTargetToTerritory(Position);
+        Vector3 clampedGlobal = ClampTargetToTerritory(GlobalPosition);
+        Vector3 clampedLocal = SurfaceGlobalToLocal(clampedGlobal);
         float surfaceY = _navigationSurface is null
-            ? clamped.Y
-            : _navigationSurface.GetNavigationHeight(clamped.X, clamped.Z);
-        Position = new Vector3(clamped.X, surfaceY, clamped.Z);
+            ? clampedLocal.Y
+            : _navigationSurface.GetNavigationHeight(
+                clampedLocal.X,
+                clampedLocal.Z);
+        Position = new Vector3(clampedLocal.X, surfaceY, clampedLocal.Z);
     }
+
+    public void ApplyWorldOriginShift(Vector3 worldShift)
+    {
+        _lastRequestedTarget -= worldShift;
+        _progressAnchor -= worldShift;
+        _recoveryTarget -= worldShift;
+        _cachedBehaviorTarget -= worldShift;
+        if (_navigationAgent is not null)
+        {
+            _navigationAgent.TargetPosition -= worldShift;
+        }
+        _nextNavigationTargetRefreshAt = 0.0;
+        _nextProgressCheckAt = 0.0;
+    }
+
+    private Vector3 SurfaceLocalToGlobal(Vector3 localPosition) =>
+        GetParent() is Node3D parent
+            ? parent.ToGlobal(localPosition)
+            : localPosition;
+
+    private Vector3 SurfaceGlobalToLocal(Vector3 globalPosition) =>
+        GetParent() is Node3D parent
+            ? parent.ToLocal(globalPosition)
+            : globalPosition;
 
     private static float HorizontalDistance(Vector3 left, Vector3 right)
     {

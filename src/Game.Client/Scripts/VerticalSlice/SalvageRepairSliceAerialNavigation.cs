@@ -272,6 +272,7 @@ public partial class SalvageRepairSlice
     private IReadOnlyList<AerialPointOfInterest> BuildAerialPointsOfInterest()
     {
         List<AerialPointOfInterest> points = new();
+        Node3D? gameplay = GetNodeOrNull<Node3D>("Gameplay");
         Node3D? water = GetNodeOrNull<Node3D>("Gameplay/WaterPool");
         Node3D? landingPad = GetNodeOrNull<Node3D>("Gameplay/LandingPad");
         Node3D? station = GetNodeOrNull<Node3D>("Gameplay/OrbitalStation");
@@ -291,15 +292,21 @@ public partial class SalvageRepairSlice
                 landingPad.GlobalPosition + Vector3.Up * 5.0f,
                 2.0f));
         }
+        Vector3 ridgeWest = gameplay?.ToGlobal(
+            new Vector3(-20.0f, 6.5f, -4.0f)) ??
+            new Vector3(-20.0f, 6.5f, -4.0f);
+        Vector3 ridgeEast = gameplay?.ToGlobal(
+            new Vector3(22.0f, 7.0f, 16.0f)) ??
+            new Vector3(22.0f, 7.0f, 16.0f);
         points.Add(new AerialPointOfInterest(
             "poi.fauna.ridge_west",
             "fauna",
-            new Vector3(-20.0f, 6.5f, -4.0f),
+            ridgeWest,
             2.0f));
         points.Add(new AerialPointOfInterest(
             "poi.fauna.ridge_east",
             "fauna",
-            new Vector3(22.0f, 7.0f, 16.0f),
+            ridgeEast,
             2.0f));
 
         Vector3 stationPosition = station?.GlobalPosition ??

@@ -113,6 +113,7 @@ public partial class SalvageRepairSlice
         _planetSurfaceContentProfile = _planetSurfaceContentRuntime.BuildProfile(
             planet,
             GalaxyNavigation.CurrentSystem.StarType);
+        EnsurePlanetSurfaceFrameForCurrentPlanet();
 
         bool legacyStarter = string.Equals(
             planet.PlanetId,

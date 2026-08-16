@@ -117,6 +117,20 @@ public partial class NpcShipNavigationNode : CharacterBody3D
         _primaryTarget = target;
     }
 
+    public void ApplyWorldOriginShift(Vector3 worldShift)
+    {
+        for (int index = 0; index < _route.Length; index++)
+        {
+            _route[index] -= worldShift;
+        }
+        _steering?.UpsertEntity(
+            ShipId,
+            "npc_ship",
+            GlobalPosition,
+            Velocity,
+            _radius);
+    }
+
     public void PrimeAcceptanceCombatCycle()
     {
         if (Role != NpcShipNavigationRole.HostileRaider)

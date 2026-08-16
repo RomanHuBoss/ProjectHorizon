@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.0-alpha.162] - 2026-08-16
+
+### Added
+
+- Added `PlanetSurfaceFrameRuntime`, a Godot-independent double-precision planet-logical East/North frame with 4096 m floating-origin cells and a 2048 m local rebase threshold.
+- Added TASK-162 F5 acceptance covering >150 km logical traversal, bounded local coordinates, chunk identity, cold restore, planet reset and geodesic stability.
+- Added three xUnit frame regressions, `docs/PLANET_GLOBAL_SURFACE_FRAME.md` and `validate-task162-planet-global-surface-frame.py`, wired into Windows/Linux section-37 quality gates.
+
+### Changed
+
+- `TerrainChunkManager` now selects/samples chunks in logical surface coordinates while positioning live chunk nodes relative to the current floating-origin offset; bounded 25-chunk residency and asynchronous worker generation are unchanged.
+- Procedural resources, POI residency, ecology proximity, planet map, terrain/geodesic HUD, base construction, NPC surface navigation and Stage-1 voyage coordinates now share the same frame conversion contract.
+- Live rebase now shifts non-transform absolute caches as well: ground-NPC path targets, NPC-ship route waypoints, flying-fauna aerial entries and aerial obstacle/POI steering environment.
+- Player autosave/graceful-exit X/Z now persist planet-logical coordinates and cold load reconstructs a bounded local scene position without a SQLite schema bump; new-slot reset and piloted ship cold-load initialize the frame explicitly.
+- TASK-150's static graceful-exit gate now accepts the frame-aware logical player snapshot path in addition to the pre-TASK-162 direct `GlobalPosition` path.
+
+### Known boundary
+
+- TASK-162 closes coordinate/floating-origin scaling, not physical cube-sphere topology: radial gravity, curved collision and cube-face transitions remain outside this iteration.
+
+
 ## [0.1.0-alpha.160.1] - 2026-08-16
 
 ### Fixed — TASK-160.1 Traversal-Safe Aerial Acceptance
@@ -108,6 +129,9 @@ The project uses Semantic Versioning for application releases. Content schema,
 save schema and procedural-generator versions are versioned independently.
 
 ## [Unreleased]
+
+
+
 
 ### Changed
 

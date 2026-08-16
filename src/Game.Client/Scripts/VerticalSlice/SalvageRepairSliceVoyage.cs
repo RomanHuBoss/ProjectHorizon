@@ -121,10 +121,10 @@ public partial class SalvageRepairSlice
         }
 
         StageOneVoyageSaveData state = StageOneVoyage.CreateSaveData();
-        _voyageShip.GlobalPosition = new Vector3(
-            (float)state.PositionX,
-            (float)state.PositionY,
-            (float)state.PositionZ);
+        _voyageShip.GlobalPosition = SurfaceLogicalToLocalPosition(
+            state.PositionX,
+            state.PositionY,
+            state.PositionZ);
         _voyageShip.Rotation = new Vector3(
             (float)state.RotationX,
             (float)state.RotationY,
@@ -214,14 +214,14 @@ public partial class SalvageRepairSlice
             {
                 Vector3 target = StageOneVoyage.Location ==
                         StageOneVoyageLocation.OutboundFlight
-                    ? new Vector3(
-                        (float)StageOneVoyageRuntime.StationDockPositionX,
-                        (float)StageOneVoyageRuntime.StationDockPositionY,
-                        (float)StageOneVoyageRuntime.StationDockPositionZ)
-                    : new Vector3(
-                        (float)StageOneVoyageRuntime.SurfacePositionX,
-                        (float)StageOneVoyageRuntime.LaunchPositionY,
-                        (float)StageOneVoyageRuntime.SurfacePositionZ);
+                    ? SurfaceLogicalToLocalPosition(
+                        StageOneVoyageRuntime.StationDockPositionX,
+                        StageOneVoyageRuntime.StationDockPositionY,
+                        StageOneVoyageRuntime.StationDockPositionZ)
+                    : SurfaceLogicalToLocalPosition(
+                        StageOneVoyageRuntime.SurfacePositionX,
+                        StageOneVoyageRuntime.LaunchPositionY,
+                        StageOneVoyageRuntime.SurfacePositionZ);
                 Vector3 offset = target - _voyageShip.GlobalPosition;
                 float distance = offset.Length();
                 if (distance > 0.25f)
@@ -256,7 +256,8 @@ public partial class SalvageRepairSlice
             _voyageShip.ClearExternalCommand();
         }
 
-        Vector3 position = _voyageShip.GlobalPosition;
+        Vector3 position = WorldToPlanetSurfaceLogicalPosition(
+            _voyageShip.GlobalPosition);
         Vector3 rotation = _voyageShip.Rotation;
         Vector3 velocity = _voyageShip.Velocity;
         StageOneVoyage.UpdateFlightState(
@@ -468,10 +469,10 @@ public partial class SalvageRepairSlice
             return;
         }
 
-        Vector3 dock = new(
-            (float)StageOneVoyageRuntime.StationDockPositionX,
-            (float)StageOneVoyageRuntime.StationDockPositionY,
-            (float)StageOneVoyageRuntime.StationDockPositionZ);
+        Vector3 dock = SurfaceLogicalToLocalPosition(
+            StageOneVoyageRuntime.StationDockPositionX,
+            StageOneVoyageRuntime.StationDockPositionY,
+            StageOneVoyageRuntime.StationDockPositionZ);
         double distance = _voyageShip.GlobalPosition.DistanceTo(dock);
         StageOneVoyageActionResult action = StageOneVoyage.TryDock(
             ShipSystems,
@@ -551,10 +552,10 @@ public partial class SalvageRepairSlice
             return;
         }
 
-        Vector3 landing = new(
-            (float)StageOneVoyageRuntime.SurfacePositionX,
-            (float)StageOneVoyageRuntime.LaunchPositionY,
-            (float)StageOneVoyageRuntime.SurfacePositionZ);
+        Vector3 landing = SurfaceLogicalToLocalPosition(
+            StageOneVoyageRuntime.SurfacePositionX,
+            StageOneVoyageRuntime.LaunchPositionY,
+            StageOneVoyageRuntime.SurfacePositionZ);
         double distance = _voyageShip.GlobalPosition.DistanceTo(landing);
         StageOneVoyageActionResult action = StageOneVoyage.TryLand(
             ShipSystems,
@@ -599,7 +600,10 @@ public partial class SalvageRepairSlice
 
         if (_player is not null)
         {
-            _player.GlobalPosition = new Vector3(0.0f, 1.05f, -4.6f);
+            _player.GlobalPosition = SurfaceLogicalToLocalPosition(
+                0.0,
+                1.05,
+                -4.6);
             _player.Rotation = Vector3.Zero;
             _player.Velocity = Vector3.Zero;
         }
@@ -626,14 +630,14 @@ public partial class SalvageRepairSlice
         {
             Vector3 target = StageOneVoyage.Location ==
                     StageOneVoyageLocation.OutboundFlight
-                ? new Vector3(
-                    (float)StageOneVoyageRuntime.StationDockPositionX,
-                    (float)StageOneVoyageRuntime.StationDockPositionY,
-                    (float)StageOneVoyageRuntime.StationDockPositionZ)
-                : new Vector3(
-                    (float)StageOneVoyageRuntime.SurfacePositionX,
-                    (float)StageOneVoyageRuntime.LaunchPositionY,
-                    (float)StageOneVoyageRuntime.SurfacePositionZ);
+                ? SurfaceLogicalToLocalPosition(
+                    StageOneVoyageRuntime.StationDockPositionX,
+                    StageOneVoyageRuntime.StationDockPositionY,
+                    StageOneVoyageRuntime.StationDockPositionZ)
+                : SurfaceLogicalToLocalPosition(
+                    StageOneVoyageRuntime.SurfacePositionX,
+                    StageOneVoyageRuntime.LaunchPositionY,
+                    StageOneVoyageRuntime.SurfacePositionZ);
             approach = _voyageShip.GlobalPosition.DistanceTo(target)
                 .ToString("0.0", CultureInfo.InvariantCulture) + "m";
         }
