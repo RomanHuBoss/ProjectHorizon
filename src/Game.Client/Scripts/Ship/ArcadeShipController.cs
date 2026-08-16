@@ -67,6 +67,10 @@ public partial class ArcadeShipController : CharacterBody3D
     [Export(PropertyHint.Range, "0.0,20.0,0.05")]
     public float PassiveLinearDamping { get; set; } = 0.35f;
 
+    [Export(PropertyHint.Range, "0.1,12.0,0.1")]
+    public float VelocityAlignmentRate { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultVelocityAlignmentRate;
+
     [Export(PropertyHint.Range, "1.0,200.0,0.5")]
     public float BrakeDeceleration { get; set; } = 38.0f;
 
@@ -115,6 +119,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public Vector3 LocalVelocity { get; private set; } = Vector3.Zero;
     public float Speed { get; private set; }
     public float AngularSpeedDegrees { get; private set; }
+    public float FlightAssistHeadingErrorDegrees { get; private set; }
     public bool BoostActive { get; private set; }
     public bool BrakeActive { get; private set; }
     public bool AutoStabilizationEnabled { get; private set; } = true;
@@ -279,6 +284,7 @@ public partial class ArcadeShipController : CharacterBody3D
         ApplyAtmosphericFlight(command, deltaSeconds);
         ApplyAtmosphericRadialGuidance(deltaSeconds);
         ApplyAngularFlight(command, deltaSeconds);
+        ApplyArcadeFlightAssist(command, deltaSeconds);
         MoveAndSlide();
         ApplyAtmosphericSurfaceCorrection();
 
@@ -533,6 +539,19 @@ public partial class ArcadeShipController : CharacterBody3D
         BrakeActive = command.Brake;
     }
 
+    private void ApplyArcadeFlightAssist(
+        ShipControlCommand command,
+        float deltaSeconds)
+    {
+        Velocity = ArcadeFlightAssistRuntime.AlignVelocityToShipAxes(
+            Velocity,
+            GlobalTransform.Basis,
+            command,
+            AutoStabilizationEnabled,
+            deltaSeconds,
+            VelocityAlignmentRate);
+    }
+
     private void ApplyAngularFlight(
         ShipControlCommand command,
         float deltaSeconds)
@@ -581,6 +600,10 @@ public partial class ArcadeShipController : CharacterBody3D
         LocalVelocity = basis.Inverse() * Velocity;
         Speed = Velocity.Length();
         AngularSpeedDegrees = Mathf.RadToDeg(AngularVelocityLocal.Length());
+        FlightAssistHeadingErrorDegrees =
+            ArcadeFlightAssistRuntime.HeadingErrorDegrees(
+                Velocity,
+                GlobalTransform.Basis);
 
         if (!Velocity.IsFinite() ||
             !AngularVelocityLocal.IsFinite() ||

@@ -87,6 +87,7 @@ MaxSpeed = 42.0
 BoostMaxSpeed = 72.0
 BoostAccelerationMultiplier = 1.85
 PassiveLinearDamping = 0.35
+VelocityAlignmentRate = 3.2
 BrakeDeceleration = 38.0
 MaxPitchRateDegrees = 80.0
 MaxYawRateDegrees = 85.0

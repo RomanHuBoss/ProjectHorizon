@@ -15,6 +15,23 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.5 — Arcade Flight Kinematics & Continuous Orbital Collision
+
+Alpha.178.5 closes two gameplay gaps exposed by the first real return flight from the station. The default `ArcadeShipController` now behaves as an arcade spacecraft rather than as an unintentionally Newtonian rigid body: with flight assist enabled, turning the ship continuously bends the velocity vector toward the ship's local forward/translation axes while preserving speed. `G` deliberately disables that coupling and exposes inertial-drift mode; this is an explicit opt-out rather than the default.
+
+Orbital stars, planets and moons are no longer visual-only spheres. `StarSystemSimulationNode` exposes the live display centre/radius of each solid body and performs continuous swept-sphere intersection against the ship trajectory, so even a frame that jumps from one side of a planet to the other is caught. A physical impact clamps the ship to the boundary, zeroes velocity and opens the localized death screen instead of allowing tunnelling.
+
+The current landable planet additionally exposes a physical outer entry shell at the existing TASK-178.4 clearance. Manual flight can cross that shell at `<=28 m/s` and transition into the verified 220 m curved-surface approach without requiring `K` or `Enter`; navigation assist and manual capture continue to use the same contract.
+
+### Acceptance TASK-178.5
+
+1. `tools\run-section37-quality.cmd`: clean build `0 errors / 0 warnings`, tests green, `TASK-178.5 ... CONTRACT PASS`.
+2. Undock with `T`, leave `G` enabled and accelerate to a visible velocity. Rotate the nose by roughly 90–180 degrees without pressing `K`: the actual trajectory must curve toward the new heading instead of continuing indefinitely along the old world-space vector.
+3. Toggle `G` once: Output must show `mode=inertial-drift`; now rotation is allowed to leave the velocity vector uncoupled. Toggle `G` again before the collision/landing tests.
+4. Approach the current landable planet manually. At `<=28 m/s`, crossing the outer entry shell must log `TASK-178.5 free-flight planetary entry PASS` and hand off to the surface approach even with navigation assist off.
+5. Repeat at unsafe/high speed (or aim at another planet/moon): the ship must not pass through the sphere. Expected Output is `TASK-178.5 orbital body collision PASS ... swept=1; blocked=1; death=1` and the death overlay.
+6. F5 must contain `TASK-178.5 spaceflight kinematics/collision acceptance PASS` with `headingCoupling=1; sweptPlanetCollision=1; highSpeedTunnelingBlocked=1; liveAssist=1; currentPlanetSphere=1; liveSweep=1`.
+
 ## TASK-178.4 — Planetary Approach, Landing & Orbital Lighting Recovery
 
 Alpha.178.4 closes the gap between the large-scale orbital representation and the already verified curved planetary surface. Planets are no longer small decorative spheres: orbital planet size is derived from the real `PlanetEnvironment` radius and rendered at a deliberately compressed kilometre-class flight scale, with moon orbits pushed safely beyond the parent body's visible surface. The current detailed globe remains bounded/non-colliding, but is large enough to read as a destination rather than as an object comparable to the ship. Ship cameras retain the expanded system out to 60 km.

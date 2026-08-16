@@ -143,24 +143,13 @@ public partial class StarSystemSimulationNode : Node3D
             return false;
         }
 
-        StarSystemBodyDefinition? definition = _runtime.Definitions.FirstOrDefault(
-            candidate => string.Equals(
-                candidate.BodyId,
+        if (!TryGetBodyDisplaySphere(
                 bodyId,
-                StringComparison.Ordinal));
-        if (definition is null)
+                out _,
+                out bodyCenter,
+                out displayRadius))
         {
             return false;
-        }
-
-        bodyCenter = visual.GlobalPosition;
-        displayRadius = (float)Math.Max(1.0, definition.VisualRadius * visual.Scale.X);
-        if (_detailedGlobe is not null &&
-            GodotObject.IsInstanceValid(_detailedGlobe) &&
-            string.Equals(_detailedGlobePlanetId, bodyId, StringComparison.Ordinal))
-        {
-            bodyCenter = _detailedGlobe.GlobalPosition;
-            displayRadius = Math.Max(1.0f, _detailedGlobe.Diagnostics.DisplayRadius);
         }
 
         Vector3 outward = referencePosition - bodyCenter;
@@ -172,6 +161,126 @@ public partial class StarSystemSimulationNode : Node3D
         approachPoint = bodyCenter + outward *
             (displayRadius + (float)clearanceMeters);
         return true;
+    }
+
+    public bool TryGetBodyDisplaySphere(
+        string bodyId,
+        out StarSystemBodyDefinition definition,
+        out Vector3 bodyCenter,
+        out float displayRadius)
+    {
+        definition = null!;
+        bodyCenter = Vector3.Zero;
+        displayRadius = 0.0f;
+        if (_runtime is null || string.IsNullOrWhiteSpace(bodyId) ||
+            !_visuals.TryGetValue(bodyId, out MeshInstance3D? visual) ||
+            !GodotObject.IsInstanceValid(visual) || !visual.IsInsideTree())
+        {
+            return false;
+        }
+
+        StarSystemBodyDefinition? resolved = _runtime.Definitions.FirstOrDefault(
+            candidate => string.Equals(
+                candidate.BodyId,
+                bodyId,
+                StringComparison.Ordinal));
+        if (resolved is null)
+        {
+            return false;
+        }
+
+        definition = resolved;
+        bodyCenter = visual.GlobalPosition;
+        displayRadius = (float)Math.Max(
+            1.0,
+            resolved.VisualRadius * Math.Abs(visual.Scale.X));
+        if (_detailedGlobe is not null &&
+            GodotObject.IsInstanceValid(_detailedGlobe) &&
+            string.Equals(_detailedGlobePlanetId, bodyId, StringComparison.Ordinal))
+        {
+            bodyCenter = _detailedGlobe.GlobalPosition;
+            displayRadius = Math.Max(
+                1.0f,
+                _detailedGlobe.Diagnostics.DisplayRadius);
+        }
+
+        return bodyCenter.IsFinite() && float.IsFinite(displayRadius) &&
+            displayRadius > 0.0f;
+    }
+
+    public bool TryGetFirstSolidBodyHit(
+        Vector3 segmentStart,
+        Vector3 segmentEnd,
+        float shipRadius,
+        out OrbitalBodyCollisionHit hit)
+    {
+        hit = default;
+        if (_runtime is null || !segmentStart.IsFinite() ||
+            !segmentEnd.IsFinite() || !float.IsFinite(shipRadius) ||
+            shipRadius < 0.0f)
+        {
+            return false;
+        }
+
+        bool found = false;
+        float bestFraction = float.PositiveInfinity;
+        foreach (StarSystemBodyDefinition candidate in _runtime.Definitions)
+        {
+            bool detailedVisible = _detailedGlobe is not null &&
+                GodotObject.IsInstanceValid(_detailedGlobe) &&
+                _detailedGlobe.Visible &&
+                string.Equals(
+                    _detailedGlobePlanetId,
+                    candidate.BodyId,
+                    StringComparison.Ordinal);
+            bool proxyVisible = _visuals.TryGetValue(
+                    candidate.BodyId,
+                    out MeshInstance3D? candidateVisual) &&
+                GodotObject.IsInstanceValid(candidateVisual) &&
+                candidateVisual.Visible;
+            if (candidate.Kind is not (
+                    StarSystemBodyKind.Star or
+                    StarSystemBodyKind.Planet or
+                    StarSystemBodyKind.Moon) ||
+                (!detailedVisible && !proxyVisible) ||
+                !TryGetBodyDisplaySphere(
+                    candidate.BodyId,
+                    out StarSystemBodyDefinition resolved,
+                    out Vector3 center,
+                    out float radius))
+            {
+                continue;
+            }
+
+            float collisionRadius = radius + shipRadius +
+                OrbitalBodyCollisionRuntime.SurfaceSafetyMarginMeters;
+            if (!OrbitalBodyCollisionRuntime.TrySweepSphere(
+                    segmentStart,
+                    segmentEnd,
+                    center,
+                    collisionRadius,
+                    out float fraction,
+                    out Vector3 impact,
+                    out Vector3 normal) ||
+                fraction >= bestFraction)
+            {
+                continue;
+            }
+
+            bestFraction = fraction;
+            hit = new OrbitalBodyCollisionHit(
+                resolved.BodyId,
+                resolved.Kind,
+                center,
+                radius,
+                collisionRadius,
+                fraction,
+                impact,
+                normal);
+            found = true;
+        }
+
+        return found;
     }
 
 

@@ -1382,6 +1382,8 @@
     "ui.weather.clear": "clear",
     "ui.weather.wind": "wind",
     "ui.weather.storm": "storm",
-    "ui.weather.toxic": "toxic weather"
+    "ui.weather.toxic": "toxic weather",
+    "ui.death.planet_impact": "Catastrophic planetary impact • orbital collision envelope breached • simulation paused",
+    "ui.death.star_impact": "Catastrophic stellar impact • thermal/structural failure • simulation paused"
   }
 }

@@ -84,7 +84,8 @@ public partial class SalvageRepairSlice
         requiredKeys.AddRange(new[]
         {
             "ui.main.title", "ui.main.continue", "ui.settings.title", "ui.settings.language",
-            "ui.pause.title", "ui.death.title", "ui.game.industry_terminal", "ui.game.frontier_exchange",
+            "ui.pause.title", "ui.death.title", "ui.death.planet_impact", "ui.death.star_impact",
+            "ui.game.industry_terminal", "ui.game.frontier_exchange",
             "ui.game.base_construction", "ui.game.discovery_catalog", "ui.game.ship_management",
             "ui.game.galaxy_map", "ui.game.ecology_catalog", "ui.game.mission_journal",
             "ui.game.npc_interaction", "ui.game.player_equipment", "ui.game.planet_map"

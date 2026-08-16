@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.178.5] - 2026-08-16
+
+### Fixed — TASK-178.5
+
+- Default arcade flight assist now continuously couples velocity direction to the ship's local heading, so rotating the nose curves the actual flight path instead of leaving the ship drifting indefinitely along the old world-space vector.
+- `G` remains an explicit opt-out into inertial-drift mode for players/tests that need Newtonian translation; takeoff/undock remain heading-coupled by default.
+- Orbital stars, planets and moons now expose continuous swept-sphere collision envelopes derived from the same live display radii used by the star-system renderer.
+- High-speed segment/sphere tests prevent a ship from tunnelling through a planet between physics/process samples; impact is clamped to the boundary and opens the localized death screen.
+- Free manual approach to the current landable planet now crosses the same physical entry shell used by `K`/`Enter` and can hand off to the verified 220 m surface approach without requiring navigation assist.
+- Added TASK-178.5 F5/live acceptance, xUnit tests, section-37 validator and CI/release gating.
+
 ## [0.1.0-alpha.178.4] - 2026-08-16
 
 ### Fixed — external build hotfix

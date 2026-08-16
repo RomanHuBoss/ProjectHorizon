@@ -2,11 +2,43 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.4-build-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.5-spaceflight-kinematics-collision.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.5 Arcade Flight Kinematics & Continuous Orbital Collision
+
+**Исходный снимок:** `ProjectHorizon-main-task178.4-build-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.5-spaceflight-kinematics-collision.zip`.  
+**Версия:** `0.1.0-alpha.178.5`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MANUAL FLIGHT/COLLISION+F5`; TASK-178.4 имеет успешный runtime launch/undock/station-docking smoke, но planet-return acceptance переоткрыта обнаруженным collision/kinematics defect.
+
+### Внешнее evidence / обнаруженные дефекты
+
+Пользовательский alpha.178.4 build-hotfix реально запускается в Godot 4.7.1 и подтверждает manual ownership (`TASK-112 player takeoff PASS ... manualControl=1; externalControl=0`), автоматический docking/StationInterior из предыдущего smoke и увеличенный orbital scale (`planetOrbitMin=6380m`, `moonOrbitMin=2700m`). После undock пользователь вручную развернул корабль носом к планете, но фактический world-space velocity продолжил прежнее направление; затем корабль на скорости визуально прошёл сквозь planet globe.
+
+Корень первого дефекта: `ArcadeShipController` суммировал local thrust в world velocity, но rotation не меняла уже накопленный velocity vector. Несмотря на название `ArcadeShipController`, default flight фактически имел Newtonian drift. Корень второго дефекта: orbital planet/moon/star bodies оставались visual representation без непрерывной gameplay collision envelope; TASK-178.4 entry capture был point/speed contract, а не solid-body boundary.
+
+### Реализация
+
+- добавлен `ArcadeFlightAssistRuntime`: при включённом стандартном flight assist velocity direction экспоненциально сопрягается с локальными осями корабля (`3.2/s`) после rotation, сохраняя модуль скорости; поворот носа теперь физически изгибает траекторию;
+- `G` остаётся явным opt-out: `heading-coupled` ↔ `inertial-drift`, поэтому Newtonian drift доступен осознанно, а не является случайным default;
+- `StarSystemSimulationNode.TryGetBodyDisplaySphere` возвращает единую live center/radius геометрию visual body; `TryGetFirstSolidBodyHit` строит solid envelopes для Star/Planet/Moon;
+- `OrbitalBodyCollisionRuntime.TrySweepSphere` выполняет segment-vs-sphere continuous collision detection. Planet нельзя прошить даже если один tick перескочил с одной стороны sphere на другую;
+- при impact ship center фиксируется на inflated boundary (`display radius + ship radius + margin`), velocity обнуляется и открывается локализованный death overlay;
+- manual InboundFlight теперь физически пересекает outer entry shell текущей landable planet. При `<=28 m/s` safe shell crossing автоматически использует существующий TASK-178.4 surface handoff даже без `K/Enter`; при high-speed penetration safe capture не применяется и surface impact блокируется solid envelope;
+- добавлены TASK-178.5 model/live F5 acceptance, xUnit, section-37/CI/release static gate и final-state gating.
+
+### Acceptance TASK-178.5
+
+1. `tools\run-section37-quality.cmd`: clean `0 errors / 0 warnings`, tests PASS, `TASK-178.5 SPACEFLIGHT KINEMATICS/COLLISION CONTRACT PASS`.
+2. Station → `T` undock, `G` оставить включённым. Разогнаться и повернуть корабль примерно на 90–180° без `K`: траектория должна заметно загибаться к носу; нельзя продолжать бесконечно лететь по старому world-space vector.
+3. Один раз `G`: Output `TASK-178.5 flight assist mode PASS ... mode=inertial-drift`; теперь rotation может не менять velocity. Ещё раз `G` вернуть `heading-coupled`.
+4. Manual approach к current planet при `<=28 m/s`, без `K`: ожидается `TASK-178.5 free-flight planetary entry PASS ... swept=1; surfaceHandoff=1`, затем surface approach.
+5. Отдельно проверить unsafe/high-speed impact (можно на другой planet/moon): ship не проходит сквозь sphere; ожидается `TASK-178.5 orbital body collision PASS ... swept=1; blocked=1; death=1` и death overlay.
+6. F5: `TASK-178.5 spaceflight kinematics/collision acceptance PASS` с `headingCoupling=1; driftOptOut=1; speedConservation=1; sweptPlanetCollision=1; highSpeedTunnelingBlocked=1; entryShellCrossing=1; liveAssist=1; currentPlanetSphere=1; liveSweep=1`.
 
 ## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.4 Planetary Approach, Landing & Orbital Lighting Recovery
 
@@ -6619,6 +6651,19 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-HF-17847` | F5/xUnit/section-37/CI/release защищают recovery | `IMPLEMENTED` | TASK-178.4 aggregate/live acceptance and static validator |
 | `FLIGHT-HF-ACC-1784` | Clean build + restore smoke + planet-entry/landing + F5 PASS | `IN_PROGRESS` | external Windows/Godot required |
 
+### 8.41. Arcade Flight Kinematics & Continuous Orbital Collision — TASK-178.5
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-HF-17850` | Default arcade flight связывает velocity direction с heading корабля | `IMPLEMENTED` | `ArcadeFlightAssistRuntime`, default response `3.2/s`; G отключает coupling |
+| `FLIGHT-HF-17851` | Inertial drift доступен только как явный opt-out | `IMPLEMENTED` | `G` diagnostics `heading-coupled/inertial-drift` |
+| `FLIGHT-HF-17852` | Planet/moon/star orbital visuals имеют gameplay solid envelope | `IMPLEMENTED` | live display sphere + ship radius + safety margin |
+| `FLIGHT-HF-17853` | High-speed planet tunnelling блокируется continuous sweep | `IMPLEMENTED` | segment-sphere quadratic CCD; impact clamps ship to boundary |
+| `FLIGHT-HF-17854` | Manual planet approach физически может перейти в surface handoff без K | `IMPLEMENTED` | safe outer-shell crossing <=28 m/s → existing TASK-178.4 handoff |
+| `FLIGHT-HF-17855` | Unsafe orbital body impact имеет deterministic outcome | `IMPLEMENTED` | velocity zero + localized death overlay + Output diagnostics |
+| `FLIGHT-HF-17856` | F5/xUnit/section-37/CI/release защищают flight/collision semantics | `IMPLEMENTED` | TASK-178.5 aggregate/static gate |
+| `FLIGHT-HF-ACC-1785` | Clean build + heading/manual-entry/high-speed-collision + F5 | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -6635,8 +6680,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED / PENDING EXTERNAL BUILD+RESTORE+PLANET-LANDING+F5`.  
-**Формально ближайший шаг:** внешний build + restore docked save + Orbit→planet-entry→surface landing smoke для TASK-178.4, затем F5 reacceptance TASK-178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED` с external build/runtime smoke; TASK-178.5 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+MANUAL FLIGHT/COLLISION+F5`.  
+**Формально ближайший шаг:** внешний clean build + manual heading-coupling/free-flight planet-entry/high-speed collision smoke для TASK-178.5, затем общий F5 reacceptance TASK-178.5/178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

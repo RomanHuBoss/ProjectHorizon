@@ -60,3 +60,11 @@ The system presentation now uses a 1x simulation clock, kilometre-scale compress
 Finally, `WorldSceneEnvironmentPresentationRuntime` owns non-surface environment profiles. Orbit, interplanetary transit, hyperspace and station interior are dark/fog-free and can no longer inherit the blue surface atmosphere. Returning to Surface reconstructs the atmospheric sky and reapplies the current deterministic weather state.
 
 F5 `TASK-178.2` requires: `orbitClock=1`, `planetSpacing=1`, `moonCadence=1`, `visualHierarchy=1`, `assistDock=1`, `localProxyPolicy=1`, `spaceEnvironment=1`, and `stationInterior=1`.
+
+## TASK-178.5 — arcade kinematics and continuous orbital collision
+
+The default piloted flight mode is now explicitly arcade/heading-coupled. `ArcadeFlightAssistRuntime` rotates the existing velocity direction toward the current ship-local translation axes after angular motion, preserving speed while preventing the accidental permanent world-space drift that made a ship continue away from a planet after turning toward it. `G` disables this coupling and exposes deliberate inertial-drift mode.
+
+Orbital Star/Planet/Moon presentation now also defines the solid-body gameplay envelope. `StarSystemSimulationNode.TryGetBodyDisplaySphere` is the single source of live display centre/radius for both approach and collision. `TryGetFirstSolidBodyHit` uses continuous segment/sphere intersection with a ship-radius safety expansion so a high-speed frame cannot tunnel through a body.
+
+For the current landable planet, the existing TASK-178.4 outer entry shell is also a physical free-flight transition boundary: a manual inbound ship crossing it at safe speed can enter the 220 m curved-surface approach without navigation assist. Unsafe penetration continues to the solid surface envelope and produces a deterministic fatal impact rather than visual pass-through.

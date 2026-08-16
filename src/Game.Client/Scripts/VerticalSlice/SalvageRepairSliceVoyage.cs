@@ -568,6 +568,10 @@ public partial class SalvageRepairSlice
                 bool enabled = !_voyageShip.AutoStabilizationEnabled;
                 _voyageShip.SetAutoStabilization(enabled);
                 _status = LF("ui.voyage.stabilization", ("state", L(enabled ? "ui.common.on" : "ui.common.off")));
+                GD.Print(
+                    "TASK-178.5 flight assist mode PASS: " +
+                    $"enabled={(enabled ? 1 : 0)}; mode={(enabled ? "heading-coupled" : "inertial-drift")}; " +
+                    $"headingError={_voyageShip.FlightAssistHeadingErrorDegrees:0.0}deg.");
             }
 
             return true;
@@ -682,7 +686,7 @@ public partial class SalvageRepairSlice
             $"acceleration={profile.Acceleration.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"maxSpeed={profile.MaxSpeed.ToString("0.###", CultureInfo.InvariantCulture)}; " +
             $"maneuverYaw={profile.YawRateDegrees.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"target=orbital_station; navigationAssist=0; " +
+            $"target=orbital_station; navigationAssist=0; flightAssist=heading-coupled; " +
             $"manualControl={(_voyageShip?.ManualInputOwnershipActive == true ? 1 : 0)}; " +
             $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
@@ -768,7 +772,7 @@ public partial class SalvageRepairSlice
         GD.Print(
             "TASK-112 player undock PASS: " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"target=planet-entry; navigationAssist=0; " +
+            $"target=planet-entry; navigationAssist=0; flightAssist=heading-coupled; " +
             $"manualControl={(_voyageShip?.ManualInputOwnershipActive == true ? 1 : 0)}; " +
             $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
