@@ -67,7 +67,7 @@ need("PlanetPhysicalRadialFrame_MapsLogicalPointsAndVectorsThroughRotatingTangen
      "TASK-172 xUnit regression groups missing", f)
 need("ExpectedActiveChunks" in part and "ExpectedCollisionChunks" in part,
      "25/9 bounded-streamer guard missing from TASK-172 acceptance", f)
-need(version in {"0.1.0-alpha.172", "0.1.0-alpha.172.1", "0.1.0-alpha.174", "0.1.0-alpha.174.1", "0.1.0-alpha.176", "0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3"}, "VERSION not alpha.172/172.1/174/174.1/176", f)
+need(version in {"0.1.0-alpha.172", "0.1.0-alpha.172.1", "0.1.0-alpha.174", "0.1.0-alpha.174.1", "0.1.0-alpha.176", "0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182"}, "VERSION not alpha.172/172.1/174/174.1/176", f)
 
 if f:
     print("TASK-172 PHYSICAL RADIAL SURFACE CONTRACT FAIL:")

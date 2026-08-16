@@ -162,6 +162,8 @@ public partial class SalvageRepairSlice
                     (float)PlanetSurfaceStreamingRuntime.SwitchHysteresisMeters,
                 OperationIntervalSeconds = 0.035f,
                 MaxOperationsPerStep = 2,
+                RuntimeRefreshCoalescingEnabled = true,
+                MaxCoalescedCenterLagChunks = 1,
                 PlayerPath = new NodePath("../Player"),
                 EnablePrototypeControls = false,
                 EnablePrototypeHud = false,
@@ -199,8 +201,16 @@ public partial class SalvageRepairSlice
             return;
         }
 
-        CharacterBody3D? observer = _surfaceRuntimeActive &&
-            StageOneVoyage.Piloted &&
+        // TASK-182: when PlanetRuntime is suspended there is no useful terrain
+        // observer. Switching back to the on-foot player during the same frame
+        // previously scheduled a pointless 25-create/25-remove revision just
+        // before the streamer was disabled (queued=50 in the owner log).
+        if (!_surfaceRuntimeActive)
+        {
+            return;
+        }
+
+        CharacterBody3D? observer = StageOneVoyage.Piloted &&
             _voyageShip is not null
                 ? _voyageShip
                 : _player;

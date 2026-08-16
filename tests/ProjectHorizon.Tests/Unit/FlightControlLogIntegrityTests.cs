@@ -5,7 +5,7 @@ namespace ProjectHorizon.Tests.Unit;
 public sealed class FlightControlLogIntegrityTests
 {
     [Fact]
-    public void VirtualFlightStick_RetainsDeflectionUntilPilotRecenters()
+    public void VirtualFlightStick_CoreRetainsDeflectionBeforeTask182SpringCentering()
     {
         Vector2 stick = ArcadeFlightAssistRuntime.AccumulateVirtualFlightStick(
             Vector2.Zero,

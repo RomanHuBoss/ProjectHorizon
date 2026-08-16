@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.182] - 2026-08-16
+
+### Fixed — TASK-182 flight runtime closure & streaming stability
+
+- Converted the TASK-180.3 live virtual flight stick from infinite retained deflection to a spring-centered stateful control: 0.08 s micro-input hold, exponential 5.5/s neutral return, dead-zone snap and immediate middle-mouse recenter. Roll-dominant horizontal attitude, coordinated yaw, unrestricted pitch/roll and separate A/D strafe remain intact.
+- Added atmosphere-presence hysteresis (`enter >= 0.018`, `exit <= 0.004`) so hovering around the upper atmosphere no longer produces adjacent-frame `EXIT 590.0 m -> ENTER 589.9 m` state chatter while continuous atmosphere-force blending remains unchanged.
+- Added bounded terrain-refresh coalescing: adjacent one-chunk observer movement no longer cancels/replans an in-flight revision, while larger jumps still replan immediately for collision safety.
+- Suppressed terrain observer handoff while PlanetRuntime is inactive, removing the owner-observed pointless `create=25/remove=25/queued=50` refresh immediately before surface-runtime suspension.
+- Added TASK-182 model/F5/xUnit/static acceptance and section-37/CI/release enforcement; retained TASK-180.1/180.2/180.3 as regression gates.
+- Owner alpha.180.3 log is recorded as materially clean versus previous runs: no `ERROR:`, `WARNING:`, `Exception`, `create_frustum_points`, or surface-contact chatter; remaining defects were the spring-centering UX issue, atmosphere threshold chatter and bounded streaming churn addressed here.
+
 ## [0.1.0-alpha.180.3] - 2026-08-16
 
 ### Fixed

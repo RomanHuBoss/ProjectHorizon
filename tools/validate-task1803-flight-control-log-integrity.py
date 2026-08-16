@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.180.3", "VERSION must be alpha.180.3", f)
+need(version in {"0.1.0-alpha.180.3", "0.1.0-alpha.182"}, "VERSION must be alpha.180.3 or alpha.182", f)
 
 # Mouse input must be a persistent virtual control position. A raw delta may move
 # the stick but may not directly become a one-frame yaw/pitch command or decay away.
@@ -118,11 +118,11 @@ need("RunFlightControlLogIntegrityAcceptance" in live and
      "_flightControlLogIntegrityAcceptancePassed == true" in slice_cs and
      "TASK-180.3 (F5)" in slice_cs,
      "TASK-180.3 is not wired into F5/final acceptance", f)
-need("VirtualFlightStick_RetainsDeflectionUntilPilotRecenters" in tests and
+need("VirtualFlightStick_CoreRetainsDeflectionBeforeTask182SpringCentering" in tests and
      "VirtualFlightStick_HorizontalIsRollDominant_VerticalIsPitch" in tests and
      "CameraEnvelope_KeepsStarfieldInsideStableFrustum" in tests,
      "TASK-180.3 xUnit coverage missing", f)
-need("TASK-180.3" in readme and "0.1.0-alpha.180.3" in changelog and
+need("TASK-180.3" in readme and ("0.1.0-alpha.180.3" in changelog or "0.1.0-alpha.182" in changelog) and
      "TASK-180.3" in status and "stateful virtual flight stick" in doc.lower(),
      "TASK-180.3 documentation/status missing", f)
 validator = "validate-task1803-flight-control-log-integrity.py"
@@ -137,7 +137,7 @@ if f:
 
 print(
     "TASK-180.3 FLIGHT CONTROL / LOG INTEGRITY CONTRACT PASS: "
-    "virtualStick=stateful; horizontal=roll-dominant; vertical=pitch; decay=0; "
+    "virtualStick=stateful-core; horizontal=roll-dominant; vertical=pitch; "
     "recenter=1; frustum=bounded; weatherOwner=surface; surfaceHysteresis=1; "
     "terrainOverflowSafe=1; f5=1; xunit=1."
 )

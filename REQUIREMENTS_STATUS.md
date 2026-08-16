@@ -2,18 +2,53 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая emergency hotfix-итерация 2026-08-16 — TASK-180.3 Stateful Virtual Flight Stick / Log Integrity
+## 0. Текущая мега-итерация 2026-08-16 — TASK-182 Flight Runtime Closure & Streaming Stability
+
+**Исходный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip` (`0.1.0-alpha.180.3`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip`.  
+**Версия:** `0.1.0-alpha.182`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`.
+
+### Основание: owner-run alpha.180.3
+
+Новый owner Output существенно чище предыдущих: `ERROR:=0`, `WARNING:=0`, `Exception=0`, `create_frustum_points=0`, surface-contact chatter отсутствует, terrain worker `failed=0`. Управление пользователь оценил как в целом нормальное, но выявил остаточный UX-дефект: небольшой mouse deflection сохранялся после прекращения физического движения и продолжал докручивать корабль. В том же логе обнаружены два дополнительных runtime-quality дефекта: adjacent `Ship atmosphere transition: EXIT altitude=590.0m -> ENTER altitude=589.9m` и bounded, но избыточный terrain refresh churn (`queued` до `50`, `stale` до `12`), включая full-window `create=25/remove=25` непосредственно перед `PlanetRuntime active=0`. По регламенту известные runtime-дефекты исправляются до следующего контентного наращивания.
+
+### Реализация
+
+- **Spring-centered virtual stick:** TASK-180.3 stateful/roll-dominant control сохранён, но live command теперь имеет `0.08 s` micro-input hold и затем экспоненциально возвращается к нейтрали со скоростью `5.5/s`; ниже внутреннего dead-zone state snap-ится в zero. Middle mouse остаётся мгновенным recenter. Это устраняет бесконечный residual roll/yaw без возврата к FPS one-frame steering.
+- **Angular closure:** при возврате stick в dead-zone command становится neutral, после чего существующая auto-stabilization гасит `AngularVelocityLocal`; sustained physical mouse motion по-прежнему разрешает continuous roll/pitch и 360-degree loops.
+- **Atmosphere Schmitt hysteresis:** `enterBlend=0.018`, `exitBlend=0.004`; в промежуточной зоне сохраняется текущее состояние `InAtmosphere`, поэтому дрожание вокруг ~590 m не генерирует соседние ENTER/EXIT transitions. Continuous force/lighting blend 110..620 m не меняется.
+- **Streaming refresh coalescing:** при уже выполняющейся revision adjacent one-chunk center update коалесцируется вместо cancel/replan; jump больше `MaxCoalescedCenterLagChunks=1` по-прежнему вызывает немедленный refresh. После completion следующий physics tick берёт актуальный observer center.
+- **Inactive surface observer suppression:** при `_surfaceRuntimeActive=false` `UpdatePlanetSurfaceStreamingObserver()` не переключает observer на Player и не запускает бессмысленный full-window refresh перед suspend.
+- Добавлены `FlightRuntimeClosureAcceptanceRunner`, F5 `TASK-182`, xUnit `FlightRuntimeClosureTests`, `validate-task182-flight-runtime-closure.py`, section-37/CI/release enforcement и `docs/FLIGHT_RUNTIME_CLOSURE.md`.
+
+### Runtime-приёмка TASK-182
+
+1. `tools\run-section37-quality.cmd`: clean `CoreCompile`, `0 errors / 0 warnings`, все tests/validators green.
+2. F5: `TASK-182 (F5): PASS spring=1 atmHys=1 streamCoal=1 stick=0.000`; Output — `TASK-182 flight-runtime closure acceptance PASS ...`.
+3. В полёте слегка сдвинуть мышь и полностью прекратить движение: `○` может коротко удержаться, затем должен сам плавно вернуться к `+`; корабль прекращает докручивание без middle-click. Sustained mouse motion сохраняет roll/pitch authority и full loop.
+4. Несколько раз пересечь верхнюю границу атмосферы около 590–620 m: FAIL, если появляются adjacent-frame ENTER/EXIT пары без реального ухода из hysteresis band.
+5. Выполнить быстрый near-surface flight и затем уход на станцию/Orbit: terrain остаётся solid; worker `failed=0`; при `PlanetRuntime active=0` не должно появляться нового `create=25/remove=25/queued=50` observer refresh.
+6. Любое повторное `create_frustum_points`, `OverflowException`, surface-contact spam либо TASK-180.1/180.2/180.3 regression FAIL означает неприёмку TASK-182.
+
+### Ограничение проверки в контейнере
+
+В текущей среде нет `dotnet` и Godot executable; доступные static/resource/version/archive gates не заменяют внешний clean build/F5.
+
+---
+
+## 0. Предыдущая emergency hotfix-итерация 2026-08-16 — TASK-180.3 Stateful Virtual Flight Stick / Log Integrity
 
 **Исходный снимок:** `ProjectHorizon-main-task180.2-flight-feel-hotfix.zip` (`0.1.0-alpha.180.2`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task180.3-virtual-stick-log-integrity-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.180.3`.  
-**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`; функциональная очередь не продвигается до owner-проверки управления и чистого Output.
+**Статус:** `IMPLEMENTED / OWNER RUNTIME SMOKE MATERIALLY PASSED / F5 PENDING`; alpha.180.3 Output подтвердил отсутствие прежних ERROR/WARNING/Exception классов, а остаточный infinite-stick command superseded by TASK-182.
 
 ### Основание: повторная owner-неприёмка и полный разбор лога
 
@@ -6945,25 +6980,39 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `VIS-ACC-180` | Clean build + cockpit/station/NPC/orbit visual smoke + F5 | `IN_PROGRESS` | external Windows/Godot required |
 | `VIS-ART-180` | Авторские GLTF/textures/LOD/PBR atlases | `DEFERRED` | payload absent from supplied snapshot; later art-content import pass |
 
+### 8.44. Flight Runtime Closure & Streaming Stability — TASK-182
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-18200` | Небольшое mouse deflection не создаёт бесконечную roll/yaw команду после прекращения физического движения | `IMPLEMENTED` | stateful spring-center: hold 0.08s, return 5.5/s, neutral snap |
+| `FLIGHT-18201` | Spring-centering не возвращает FPS-relative steering и не ломает roll-dominant/pitch/full-attitude contract | `IMPLEMENTED` | TASK-180.3 core retained; A/D strafe independent; middle-click recenter |
+| `FLIGHT-18202` | Atmosphere presence не дребезжит на одном пороге | `IMPLEMENTED` | enter 0.018 / exit 0.004 hysteresis state machine |
+| `FLIGHT-18203` | Adjacent terrain center changes не отменяют выполняющуюся revision каждый chunk | `IMPLEMENTED` | bounded one-chunk refresh coalescing; large jump immediate |
+| `FLIGHT-18204` | PlanetRuntime deactivation не создаёт бессмысленный observer refresh перед suspend | `IMPLEMENTED` | inactive surface observer suppressed |
+| `FLIGHT-18205` | TASK-180.1/180.2/180.3 runtime integrity guards не регрессируют | `IMPLEMENTED` | old validators retained + TASK-182 aggregate gate |
+| `FLIGHT-18206` | F5/xUnit/section-37/CI/release защищают closure contract | `IMPLEMENTED` | `FlightRuntimeClosureAcceptance`, tests, static validator |
+| `FLIGHT-ACC-182` | Clean build + mouse neutral-return + atmosphere/streaming smoke + F5 | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
-| 2 | `TASK-181` | External acceptance TASK-180 | clean build; cockpit/station/NPC/orbit visual smoke; F5 TASK-180 PASS |
-| 3 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
-| 4 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
-| 5 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
-| 6 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
-| 7 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
-| 8 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
-| 9 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
-| 10 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
+| 1 | `TASK-182` | External acceptance flight runtime closure | clean build; neutral-return/atmosphere/streaming smoke; F5 TASK-182 PASS |
+| 2 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=8/8; manual hyperspace target-clear smoke |
+| 3 | `TASK-181` | External acceptance TASK-180 | clean build; cockpit/station/NPC/orbit visual smoke; F5 TASK-180 PASS |
+| 4 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
+| 5 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
+| 6 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
+| 7 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | manual >160 m/diagonal traversal + planet-switch smoke |
+| 8 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 already PASS; manual target→cruise→landing→cold restore |
+| 9 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 PASS; manual variation/cold restore after subsystem closure |
+| 10 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
+| 11 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178…178.7 остаются `IMPLEMENTED` с указанным в журнале owner runtime evidence/acceptance tails; TASK-180 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`. TASK-179 не закрывается без внешнего запуска.  
-**Формально ближайший шаг:** внешний section-37/F5 прогон alpha.180 может одним owner-run закрыть evidence для TASK-179 (flight stack) и TASK-181 (visual pass), после чего задачи переводятся в `VERIFIED` только по фактическому логу/скриншотам. Планетарный surface-stack не переоткрывается; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178…178.7 остаются `IMPLEMENTED` с указанным в журнале owner runtime evidence/acceptance tails; TASK-180 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+VISUAL SMOKE+F5`; TASK-182 `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+RUNTIME SMOKE+F5`. TASK-179/181/182 не закрываются без внешнего запуска.  
+**Формально ближайший шаг:** внешний section-37/F5 прогон alpha.182 должен сначала закрыть TASK-182 и одновременно может дать недостающий evidence для TASK-179 (flight stack) и TASK-181 (visual pass); `VERIFIED` присваивается только по фактическому логу/скриншотам. Планетарный surface-stack не переоткрывается; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

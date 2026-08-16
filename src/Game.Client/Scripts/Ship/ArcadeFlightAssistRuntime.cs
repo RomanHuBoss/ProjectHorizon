@@ -8,6 +8,8 @@ public static class ArcadeFlightAssistRuntime
     public const float DefaultVirtualStickDeadZone = 0.045f;
     public const float DefaultVirtualStickResponseExponent = 1.55f;
     public const float DefaultCoordinatedYawFactor = 0.18f;
+    public const float DefaultVirtualStickAutoCenterDelaySeconds = 0.08f;
+    public const float DefaultVirtualStickAutoCenterRate = 5.5f;
 
     public static Vector3 AlignVelocityToShipAxes(
         Vector3 velocity,
@@ -95,6 +97,39 @@ public static class ArcadeFlightAssistRuntime
         return new Vector2(
             Mathf.Clamp(accumulated.X, -1.0f, 1.0f),
             Mathf.Clamp(accumulated.Y, -1.0f, 1.0f));
+    }
+
+
+    /// <summary>
+    /// TASK-182: spring-centre the virtual stick after the pilot stops producing
+    /// mouse motion. The short hold preserves deliberate micro-corrections, while
+    /// exponential return removes the TASK-180.3 infinite-command behaviour that
+    /// could keep rolling the ship after the physical mouse had stopped.
+    /// </summary>
+    public static Vector2 SpringCenterVirtualFlightStick(
+        Vector2 current,
+        float idleSeconds,
+        float deltaSeconds,
+        float delaySeconds = DefaultVirtualStickAutoCenterDelaySeconds,
+        float returnRate = DefaultVirtualStickAutoCenterRate)
+    {
+        if (!current.IsFinite() || !float.IsFinite(idleSeconds) ||
+            !float.IsFinite(deltaSeconds) || !float.IsFinite(delaySeconds) ||
+            !float.IsFinite(returnRate))
+        {
+            return Vector2.Zero;
+        }
+
+        if (deltaSeconds <= 0.0f || idleSeconds < Math.Max(0.0f, delaySeconds))
+        {
+            return current;
+        }
+
+        float blend = 1.0f - MathF.Exp(-Math.Max(0.1f, returnRate) * deltaSeconds);
+        Vector2 centered = current.Lerp(Vector2.Zero, Mathf.Clamp(blend, 0.0f, 1.0f));
+        return centered.Length() <= DefaultVirtualStickDeadZone * 0.70f
+            ? Vector2.Zero
+            : centered;
     }
 
     public static float ApplyVirtualStickResponse(

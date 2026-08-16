@@ -3,6 +3,9 @@ using Godot;
 
 public partial class ArcadeShipController
 {
+    public const float DefaultAtmospherePresenceEnterBlend = 0.018f;
+    public const float DefaultAtmospherePresenceExitBlend = 0.004f;
+
     [Export]
     public NodePath AtmosphereBodyPath { get; set; } = new("../AtmospherePlanet");
 
@@ -14,6 +17,14 @@ public partial class ArcadeShipController
 
     [Export(PropertyHint.Range, "0.0,1000.0,1.0")]
     public float AtmosphereFadeStart { get; set; } = 18.0f;
+
+    [Export(PropertyHint.Range, "0.001,0.10,0.001")]
+    public float AtmospherePresenceEnterBlend { get; set; } =
+        DefaultAtmospherePresenceEnterBlend;
+
+    [Export(PropertyHint.Range, "0.0001,0.05,0.0001")]
+    public float AtmospherePresenceExitBlend { get; set; } =
+        DefaultAtmospherePresenceExitBlend;
 
     [Export(PropertyHint.Range, "0.0,30.0,0.1")]
     public float AtmosphereGravityAcceleration { get; set; } = 7.5f;
@@ -82,6 +93,7 @@ public partial class ArcadeShipController
     {
         _atmosphereBody = atmosphereBody;
         _wasInAtmosphere = false;
+        InAtmosphere = false;
         UpdateAtmosphereContext();
     }
 
@@ -171,6 +183,24 @@ public partial class ArcadeShipController
         return 1.0f - vacuumBlend;
     }
 
+    public static bool ResolveAtmospherePresence(
+        bool currentlyInAtmosphere,
+        float atmosphereBlend,
+        float enterBlend = DefaultAtmospherePresenceEnterBlend,
+        float exitBlend = DefaultAtmospherePresenceExitBlend)
+    {
+        if (!float.IsFinite(atmosphereBlend) || !float.IsFinite(enterBlend) ||
+            !float.IsFinite(exitBlend))
+        {
+            return false;
+        }
+
+        float enter = Mathf.Clamp(enterBlend, 0.001f, 0.20f);
+        float exit = Mathf.Clamp(exitBlend, 0.0001f, enter * 0.75f);
+        float blend = Mathf.Clamp(atmosphereBlend, 0.0f, 1.0f);
+        return currentlyInAtmosphere ? blend > exit : blend >= enter;
+    }
+
     public static float ComputeSmoothAtmosphericClimbSpeed(
         float radialSpeed,
         float atmosphereBlend,
@@ -241,7 +271,11 @@ public partial class ArcadeShipController
             AltitudeAboveSurface,
             AtmosphereFadeStart,
             AtmosphereHeight);
-        InAtmosphere = AtmosphereBlend > 0.01f;
+        InAtmosphere = ResolveAtmospherePresence(
+            InAtmosphere,
+            AtmosphereBlend,
+            AtmospherePresenceEnterBlend,
+            AtmospherePresenceExitBlend);
         RadialSpeed = Velocity.Dot(AtmosphereRadialUp);
         Basis basis = GlobalTransform.Basis.Orthonormalized();
         LocalVelocity = basis.Inverse() * Velocity;

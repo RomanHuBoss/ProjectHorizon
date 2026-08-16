@@ -47,6 +47,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public const bool FullAttitudeRotationEnabled = true;
     public const bool MouseTranslationCouplingEnabled = false;
     public const bool StatefulVirtualFlightStickEnabled = true;
+    public const bool SpringCenteredVirtualFlightStickEnabled = true;
     public const float DefaultFlightCameraNearMeters = 0.25f;
     public const float DefaultFlightCameraFarMeters = 900000.0f;
 
@@ -135,6 +136,14 @@ public partial class ArcadeShipController : CharacterBody3D
     public float MouseCoordinatedYawFactor { get; set; } =
         ArcadeFlightAssistRuntime.DefaultCoordinatedYawFactor;
 
+    [Export(PropertyHint.Range, "0.0,0.40,0.01")]
+    public float MouseVirtualStickAutoCenterDelaySeconds { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultVirtualStickAutoCenterDelaySeconds;
+
+    [Export(PropertyHint.Range, "0.5,16.0,0.1")]
+    public float MouseVirtualStickAutoCenterRate { get; set; } =
+        ArcadeFlightAssistRuntime.DefaultVirtualStickAutoCenterRate;
+
     [Export(PropertyHint.Range, "0.05,2.0,0.05")]
     public float FlightCameraNearMeters { get; set; } = DefaultFlightCameraNearMeters;
 
@@ -145,6 +154,8 @@ public partial class ArcadeShipController : CharacterBody3D
     private Camera3D? _cockpitCamera;
     private Transform3D _spawnTransform;
     private Vector2 _mouseVirtualStick;
+    private float _mouseVirtualStickIdleSeconds;
+    private bool _mouseMotionSinceLastPhysics;
     private ShipControlCommand _externalCommand = ShipControlCommand.Neutral;
     private float _externalMaxSpeedOverride;
     private bool _externalControlActive;
@@ -235,8 +246,8 @@ public partial class ArcadeShipController : CharacterBody3D
     {
         // TASK-178.6: flight mouse motion must be sampled before Controls/HUD can
         // consume the event. The old _UnhandledInput path was vulnerable to UI
-        // interception, and its fixed per-tick decay erased normal 5-20 px mouse
-        // deltas before angular acceleration could produce a visible manoeuvre.
+        // interception. TASK-180.3 moved this to a stateful virtual stick;
+        // TASK-182 spring-centres that stored command only after mouse input goes idle.
         if (!ManualInputOwnershipActive)
         {
             return;
@@ -253,6 +264,11 @@ public partial class ArcadeShipController : CharacterBody3D
                 InvertPitchLook,
                 InvertYawLook);
             _mouseSteeringSamples++;
+            if (mouseMotion.Relative.LengthSquared() > 0.0001f)
+            {
+                _mouseVirtualStickIdleSeconds = 0.0f;
+                _mouseMotionSinceLastPhysics = true;
+            }
             _lastMouseSteeringMagnitude = _mouseVirtualStick.Length();
             if (_mouseSteeringSamples == 1)
             {
@@ -275,6 +291,8 @@ public partial class ArcadeShipController : CharacterBody3D
             Input.MouseMode == Input.MouseModeEnum.Captured)
         {
             _mouseVirtualStick = Vector2.Zero;
+            _mouseVirtualStickIdleSeconds = 0.0f;
+            _mouseMotionSinceLastPhysics = false;
             GetViewport().SetInputAsHandled();
             return;
         }
@@ -285,6 +303,7 @@ public partial class ArcadeShipController : CharacterBody3D
             Input.MouseMode == Input.MouseModeEnum.Visible)
         {
             _mouseVirtualStick = Vector2.Zero;
+            _mouseVirtualStickIdleSeconds = 0.0f;
             Input.MouseMode = Input.MouseModeEnum.Captured;
         }
     }
@@ -338,6 +357,7 @@ public partial class ArcadeShipController : CharacterBody3D
         if (inputEvent.IsActionPressed("ui_cancel"))
         {
             _mouseVirtualStick = Vector2.Zero;
+            _mouseVirtualStickIdleSeconds = 0.0f;
             Input.MouseMode = Input.MouseModeEnum.Visible;
         }
 
@@ -346,6 +366,7 @@ public partial class ArcadeShipController : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         float deltaSeconds = (float)delta;
+        UpdateVirtualFlightStickSpringCentering(deltaSeconds);
         ShipControlCommand command = _externalControlActive
             ? _externalCommand
             : ReadManualCommand();
@@ -411,6 +432,11 @@ public partial class ArcadeShipController : CharacterBody3D
     {
         _externalControlActive = true;
         _externalCommand = SanitizeCommand(command);
+        // TASK-182: external/autopilot authority must not preserve a latent
+        // manual stick deflection and re-apply it when control returns.
+        _mouseVirtualStick = Vector2.Zero;
+        _mouseVirtualStickIdleSeconds = 0.0f;
+        _mouseMotionSinceLastPhysics = false;
     }
 
     public void SetExternalSpeedLimit(float speedMetersPerSecond)
@@ -434,6 +460,8 @@ public partial class ArcadeShipController : CharacterBody3D
         if (!enabled)
         {
             _mouseVirtualStick = Vector2.Zero;
+            _mouseVirtualStickIdleSeconds = 0.0f;
+            _mouseMotionSinceLastPhysics = false;
         }
     }
 
@@ -546,6 +574,7 @@ public partial class ArcadeShipController : CharacterBody3D
         Velocity = Vector3.Zero;
         AngularVelocityLocal = Vector3.Zero;
         _mouseVirtualStick = Vector2.Zero;
+        _mouseVirtualStickIdleSeconds = 0.0f;
         _pendingCollisionImpact = null;
         _collisionEvents = 0;
         SetManualControlEnabled(true);
@@ -589,6 +618,7 @@ public partial class ArcadeShipController : CharacterBody3D
         AutoStabilizationEnabled = state.AutoStabilizationEnabled;
         SetCameraMode(state.CameraMode, false);
         _mouseVirtualStick = Vector2.Zero;
+        _mouseVirtualStickIdleSeconds = 0.0f;
         _pendingCollisionImpact = null;
         UpdateAtmosphereContext();
         UpdateDiagnostics();
@@ -613,6 +643,34 @@ public partial class ArcadeShipController : CharacterBody3D
             _cockpitCamera.Near = nearPlane;
             _cockpitCamera.Far = farPlane;
         }
+    }
+
+    private void UpdateVirtualFlightStickSpringCentering(float deltaSeconds)
+    {
+        if (!ManualInputOwnershipActive || Input.MouseMode != Input.MouseModeEnum.Captured)
+        {
+            _mouseVirtualStickIdleSeconds = 0.0f;
+            _mouseMotionSinceLastPhysics = false;
+            return;
+        }
+
+        if (_mouseMotionSinceLastPhysics)
+        {
+            _mouseVirtualStickIdleSeconds = 0.0f;
+        }
+        else
+        {
+            _mouseVirtualStickIdleSeconds += Math.Max(0.0f, deltaSeconds);
+            _mouseVirtualStick = ArcadeFlightAssistRuntime.SpringCenterVirtualFlightStick(
+                _mouseVirtualStick,
+                _mouseVirtualStickIdleSeconds,
+                deltaSeconds,
+                MouseVirtualStickAutoCenterDelaySeconds,
+                MouseVirtualStickAutoCenterRate);
+        }
+
+        _mouseMotionSinceLastPhysics = false;
+        _lastMouseSteeringMagnitude = _mouseVirtualStick.Length();
     }
 
     private ShipControlCommand ReadManualCommand()

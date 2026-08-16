@@ -64,6 +64,12 @@ public partial class TerrainChunkManager : Node3D
     [Export(PropertyHint.Range, "1,4,1")]
     public int MaxOperationsPerStep { get; set; } = 1;
 
+    [Export]
+    public bool RuntimeRefreshCoalescingEnabled { get; set; } = true;
+
+    [Export(PropertyHint.Range, "1,4,1")]
+    public int MaxCoalescedCenterLagChunks { get; set; } = 1;
+
     [Export(PropertyHint.Range, "4,32,1")]
     public int StressTestRevisionCount { get; set; } = 12;
 
@@ -228,6 +234,9 @@ public partial class TerrainChunkManager : Node3D
     private double _planetSurfaceRadiusMeters;
     private int _surfaceCurvatureRevision;
     private bool _runtimeCollisionEnabled = true;
+    private int _coalescedRuntimeRefreshSkips;
+
+    public int CoalescedRuntimeRefreshSkips => _coalescedRuntimeRefreshSkips;
 
     public override void _Ready()
     {
@@ -396,8 +405,20 @@ public partial class TerrainChunkManager : Node3D
 
             if (nextCenter != _currentChunk)
             {
-                _currentChunk = nextCenter;
-                PlanRefresh(executeImmediately: false);
+                if (ShouldCoalesceRuntimeRefresh(
+                    _currentChunk,
+                    nextCenter,
+                    _completedRevision != _planRevision,
+                    RuntimeRefreshCoalescingEnabled,
+                    MaxCoalescedCenterLagChunks))
+                {
+                    _coalescedRuntimeRefreshSkips++;
+                }
+                else
+                {
+                    _currentChunk = nextCenter;
+                    PlanRefresh(executeImmediately: false);
+                }
             }
         }
 
@@ -807,6 +828,25 @@ public partial class TerrainChunkManager : Node3D
     private double GetOperationInterval()
     {
         return Math.Max(0.001, OperationIntervalSeconds);
+    }
+
+    public static bool ShouldCoalesceRuntimeRefresh(
+        Vector2I currentCenter,
+        Vector2I requestedCenter,
+        bool refreshInFlight,
+        bool coalescingEnabled,
+        int maxLagChunks)
+    {
+        if (!coalescingEnabled || !refreshInFlight ||
+            currentCenter == requestedCenter)
+        {
+            return false;
+        }
+
+        long dx = Math.Abs((long)requestedCenter.X - currentCenter.X);
+        long dz = Math.Abs((long)requestedCenter.Y - currentCenter.Y);
+        long lag = Math.Max(dx, dz);
+        return lag <= Math.Max(1, maxLagChunks);
     }
 
     private void PlanRefresh(bool executeImmediately)

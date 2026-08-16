@@ -10,7 +10,7 @@ public partial class SalvageRepairSlice
         GD.Print(
             "TASK-180.3 flight control/log integrity READY: " +
             "mouse=stateful-virtual-stick; horizontal=roll-dominant+coordinated-yaw; " +
-            "vertical=pitch; decay=0; recenter=middle-mouse; " +
+            "vertical=pitch; commandCore=stateful; liveCentering=TASK-182; recenter=middle-mouse; " +
             $"camera={ArcadeShipController.DefaultFlightCameraNearMeters:0.00}.." +
             $"{ArcadeShipController.DefaultFlightCameraFarMeters / 1000.0f:0}km; " +
             "surfaceGuard=hysteretic; weatherOwnership=surface-only; " +
