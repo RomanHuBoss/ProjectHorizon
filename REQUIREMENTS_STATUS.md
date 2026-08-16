@@ -2,9 +2,63 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task178.3-orbital-handoff-recovery.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178.4-planetary-landing-lighting.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-178.4 Planetary Approach, Landing & Orbital Lighting Recovery
+
+**Исходный снимок:** `ProjectHorizon-main-task178.3-orbital-handoff-recovery.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178.4-planetary-landing-lighting.zip`.  
+**Версия:** `0.1.0-alpha.178.4`.  
+**Статус:** `IMPLEMENTED / PENDING EXTERNAL BUILD+RESTORE+PLANET-LANDING+F5`; TASK-178.1 остаётся `VERIFIED`; TASK-178.2/178.3 имеют положительный external manual smoke, но не повышаются до `VERIFIED` без clean build/F5.
+
+### Внешнее evidence / обнаруженные дефекты
+
+Пользовательский alpha.178.3 run подтвердил, что предыдущие orbit fixes реально работают: атмосфера прошла `lower-atmosphere altitude=18.4m blend=0.000` → `upper-atmosphere altitude=110.2m` → `vacuum-orbit altitude=599.0m blend=0.995`; navigation assist завершил `TASK-112 player orbital docking PASS` при `distance=13.965`, `speed=0`, `fuel=31`, после чего coordinator перешёл в `StationInterior` и открыл station services.
+
+В том же smoke обнаружены три оставшиеся системные проблемы:
+
+- orbital planets всё ещё воспринимаются слишком маленькими относительно корабля и не имеют физического gameplay bridge к surface landing;
+- space light/shadow использует переходный environment, но terminator/направление key light не связано достаточно жёстко с star→planet геометрией, а atmosphere/cloud shells частично маскируют тень emissive-составляющей;
+- после сохранения внутри orbital station и `Continue` bootstrap coordinator стартует с `Surface`, а persisted `OrbitalStation` ошибочно обрабатывается как live `Surface->StationInterior`, что даёт `TASK-148 ... transition FAIL ... not allowed`.
+
+### Реализация
+
+- persistence load теперь передаёт `restoreWorldContext=true`; `SynchronizeWorldSceneCoordinator(... restoreFromPersistence=true)` вызывает transactional `WorldSceneCoordinatorNode.Restore(desired)`. Строгий live graph не расширен: `Surface->StationInterior` по-прежнему illegal во время обычной игры;
+- orbital scale увеличен: planet orbit min `6200 m`, gap `5200 m`; moon orbit min `2700 m`, gap `1400 m`; star visual radius `2800 m`; planet runtime visual radius derives from `PlanetEnvironment.RadiusKm * 24`, clamp `520..1900 m`; focused detailed globe uses `1.12x`; cameras `far=60000`;
+- добавлен `PlanetaryApproachRuntime`: near-side entry clearance `220 m`, capture radius `95 m`, max capture speed `28 m/s`, surface handoff altitude `220 m`;
+- `TryGetBodyApproachPoint` выдаёт безопасную точку на ближней стороне видимого globe; current-planet return и interplanetary cruise используют этот contract вместо полёта к центру sphere;
+- Stage-1 inbound voyage разделён на `planet-entry` и `planet-pad`: `K` автоматически проходит entry envelope, затем продолжает surface approach/landing; `Enter` может подтвердить оба безопасных capture этапа вручную;
+- orbital environment при передаче ownership захватывает фактические weather background/ambient/fog/directional значения и кросс-фейдит от них; DirectionalLight плавно ориентируется по star→focused-planet vector; atmosphere/cloud shells переведены на shaded material с минимальной emissive поддержкой;
+- добавлены TASK-178.4 model/live acceptance, xUnit и static gate в section-37/CI/release/final F5.
+
+### Изменённые ключевые файлы
+
+`SalvageRepairSliceVoyage.cs`, `SalvageRepairSliceWorldScenes.cs`, `PlanetaryApproachRuntime.cs`, `StarSystemSimulationRuntime.cs`, `StarSystemSimulationNode.cs`, `SalvageRepairSliceStarSystem.cs`, `DetailedPlanetGlobeNode.cs`, `SalvageRepairSliceInterplanetaryTravel.cs`, `SalvageRepairSliceWorldEnvironmentPresentation.cs`, `PlanetaryLandingRecoveryAcceptance.cs`, `SalvageRepairSlicePlanetaryLandingRecovery.cs`, `ArcadeShip.tscn`, EN/RU localization, xUnit/static/CI/release gates, README/CHANGELOG.
+
+### ТЗ / ограничения
+
+Затронуты уже заведённые требования star-system simulation, same-system interplanetary travel, Stage-1 voyage/landing, world scene residency/persistence и planet-global/spherical surface handoff. PDF v2.0 в переданном GitHub ZIP остаётся Git-LFS pointer (`132 bytes`, оригинал `1774256 bytes`), поэтому новые нормативные формулировки из недоступного тела PDF не изобретались; реализация ограничена существующими требованиями/контрактами и runtime evidence.
+
+### Проверки
+
+- доступный static quality contour: JSON/Godot resource/localization/audio/§36–38/platform/TASK-146…178.4;
+- отдельные regressions TASK-174/174.1 адаптированы к alpha.178.4 version gate без изменения их семантики;
+- YAML parse, shell syntax, C# structural checks и ZIP integrity выполняются перед передачей;
+- `dotnet build/test` и Godot runtime в рабочей среде недоступны (нет `dotnet`/Godot executable), поэтому не заявляются как PASS.
+
+### Acceptance TASK-178.4
+
+1. `tools\run-section37-quality.cmd`: требуется clean build `0 errors / 0 warnings`, unit tests PASS и `TASK-178.4 ... CONTRACT PASS`.
+2. `Continue` из сохранения, сделанного внутри station: должен быть `TASK-178.4 world scene persistence restore PASS ... to=StationInterior`; строки `TASK-148 ... Surface->StationInterior ... FAIL` быть не должно.
+3. На станции `T` → undock. Для current landable planet включить `K`: цель должна называться `planet-entry`, корабль идёт к ближней стороне крупного globe.
+4. Ожидается `TASK-178.4 planetary atmosphere entry PASS` при `entryDistance<=95 m`, `entrySpeed<=28 m/s`, `surfaceAltitude=220m`, после чего assist продолжает `planet-pad` и выдаёт `TASK-112 player landing PASS ... mode=navigation-assist`.
+5. В Orbit planet должна визуально доминировать над ship; moons не пересекают её поверхность. Проверить terminator/светотень при вращении камеры и в течение минимум 20–30 s: без резких смен яркости/цвета.
+6. F5: `TASK-178.4 planetary landing/lighting acceptance PASS` с `restoreSafe=1; planetScale=1; moonClearance=1; orbitalEntry=1; surfaceHandoff=1; voyagePath=1; lightingContinuity=1; liveGlobe=1; entryOutsideGlobe=1; landable=1`.
+7. При FAIL прислать полную TASK-178.4 строку, ближайшие TASK-148/TASK-112/TASK-152 строки и screenshot Orbit с ship+focused planet.
 
 ---
 
@@ -6548,6 +6602,20 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `FLIGHT-HF-17835` | F5/CI/xUnit защищают orbital handoff | `IMPLEMENTED` | TASK-178.3 aggregate + static validator + final-state gate |
 | `FLIGHT-HF-ACC-1783` | Clean build + manual ascent + F5 PASS | `IN_PROGRESS` | external Windows/Godot required |
 
+### 8.40. Planetary Approach, Landing & Orbital Lighting Recovery — TASK-178.4
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-HF-17840` | Persisted world context восстанавливается без нарушения live transition graph | `IMPLEMENTED` | load uses coordinator `Restore`; live `Surface->StationInterior` remains rejected |
+| `FLIGHT-HF-17841` | Orbital planets имеют читаемый масштаб относительно ship/moons | `IMPLEMENTED` | planet visual radius derived from `PlanetEnvironment.RadiusKm`; min authored >=520 m; focused globe *1.12; camera far=60 km |
+| `FLIGHT-HF-17842` | Moon orbits не пересекают визуальную поверхность parent planet | `IMPLEMENTED` | moon orbit min 2700 m, explicit surface-clearance acceptance |
+| `FLIGHT-HF-17843` | Из Orbit существует физический маршрут входа к landable planet | `IMPLEMENTED` | near-side orbital entry envelope 220 m clearance / 95 m capture / <=28 m/s |
+| `FLIGHT-HF-17844` | Orbital entry передаёт корабль bounded curved-surface runtime | `IMPLEMENTED` | handoff to verified surface runtime at 220 m, then existing pad landing transaction |
+| `FLIGHT-HF-17845` | Interplanetary arrival не целится в центр planet sphere | `IMPLEMENTED` | cruise guidance uses `TryGetBodyApproachPoint` near-side entry target |
+| `FLIGHT-HF-17846` | Space light/shadow transition сохраняет continuity и star-relative terminator | `IMPLEMENTED` | actual weather-frame capture + smoothed star→planet key light + shaded atmosphere/cloud shells |
+| `FLIGHT-HF-17847` | F5/xUnit/section-37/CI/release защищают recovery | `IMPLEMENTED` | TASK-178.4 aggregate/live acceptance and static validator |
+| `FLIGHT-HF-ACC-1784` | Clean build + restore smoke + planet-entry/landing + F5 PASS | `IN_PROGRESS` | external Windows/Godot required |
+
 ## 9. Очередь ближайших задач
 
 Задачи выполняются итеративно; runtime-проверки фиксируются до присвоения `VERIFIED`, кроме явно записанного product-owner acceptance waiver.
@@ -6564,8 +6632,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2 `IMPLEMENTED`; TASK-178.3 `IMPLEMENTED / PENDING EXTERNAL BUILD+TAKEOFF/HANDOFF SMOKE+F5`.  
-**Формально ближайший шаг:** внешний reacceptance TASK-178.3 вместе с TASK-178/TASK-178.2; после зелёного ascent/dock smoke возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
+**Текущая разрабатываемая реализация:** TASK-176.1 и TASK-178.1 `VERIFIED`; TASK-178/TASK-178.2/TASK-178.3 `IMPLEMENTED` с external runtime evidence для manual flight, atmosphere handoff и automatic station docking; TASK-178.4 `IMPLEMENTED / PENDING EXTERNAL BUILD+RESTORE+PLANET-LANDING+F5`.  
+**Формально ближайший шаг:** внешний build + restore docked save + Orbit→planet-entry→surface landing smoke для TASK-178.4, затем F5 reacceptance TASK-178.4/178.3/178.2/178; после зелёного результата возвращаемся к TASK-179 closure acceptance. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

@@ -46,7 +46,17 @@ public partial class SalvageRepairSlice
         double initialEpoch = Math.Max(0, GalaxyNavigation.JumpCount) * 7200.0;
         _starSystemSimulationRuntime = new StarSystemSimulationRuntime(
             GalaxyNavigation.CurrentSystem,
-            initialEpoch);
+            initialEpoch,
+            planet =>
+            {
+                PlanetEnvironmentProfile profile = PlanetEnvironment.BuildProfile(
+                    planet,
+                    GalaxyNavigation.CurrentSystem.StarType);
+                // Compressed visual kilometres: preserve the catalog radius
+                // ordering while fitting a 20..80 km world into an arcade-scale
+                // star system. The focused globe gets a further detail factor.
+                return Math.Clamp(profile.RadiusKm * 24.0, 520.0, 1900.0);
+            });
         _starSystemSimulationNode!.Configure(StarSystemSimulation);
         _planetActivationPipelineMask = 0;
         ApplySurfaceRuntimeActivation(
@@ -101,6 +111,7 @@ public partial class SalvageRepairSlice
             GetActiveDeveloperPlanetId(),
             shouldActivateSurface,
             renderSystemProxies);
+        UpdateOrbitalKeyLightDirection(delta);
     }
 
     private bool ResolveSurfaceRuntimeActive()

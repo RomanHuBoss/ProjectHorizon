@@ -1351,6 +1351,7 @@
     "ui.voyage.location.outbound_flight": "полёт к станции",
     "ui.voyage.location.planet_surface": "поверхность планеты",
     "ui.voyage.location.unknown": "неизвестно",
+    "ui.voyage.planet_entry_requires": "Вход к планете требует дистанцию <= {distance} м и скорость <= {speed} м/с; сейчас дистанция={current_distance} м, скорость={current_speed} м/с.",
     "ui.voyage.nav_assist": "Навигационная помощь {state}.",
     "ui.voyage.nav_only_flight": "Навигационная помощь доступна только в полёте.",
     "ui.voyage.not_piloted": "Стартовый корабль не пилотируется.",

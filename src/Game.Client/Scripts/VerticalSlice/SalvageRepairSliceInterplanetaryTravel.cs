@@ -87,9 +87,13 @@ public partial class SalvageRepairSlice
 
         InterplanetaryTravel.SynchronizeSelection(GalaxyNavigation);
         string targetPlanetId = GalaxyNavigation.SelectedPlanetId;
-        if (!_starSystemSimulationNode.TryGetBodyDisplayPosition(
+        if (!_starSystemSimulationNode.TryGetBodyApproachPoint(
                 targetPlanetId,
-                out Vector3 target))
+                _voyageShip.GlobalPosition,
+                PlanetaryApproachRuntime.OrbitalEntryClearanceMeters,
+                out Vector3 target,
+                out Vector3 targetCenter,
+                out float targetDisplayRadius))
         {
             _status = LF(
                 "ui.interplanetary.target_proxy_unavailable",
@@ -131,6 +135,8 @@ public partial class SalvageRepairSlice
                 $"source={InterplanetaryTravel.SourcePlanetId}; " +
                 $"target={InterplanetaryTravel.TargetPlanetId}; " +
                 $"distance={InterplanetaryTravel.PlannedDistanceMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
+                $"planetRadius={targetDisplayRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
+                $"entryClearance={PlanetaryApproachRuntime.OrbitalEntryClearanceMeters.ToString("0", CultureInfo.InvariantCulture)}m; " +
                 $"fuelCost={InterplanetaryTravel.FuelCost.ToString("0.00", CultureInfo.InvariantCulture)}; " +
                 $"fuelRemaining={ShipSystems.Fuel.ToString("0.00", CultureInfo.InvariantCulture)}.");
         }
@@ -193,6 +199,7 @@ public partial class SalvageRepairSlice
             $"current={GalaxyNavigation.CurrentPlanetId}; " +
             $"plannedDistance={plannedDistance.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
             $"arrivalDistance={distance.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
+            $"planetCenter=({targetCenter.X.ToString("0", CultureInfo.InvariantCulture)},{targetCenter.Y.ToString("0", CultureInfo.InvariantCulture)},{targetCenter.Z.ToString("0", CultureInfo.InvariantCulture)}); " +
             $"transfers={GalaxyNavigation.InterplanetaryTransferCount}; " +
             $"totalDistance={GalaxyNavigation.TotalInterplanetaryDistanceMeters.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
             $"checkpoint={StageOneVoyage.LastCheckpoint}; navAssist=1.");

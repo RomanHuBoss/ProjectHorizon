@@ -5537,6 +5537,7 @@ public partial class SalvageRepairSlice : Node3D
         RunWorldSceneCoordinatorAcceptance();
         RunOrbitalNavigationPresentationAcceptance();
         RunOrbitalHandoffRecoveryAcceptance();
+        RunPlanetaryLandingRecoveryAcceptance();
         RequestSpaceflightNavigationSubsystemAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5546,7 +5547,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6734,7 +6735,8 @@ public partial class SalvageRepairSlice : Node3D
             _aerialNavigationAcceptanceReport is null ||
             _spaceflightNavigationSubsystemAcceptancePassed is null ||
             _orbitalNavigationPresentationAcceptancePassed is null ||
-            _orbitalHandoffRecoveryAcceptancePassed is null)
+            _orbitalHandoffRecoveryAcceptancePassed is null ||
+            _planetaryLandingRecoveryAcceptancePassed is null)
         {
             return;
         }
@@ -6751,13 +6753,14 @@ public partial class SalvageRepairSlice : Node3D
             _aerialNavigationAcceptanceReport.Passed &&
             _spaceflightNavigationSubsystemAcceptancePassed == true &&
             _orbitalNavigationPresentationAcceptancePassed == true &&
-            _orbitalHandoffRecoveryAcceptancePassed == true;
+            _orbitalHandoffRecoveryAcceptancePassed == true &&
+            _planetaryLandingRecoveryAcceptancePassed == true;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7703,6 +7706,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-178 (F5): {_spaceflightNavigationSubsystemAcceptanceHud}",
             $"TASK-178.2 (F5): {_orbitalNavigationPresentationAcceptanceHud}",
             $"TASK-178.3 (F5): {_orbitalHandoffRecoveryAcceptanceHud}",
+            $"TASK-178.4 (F5): {_planetaryLandingRecoveryAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",

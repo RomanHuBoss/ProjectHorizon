@@ -37,7 +37,7 @@ public partial class StarSystemSimulationNode : Node3D
     // the third-person ship camera that the player never reads a 6 m ship as a
     // planet-scale object. Local station/traffic have separate physical nodes.
     public Vector3 DisplayAnchor { get; set; } =
-        new(0.0f, -180.0f, 900.0f);
+        new(0.0f, 0.0f, 3400.0f);
 
     public const bool LocalTrafficProxiesSuppressed = true;
 
@@ -122,6 +122,56 @@ public partial class StarSystemSimulationNode : Node3D
 
         globalPosition = Vector3.Zero;
         return false;
+    }
+
+    public bool TryGetBodyApproachPoint(
+        string bodyId,
+        Vector3 referencePosition,
+        double clearanceMeters,
+        out Vector3 approachPoint,
+        out Vector3 bodyCenter,
+        out float displayRadius)
+    {
+        approachPoint = Vector3.Zero;
+        bodyCenter = Vector3.Zero;
+        displayRadius = 0.0f;
+        if (_runtime is null || string.IsNullOrWhiteSpace(bodyId) ||
+            !double.IsFinite(clearanceMeters) || clearanceMeters < 0.0 ||
+            !_visuals.TryGetValue(bodyId, out MeshInstance3D? visual) ||
+            !GodotObject.IsInstanceValid(visual) || !visual.IsInsideTree())
+        {
+            return false;
+        }
+
+        StarSystemBodyDefinition? definition = _runtime.Definitions.FirstOrDefault(
+            candidate => string.Equals(
+                candidate.BodyId,
+                bodyId,
+                StringComparison.Ordinal));
+        if (definition is null)
+        {
+            return false;
+        }
+
+        bodyCenter = visual.GlobalPosition;
+        displayRadius = (float)Math.Max(1.0, definition.VisualRadius * visual.Scale.X);
+        if (_detailedGlobe is not null &&
+            GodotObject.IsInstanceValid(_detailedGlobe) &&
+            string.Equals(_detailedGlobePlanetId, bodyId, StringComparison.Ordinal))
+        {
+            bodyCenter = _detailedGlobe.GlobalPosition;
+            displayRadius = Math.Max(1.0f, _detailedGlobe.Diagnostics.DisplayRadius);
+        }
+
+        Vector3 outward = referencePosition - bodyCenter;
+        if (outward.LengthSquared() < 0.0001f)
+        {
+            outward = Vector3.Back;
+        }
+        outward = outward.Normalized();
+        approachPoint = bodyCenter + outward *
+            (displayRadius + (float)clearanceMeters);
+        return true;
     }
 
 

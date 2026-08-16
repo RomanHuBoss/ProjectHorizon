@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0-alpha.178.4] - 2026-08-16
+
+### Fixed — planetary approach, landing and restore safety
+- Added an authoritative persistence-restore path for the world-scene coordinator. A save made inside `OrbitalStation` now restores directly to `StationInterior` without pretending that the load is a live `Surface -> StationInterior` gameplay transition; the strict live transition graph remains unchanged.
+- Rebuilt orbital planet presentation scale: starter-system planets now use kilometre-class visual radii/spacing in the compressed flight scene, with the focused planet size derived from its actual `PlanetEnvironment` radius; moons are separated far outside the parent visual surface instead of reading as tightly packed props.
+- Added a two-stage planetary landing path. `K` or manual `Enter` first captures a safe near-side orbital-entry envelope around the visible planet globe, then hands the ship into the already verified 260 m curved-surface runtime at 220 m approach altitude, after which normal pad landing completes. Interplanetary cruise now targets the same safe near-side envelope instead of the planet centre.
+- Expanded ship camera range to 60 km and enlarged the detailed globe while retaining bounded/non-colliding orbital representation.
+- Improved space light/shadow continuity: upper-atmosphere cross-fade now starts from the actual live weather frame rather than hard-coded colours; the orbital directional key light is derived from star-to-planet direction and smoothed over time; atmosphere/cloud shells are shaded instead of uniformly emissive.
+
+### Added — TASK-178.4
+- Added model/live acceptance for restore safety, planet/moon scale, orbital-entry envelope, surface handoff, voyage path and lighting continuity.
+- Added xUnit and section-37/CI/release regression gates and final F5 gating.
+
+### Runtime evidence that triggered the repair
+- External alpha.178.3 run verified automatic station docking and `StationInterior` services, but showed that planets were still visually underscaled and had no physical gameplay landing bridge from orbital representation to surface runtime.
+- Loading the docked save reproduced `TASK-148 ... FAIL: from=Surface; to=StationInterior`, proving that bootstrap scene state was incorrectly being treated as a live transition instead of persistence restoration.
+
 ## [0.1.0-alpha.178.3] - 2026-08-16
 
 ### Fixed — orbital handoff scale and visibility

@@ -1,8 +1,20 @@
+using System;
 using Godot;
 
 public partial class SalvageRepairSlice
 {
     private string _lastWorldEnvironmentPresentationProfile = string.Empty;
+    private bool _orbitalHandoffSourceCaptured;
+    private Color _orbitalHandoffSourceBackground;
+    private Color _orbitalHandoffSourceAmbient;
+    private float _orbitalHandoffSourceAmbientEnergy;
+    private bool _orbitalHandoffSourceFogEnabled;
+    private float _orbitalHandoffSourceFogDensity;
+    private Color _orbitalHandoffSourceDirectionalColor = Colors.White;
+    private float _orbitalHandoffSourceDirectionalEnergy = 1.0f;
+    private double _orbitalHandoffSourceBlend;
+    private Vector3 _smoothedOrbitalLightDirection = new(0.35f, -0.22f, 0.91f);
+    private bool _orbitalLightDirectionInitialized;
 
     private void UpdateWorldSceneEnvironmentPresentation()
     {
@@ -35,6 +47,11 @@ public partial class SalvageRepairSlice
 
         if (surfaceOwned)
         {
+            if (kind == WorldSceneKind.Surface)
+            {
+                _orbitalHandoffSourceCaptured = false;
+                _orbitalLightDirectionInitialized = false;
+            }
             // The lower-atmosphere part of Orbit deliberately remains owned by
             // the same weather sky as Surface. This avoids a one-frame switch
             // from blue atmosphere to black vacuum at the old ~85 m boundary.
@@ -74,9 +91,32 @@ public partial class SalvageRepairSlice
 
         if (kind == WorldSceneKind.Orbit)
         {
-            float t = (float)handoff.VacuumBlend;
-            Color highAtmosphere = new(0.16f, 0.28f, 0.50f);
-            Color highAmbient = new(0.30f, 0.36f, 0.48f);
+            DirectionalLight3D? currentDirectional =
+                GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
+            if (!_orbitalHandoffSourceCaptured)
+            {
+                // TASK-178.4: capture the *actual* weather-driven frame at the
+                // first upper-atmosphere sample. The previous implementation
+                // jumped to hard-coded colors at 110 m, which was mathematically
+                // smooth afterwards but still visibly stepped at ownership handoff.
+                _orbitalHandoffSourceCaptured = true;
+                _orbitalHandoffSourceBackground = environment.BackgroundColor;
+                _orbitalHandoffSourceAmbient = environment.AmbientLightColor;
+                _orbitalHandoffSourceAmbientEnergy = environment.AmbientLightEnergy;
+                _orbitalHandoffSourceFogEnabled = environment.FogEnabled;
+                _orbitalHandoffSourceFogDensity = environment.FogDensity;
+                _orbitalHandoffSourceDirectionalColor =
+                    currentDirectional?.LightColor ?? new Color(1.0f, 0.92f, 0.80f);
+                _orbitalHandoffSourceDirectionalEnergy =
+                    currentDirectional?.LightEnergy ?? 1.2f;
+                _orbitalHandoffSourceBlend = handoff.VacuumBlend;
+            }
+
+            float t = (float)Math.Clamp(
+                (handoff.VacuumBlend - _orbitalHandoffSourceBlend) /
+                    Math.Max(0.000001, 1.0 - _orbitalHandoffSourceBlend),
+                0.0,
+                1.0);
             Color vacuumBackground = new(
                 (float)profile.BackgroundRed,
                 (float)profile.BackgroundGreen,
@@ -86,22 +126,23 @@ public partial class SalvageRepairSlice
                 (float)profile.AmbientGreen,
                 (float)profile.AmbientBlue);
 
-            background = highAtmosphere.Lerp(vacuumBackground, t);
-            ambient = highAmbient.Lerp(vacuumAmbient, t);
+            background = _orbitalHandoffSourceBackground.Lerp(vacuumBackground, t);
+            ambient = _orbitalHandoffSourceAmbient.Lerp(vacuumAmbient, t);
             ambientEnergy = Mathf.Lerp(
-                0.46f,
+                _orbitalHandoffSourceAmbientEnergy,
                 (float)profile.AmbientEnergy,
                 t);
             directionalEnergy = Mathf.Lerp(
-                1.22f,
+                _orbitalHandoffSourceDirectionalEnergy,
                 (float)profile.DirectionalEnergy,
                 t);
-            fogEnabled = t < 0.96f;
             float remainingAtmosphere = 1.0f - t;
-            fogDensity = 0.0022f *
+            fogEnabled = _orbitalHandoffSourceFogEnabled && t < 0.985f;
+            fogDensity = _orbitalHandoffSourceFogDensity *
                 remainingAtmosphere * remainingAtmosphere;
-            directionalColor = new Color(1.0f, 0.92f, 0.80f)
-                .Lerp(new Color(0.86f, 0.91f, 1.0f), t);
+            directionalColor = _orbitalHandoffSourceDirectionalColor.Lerp(
+                new Color(0.94f, 0.96f, 1.0f),
+                t);
         }
         else
         {
@@ -159,5 +200,73 @@ public partial class SalvageRepairSlice
                 $"fog={(fogEnabled ? 1 : 0)}; ambient={ambientEnergy:0.00}; " +
                 $"directional={directionalEnergy:0.00}.");
         }
+    }
+
+    private void UpdateOrbitalKeyLightDirection(double delta)
+    {
+        if (_worldSceneCoordinatorRuntime is null ||
+            _starSystemSimulationNode is null ||
+            _galaxyNavigationRuntime is null ||
+            WorldScenes.Current.Kind is not
+                (WorldSceneKind.Orbit or WorldSceneKind.InterplanetaryTransit))
+        {
+            return;
+        }
+
+        if (WorldScenes.Current.Kind == WorldSceneKind.Orbit &&
+            OrbitalHandoffPresentationRuntime.Evaluate(
+                _voyageShip?.AltitudeAboveSurface ?? double.PositiveInfinity)
+                .SurfaceSkyOwned)
+        {
+            // Surface weather owns the sun direction until the visual handoff
+            // actually begins; orbital lighting must not rotate the lower-sky sun.
+            return;
+        }
+
+        string starId = $"{GalaxyNavigation.CurrentSystem.SystemId}.star";
+        if (!_starSystemSimulationNode.TryGetBodyDisplayPosition(
+                starId,
+                out Vector3 starPosition) ||
+            !_starSystemSimulationNode.TryGetBodyDisplayPosition(
+                GalaxyNavigation.CurrentPlanetId,
+                out Vector3 planetPosition))
+        {
+            return;
+        }
+
+        Vector3 desired = planetPosition - starPosition;
+        if (desired.LengthSquared() < 0.0001f)
+        {
+            return;
+        }
+        desired = desired.Normalized();
+        if (!_orbitalLightDirectionInitialized)
+        {
+            _smoothedOrbitalLightDirection = desired;
+            _orbitalLightDirectionInitialized = true;
+        }
+        else
+        {
+            float factor = 1.0f - Mathf.Exp(-(float)Math.Max(0.0, delta) * 0.65f);
+            Vector3 blended = _smoothedOrbitalLightDirection.Lerp(desired, factor);
+            if (blended.LengthSquared() > 0.0001f)
+            {
+                _smoothedOrbitalLightDirection = blended.Normalized();
+            }
+        }
+
+        DirectionalLight3D? directional =
+            GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
+        if (directional is null)
+        {
+            return;
+        }
+
+        Vector3 up = Math.Abs(_smoothedOrbitalLightDirection.Dot(Vector3.Up)) > 0.96f
+            ? Vector3.Right
+            : Vector3.Up;
+        directional.LookAt(
+            directional.GlobalPosition + _smoothedOrbitalLightDirection,
+            up);
     }
 }

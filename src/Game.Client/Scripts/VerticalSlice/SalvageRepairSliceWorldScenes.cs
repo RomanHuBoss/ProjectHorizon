@@ -95,7 +95,9 @@ public partial class SalvageRepairSlice
             GalaxyNavigation.CurrentPlanetId);
     }
 
-    private void SynchronizeWorldSceneCoordinator(bool force = false)
+    private void SynchronizeWorldSceneCoordinator(
+        bool force = false,
+        bool restoreFromPersistence = false)
     {
         if (_worldSceneCoordinatorRuntime is null ||
             _worldSceneCoordinatorNode is null ||
@@ -108,26 +110,40 @@ public partial class SalvageRepairSlice
         WorldSceneContext desired = ResolveWorldSceneContext();
         if (WorldScenes.Current != desired)
         {
-            WorldSceneTransitionResult transition =
-                _worldSceneCoordinatorNode.TryTransition(
-                    desired,
-                    out string result);
-            if (transition == WorldSceneTransitionResult.Rejected)
+            if (restoreFromPersistence)
             {
-                GD.PushError(
-                    "TASK-148 world scene coordinator transition FAIL: " +
-                    $"from={WorldScenes.Current.Kind}; to={desired.Kind}; " +
-                    $"system={desired.SystemId}; planet={desired.PlanetId}; result={result}");
-                return;
-            }
-
-            if (transition == WorldSceneTransitionResult.Applied)
-            {
+                WorldSceneContext previous = WorldScenes.Current;
+                _worldSceneCoordinatorNode.Restore(desired);
                 _worldResidencyTransitions++;
                 GD.Print(
-                    "TASK-148 world scene transition PASS: " +
-                    $"kind={desired.Kind}; system={desired.SystemId}; planet={desired.PlanetId}; " +
-                    $"generation={WorldScenes.Generation}; transitions={WorldScenes.TransitionCount}.");
+                    "TASK-178.4 world scene persistence restore PASS: " +
+                    $"from={previous.Kind}; to={desired.Kind}; " +
+                    $"system={desired.SystemId}; planet={desired.PlanetId}; " +
+                    $"generation={WorldScenes.Generation}; mode=authoritative-save-restore.");
+            }
+            else
+            {
+                WorldSceneTransitionResult transition =
+                    _worldSceneCoordinatorNode.TryTransition(
+                        desired,
+                        out string result);
+                if (transition == WorldSceneTransitionResult.Rejected)
+                {
+                    GD.PushError(
+                        "TASK-148 world scene coordinator transition FAIL: " +
+                        $"from={WorldScenes.Current.Kind}; to={desired.Kind}; " +
+                        $"system={desired.SystemId}; planet={desired.PlanetId}; result={result}");
+                    return;
+                }
+
+                if (transition == WorldSceneTransitionResult.Applied)
+                {
+                    _worldResidencyTransitions++;
+                    GD.Print(
+                        "TASK-148 world scene transition PASS: " +
+                        $"kind={desired.Kind}; system={desired.SystemId}; planet={desired.PlanetId}; " +
+                        $"generation={WorldScenes.Generation}; transitions={WorldScenes.TransitionCount}.");
+                }
             }
         }
         else if (force)

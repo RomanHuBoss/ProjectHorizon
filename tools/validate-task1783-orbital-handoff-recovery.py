@@ -34,10 +34,10 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version == "0.1.0-alpha.178.3", "VERSION must be alpha.178.3", f)
+need(version in {"0.1.0-alpha.178.3", "0.1.0-alpha.178.4"}, "VERSION must be alpha.178.3 or later", f)
 need("StationDockPositionZ = -1600.0" in voyage_runtime and
      "StationUndockPositionZ = -1582.0" in voyage_runtime,
-     "physical station approach remains on the near-surface scale", f)
+     "physical station approach regressed to the old near-surface scale", f)
 need("PlanetRuntimeActivationRadiusMeters = 260.0f" in star_system,
      "surface runtime overlap was not extended beyond the old 72 m cutoff", f)
 need("VacuumBlendStartMeters = 110.0" in handoff and
@@ -48,10 +48,11 @@ need("VacuumBlendStartMeters = 110.0" in handoff and
      "gradual orbital handoff model is incomplete", f)
 need("StarCount = 420" in handoff and "StarfieldRadiusMeters = 7200.0f" in handoff,
      "procedural starfield contract missing", f)
-need("ambient_light_energy" in env_live and "highAtmosphere" in env_live and
+need("ambient_light_energy" in env_live and "_orbitalHandoffSourceCaptured" in env_live and
+     "environment.BackgroundColor" in env_live and "environment.AmbientLightEnergy" in env_live and
      "handoff.VacuumBlend" in env_live and "fogDensity" in env_live and
      "TASK-178.3 world environment handoff PASS" in env_live,
-     "live environment still performs a hard atmosphere-to-vacuum switch", f)
+     "live environment no longer preserves the gradual atmosphere-to-vacuum handoff", f)
 need("0.30, 1.00, false" in env_model,
      "vacuum orbit profile remains too dim for readable geometry", f)
 need("EnsureOrbitalBackdropRuntime" in backdrop and

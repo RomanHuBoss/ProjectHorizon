@@ -15,6 +15,22 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178.4 — Planetary Approach, Landing & Orbital Lighting Recovery
+
+Alpha.178.4 closes the gap between the large-scale orbital representation and the already verified curved planetary surface. Planets are no longer small decorative spheres: orbital planet size is derived from the real `PlanetEnvironment` radius and rendered at a deliberately compressed kilometre-class flight scale, with moon orbits pushed safely beyond the parent body's visible surface. The current detailed globe remains bounded/non-colliding, but is large enough to read as a destination rather than as an object comparable to the ship. Ship cameras retain the expanded system out to 60 km.
+
+Planet landing is now a two-stage physical gameplay route. From Orbit/InboundFlight, `K` guides to a **near-side planetary entry envelope** outside the visible globe (or `Enter` commits it manually when range/speed are safe). Crossing that envelope hands the ship to the verified curved-surface runtime at 220 m altitude; navigation assist can then continue to the landing pad and complete the normal `TryLand` transaction. Interplanetary travel uses the same near-side approach contract instead of aiming at a planet centre.
+
+The alpha also fixes the docked-save crash path: persistence load uses coordinator `Restore(...)`, so an authoritative `OrbitalStation` save can restore directly into `StationInterior` while the normal gameplay graph still rejects illegal `Surface -> StationInterior` transitions. Space lighting now captures the actual weather-driven source frame before blending to vacuum, shades atmosphere/cloud shells, and smoothly aligns the orbital key light with star→planet direction. F5 includes `TASK-178.4 planetary landing/lighting acceptance`.
+
+### Acceptance TASK-178.4
+
+1. `tools\run-section37-quality.cmd`: clean build, all tests and `TASK-178.4 ... CONTRACT PASS`.
+2. Load the previously docked save: no `TASK-148 ... Surface->StationInterior ... not allowed`; expected `TASK-178.4 world scene persistence restore PASS ... to=StationInterior`.
+3. Undock with `T`, select/return toward a landable planet and use `K`: the ship must approach the visible globe rather than its centre, enter the planetary envelope, log `TASK-178.4 planetary atmosphere entry PASS`, then continue into the 220 m surface-approach layer and land. Manual `Enter` can commit each safe capture stage instead.
+4. In Orbit, the focused planet must be visually dominant over the ship and its moons must remain clearly outside the parent surface. Light/shadow must form a stable star-relative terminator without a hard colour/brightness step during upper-atmosphere handoff.
+5. F5: `TASK-178.4 planetary landing/lighting acceptance PASS` with `restoreSafe=1; planetScale=1; moonClearance=1; orbitalEntry=1; surfaceHandoff=1; voyagePath=1; lightingContinuity=1; liveGlobe=1; entryOutsideGlobe=1; landable=1`. Existing TASK-178.3/178.2/178/176/126 remain green.
+
 ## TASK-178.3 — Orbital Handoff Scale & Visibility Recovery
 
 Alpha.178.3 fixes the remaining takeoff handoff defect exposed by the external alpha.178.2 run. The Stage-1 station is no longer parked roughly one hundred metres from the launch pad: its docking target is about **1.59 km** from launch, so even at the starter ship's ~85 m/s top speed the approach is a real flight rather than a near-surface hop. The station and docking beacon are hidden in the lower atmosphere and become available only after 220 m altitude.
@@ -25,7 +41,7 @@ The former visual cutoff was also wrong: ship atmosphere physics ended around 85
 
 Alpha.178.2 fixes the first real orbital-flight defects exposed after manual control was restored. `K` is now a complete navigation assist: it approaches the Stage-1 station/landing target, sheds excess speed, creeps into the capture envelope and automatically executes docking/landing; `Enter` remains the manual transaction key. Successful station docking switches the world coordinator into a lit hangar shell and opens station services.
 
-The star-system view is rescaled as a deliberate compressed astronomical presentation instead of the former metre-scale toy model. The simulation clock is 1x rather than 120x, moons have much larger orbit radii and multi-minute periods, planets are separated by kilometre-scale gameplay distances, and star/planet/moon visual radii maintain an explicit hierarchy. Both ship cameras now retain a 12 km far plane so the expanded system presentation remains visible. The focused planet is placed behind/below the local flight scene as a large orbital backdrop. Statistical station/traffic proxies are hidden while the physical station and NPC ships are resident, preventing duplicate local objects. Orbit, interplanetary, station-interior and hyperspace contexts also get explicit dark fog-free environment profiles so the planetary blue atmosphere cannot leak into space. F5 now includes `TASK-178.2 orbital navigation/presentation acceptance`.
+The star-system view is rescaled as a deliberate compressed astronomical presentation instead of the former metre-scale toy model. The simulation clock is 1x rather than 120x, moons have much larger orbit radii and multi-minute periods, planets are separated by kilometre-scale gameplay distances, and star/planet/moon visual radii maintain an explicit hierarchy. Both ship cameras now retain a 60 km far plane so the expanded system presentation remains visible. The focused planet is placed behind/below the local flight scene as a large orbital backdrop. Statistical station/traffic proxies are hidden while the physical station and NPC ships are resident, preventing duplicate local objects. Orbit, interplanetary, station-interior and hyperspace contexts also get explicit dark fog-free environment profiles so the planetary blue atmosphere cannot leak into space. F5 now includes `TASK-178.2 orbital navigation/presentation acceptance`.
 
 ## TASK-178.1 — Pilot Input Ownership Hotfix
 

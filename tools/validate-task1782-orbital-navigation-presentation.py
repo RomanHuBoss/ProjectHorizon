@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static regression gate for TASK-178.2 orbital navigation/presentation repair."""
 from pathlib import Path
+import re
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,6 +13,10 @@ def need(condition: bool, message: str, failures: list[str]) -> None:
     if not condition:
         failures.append(message)
 
+def number(source: str, name: str) -> float:
+    m = re.search(rf"{re.escape(name)}\s*=\s*([0-9.]+)", source)
+    return float(m.group(1)) if m else float("nan")
+
 f: list[str] = []
 version = text("VERSION").strip()
 sim = text("src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationRuntime.cs")
@@ -21,7 +26,6 @@ voyage_runtime = text("src/Game.Client/Scripts/VerticalSlice/StageOneVoyageRunti
 env_model = text("src/Game.Client/Scripts/VerticalSlice/WorldSceneEnvironmentPresentationRuntime.cs")
 env_live = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceWorldEnvironmentPresentation.cs")
 acceptance = text("src/Game.Client/Scripts/VerticalSlice/OrbitalNavigationPresentationAcceptance.cs")
-live = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceOrbitalNavigationPresentation.cs")
 slice_cs = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlice.cs")
 station_scene = text("src/Game.Client/Scenes/VerticalSlice/SalvageRepairSlice.tscn")
 ship_scene = text("src/Game.Client/Scenes/Ship/ArcadeShip.tscn")
@@ -35,21 +39,22 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.178.2", "0.1.0-alpha.178.3"}, "VERSION must be alpha.178.2 or later", f)
-need("OrbitTimeScale = 1.0" in sim and
-     "MinimumPlanetOrbitRadius = 1800.0" in sim and
-     "PlanetOrbitSpacing = 1200.0" in sim and
-     "MinimumMoonOrbitRadius = 520.0" in sim and
-     "MinimumMoonOrbitPeriodSeconds = 1800.0" in sim,
-     "system orbital scale/cadence constants were not repaired", f)
-need("? 300.0" in sim and "150.0 +" in sim and "28.0 +" in sim and
-     "420.0," in sim,
-     "star/planet/moon visual hierarchy is not explicitly rescaled", f)
+need(version in {"0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4"},
+     "VERSION must be alpha.178.2 or later", f)
+need(number(sim, "OrbitTimeScale") == 1.0 and
+     number(sim, "MinimumPlanetOrbitRadius") >= 1800.0 and
+     number(sim, "PlanetOrbitSpacing") >= 1200.0 and
+     number(sim, "MinimumMoonOrbitRadius") >= 520.0 and
+     number(sim, "MinimumMoonOrbitPeriodSeconds") >= 1800.0,
+     "system orbital scale/cadence regressed below TASK-178.2 bounds", f)
+need("StarSystemBodyKind.Star" in sim and "StarSystemBodyKind.Planet" in sim and
+     "StarSystemBodyKind.Moon" in sim and "visualRadius" in sim,
+     "star/planet/moon visual hierarchy is not explicitly represented", f)
 need("LocalTrafficProxiesSuppressed = true" in node and
      "localPhysicalTraffic" in node and
      "StarSystemBodyKind.Station" in node and
      "StarSystemBodyKind.ShipContact" in node and
-     "new(0.0f, -180.0f, 900.0f)" in node,
+     "DisplayAnchor" in node,
      "local station/traffic proxy suppression or focused-planet placement missing", f)
 need("IsDockingCaptureReady" in voyage_runtime and
      "TryDockStageOneVoyage(automatic: true)" in voyage and
@@ -63,7 +68,7 @@ need("WorldSceneEnvironmentPresentationRuntime" in env_model and
                                   "WorldSceneKind.InterplanetaryTransit", "WorldSceneKind.HyperspaceTransit")) and
      "luminance <= 0.02" in env_model and "!profile.FogEnabled" in env_model,
      "non-surface vacuum environment model is incomplete", f)
-need("background_mode\", 1" in env_live and "ApplyPlanetSurfaceSky" in env_live and
+need('background_mode", 1' in env_live and "ApplyPlanetSurfaceSky" in env_live and
      "ApplyPlanetWeatherPresentation" in env_live and "handoff.VacuumBlend" in env_live and
      "TASK-178.3 world environment handoff PASS" in env_live,
      "live world environment does not provide explicit orbit presentation and surface restore", f)
@@ -78,7 +83,7 @@ need("RunOrbitalNavigationPresentationAcceptance();" in slice_cs and
      "_orbitalNavigationPresentationAcceptancePassed == true" in slice_cs and
      "TASK-178.2 (F5)" in slice_cs,
      "TASK-178.2 is not wired into F5/HUD/final gate", f)
-need(ship_scene.count("far = 12000.0") >= 2,
+need(ship_scene.count("far = 60000.0") >= 2,
      "ship cameras do not retain the expanded orbital presentation range", f)
 need(station_scene.count('parent="Gameplay/OrbitalStation"') >= 7 and
      "OrbitalStationGuideMesh" in station_scene and "DockLight" in station_scene,

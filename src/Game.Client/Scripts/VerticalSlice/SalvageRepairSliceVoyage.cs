@@ -69,7 +69,11 @@ public partial class SalvageRepairSlice
         _voyageNavigationAssist = false;
         _stationServicesOpenedFromVoyage = false;
         ConfigureVoyageShipFromDerivedStats();
-        ApplyStageOneVoyageToScene();
+        // TASK-178.4: a persisted location is authoritative state restoration,
+        // not a live gameplay transition. This distinction prevents a valid
+        // OrbitalStation save from being rejected as Surface->StationInterior
+        // while the bootstrap coordinator is still on its default surface shell.
+        ApplyStageOneVoyageToScene(restoreWorldContext: saveData is not null);
     }
 
     private void ConfigureVoyageShipFromDerivedStats()
@@ -119,7 +123,7 @@ public partial class SalvageRepairSlice
             10.0 + (12.0 * atmosphericFactor));
     }
 
-    private void ApplyStageOneVoyageToScene()
+    private void ApplyStageOneVoyageToScene(bool restoreWorldContext = false)
     {
         if (_voyageShip is null || _player is null ||
             _playerCamera is null || _shipTerminal is null ||
@@ -169,7 +173,8 @@ public partial class SalvageRepairSlice
         }
 
         UpdateVoyageMarkers();
-        SynchronizeWorldSceneCoordinator();
+        SynchronizeWorldSceneCoordinator(
+            restoreFromPersistence: restoreWorldContext);
         if (!piloted)
         {
             Input.MouseMode = Input.MouseModeEnum.Captured;
@@ -219,6 +224,18 @@ public partial class SalvageRepairSlice
         {
             if (!TryApplyInterplanetaryNavigationAssist())
             {
+                bool orbitalPlanetEntryHandled =
+                    StageOneVoyage.Location == StageOneVoyageLocation.InboundFlight &&
+                    !StageOneVoyage.IsPlanetarySurfaceApproach &&
+                    TryApplyPlanetaryEntryNavigationAssist();
+                if (orbitalPlanetEntryHandled)
+                {
+                    // The orbital-entry helper owns guidance until the visible
+                    // globe handoff is complete. Flight-state persistence still
+                    // runs below, so manual interruption/restoration stays exact.
+                }
+                else
+                {
                 Vector3 target = StageOneVoyage.Location ==
                         StageOneVoyageLocation.OutboundFlight
                     ? SurfaceLogicalToLocalPosition(
@@ -291,6 +308,7 @@ public partial class SalvageRepairSlice
                     0.0f,
                     distance > 90.0f && !braking,
                     braking));
+                }
             }
         }
         else
@@ -315,6 +333,129 @@ public partial class SalvageRepairSlice
         UpdateVoyageMarkers();
     }
 
+    private bool TryResolvePlanetaryEntryTarget(
+        out Vector3 entryTarget,
+        out Vector3 planetCenter,
+        out float displayRadius)
+    {
+        entryTarget = Vector3.Zero;
+        planetCenter = Vector3.Zero;
+        displayRadius = 0.0f;
+        return _starSystemSimulationNode is not null &&
+            _voyageShip is not null &&
+            _galaxyNavigationRuntime is not null &&
+            _starSystemSimulationNode.TryGetBodyApproachPoint(
+                GalaxyNavigation.CurrentPlanetId,
+                _voyageShip.GlobalPosition,
+                PlanetaryApproachRuntime.OrbitalEntryClearanceMeters,
+                out entryTarget,
+                out planetCenter,
+                out displayRadius);
+    }
+
+    private bool TryApplyPlanetaryEntryNavigationAssist()
+    {
+        if (_voyageShip is null ||
+            !TryResolvePlanetaryEntryTarget(
+                out Vector3 target,
+                out _,
+                out _))
+        {
+            return false;
+        }
+
+        float distance = _voyageShip.GlobalPosition.DistanceTo(target);
+        if (distance > 0.25f)
+        {
+            _voyageShip.LookAt(
+                target,
+                SurfaceLocalDirectionToWorld(Vector3.Up).Normalized());
+        }
+
+        if (PlanetaryApproachRuntime.IsOrbitalEntryCaptureReady(
+                distance,
+                _voyageShip.Speed))
+        {
+            TryCommitPlanetaryEntryHandoff(automatic: true);
+            return true;
+        }
+
+        float speedLimit = (float)PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed;
+        bool overspeed = _voyageShip.Speed > speedLimit * 0.82f;
+        bool closeAndFast =
+            distance <= PlanetaryApproachRuntime.OrbitalEntryCaptureRadiusMeters + 90.0 &&
+            _voyageShip.Speed > speedLimit * 0.38f;
+        bool braking = overspeed || closeAndFast;
+        float forward = braking
+            ? 0.0f
+            : distance > 700.0f
+                ? 0.82f
+                : distance > 220.0f
+                    ? 0.48f
+                    : 0.22f;
+        _voyageShip.SetExternalCommand(new ShipControlCommand(
+            forward,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            0.0f,
+            distance > 1100.0f && !braking,
+            braking));
+        return true;
+    }
+
+    private bool TryCommitPlanetaryEntryHandoff(bool automatic)
+    {
+        if (_voyageShip is null ||
+            StageOneVoyage.Location != StageOneVoyageLocation.InboundFlight ||
+            StageOneVoyage.IsPlanetarySurfaceApproach ||
+            !TryResolvePlanetaryEntryTarget(
+                out Vector3 target,
+                out Vector3 center,
+                out float displayRadius))
+        {
+            return false;
+        }
+
+        double distance = _voyageShip.GlobalPosition.DistanceTo(target);
+        if (!PlanetaryApproachRuntime.IsOrbitalEntryCaptureReady(
+                distance,
+                _voyageShip.Speed))
+        {
+            _status = LF(
+                "ui.voyage.planet_entry_requires",
+                ("distance", PlanetaryApproachRuntime.OrbitalEntryCaptureRadiusMeters.ToString("0", CultureInfo.InvariantCulture)),
+                ("speed", PlanetaryApproachRuntime.MaximumOrbitalEntrySpeed.ToString("0", CultureInfo.InvariantCulture)),
+                ("current_distance", distance.ToString("0.0", CultureInfo.InvariantCulture)),
+                ("current_speed", _voyageShip.Speed.ToString("0.0", CultureInfo.InvariantCulture)));
+            return false;
+        }
+
+        double entrySpeed = _voyageShip.Speed;
+        double centerDistanceBeforeHandoff = _voyageShip.GlobalPosition.DistanceTo(center);
+        double angularRadius = PlanetaryApproachRuntime.AngularRadiusDegrees(
+            displayRadius,
+            Math.Max(displayRadius + 0.1, centerDistanceBeforeHandoff));
+
+        StageOneVoyage.ArriveAtPlanetaryApproach();
+        _voyageNavigationAssist = automatic;
+        _voyageShip.ClearExternalCommand();
+        ApplyStageOneVoyageToScene();
+        _lastDomainEvent = "PlanetaryAtmosphereEntry";
+        QueueCurrentSnapshot(AutosaveTrigger.ShipChanged);
+        GD.Print(
+            "TASK-178.4 planetary atmosphere entry PASS: " +
+            $"planet={GalaxyNavigation.CurrentPlanetId}; " +
+            $"entryDistance={distance.ToString("0.0", CultureInfo.InvariantCulture)}m; " +
+            $"entrySpeed={entrySpeed.ToString("0.0", CultureInfo.InvariantCulture)}m/s; " +
+            $"displayRadius={displayRadius.ToString("0", CultureInfo.InvariantCulture)}m; " +
+            $"angularRadius={angularRadius.ToString("0.0", CultureInfo.InvariantCulture)}deg; " +
+            $"surfaceAltitude={StageOneVoyageRuntime.PlanetApproachPositionY.ToString("0", CultureInfo.InvariantCulture)}m; " +
+            $"mode={(automatic ? "navigation-assist" : "manual")}; surfaceHandoff=1.");
+        return true;
+    }
+
     private void UpdateVoyageMarkers()
     {
         if (_orbitalDockMarker is not null)
@@ -334,10 +475,27 @@ public partial class SalvageRepairSlice
 
         if (_planetApproachMarker is not null)
         {
-            _planetApproachMarker.Visible =
-                _interplanetaryTravelRuntime?.IsCruising != true &&
-                _stageOneVoyageRuntime?.Location ==
-                    StageOneVoyageLocation.InboundFlight;
+            bool inbound = _stageOneVoyageRuntime?.Location ==
+                StageOneVoyageLocation.InboundFlight;
+            bool show = _interplanetaryTravelRuntime?.IsCruising != true && inbound;
+            if (show && !StageOneVoyage.IsPlanetarySurfaceApproach &&
+                TryResolvePlanetaryEntryTarget(
+                    out Vector3 entryTarget,
+                    out _,
+                    out _))
+            {
+                _planetApproachMarker.GlobalPosition = entryTarget;
+                _planetApproachMarker.Scale = Vector3.One * 6.0f;
+            }
+            else if (show)
+            {
+                _planetApproachMarker.GlobalPosition = SurfaceLogicalToLocalPosition(
+                    StageOneVoyageRuntime.SurfacePositionX,
+                    StageOneVoyageRuntime.LaunchPositionY,
+                    StageOneVoyageRuntime.SurfacePositionZ);
+                _planetApproachMarker.Scale = Vector3.One;
+            }
+            _planetApproachMarker.Visible = show;
         }
     }
 
@@ -366,7 +524,7 @@ public partial class SalvageRepairSlice
                     "TASK-178.2 navigation assist PASS: " +
                     $"enabled={(_voyageNavigationAssist ? 1 : 0)}; " +
                     $"leg={StageOneVoyage.Location}; " +
-                    $"target={(StageOneVoyage.Location == StageOneVoyageLocation.OutboundFlight ? "station-dock" : "planet-pad")}; " +
+                    $"target={(StageOneVoyage.Location == StageOneVoyageLocation.OutboundFlight ? "station-dock" : StageOneVoyage.IsPlanetarySurfaceApproach ? "planet-pad" : "planet-entry")}; " +
                     "autoCapture=1; manualEnter=1.");
             }
             else
@@ -433,7 +591,14 @@ public partial class SalvageRepairSlice
                     OpenOrbitalStationServices();
                     break;
                 case StageOneVoyageLocation.InboundFlight:
-                    TryLandStageOneVoyage();
+                    if (!StageOneVoyage.IsPlanetarySurfaceApproach)
+                    {
+                        TryCommitPlanetaryEntryHandoff(automatic: false);
+                    }
+                    else
+                    {
+                        TryLandStageOneVoyage();
+                    }
                     break;
                 case StageOneVoyageLocation.PlanetSurface:
                     DisembarkStageOneVoyage();
@@ -603,7 +768,7 @@ public partial class SalvageRepairSlice
         GD.Print(
             "TASK-112 player undock PASS: " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
-            $"target=planetary_landing_pad; navigationAssist=0; " +
+            $"target=planet-entry; navigationAssist=0; " +
             $"manualControl={(_voyageShip?.ManualInputOwnershipActive == true ? 1 : 0)}; " +
             $"externalControl={(_voyageShip?.ExternalControlActive == true ? 1 : 0)}.");
     }
@@ -692,16 +857,27 @@ public partial class SalvageRepairSlice
         string approach = L("ui.common.not_available");
         if (_voyageShip is not null && StageOneVoyage.Piloted)
         {
-            Vector3 target = StageOneVoyage.Location ==
-                    StageOneVoyageLocation.OutboundFlight
-                ? SurfaceLogicalToLocalPosition(
+            Vector3 target;
+            if (StageOneVoyage.Location == StageOneVoyageLocation.OutboundFlight)
+            {
+                target = SurfaceLogicalToLocalPosition(
                     StageOneVoyageRuntime.StationDockPositionX,
                     StageOneVoyageRuntime.StationDockPositionY,
-                    StageOneVoyageRuntime.StationDockPositionZ)
-                : SurfaceLogicalToLocalPosition(
+                    StageOneVoyageRuntime.StationDockPositionZ);
+            }
+            else if (StageOneVoyage.Location == StageOneVoyageLocation.InboundFlight &&
+                !StageOneVoyage.IsPlanetarySurfaceApproach &&
+                TryResolvePlanetaryEntryTarget(out Vector3 entryTarget, out _, out _))
+            {
+                target = entryTarget;
+            }
+            else
+            {
+                target = SurfaceLogicalToLocalPosition(
                     StageOneVoyageRuntime.SurfacePositionX,
                     StageOneVoyageRuntime.LaunchPositionY,
                     StageOneVoyageRuntime.SurfacePositionZ);
+            }
             approach = _voyageShip.GlobalPosition.DistanceTo(target)
                 .ToString("0.0", CultureInfo.InvariantCulture) + "m";
         }

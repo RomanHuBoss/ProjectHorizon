@@ -71,7 +71,7 @@ public sealed class StageOneVoyageRuntime
         IsFiniteNonNegative(speedMetersPerSecond) &&
         speedMetersPerSecond <= MaximumLandingSpeed;
 
-    public const double PlanetApproachPositionY = 42.0;
+    public const double PlanetApproachPositionY = PlanetaryApproachRuntime.SurfaceApproachAltitudeMeters;
     public const double PlanetApproachPositionZ = -38.0;
 
     public StageOneVoyageRuntime(StageOneVoyageSaveData? saveData = null)
@@ -175,6 +175,10 @@ public sealed class StageOneVoyageRuntime
     public string LastCheckpoint { get; private set; }
 
     public bool LoopCompleted => CompletedLoops > 0;
+
+    public bool IsPlanetarySurfaceApproach =>
+        Location == StageOneVoyageLocation.InboundFlight &&
+        string.Equals(LastCheckpoint, "planet.approach", StringComparison.Ordinal);
 
     public string BuildSummary()
     {

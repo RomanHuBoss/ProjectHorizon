@@ -49,7 +49,7 @@ public partial class DetailedPlanetGlobeNode : Node3D
 
         ClearVisuals();
         PlanetId = definition.BodyId;
-        float radius = (float)Math.Max(2.8, definition.VisualRadius * 1.45);
+        float radius = (float)Math.Max(420.0, definition.VisualRadius * 1.12);
         float relief = Math.Clamp(radius * ResolveReliefFraction(definition.Archetype),
             0.10f, 0.55f);
         int seed = unchecked((int)(definition.Seed ^ (definition.Seed >> 32)));
@@ -112,8 +112,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
                 "AtmosphereShell",
                 radius * 1.075f,
                 ResolveAtmosphereColor(definition.Archetype),
-                unshaded: true,
-                emissionEnergy: 0.38f);
+                unshaded: false,
+                emissionEnergy: 0.055f);
             AddChild(_atmosphere);
         }
 
@@ -123,8 +123,8 @@ public partial class DetailedPlanetGlobeNode : Node3D
                 "CloudShell",
                 radius * 1.035f,
                 ResolveCloudColor(definition.Archetype),
-                unshaded: true,
-                emissionEnergy: 0.10f);
+                unshaded: false,
+                emissionEnergy: 0.025f);
             AddChild(_clouds);
         }
 

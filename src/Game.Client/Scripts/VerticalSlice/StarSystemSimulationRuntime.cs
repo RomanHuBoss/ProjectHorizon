@@ -77,23 +77,29 @@ public sealed class StarSystemSimulationRuntime
     // at real time; authored orbital periods provide the deliberate gameplay
     // compression without turning the system into a centrifuge.
     public const double OrbitTimeScale = 1.0;
-    public const double ProxyDistance = 4200.0;
-    public const double MarkerDistance = 8000.0;
-    public const double MinimumPlanetOrbitRadius = 1800.0;
-    public const double PlanetOrbitSpacing = 1200.0;
-    public const double MinimumMoonOrbitRadius = 520.0;
-    public const double MoonOrbitSpacing = 320.0;
+    public const double ProxyDistance = 26000.0;
+    public const double MarkerDistance = 52000.0;
+    // TASK-178.4: the old 1.8 km planetary system made bodies read like
+    // props next to the ship. Keep the simulation compressed enough for an
+    // arcade flight loop, but reserve kilometres of clear space between
+    // planet surfaces and their moons/neighboring planets.
+    public const double MinimumPlanetOrbitRadius = 6200.0;
+    public const double PlanetOrbitSpacing = 5200.0;
+    public const double MinimumMoonOrbitRadius = 2700.0;
+    public const double MoonOrbitSpacing = 1400.0;
     public const double MinimumMoonOrbitPeriodSeconds = 1800.0;
     public const int MaximumShipContacts = 16;
 
     private readonly GalaxySystemDefinition _system;
+    private readonly Func<GalaxyPlanetDefinition, double>? _planetVisualRadiusResolver;
     private readonly Dictionary<string, StarSystemBodyDefinition> _definitions;
     private readonly StarSystemBodyDefinition[] _orderedDefinitions;
     private double _simulationSeconds;
 
     public StarSystemSimulationRuntime(
         GalaxySystemDefinition system,
-        double initialSimulationSeconds = 0.0)
+        double initialSimulationSeconds = 0.0,
+        Func<GalaxyPlanetDefinition, double>? planetVisualRadiusResolver = null)
     {
         ArgumentNullException.ThrowIfNull(system);
         if (!double.IsFinite(initialSimulationSeconds) ||
@@ -104,8 +110,9 @@ public sealed class StarSystemSimulationRuntime
         }
 
         _system = system;
+        _planetVisualRadiusResolver = planetVisualRadiusResolver;
         _simulationSeconds = initialSimulationSeconds;
-        _orderedDefinitions = BuildDefinitions(system).ToArray();
+        _orderedDefinitions = BuildDefinitions(system, _planetVisualRadiusResolver).ToArray();
         _definitions = _orderedDefinitions.ToDictionary(
             definition => definition.BodyId,
             StringComparer.Ordinal);
@@ -283,7 +290,8 @@ public sealed class StarSystemSimulationRuntime
     }
 
     private static IEnumerable<StarSystemBodyDefinition> BuildDefinitions(
-        GalaxySystemDefinition system)
+        GalaxySystemDefinition system,
+        Func<GalaxyPlanetDefinition, double>? planetVisualRadiusResolver)
     {
         string starId = $"{system.SystemId}.star";
         long starSeed = StableSeed(system.SystemId, 0x15A1UL);
@@ -296,7 +304,7 @@ public sealed class StarSystemSimulationRuntime
             0.0,
             0.0,
             0.0,
-            420.0,
+            2800.0,
             starSeed);
 
         foreach (GalaxyPlanetDefinition planet in system.Planets
@@ -310,12 +318,15 @@ public sealed class StarSystemSimulationRuntime
                 ((hash >> 8) % 1800UL);
             double phase = ToUnit(hash >> 16) * Math.PI * 2.0;
             double inclination = (ToUnit(hash >> 24) - 0.5) * 0.10;
-            double visualRadius = string.Equals(
+            double fallbackVisualRadius = string.Equals(
                     planet.Archetype,
                     "gas_giant",
                     StringComparison.Ordinal)
-                ? 300.0
-                : 150.0 + ((hash >> 32) % 61UL);
+                ? 1650.0
+                : 720.0 + ((hash >> 32) % 281UL);
+            double resolvedVisualRadius = planetVisualRadiusResolver?.Invoke(planet)
+                ?? fallbackVisualRadius;
+            double visualRadius = Math.Clamp(resolvedVisualRadius, 520.0, 1900.0);
             yield return new StarSystemBodyDefinition(
                 planet.PlanetId,
                 starId,
@@ -344,7 +355,7 @@ public sealed class StarSystemSimulationRuntime
                         ((moonHash >> 9) % 420UL),
                     ToUnit(moonHash >> 17) * Math.PI * 2.0,
                     (ToUnit(moonHash >> 25) - 0.5) * 0.20,
-                    28.0 + ((moonHash >> 31) % 15UL),
+                    150.0 + ((moonHash >> 31) % 91UL),
                     (long)(moonHash & 0x7FFF_FFFF_FFFF_FFFFUL));
             }
         }

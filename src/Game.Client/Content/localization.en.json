@@ -1351,6 +1351,7 @@
     "ui.voyage.location.outbound_flight": "outbound flight",
     "ui.voyage.location.planet_surface": "planet surface",
     "ui.voyage.location.unknown": "unknown",
+    "ui.voyage.planet_entry_requires": "Planetary entry requires distance <= {distance} m and speed <= {speed} m/s; current distance={current_distance} m, speed={current_speed} m/s.",
     "ui.voyage.nav_assist": "Voyage navigation assist {state}.",
     "ui.voyage.nav_only_flight": "Navigation assist is available only in flight.",
     "ui.voyage.not_piloted": "Starter ship is not piloted.",
