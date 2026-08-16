@@ -16,7 +16,7 @@ def need(cond: bool, msg: str):
         raise SystemExit(1)
 
 version = VERSION.read_text(encoding='utf-8').strip()
-need(version == '0.1.0-alpha.184.1', 'VERSION must be 0.1.0-alpha.184.1')
+need(version in {'0.1.0-alpha.184.1', '0.1.0-alpha.186'}, 'VERSION must preserve alpha.184.1 hotfix or later accepted revision')
 live = LIVE.read_text(encoding='utf-8')
 need('ProductionGlbResources.Count(path => ResourceLoader.Exists(path))' in live,
      'ResourceLoader.Exists must be adapted with an explicit string lambda')
@@ -27,4 +27,4 @@ for path, token in [
     (README, 'TASK-184.1'),
     (STATUS, 'TASK-184.1')]:
     need(token in path.read_text(encoding='utf-8'), f'{path.name} missing {token}')
-print('TASK-184.1 PRODUCTION ASSET BUILD HOTFIX CONTRACT PASS: cs1503=guarded; resourceLoaderExists=lambda; version=0.1.0-alpha.184.1.')
+print('TASK-184.1 PRODUCTION ASSET BUILD HOTFIX CONTRACT PASS: cs1503=guarded; resourceLoaderExists=lambda; version>=0.1.0-alpha.184.1.')

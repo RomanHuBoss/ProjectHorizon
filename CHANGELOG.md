@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.0-alpha.186] - 2026-08-16
+
+### Changed — TASK-186 hard-surface visual redesign
+
+- Rebuilt the player explorer from primitive wedges/sphere/cylinders into a lofted faceted fuselage with cranked swept wings, polygonal twin nacelles, integrated canopy, dorsal stabilizers, armor and maneuvering-pod details.
+- Rebuilt the NPC interceptor as a distinct arrowhead/blade-wing craft with its own pressure hull, engine nacelles, ventral spine and gun fairings.
+- Replaced the station's torus-plus-boxes presentation with a segmented habitation/industry ring, structural trusses, central service spindle, utility pylons, radiator arrays, service pods, docking collar/tunnel and approach lights.
+- Replaced the saturated toy-blue material language with restrained graphite/steel, limited safety-orange accents, smoked canopy and bounded emissive engine/approach lighting.
+- Preserved TASK-184 GLB, LOD0/1/2, `MNT_*`, separate collision, docking and fallback contracts; no save/input/flight-physics schema changes.
+- Added TASK-186 live/F5 acceptance, xUnit coverage, hard-surface GLB static validation and section-37/CI/release gates. Aesthetic acceptance remains manual and requires owner screenshots.
+
 ## [0.1.0-alpha.184.1] - 2026-08-16
 
 ### Fixed — TASK-184.1 production asset build hotfix

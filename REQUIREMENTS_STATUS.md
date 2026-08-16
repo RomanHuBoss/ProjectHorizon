@@ -2,18 +2,44 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task184.1-production-asset-build-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task186-hard-surface-visual-redesign.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Мега-итерация 2026-08-16 — TASK-186 Hard-Surface Visual Redesign
+
+**Исходный снимок:** `ProjectHorizon-main-task184.1-production-asset-build-hotfix.zip` (`0.1.0-alpha.184.1`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task186-hard-surface-visual-redesign.zip`.  
+**Версия:** `0.1.0-alpha.186`.  
+**Статус:** `IMPLEMENTED / OWNER BUILD+RUNTIME BASELINE PASSED / MANUAL VISUAL+F5 PENDING`.
+
+### Основание и owner evidence
+
+Owner runtime для alpha.184.1 подтвердил, что предыдущий compile blocker устранён: проект стартует в Godot 4.7.1 Mono, `TASK-184 production asset pipeline READY` печатается, полёт до станции проходит, `TASK-180.1 orbital station collision BLOCKED` срабатывает, navigation-assist выполняет `player orbital docking PASS`, StationInterior и station services открываются, graceful-exit autosave PASS. В приложленном Output нет `ERROR`, `WARNING` или `Exception`. Следовательно, GLB/LOD/import инфраструктура пригодна как baseline и не нуждается в очередном техническом переписывании.
+
+Owner отдельно отклонил художественный результат как «уродливые модели». Анализ генератора подтвердил причину: TASK-184 строил корабль как композицию `wedge + icosphere + cylinders`, а станцию как `torus + boxes`. TASK-186 поэтому является художественно-геометрической мега-итерацией поверх уже работающего pipeline.
+
+### Реализация TASK-186
+
+- `SHP_Explorer_01`: цельный lofted/faceted pressure hull, cranked swept wings, polygonal twin nacelles, faceted canopy, dorsal fins, armor/leading-edge accents и maneuvering pods; sphere/cylinder больше не задают основной силуэт.
+- `SHP_Interceptor_01`: отдельный arrowhead silhouette с blade wings, twin nacelles, ventral spine и gun fairings, чтобы NPC визуально не был уменьшенной копией player ship.
+- `STN_Orbital_01`: torus-based presentation заменён segmented industrial ring из отдельных модулей, truss spokes, central spindle/command hub, utility pylons, radiator arrays, service pods, docking collar/tunnel и approach lights.
+- Новый material language: graphite/steel + ограниченный safety-orange + smoked canopy + cyan emissive; <=5 material slots/asset сохраняются.
+- TASK-184 contracts сохранены: 3 family × 3 GLB, LOD0/1/2, `MNT_*`, отдельные gameplay collision, station docking envelope, NPC fallback, flight physics и save schema не изменены.
+- Добавлены `HardSurfaceVisualRedesignAcceptanceRunner`, live/F5 TASK-186, xUnit, `tools/validate-task186-hard-surface-visual-redesign.py`, section-37/CI/release gate и `docs/HARD_SURFACE_VISUAL_DIRECTION.md`.
+
+### Граница приёмки
+
+Static/F5 проверяют, что redesigned hard-surface assets действительно загружены и содержат signature nodes/mesh-part complexity, при этом LOD/collision contracts сохранены. Красота не может быть доказана количеством треугольников или validator-ом: для завершения TASK-186 обязательна **manual visual acceptance** по скриншотам player exterior, NPC и station approach. До неё задача не помечается VERIFIED.
 
 ## 0. HOTFIX 2026-08-16 — TASK-184.1 Production Asset Build Hotfix
 
 **Исходный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip` (`0.1.0-alpha.184`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task184.1-production-asset-build-hotfix.zip`.  
 **Версия:** `0.1.0-alpha.184.1`.  
-**Статус:** `IMPLEMENTED / PENDING OWNER CLEAN BUILD + GODOT IMPORT/RUNTIME`.
+**Статус:** `OWNER CLEAN BUILD + GODOT IMPORT/RUNTIME PASSED / F5 TASK-184 PENDING`.
 
 Owner build-log подтвердил единственный compile blocker: `SalvageRepairSliceProductionAssetPipeline.cs(40,54) CS1503`, где overloaded `ResourceLoader.Exists` передавался напрямую как method group в `Enumerable.Count(Func<string,bool>)`. `Game.Domain` и restore прошли, итог `warnings=0 / errors=1`; до Godot import/F5 TASK-184 выполнение не дошло. Исправление использует явный адаптер `ProductionGlbResources.Count(path => ResourceLoader.Exists(path))`. Добавлен dedicated static gate, запрещающий возврат к compile-breaking форме; GLB/LOD/collision/docking contracts TASK-184 не изменены.
 
@@ -23,7 +49,7 @@ Owner build-log подтвердил единственный compile blocker: `
 **Исходный снимок:** `ProjectHorizon-main-task182-flight-runtime-closure.zip` (`0.1.0-alpha.182`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task184-production-asset-pipeline.zip`.  
 **Версия:** `0.1.0-alpha.184`.  
-**Статус:** `IMPLEMENTED / PENDING EXTERNAL CLEAN BUILD+GLB IMPORT+VISUAL/LOD SMOKE+F5`.
+**Статус:** `OWNER CLEAN BUILD+GLB IMPORT+RUNTIME SMOKE PASSED / VISUAL ACCEPTANCE REJECTED / F5 PENDING`.
 
 ### Основание и owner evidence alpha.182
 

@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1"}, "VERSION must be alpha.182 or later accepted revision", f)
+need(version in {"0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186"}, "VERSION must be alpha.182 or later accepted revision", f)
 
 # The TASK-180.3 virtual stick remains the input representation, but live pilot
 # input must return to neutral after a short idle hold rather than preserving an

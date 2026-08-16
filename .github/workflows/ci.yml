@@ -98,6 +98,7 @@ jobs:
           python3 tools/validate-task182-flight-runtime-closure.py
           python3 tools/validate-task184-production-asset-pipeline.py
           python3 tools/validate-task1841-production-asset-build-hotfix.py
+          python3 tools/validate-task186-hard-surface-visual-redesign.py
 
       - name: Unit tests and coverage
         run: >-

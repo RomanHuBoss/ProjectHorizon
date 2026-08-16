@@ -11,6 +11,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-186 — Hard-Surface Visual Redesign
+
+Alpha.186 keeps the working TASK-184 GLB/LOD/collision pipeline but replaces its primitive-looking geometry. Player explorer and NPC interceptor now use lofted/faceted pressure hulls, swept hard-surface wings, polygonal nacelles and integrated canopy/armor details; the orbital station is rebuilt as a segmented industrial ring with structural trusses, utility pylons, radiator arrays, a dedicated docking collar/tunnel and approach lights. The old sphere/torus-dominant construction is explicitly prohibited by `tools/validate-task186-hard-surface-visual-redesign.py`.
+
+TASK-186 adds runtime signature/mesh-part acceptance and an F5 gate, but visual quality remains a manual acceptance item: the validator can prove that the new authored shape language loaded and that collision/LOD stayed intact, not that the result is aesthetically successful. See `docs/HARD_SURFACE_VISUAL_DIRECTION.md`.
+
 ## TASK-184.1 — Production Asset Build Hotfix
 
 Alpha.184.1 fixes the external clean-build blocker found immediately after TASK-184 delivery. Godot 4.7.1 exposes `ResourceLoader.Exists` in a form that cannot be consumed as the LINQ `Count(Func<string,bool>)` predicate by method-group conversion. The live TASK-184 acceptance now uses an explicit `path => ResourceLoader.Exists(path)` adapter. No GLB, LOD, collision, docking or presentation contract is changed. `tools/validate-task1841-production-asset-build-hotfix.py` prevents the compile-breaking form from returning.
