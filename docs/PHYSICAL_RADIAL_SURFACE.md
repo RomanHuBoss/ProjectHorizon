@@ -26,6 +26,7 @@ Logical points are mapped by `GameplayTransform`; world points are restored with
 - movement is projected onto the tangent plane;
 - jump, jetpack and swim vertical motion use radial Up;
 - body orientation preserves heading while aligning the capsule/body Y axis to radial Up;
+- TASK-172.1 rebuilds an upright basis every physics tick and performs mouse yaw around radial Up, preventing A/D strafing from accumulating roll;
 - velocity and body basis are remapped during physical-frame transitions.
 
 ## Terrain and collision
@@ -42,7 +43,22 @@ This is **not** a globally curved collision mesh yet. Each resident patch is sti
 
 ## Navigation and AI
 
-TASK-124 navigation regions are children of the rotating surface root and therefore inherit the physical tangent basis. The surface runtime additionally:
+### TASK-172.1 navigation-map correction
+
+Godot NavigationServer3D maps have their own explicit UP direction. Rotating NavigationRegion3D nodes under the default world map is therefore invalid once the radial surface frame reaches an orientation close to or beyond 90 degrees from global +Y. TASK-172.1 replaces that design with a dedicated bounded navigation map whose UP is recreated from the active planet radial frame before the Gameplay hierarchy rotates.
+
+The handoff order is now:
+
+1. detach NavigationAgent3D instances from the outgoing map;
+2. remove old NavigationRegion3D nodes from the tree;
+3. recreate the dedicated NavigationServer3D map with the next radial UP;
+4. bind avoidance obstacles to that dedicated map;
+5. rotate Gameplay / terrain collision into the next tangent frame;
+6. rebuild bounded regions and rebind NavigationAgent3D instances.
+
+This preserves the existing 25-region local budget while respecting Godot's map-UP contract. Ground-NPC avoidance uses 3D/radius avoidance in the radial runtime because Godot's 2D avoidance operates in the global X/Z plane; the returned safe velocity is projected back onto the active surface tangent plane before `MoveAndSlide()`.
+
+TASK-124 navigation regions inherit the physical tangent basis. The surface runtime additionally:
 
 - forces NavigationServer re-synchronization after frame handoff;
 - performs recovery-waypoint lateral offsets in surface-local coordinates;

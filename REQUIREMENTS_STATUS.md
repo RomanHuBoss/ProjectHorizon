@@ -2,9 +2,49 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task172-physical-radial-surface.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Текущая emergency-итерация 2026-08-16 — TASK-172.1 Radial Physics / Navigation Hotfix
+
+**Исходный снимок:** `ProjectHorizon-main-task172-physical-radial-surface.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task172.1-radial-physics-hotfix.zip`.  
+**Версия:** `0.1.0-alpha.172.1`.  
+**Статус:** TASK-172 `IMPLEMENTED / RUNTIME REGRESSION FIXED, PENDING EXTERNAL RECHECK`; TASK-172.1 `IMPLEMENTED`; TASK-174 заблокирован до повторной приёмки 172.1.
+
+### Внешнее runtime evidence, вызвавшее hotfix
+
+Пользовательский Godot 4.7.1 прогон alpha.172 выявил три реальные регрессии:
+
+- NavigationServer3D: `Attempted to update a navigation region transform rotated 90 degrees or more away from the current navigation map UP orientation`;
+- TASK-162.2 false-negative на численной границе: `clearance=0.80m`, при этом acceptance завершался `FAIL`;
+- TASK-172: `roundTrip=0`, хотя максимальная ошибка составляла только `0.007814m`, а остальные ключевые инварианты (`frames`, `velocity`, `faces=6/6`, `seams`, `player`, `gameplay`, `streamer`, `nav`, `bounded25x9`) были зелёными;
+- ручной дефект: при A/D arbitrary-up PlayerController накапливал roll и визуально заваливал игрока набок.
+
+### Исправления TASK-172.1
+
+- mouse yaw больше не использует глобальный `RotateY`: поворот выполняется вокруг активного radial Up;
+- каждый physics tick body basis реконструируется как roll-free `right / radial-up / back`, сохраняя tangent heading и устраняя накопление крена при A/D;
+- TASK-124 больше не вращает NavigationRegion3D под default-world navigation map: создаётся отдельный bounded NavigationServer3D map с `MapSetUp(currentRadialUp)`;
+- перед сменой physical frame NPC NavigationAgent3D отсоединяются, старые navigation regions удаляются из tree, avoidance obstacles отвязываются; затем создаётся map с новым UP, Gameplay вращается, regions/obstacles/agents привязываются к новому map;
+- avoidance obstacles также явно используют dedicated radial navigation map, а не default map; ground-NPC/obstacle avoidance переведён в 3D/radius режим, потому что Godot 2D avoidance вычисляется в глобальной X/Z-плоскости; safe velocity после 3D avoidance проецируется обратно в tangent plane;
+- TASK-172 physical round-trip budget установлен `0.020m`: physical world использует float `Vector3/Transform3D`, поэтому старый 1 mm invariant был некорректен при planet-scale logical addresses; наблюдавшиеся `7.814mm` остаются внутри нового сантиметрового бюджета;
+- TASK-162.2 сохраняет целевой clearance `0.80m`, но получает только численную tolerance `0.01m`, чтобы округлённые `0.80m` не давали false FAIL;
+- TASK-172 F5 усилен отдельным `upright=1` invariant; static/CI/release gate TASK-172.1 добавлен.
+
+### Acceptance TASK-172.1
+
+1. Clean Windows/Godot build: `0 errors / 0 warnings`.
+2. New Game: в Output **нет** `navigation region transform rotated 90 degrees or more away from ... UP orientation`.
+3. Ходьба вперёд/назад и 10–15 секунд непрерывного A/D: игрок и камера не получают roll; body Y остаётся совмещён с radial Up.
+4. F5: TASK-162.2 снова `PASS`; допускается `clearance` около 0.80 m при `clearanceMin=0.80m; clearanceTol=0.01m`.
+5. F5: TASK-172 `PASS` с `roundTrip=1`, `upright=1`, `nav=1`, `faces=6/6`, `pointBudget=0.020m`; `maxPointErr` должен быть <= 0.020m.
+6. Seam smoke: `surface_warp 0 44.9` → `surface_warp 0 45.1`; должны появиться TASK-170 logical transition и TASK-172 physical handoff, без NavigationServer UP error.
+7. После seam streamer снова `25/25`, collisions `9/9`; TASK-124 и TASK-126 остаются PASS.
+8. До выполнения этих критериев TASK-172 не переводить в VERIFIED и TASK-174 не начинать.
 
 ---
 
@@ -6083,15 +6123,27 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---:|---|
 | `PHYSRAD-1720` | Rotating Gameplay East/Up/North tangent transform | `IMPLEMENTED` | `PlanetSurfacePhysicalFrameRuntime`; live `GameplayTransform` |
-| `PHYSRAD-1721` | Arbitrary-up player gravity/movement/floor/jump/jetpack/swim | `IMPLEMENTED` | `PlayerController.SetPlanetSurfaceFrame`; radial `UpDirection` |
+| `PHYSRAD-1721` | Arbitrary-up player gravity/movement/floor/jump/jetpack/swim | `IMPLEMENTED / HOTFIXED` | alpha.172 external A/D roll regression; alpha.172.1 no-roll radial-yaw + upright basis |
 | `PHYSRAD-1722` | Terrain/fallback collision patch rotates with frame | `IMPLEMENTED` | GroundBody + TerrainChunkManager basis; 25/9 budget unchanged |
 | `PHYSRAD-1723` | Terrain world→logical addressing is rotation-aware | `IMPLEMENTED` | `TerrainChunkManager.ToLocal(worldPosition)` before logical origin |
-| `PHYSRAD-1724` | TASK-124 navigation frame handoff/recovery/probes | `IMPLEMENTED` | parent-frame sync + local recovery/probes |
+| `PHYSRAD-1724` | TASK-124 navigation frame handoff/recovery/probes | `IMPLEMENTED / HOTFIXED` | dedicated radial-UP NavigationServer map; regions/obstacles/agents detach/rebind before frame rotation |
 | `PHYSRAD-1725` | NPC/fauna/ship absolute caches and velocities remap | `IMPLEMENTED` | `ApplyWorldFrameTransform` integrations |
 | `PHYSRAD-1726` | Weather/flying altitude/surface ship steering follow radial Up | `IMPLEMENTED` | tangent-vector conversions and local altitude envelope |
 | `PHYSRAD-1727` | F5/static/xUnit regression contract | `IMPLEMENTED` | TASK-172 acceptance + validator + 3 unit groups |
 | `PHYSRAD-ACC-100` | Clean build/section-37/xUnit | `IN_PROGRESS` | external Windows/.NET required |
-| `PHYSRAD-ACC-101` | F5 TASK-172 PASS + seam physical smoke | `IN_PROGRESS` | external Godot evidence required |
+| `PHYSRAD-ACC-101` | F5 TASK-172 PASS + seam physical smoke | `IN_PROGRESS / RECHECK` | alpha.172 external FAIL: nav-map UP + roundTrip 7.814mm + A/D roll; alpha.172.1 recheck required |
+
+### 8.36. TASK-172.1 Emergency radial hotfix
+
+| ID | Требование | Статус | Evidence / критерий |
+|---|---|---|---|
+| `PHYSRAD-HF-1721` | Player never accumulates roll while strafing under arbitrary radial Up | `IMPLEMENTED` | radial-axis yaw + per-physics upright basis; F5 `upright=1` |
+| `PHYSRAD-HF-1722` | Navigation map UP follows current radial frame without >=90° region transform rejection | `IMPLEMENTED` | dedicated map `MapCreate/MapSetUp`; regions removed before parent rotation |
+| `PHYSRAD-HF-1723` | NavigationAgent3D and NavigationObstacle3D use the same dedicated radial map / radial-safe avoidance | `IMPLEMENTED` | explicit detach/rebind; 3D radius avoidance + tangent projection instead of global-XZ 2D avoidance |
+| `PHYSRAD-HF-1724` | Physical point round-trip tolerance reflects float-world precision | `IMPLEMENTED` | 0.020m budget; alpha.172 observed error 0.007814m |
+| `PHYSRAD-HF-1725` | Surface clearance acceptance has numeric tolerance without weakening 0.80m target | `IMPLEMENTED` | target 0.80m + 0.01m numerical tolerance |
+| `PHYSRAD-HF-ACC-100` | External clean build + New Game free of NavigationServer UP errors | `PENDING` | Godot 4.7.1 runtime evidence required |
+| `PHYSRAD-HF-ACC-101` | A/D no-roll + F5 TASK-162.2/TASK-172 PASS + seam smoke | `PENDING` | external runtime evidence required |
 
 
 ## 9. Очередь ближайших задач
@@ -6100,7 +6152,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-172` | Physical Radial Surface runtime/manual acceptance | clean build; F5 PASS; six-face warp; physical seam handoff; TASK-124/126 no regression |
+| 1 | `TASK-172.1` | Emergency radial physics/navigation reacceptance | clean build; no nav-UP error; A/D no-roll; F5 162.2/172 PASS; seam handoff |
 | 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
@@ -6110,8 +6162,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 ранее PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-172 Physical Radial Surface `IMPLEMENTED`; TASK-170/TASK-168/TASK-166/TASK-164 F5 externally PASS; TASK-162 manual long-traversal tail остаётся открытым.  
-**Формально ближайший шаг:** Windows/Godot clean build + F5 TASK-172; затем six-face/seam `surface_warp` smoke и TASK-163 live >2048m traversal.
+**Текущая разрабатываемая реализация:** TASK-172.1 radial hotfix `IMPLEMENTED`; TASK-172 остаётся `PENDING RECHECK`; TASK-170/TASK-168/TASK-166/TASK-164 F5 externally PASS; TASK-162 manual long-traversal tail остаётся открытым.  
+**Формально ближайший шаг:** Windows/Godot clean build + TASK-172.1 recheck: no navigation-UP error, A/D no-roll, F5 TASK-162.2/TASK-172 PASS и seam `surface_warp`; только затем TASK-163/TASK-174.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

@@ -83,8 +83,19 @@ public partial class NpcNavigationSurfaceNode : Node3D
     private int _obstacleRevision;
     private long _synchronizationBaselineIteration;
     private bool _navigationSynchronizationPending;
+    private Rid _navigationMap;
+    private bool _navigationMapCreated;
+    private Vector3 _navigationMapUp = Vector3.Up;
 
     public bool IsConfigured => _player is not null && _worldRoot is not null;
+
+    public Rid NavigationMap => _navigationMapCreated
+        ? _navigationMap
+        : GetWorld3D().NavigationMap;
+
+    public Vector3 NavigationMapUp => _navigationMapCreated
+        ? NavigationServer3D.MapGetUp(_navigationMap).Normalized()
+        : Vector3.Up;
 
     public bool ReadyForQueries => IsConfigured &&
         _regions.Count > 0 &&
@@ -100,12 +111,25 @@ public partial class NpcNavigationSurfaceNode : Node3D
                 return false;
             }
             Basis basis = parent.GlobalTransform.Basis.Orthonormalized();
-            return Math.Abs(basis.X.Length() - 1.0f) <= 0.001f &&
+            bool orthonormal = Math.Abs(basis.X.Length() - 1.0f) <= 0.001f &&
                 Math.Abs(basis.Y.Length() - 1.0f) <= 0.001f &&
                 Math.Abs(basis.Z.Length() - 1.0f) <= 0.001f &&
                 Math.Abs(basis.X.Dot(basis.Y)) <= 0.001f &&
                 Math.Abs(basis.X.Dot(basis.Z)) <= 0.001f &&
                 Math.Abs(basis.Y.Dot(basis.Z)) <= 0.001f;
+            if (!orthonormal || !_navigationMapCreated)
+            {
+                return false;
+            }
+            Vector3 mapUp = NavigationServer3D.MapGetUp(_navigationMap).Normalized();
+            bool regionBindings = _regions.Values.All(region =>
+                !GodotObject.IsInstanceValid(region) ||
+                region.GetNavigationMap().Equals(_navigationMap));
+            bool obstacleBindings = _avoidanceObstacles.All(obstacle =>
+                !GodotObject.IsInstanceValid(obstacle) ||
+                obstacle.GetNavigationMap().Equals(_navigationMap));
+            return mapUp.Dot(basis.Y.Normalized()) >= 0.9999f &&
+                regionBindings && obstacleBindings;
         }
     }
 
@@ -140,11 +164,10 @@ public partial class NpcNavigationSurfaceNode : Node3D
         _terrainProfile = terrainProfile;
         Name = "NpcNavigation";
         AddToGroup("npc_navigation_surface");
-        Rid navigationMap = GetWorld3D().NavigationMap;
-        NavigationServer3D.MapSetCellSize(navigationMap, CellSizeMeters);
-        NavigationServer3D.MapSetCellHeight(navigationMap, 0.25f);
-        NavigationServer3D.MapSetUseEdgeConnections(navigationMap, true);
-        NavigationServer3D.MapSetEdgeConnectionMargin(navigationMap, 0.2f);
+        Vector3 initialUp = GetParent() is Node3D surfaceRoot
+            ? surfaceRoot.GlobalTransform.Basis.Y.Normalized()
+            : Vector3.Up;
+        EnsureDedicatedNavigationMap(initialUp, recreate: false);
         ResolveGroundBounds();
         CaptureStaticObstacles();
         RebuildAvoidanceObstacles();
@@ -170,6 +193,21 @@ public partial class NpcNavigationSurfaceNode : Node3D
         }
     }
 
+    public void PrepareSurfaceFrameChange(Vector3 nextWorldUp)
+    {
+        Vector3 up = nextWorldUp.LengthSquared() <= 0.000001f
+            ? Vector3.Up
+            : nextWorldUp.Normalized();
+
+        // TASK-172.1: Godot navigation maps have an explicit UP orientation.
+        // A NavigationRegion3D may not be rotated >= 90 degrees away from it.
+        // Remove the old regions before the Gameplay parent rotates, then use a
+        // fresh dedicated map whose UP already matches the next radial frame.
+        DestroyNavigationRegions();
+        EnsureDedicatedNavigationMap(up, recreate: true);
+        _hasCenterTile = false;
+    }
+
     public void NotifySurfaceFrameChanged()
     {
         if (!IsConfigured)
@@ -177,10 +215,15 @@ public partial class NpcNavigationSurfaceNode : Node3D
             return;
         }
 
-        // Navigation regions are children of the rotating Gameplay surface root,
-        // so Godot propagates their transforms automatically. Force the server
-        // synchronization gate and recenter the bounded tile window from the
-        // player's new physical frame before accepting path queries again.
+        Vector3 expectedUp = GetParent() is Node3D surfaceRoot
+            ? surfaceRoot.GlobalTransform.Basis.Y.Normalized()
+            : Vector3.Up;
+        if (!_navigationMapCreated ||
+            _navigationMapUp.Dot(expectedUp) < 0.9999f)
+        {
+            DestroyNavigationRegions();
+            EnsureDedicatedNavigationMap(expectedUp, recreate: true);
+        }
         MarkNavigationSynchronizationPending(GetNavigationMapIteration());
         _hasCenterTile = false;
         RefreshStreaming(force: true);
@@ -248,7 +291,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             return point;
         }
         return NavigationServer3D.MapGetClosestPoint(
-            GetWorld3D().NavigationMap,
+            NavigationMap,
             point);
     }
 
@@ -259,13 +302,13 @@ public partial class NpcNavigationSurfaceNode : Node3D
             return Array.Empty<Vector3>();
         }
         Vector3 start = NavigationServer3D.MapGetClosestPoint(
-            GetWorld3D().NavigationMap,
+            NavigationMap,
             from);
         Vector3 target = NavigationServer3D.MapGetClosestPoint(
-            GetWorld3D().NavigationMap,
+            NavigationMap,
             to);
         return NavigationServer3D.MapGetPath(
-            GetWorld3D().NavigationMap,
+            NavigationMap,
             start,
             target,
             true,
@@ -475,6 +518,99 @@ public partial class NpcNavigationSurfaceNode : Node3D
         }
     }
 
+    private void EnsureDedicatedNavigationMap(Vector3 worldUp, bool recreate)
+    {
+        Vector3 up = worldUp.LengthSquared() <= 0.000001f
+            ? Vector3.Up
+            : worldUp.Normalized();
+        if (_navigationMapCreated && !recreate &&
+            _navigationMapUp.Dot(up) >= 0.9999f)
+        {
+            return;
+        }
+
+        if (_navigationMapCreated)
+        {
+            // TASK-172.1: obstacle nodes also carry their own navigation-map
+            // binding. Detach them before freeing/replacing the dedicated map;
+            // otherwise they may keep an obsolete default-UP map while the
+            // Gameplay parent rotates into a radial frame.
+            foreach (NavigationObstacle3D obstacle in _avoidanceObstacles)
+            {
+                if (GodotObject.IsInstanceValid(obstacle))
+                {
+                    obstacle.SetNavigationMap(new Rid());
+                }
+            }
+            NavigationServer3D.MapSetActive(_navigationMap, false);
+            NavigationServer3D.FreeRid(_navigationMap);
+            _navigationMapCreated = false;
+        }
+
+        _navigationMap = NavigationServer3D.MapCreate();
+        _navigationMapCreated = true;
+        _navigationMapUp = up;
+        NavigationServer3D.MapSetUp(_navigationMap, up);
+        NavigationServer3D.MapSetCellSize(_navigationMap, CellSizeMeters);
+        NavigationServer3D.MapSetCellHeight(_navigationMap, 0.25f);
+        NavigationServer3D.MapSetUseEdgeConnections(_navigationMap, true);
+        NavigationServer3D.MapSetEdgeConnectionMargin(_navigationMap, 0.2f);
+        NavigationServer3D.MapSetActive(_navigationMap, true);
+        foreach (NavigationObstacle3D obstacle in _avoidanceObstacles)
+        {
+            if (GodotObject.IsInstanceValid(obstacle))
+            {
+                obstacle.SetNavigationMap(_navigationMap);
+            }
+        }
+        _navigationSynchronizationPending = true;
+        _synchronizationBaselineIteration = 0;
+        _syncFramesRemaining = Math.Max(_syncFramesRemaining, 2);
+    }
+
+    private void DestroyNavigationRegions()
+    {
+        foreach (NavigationRegion3D region in _regions.Values)
+        {
+            if (!GodotObject.IsInstanceValid(region))
+            {
+                continue;
+            }
+            region.Enabled = false;
+            region.SetNavigationMap(new Rid());
+            if (region.GetParent() == this)
+            {
+                RemoveChild(region);
+            }
+            region.QueueFree();
+            _evictedRegions++;
+        }
+        _regions.Clear();
+        _walkableCells = 0;
+    }
+
+    public override void _ExitTree()
+    {
+        DestroyNavigationRegions();
+        if (_navigationMapCreated)
+        {
+            // TASK-172.1: obstacle nodes also carry their own navigation-map
+            // binding. Detach them before freeing/replacing the dedicated map;
+            // otherwise they may keep an obsolete default-UP map while the
+            // Gameplay parent rotates into a radial frame.
+            foreach (NavigationObstacle3D obstacle in _avoidanceObstacles)
+            {
+                if (GodotObject.IsInstanceValid(obstacle))
+                {
+                    obstacle.SetNavigationMap(new Rid());
+                }
+            }
+            NavigationServer3D.MapSetActive(_navigationMap, false);
+            NavigationServer3D.FreeRid(_navigationMap);
+            _navigationMapCreated = false;
+        }
+    }
+
     private long GetNavigationMapIteration()
     {
         if (!IsInsideTree())
@@ -482,7 +618,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             return 0;
         }
         return NavigationServer3D.MapGetIterationId(
-            GetWorld3D().NavigationMap);
+            NavigationMap);
     }
 
     private void MarkNavigationSynchronizationPending(long baselineIteration)
@@ -586,6 +722,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             UseEdgeConnections = true,
             Enabled = true
         };
+        region.SetNavigationMap(NavigationMap);
         region.AddToGroup("npc_navigation_tile");
         return region;
 
@@ -747,8 +884,11 @@ public partial class NpcNavigationSurfaceNode : Node3D
                 Height = Math.Max(1.0f, bounds.Height),
                 AvoidanceEnabled = true,
                 AvoidanceLayers = NavigationLayer,
-                Use3DAvoidance = false
+                Use3DAvoidance = true
             };
+            // Bind before entering the tree so the obstacle never joins the
+            // default world map whose UP remains Vector3.Up.
+            obstacle.SetNavigationMap(NavigationMap);
             obstacle.AddToGroup("npc_navigation_obstacle");
             AddChild(obstacle);
             _avoidanceObstacles.Add(obstacle);

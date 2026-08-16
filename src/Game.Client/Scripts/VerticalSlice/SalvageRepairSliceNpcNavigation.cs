@@ -68,6 +68,21 @@ public partial class SalvageRepairSlice
             $"dynamicAgents={attached}; boundedStreaming=1; obstacleRecovery=1; avoidance=1.");
     }
 
+    private void DetachNpcNavigationAgents()
+    {
+        if (_npcPopulationRoot is null)
+        {
+            return;
+        }
+        foreach (Node child in _npcPopulationRoot.GetChildren())
+        {
+            if (child is NpcFactionAgentNode agent)
+            {
+                agent.PrepareNavigationMapChange();
+            }
+        }
+    }
+
     private void RefreshNpcNavigationObstacles()
     {
         if (_npcNavigationSurface?.IsConfigured == true)

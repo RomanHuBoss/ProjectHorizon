@@ -16,6 +16,11 @@ public sealed record PlanetSurfacePhysicalFrameAcceptanceReport(
 
 public static class PlanetSurfacePhysicalFrameAcceptanceRunner
 {
+    // World transforms use Godot.Vector3/Transform3D float storage. At planet-
+    // scale logical addresses (~10^5 m), millimetre precision is not a valid
+    // invariant; centimetre-class round-trip is the correct bounded budget.
+    public const double PointRoundTripToleranceMeters = 0.02;
+
     public static PlanetSurfacePhysicalFrameAcceptanceReport Run(
         IReadOnlyList<PlanetEnvironmentProfile> profiles)
     {
@@ -62,7 +67,8 @@ public static class PlanetSurfacePhysicalFrameAcceptanceRunner
                 Vector3 restored = state.WorldToLogical(world);
                 double pointError = restored.DistanceTo(sampleLogical);
                 maxPointError = Math.Max(maxPointError, pointError);
-                worldLogicalRoundTrip &= pointError <= 0.001;
+                worldLogicalRoundTrip &=
+                    pointError <= PointRoundTripToleranceMeters;
 
                 Vector3 localVelocity = new(2.5f, -1.25f, 4.0f);
                 Vector3 worldVelocity = state.SurfaceBasis * localVelocity;

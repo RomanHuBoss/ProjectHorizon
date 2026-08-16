@@ -15,6 +15,10 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-172.1 — Radial physics/navigation hotfix
+
+External Godot 4.7.1 testing of alpha.172 exposed three regressions: NavigationServer3D rejected regions rotated >=90° away from the navigation-map UP orientation, the arbitrary-up player visibly rolled while strafing A/D, and two acceptance thresholds produced false negatives (`maxPointErr=7.814 mm`, displayed clearance `0.80 m`). Alpha.172.1 fixes those defects without starting TASK-174: TASK-124 now owns a dedicated navigation map aligned to the current radial Up; navigation regions, avoidance obstacles and NPC navigation agents are detached/rebound around a tangent-frame rotation instead of remaining on Godot's default global-UP map. Ground-NPC avoidance uses Godot's 3D/radius avoidance path (then projects the safe velocity back to the tangent plane), because the 2D avoidance path is global-XZ based. The player body is reconstructed from tangent-forward + radial-Up with zero roll, and the two acceptance tolerances now reflect the actual float/numeric budgets.
+
 ## TASK-172 — Physical Radial Surface Frame & Navigation Migration
 
 Alpha.172 turns the TASK-170 spherical/radial mathematics into a live **rotating Godot tangent physics frame**. `Gameplay`, fallback ground and the bounded terrain streamer are oriented to the current planet `East/Up/North` basis; the player uses arbitrary-up CharacterBody gravity/floor/jump/jetpack/swim motion, while logical East/North coordinates and save identity stay unchanged. TASK-124 navigation regions remain bounded children of the rotating surface frame, recovery/path probes are frame-aware, and absolute runtime targets/velocities for ground NPCs, flying fauna and NPC ships are remapped on face/frame handoff.

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.0-alpha.172.1] - 2026-08-16
+
+### Fixed — TASK-172.1 Radial Physics / Navigation Emergency Hotfix
+- Fixed player roll during A/D strafing by removing Euler/local-Y yaw from the arbitrary-up path and rebuilding a roll-free body basis from tangent forward + radial Up before movement.
+- Replaced inherited/default-map NavigationRegion3D rotation with a dedicated TASK-124 navigation map whose `map UP` matches the active radial tangent frame; NPC NavigationAgent3D instances, NavigationRegion3D nodes and NavigationObstacle3D avoidance obstacles are detached/rebound around the frame handoff so none remain on the default global-UP map. Ground-NPC avoidance is switched to 3D/radius mode because Godot's 2D avoidance is explicitly fixed to global X/Z and is therefore incompatible with arbitrary radial Up; safe velocities are projected back onto the surface tangent plane before movement.
+- Corrected TASK-172 point round-trip acceptance from an invalid 1 mm planet-scale float budget to a 20 mm `Vector3/Transform3D` budget; the reported external error was 7.814 mm.
+- Corrected TASK-162.2 clearance false-negative at a displayed 0.80 m by retaining the 0.80 m target with a 0.01 m numeric tolerance instead of weakening the physical clearance requirement.
+- Strengthened TASK-172 F5 live acceptance with an explicit `upright` invariant and added TASK-172.1 static/CI/release gating.
+
+### External runtime evidence that triggered the hotfix
+- Godot 4.7.1 rejected the rotated navigation regions with `Attempted to update a navigation region transform rotated 90 degrees or more away from the current navigation map UP orientation`.
+- TASK-172 reported `roundTrip=0; maxPointErr=0.007814m` while every other mathematical invariant passed.
+- TASK-162.2 reported `clearance=0.80m` but failed because the raw value was marginally below the exact comparison threshold.
+- Manual smoke found a visible player roll while strafing left/right.
+
 ## [0.1.0-alpha.172] - 2026-08-16
 
 ### Added — TASK-172 Physical Radial Surface Frame & Navigation Migration

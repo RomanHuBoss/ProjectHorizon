@@ -84,6 +84,13 @@ public partial class SalvageRepairSlice
             _planetSurfacePhysicalFrameMaximumAxisDelta,
             axisDelta);
 
+        // TASK-172.1: NavigationServer3D has a map-level UP direction.
+        // Detach the old regions and prepare a dedicated map for the next
+        // radial Up before the Gameplay parent rotates; otherwise Godot rejects
+        // regions that become >= 90 degrees away from the map UP orientation.
+        DetachNpcNavigationAgents();
+        _npcNavigationSurface?.PrepareSurfaceFrameChange(next.WorldUp);
+
         gameplay.GlobalTransform = next.GameplayTransform;
 
         if (_player is not null && GodotObject.IsInstanceValid(_player))
@@ -116,6 +123,7 @@ public partial class SalvageRepairSlice
             previousGameplay,
             next.GameplayTransform);
         _npcNavigationSurface?.NotifySurfaceFrameChanged();
+        AttachNpcNavigationAgents();
         if (_aerialSteeringRuntime is not null)
         {
             RefreshAerialNavigationEnvironment();
@@ -234,6 +242,11 @@ public partial class SalvageRepairSlice
             _player.SurfaceFrameActive &&
             _planetSurfacePhysicalFrameState is { } live &&
             _player.ActiveSurfaceUp.Normalized().Dot(live.WorldUp) >= 0.9999f;
+        bool playerUpright = livePlayer && _player is not null &&
+            _planetSurfacePhysicalFrameState is { } uprightState &&
+            _player.GlobalTransform.Basis.Y.Normalized().Dot(uprightState.WorldUp) >= 0.9999f &&
+            Math.Abs(_player.GlobalTransform.Basis.X.Normalized().Dot(uprightState.WorldUp)) <= 0.001f &&
+            Math.Abs(_player.GlobalTransform.Basis.Z.Normalized().Dot(uprightState.WorldUp)) <= 0.001f;
         bool liveGameplay = _planetSurfacePhysicalFrameState is { } current &&
             GetNodeOrNull<Node3D>("Gameplay") is { } gameplay &&
             gameplay.GlobalTransform.Basis.Y.Normalized().Dot(current.WorldUp) >= 0.9999f;
@@ -253,7 +266,7 @@ public partial class SalvageRepairSlice
         bool navFrame = _npcNavigationSurface is not null &&
             _npcNavigationSurface.ParentFrameAligned;
 
-        bool passed = report.Passed && livePlayer && liveGameplay &&
+        bool passed = report.Passed && livePlayer && playerUpright && liveGameplay &&
             liveStreamer && bounded && navFrame;
         _planetSurfacePhysicalFrameAcceptanceHud = passed
             ? $"PASS faces={report.FacesCovered}/6 player=1 nav=1 stream=25/9"
@@ -267,10 +280,12 @@ public partial class SalvageRepairSlice
             $"velocity={(report.VectorRemap ? 1 : 0)}; " +
             $"faces={report.FacesCovered}/6; " +
             $"seams={(report.SeamHandoff ? 1 : 0)}; " +
-            $"player={(livePlayer ? 1 : 0)}; gameplay={(liveGameplay ? 1 : 0)}; " +
-            $"streamer={(liveStreamer ? 1 : 0)}; nav={(navFrame ? 1 : 0)}; " +
+            $"player={(livePlayer ? 1 : 0)}; upright={(playerUpright ? 1 : 0)}; " +
+            $"gameplay={(liveGameplay ? 1 : 0)}; streamer={(liveStreamer ? 1 : 0)}; " +
+            $"nav={(navFrame ? 1 : 0)}; " +
             $"bounded25x9={(bounded ? 1 : 0)}; " +
             $"maxPointErr={report.MaximumPointRoundTripError.ToString("0.000000", CultureInfo.InvariantCulture)}m; " +
+            $"pointBudget={PlanetSurfacePhysicalFrameAcceptanceRunner.PointRoundTripToleranceMeters.ToString("0.000", CultureInfo.InvariantCulture)}m; " +
             $"maxVectorErr={report.MaximumVectorRoundTripError.ToString("0.000000", CultureInfo.InvariantCulture)}; " +
             $"transitions={_planetSurfacePhysicalFrameTransitions}; " +
             "result=" + (passed

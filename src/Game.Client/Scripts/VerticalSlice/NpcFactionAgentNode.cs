@@ -168,11 +168,13 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
                 AvoidanceMask = 1,
                 AvoidanceEnabled = true,
                 KeepYVelocity = false,
-                Use3DAvoidance = false
+                Use3DAvoidance = true
             };
             _navigationAgent.VelocityComputed += OnNavigationVelocityComputed;
             AddChild(_navigationAgent);
         }
+        _navigationAgent.SetNavigationMap(navigationSurface.NavigationMap);
+        _navigationAgent.AvoidanceEnabled = true;
         _navigationSnapped = false;
         _navigationActive = false;
         _nextNavigationTargetRefreshAt = 0.0;
@@ -181,6 +183,23 @@ public partial class NpcFactionAgentNode : CharacterBody3D, IInteractable, IHits
         _behaviorDecisionGate.Reset();
         _cachedBehaviorTarget = GlobalPosition;
         _cachedBehaviorSpeedScale = 1.0;
+    }
+
+    public void PrepareNavigationMapChange()
+    {
+        if (_navigationAgent is null)
+        {
+            return;
+        }
+
+        // TASK-172.1: detach the scene agent from the map that is about to be
+        // freed/recreated with a different radial UP. EnableNavigation() will
+        // bind it to the replacement map immediately after the frame handoff.
+        _navigationAgent.AvoidanceEnabled = false;
+        _navigationAgent.Velocity = Vector3.Zero;
+        _navigationAgent.SetNavigationMap(new Rid());
+        _navigationActive = false;
+        _navigationSnapped = false;
     }
 
     public override void _PhysicsProcess(double delta)

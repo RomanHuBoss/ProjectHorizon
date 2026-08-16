@@ -1139,7 +1139,10 @@ public sealed class WorldGenTests
         Godot.Vector3 worldVelocity = frame.SurfaceBasis * localVelocity;
         Godot.Vector3 restoredVelocity = frame.SurfaceBasis.Inverse() * worldVelocity;
 
-        Assert.InRange(restored.DistanceTo(logical), 0.0f, 0.001f);
+        Assert.InRange(
+            restored.DistanceTo(logical),
+            0.0f,
+            (float)PlanetSurfacePhysicalFrameAcceptanceRunner.PointRoundTripToleranceMeters);
         Assert.InRange(restoredVelocity.DistanceTo(localVelocity), 0.0f, 0.0001f);
         Assert.InRange(frame.WorldUp.Dot(new Godot.Vector3((float)frame.Radial.GlobalFrame.Up.X, (float)frame.Radial.GlobalFrame.Up.Y, (float)frame.Radial.GlobalFrame.Up.Z).Normalized()), 0.9999f, 1.0001f);
     }
@@ -1179,13 +1182,43 @@ public sealed class WorldGenTests
         Assert.InRange(
             right.WorldToLogical(remapped).DistanceTo(logical),
             0.0f,
-            0.001f);
+            (float)PlanetSurfacePhysicalFrameAcceptanceRunner.PointRoundTripToleranceMeters);
         Assert.InRange(
             PlanetSurfacePhysicalFrameRuntime.MaximumAxisErrorDegrees(
                 left.SurfaceBasis,
                 right.SurfaceBasis),
             0.0,
             0.01);
+    }
+
+    [Fact]
+    public void PlanetPhysicalRadialFrame_UprightBasisNeverIntroducesRollAcrossSixRadialAxes()
+    {
+        Godot.Vector3[] upAxes =
+        {
+            Godot.Vector3.Right,
+            Godot.Vector3.Left,
+            Godot.Vector3.Up,
+            Godot.Vector3.Down,
+            Godot.Vector3.Back,
+            Godot.Vector3.Forward
+        };
+
+        foreach (Godot.Vector3 up in upAxes)
+        {
+            Godot.Vector3 seedForward = new Godot.Vector3(0.31f, 0.47f, -0.83f);
+            Godot.Basis basis = PlanetSurfacePhysicalFrameRuntime.BuildUprightBasis(
+                seedForward,
+                up);
+            Godot.Vector3 normalizedUp = up.Normalized();
+
+            Assert.InRange(basis.Y.Normalized().Dot(normalizedUp), 0.99999f, 1.00001f);
+            Assert.InRange(Math.Abs(basis.X.Normalized().Dot(normalizedUp)), 0.0f, 0.0001f);
+            Assert.InRange(Math.Abs(basis.Z.Normalized().Dot(normalizedUp)), 0.0f, 0.0001f);
+            Assert.InRange(Math.Abs(basis.X.Dot(basis.Y)), 0.0f, 0.0001f);
+            Assert.InRange(Math.Abs(basis.X.Dot(basis.Z)), 0.0f, 0.0001f);
+            Assert.InRange(Math.Abs(basis.Y.Dot(basis.Z)), 0.0f, 0.0001f);
+        }
     }
 
     [Fact]

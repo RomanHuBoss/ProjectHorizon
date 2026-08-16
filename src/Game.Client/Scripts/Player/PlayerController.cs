@@ -93,7 +93,8 @@ public partial class PlayerController : CharacterBody3D
         {
             float yawSign = InvertLookX ? 1.0f : -1.0f;
             float pitchSign = InvertLookY ? 1.0f : -1.0f;
-            RotateY(mouseMotion.Relative.X * MouseSensitivity * yawSign);
+            RotateBodyAroundSurfaceUp(
+                mouseMotion.Relative.X * MouseSensitivity * yawSign);
             _head.RotateX(mouseMotion.Relative.Y * MouseSensitivity * pitchSign);
 
             Vector3 headRotation = _head.Rotation;
@@ -265,6 +266,14 @@ public partial class PlayerController : CharacterBody3D
     public override void _PhysicsProcess(double delta)
     {
         float dt = (float)Math.Max(0.0, delta);
+        if (_surfaceFrameActive)
+        {
+            // TASK-172.1: CharacterBody movement must never accumulate roll.
+            // Rebuild an upright basis from the current heading and radial Up
+            // before reading movement axes. This also repairs any transient
+            // basis drift introduced by a surface-frame handoff.
+            AlignBodyToSurfaceUp();
+        }
         Vector3 up = _surfaceFrameActive ? _surfaceUp : Vector3.Up;
         UpDirection = up;
 
@@ -354,22 +363,47 @@ public partial class PlayerController : CharacterBody3D
             IsJetpacking);
     }
 
+    private void RotateBodyAroundSurfaceUp(float radians)
+    {
+        Vector3 up = _surfaceFrameActive ? _surfaceUp : Vector3.Up;
+        Vector3 forward = ResolveTangentForward(up);
+        forward = forward.Rotated(up, radians).Normalized();
+        ApplyUprightBasis(forward, up);
+    }
+
     private void AlignBodyToSurfaceUp()
     {
+        ApplyUprightBasis(ResolveTangentForward(_surfaceUp), _surfaceUp);
+    }
+
+    private Vector3 ResolveTangentForward(Vector3 up)
+    {
+        Vector3 normalizedUp = up.Normalized();
         Vector3 forward = -GlobalTransform.Basis.Z;
-        forward = forward.Slide(_surfaceUp);
+        forward = forward.Slide(normalizedUp);
         if (forward.LengthSquared() <= 0.000001f)
         {
-            Vector3 reference = Math.Abs(_surfaceUp.Dot(Vector3.Forward)) > 0.95f
+            Vector3 reference = Math.Abs(normalizedUp.Dot(Vector3.Forward)) > 0.95f
                 ? Vector3.Right
                 : Vector3.Forward;
-            forward = reference.Slide(_surfaceUp);
+            forward = reference.Slide(normalizedUp);
         }
-        forward = forward.Normalized();
-        Vector3 right = forward.Cross(_surfaceUp).Normalized();
-        Vector3 back = right.Cross(_surfaceUp).Normalized();
+        return forward.Normalized();
+    }
+
+    private void ApplyUprightBasis(Vector3 forward, Vector3 up)
+    {
+        Vector3 normalizedUp = up.Normalized();
+        Vector3 tangentForward = forward.Slide(normalizedUp);
+        if (tangentForward.LengthSquared() <= 0.000001f)
+        {
+            tangentForward = ResolveTangentForward(normalizedUp);
+        }
+        tangentForward = tangentForward.Normalized();
         GlobalTransform = new Transform3D(
-            new Basis(right, _surfaceUp, back).Orthonormalized(),
+            PlanetSurfacePhysicalFrameRuntime.BuildUprightBasis(
+                tangentForward,
+                normalizedUp),
             GlobalPosition);
     }
 

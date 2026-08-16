@@ -94,6 +94,30 @@ public sealed class PlanetSurfacePhysicalFrameRuntime
         return (nextBasis * local).Orthonormalized();
     }
 
+    public static Basis BuildUprightBasis(Vector3 forward, Vector3 worldUp)
+    {
+        if (worldUp.LengthSquared() <= 0.000001f)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(worldUp),
+                "Surface up vector must be non-zero.");
+        }
+
+        Vector3 up = worldUp.Normalized();
+        Vector3 tangentForward = forward.Slide(up);
+        if (tangentForward.LengthSquared() <= 0.000001f)
+        {
+            Vector3 reference = Math.Abs(up.Dot(Vector3.Forward)) > 0.95f
+                ? Vector3.Right
+                : Vector3.Forward;
+            tangentForward = reference.Slide(up);
+        }
+        tangentForward = tangentForward.Normalized();
+        Vector3 right = tangentForward.Cross(up).Normalized();
+        Vector3 back = right.Cross(up).Normalized();
+        return new Basis(right, up, back).Orthonormalized();
+    }
+
     public static double MaximumAxisErrorDegrees(Basis left, Basis right)
     {
         return Math.Max(

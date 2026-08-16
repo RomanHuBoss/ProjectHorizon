@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Static contract gate for TASK-168 planetary globe and geodesic surface topology."""
 from pathlib import Path
+import re
 import sys
 ROOT = Path(__file__).resolve().parents[1]
 def text(path): return (ROOT/path).read_text(encoding='utf-8')
@@ -29,11 +30,9 @@ need('TASK-168 planetary globe READY' in part and 'PlanetaryGlobeAcceptanceRunne
 need('planetary globe and geodesy acceptance' in accept and 'ExpectedActiveChunks == 25' in accept, 'TASK-168 acceptance/bounded-streamer guard missing', f)
 need('PlanetSurfaceTopology_CircumnavigationWrapsAndPolesNormalize' in tests and 'PlanetaryGlobe_CubeSphereGeometryRemainsSeamless' in tests, 'TASK-168 xUnit regressions missing', f)
 version = text('VERSION').strip()
-try:
-    revision = int(version.rsplit('.', 1)[1])
-except (ValueError, IndexError):
-    revision = -1
-need(version.startswith('0.1.0-alpha.') and revision >= 168, 'VERSION older than alpha.168', f)
+match = re.fullmatch(r'0\.1\.0-alpha\.(\d+)(?:\.\d+)?', version)
+revision = int(match.group(1)) if match else -1
+need(match is not None and revision >= 168, 'VERSION older than alpha.168', f)
 if f:
     print('TASK-168 PLANETARY GLOBE/GEODESY CONTRACT FAIL:')
     for x in f: print('- '+x)

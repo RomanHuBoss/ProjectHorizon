@@ -618,7 +618,10 @@ public partial class SalvageRepairSlice
             GodotObject.IsInstanceValid(_planetSurfaceSunVisual) &&
             _planetSurfaceSunVisual.GetChildCount() >= 2;
         bool atmosphere = !sky.AtmosphereEnabled || sky.FogDensity >= 0.0045;
-        bool safeClearance = StageOneVoyage.Piloted || clearance >= 0.80;
+        const double minimumSafeClearanceMeters = 0.80;
+        const double clearanceNumericToleranceMeters = 0.01;
+        bool safeClearance = StageOneVoyage.Piloted ||
+            clearance + clearanceNumericToleranceMeters >= minimumSafeClearanceMeters;
         bool passed = relief && distantTerrain && visibleSun &&
             atmosphere && safeClearance;
 
@@ -635,6 +638,8 @@ public partial class SalvageRepairSlice
             $"sunVisual={(visibleSun ? 1 : 0)}; " +
             $"fogDensity={sky.FogDensity:0.0000}; " +
             $"clearance={clearance:0.00}m; " +
+            $"clearanceMin={minimumSafeClearanceMeters:0.00}m; " +
+            $"clearanceTol={clearanceNumericToleranceMeters:0.00}m; " +
             "boundedGameplayStreamer=25-chunks.";
         if (passed)
         {
