@@ -1371,6 +1371,8 @@
     "ui.world_scene.kind.orbit": "орбита",
     "ui.world_scene.kind.station": "интерьер станции",
     "ui.world_scene.kind.surface": "поверхность",
-    "ui.world_scene.kind.unknown": "неизвестно"
+    "ui.world_scene.kind.unknown": "неизвестно",
+    "ui.hud.planet_streaming.summary": "Стриминг поверхности: чанки={loaded}/{target}; collision={collisions}; очередь={queue}; сектор=({chunkX},{chunkZ}); lat={lat}° lon={lon}°",
+    "ui.hud.planet_streaming.unavailable": "Стриминг поверхности: недоступен"
   }
 }

@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.158] - 2026-08-16
+
+### Added — TASK-158 Planetary Surface Streaming & Traversal Foundation
+
+- Promoted the verified Prototype-B `TerrainChunkManager` into the live planet-surface lifecycle instead of introducing a parallel terrain streamer.
+- Added bounded 5x5 surface residency: 9 central 33x33 LOD0/collision chunks plus a 16-chunk 17x17 LOD1 ring, with the existing stitching, skirts, hysteresis, cancellation and stale-result guards.
+- Added pure deterministic planet-profile sampling inside terrain workers, collision-first live traversal transitions and a safe TASK-156 fallback-to-streamer handoff during startup and planet switches.
+- Extended terrain-aware TASK-124 navigation beyond the old 80x80 authored patch while keeping only 5x5 NavigationRegion3D tiles resident.
+- Added planet-radius geodesic surface addressing, RU/EN streaming HUD diagnostics, F5 acceptance, three xUnit regressions and the TASK-158 repository quality gate.
+
+### Changed
+
+- Planet-surface streamed vertices now sample the TASK-156 height function at their exact world coordinates; legacy Prototype-B noise sampling remains unchanged.
+- `PlanetSurfaceStreamer` participates in TASK-148 surface residency and is suspended outside the surface world context.
+- Streamed `TerrainChunk` collision bodies are excluded from the NPC static-obstacle catalogue because they represent walkable ground.
+
 ## [0.1.0-alpha.156] - 2026-08-15
 
 ### Added — TASK-156 Planet-Specific Terrain & Surface Geometry

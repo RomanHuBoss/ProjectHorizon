@@ -71,6 +71,13 @@ public partial class TerrainChunk : StaticBody3D
     [Export(PropertyHint.Range, "1.0,32.0,1.0")]
     public float DebugGridSpacing { get; set; } = 4.0f;
 
+    [Export]
+    public bool UsePlanetSurfacePresentation { get; set; }
+
+    [Export]
+    public Color PlanetSurfaceBaseColor { get; set; } =
+        new Color(0.32f, 0.44f, 0.28f, 1.0f);
+
     public int EffectiveResolution { get; private set; } = 33;
 
     public TerrainEdgeStitchMask StitchMask { get; private set; }
@@ -129,7 +136,9 @@ public partial class TerrainChunk : StaticBody3D
         bool showWorldGrid,
         bool showWireframe,
         bool showChunkBorders,
-        float debugGridSpacing)
+        float debugGridSpacing,
+        bool usePlanetSurfacePresentation = false,
+        Color? planetSurfaceBaseColor = null)
     {
         ChunkX = chunkX;
         ChunkZ = chunkZ;
@@ -149,6 +158,11 @@ public partial class TerrainChunk : StaticBody3D
         ShowWireframe = showWireframe;
         ShowChunkBorders = showChunkBorders;
         DebugGridSpacing = Math.Max(1.0f, debugGridSpacing);
+        UsePlanetSurfacePresentation = usePlanetSurfacePresentation;
+        if (planetSurfaceBaseColor.HasValue)
+        {
+            PlanetSurfaceBaseColor = planetSurfaceBaseColor.Value;
+        }
     }
 
     public bool SetDebugVisualization(
@@ -506,6 +520,25 @@ public partial class TerrainChunk : StaticBody3D
         Vector3 vertex,
         Vector3 normal)
     {
+        if (UsePlanetSurfacePresentation)
+        {
+            float amplitude = Math.Max(0.25f, HeightScale);
+            float normalizedHeight = Math.Clamp(
+                (vertex.Y / amplitude + 1.0f) * 0.5f,
+                0.0f,
+                1.0f);
+            float slope = 1.0f - Math.Clamp(normal.Y, 0.0f, 1.0f);
+            float multiplier = Math.Clamp(
+                0.88f + normalizedHeight * 0.22f - slope * 0.18f,
+                0.62f,
+                1.18f);
+            return new Color(
+                Math.Clamp(PlanetSurfaceBaseColor.R * multiplier, 0.0f, 1.0f),
+                Math.Clamp(PlanetSurfaceBaseColor.G * multiplier, 0.0f, 1.0f),
+                Math.Clamp(PlanetSurfaceBaseColor.B * multiplier, 0.0f, 1.0f),
+                1.0f);
+        }
+
         return DebugViewMode switch
         {
             TerrainDebugViewMode.Lod => CalculateLodColor(vertex),

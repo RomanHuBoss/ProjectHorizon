@@ -622,7 +622,11 @@ public partial class NpcNavigationSurfaceNode : Node3D
         }
         if (_terrainProfile is not null)
         {
-            float extent = (float)_terrainProfile.HalfExtent;
+            // TASK-158 promotes navigation from the authored 80x80 starter patch
+            // to the same moving traversal envelope as streamed terrain. The
+            // height sampler is global/deterministic, while only 5x5 nav tiles
+            // remain resident around the player.
+            float extent = (float)PlanetSurfaceStreamingRuntime.NavigationTraversalExtentMeters;
             _groundXZ = new Rect2(-extent, -extent, extent * 2.0f, extent * 2.0f);
             return;
         }
@@ -655,6 +659,7 @@ public partial class NpcNavigationSurfaceNode : Node3D
             if (shapeNode.Disabled ||
                 shapeNode.GetParent() is not StaticBody3D body ||
                 body.CollisionLayer == 0u ||
+                body is TerrainChunk ||
                 string.Equals(body.Name, "GroundBody", StringComparison.Ordinal) ||
                 string.Equals(body.Name, "LandingPad", StringComparison.Ordinal))
             {

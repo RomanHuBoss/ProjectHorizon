@@ -1371,6 +1371,8 @@
     "ui.world_scene.kind.orbit": "orbit",
     "ui.world_scene.kind.station": "station interior",
     "ui.world_scene.kind.surface": "surface",
-    "ui.world_scene.kind.unknown": "unknown"
+    "ui.world_scene.kind.unknown": "unknown",
+    "ui.hud.planet_streaming.summary": "Surface stream: chunks={loaded}/{target}; collision={collisions}; queue={queue}; sector=({chunkX},{chunkZ}); lat={lat}° lon={lon}°",
+    "ui.hud.planet_streaming.unavailable": "Surface stream: unavailable"
   }
 }

@@ -5,6 +5,10 @@ using Godot;
 public partial class SalvageRepairSlice
 {
     private string _planetSurfaceTerrainAcceptanceHud = "READY";
+    private string _planetSurfaceStreamingAcceptanceHud = "READY";
+    private TerrainChunkManager? _planetSurfaceStreamer;
+    private bool _planetSurfaceFallbackRetired;
+    private bool _planetSurfaceStreamingReadyPrinted;
 
     private PlanetSurfaceTerrainProfile? CurrentTerrainProfile =>
         _planetSurfaceContentProfile?.Terrain;
@@ -35,8 +39,18 @@ public partial class SalvageRepairSlice
         };
         groundMesh.Mesh = mesh;
         groundMesh.MaterialOverride = material;
+        groundMesh.Visible = true;
         groundCollision.Shape = mesh.CreateTrimeshShape();
+        groundCollision.Disabled = false;
+        _planetSurfaceFallbackRetired = false;
+        _planetSurfaceStreamingReadyPrinted = false;
+        if (_planetSurfaceStreamer is not null &&
+            GodotObject.IsInstanceValid(_planetSurfaceStreamer))
+        {
+            _planetSurfaceStreamer.Visible = false;
+        }
 
+        EnsurePlanetSurfaceStreaming(profile);
         _npcNavigationSurface?.SetTerrainProfile(profile);
         RepositionSurfaceBoundObjects();
 
@@ -55,6 +69,112 @@ public partial class SalvageRepairSlice
             $"walkable={walkable.ToString("0.0", CultureInfo.InvariantCulture)}%; " +
             $"waterBasins={(profile.WaterBasinsEnabled ? 1 : 0)}; " +
             $"vertices={vertices}; triangles={triangles}; collision=trimesh; nav=heightfield.");
+    }
+
+    private void EnsurePlanetSurfaceStreaming(
+        PlanetSurfaceTerrainProfile profile)
+    {
+        Color baseColor = BuildGroundColor(profile.Archetype);
+        if (_planetSurfaceStreamer is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceStreamer))
+        {
+            _planetSurfaceStreamer = new TerrainChunkManager
+            {
+                Name = "PlanetSurfaceStreamer",
+                ActiveRadius = PlanetSurfaceStreamingRuntime.ActiveRadius,
+                HighDetailRadius =
+                    PlanetSurfaceStreamingRuntime.HighDetailRadius,
+                CollisionRadius =
+                    PlanetSurfaceStreamingRuntime.CollisionRadius,
+                HighDetailResolution =
+                    PlanetSurfaceStreamingRuntime.HighDetailResolution,
+                LowDetailResolution =
+                    PlanetSurfaceStreamingRuntime.LowDetailResolution,
+                CollisionResolution =
+                    PlanetSurfaceStreamingRuntime.CollisionResolution,
+                ChunkSize =
+                    (float)PlanetSurfaceStreamingRuntime.ChunkSizeMeters,
+                SkirtDepth =
+                    (float)PlanetSurfaceStreamingRuntime.SkirtDepthMeters,
+                ChunkSwitchHysteresis =
+                    (float)PlanetSurfaceStreamingRuntime.SwitchHysteresisMeters,
+                OperationIntervalSeconds = 0.035f,
+                MaxOperationsPerStep = 2,
+                PlayerPath = new NodePath("../Player"),
+                EnablePrototypeControls = false,
+                EnablePrototypeHud = false,
+                ShowWorldGrid = false,
+                ShowWireframe = false,
+                ShowChunkBorders = false,
+                DebugViewMode = TerrainDebugViewMode.HeightAndSlope,
+                Visible = false
+            };
+            _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+            AddChild(_planetSurfaceStreamer);
+        }
+        else
+        {
+            _planetSurfaceStreamer.ConfigurePlanetSurface(profile, baseColor);
+        }
+    }
+
+    private void UpdatePlanetSurfaceStreaming()
+    {
+        if (!_surfaceRuntimeActive ||
+            _planetSurfaceStreamer is null ||
+            !GodotObject.IsInstanceValid(_planetSurfaceStreamer) ||
+            !_planetSurfaceStreamer.IsStreamingSettled)
+        {
+            return;
+        }
+
+        if (!_planetSurfaceFallbackRetired)
+        {
+            _planetSurfaceStreamer.Visible = true;
+            MeshInstance3D? groundMesh = GetNodeOrNull<MeshInstance3D>(
+                "GroundBody/MeshInstance3D");
+            CollisionShape3D? groundCollision = GetNodeOrNull<CollisionShape3D>(
+                "GroundBody/CollisionShape3D");
+            if (groundMesh is not null)
+            {
+                groundMesh.Visible = false;
+            }
+            if (groundCollision is not null)
+            {
+                groundCollision.Disabled = true;
+            }
+            _planetSurfaceFallbackRetired = true;
+        }
+
+        if (_planetSurfaceStreamingReadyPrinted)
+        {
+            return;
+        }
+
+        TerrainChunkProfilerSnapshot snapshot =
+            _planetSurfaceStreamer.CaptureProfilerSnapshot();
+        PlanetSurfaceTerrainProfile? profile = CurrentTerrainProfile;
+        if (profile is null)
+        {
+            return;
+        }
+        PlanetSurfaceGeodesicAddress address =
+            PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
+                PlanetSurfaceContentProfile.Environment.RadiusKm,
+                _player?.GlobalPosition.X ?? 0.0,
+                _player?.GlobalPosition.Z ?? 0.0);
+        GD.Print(
+            "TASK-158 planet surface streaming READY: " +
+            $"planet={profile.PlanetId}; archetype={profile.Archetype}; " +
+            $"active={snapshot.LoadedChunks}/{PlanetSurfaceStreamingRuntime.ExpectedActiveChunks}; " +
+            $"collisions={snapshot.Collisions}/{PlanetSurfaceStreamingRuntime.ExpectedCollisionChunks}; " +
+            $"center={_planetSurfaceStreamer.CurrentChunk.X},{_planetSurfaceStreamer.CurrentChunk.Y}; " +
+            $"chunk={PlanetSurfaceStreamingRuntime.ChunkSizeMeters:0}m; " +
+            $"window={(PlanetSurfaceStreamingRuntime.ActiveRadius * 2 + 1)}x{(PlanetSurfaceStreamingRuntime.ActiveRadius * 2 + 1)}; " +
+            $"vertices={snapshot.Vertices}; queue={snapshot.QueuedWork}; workers={snapshot.ActiveWorkers}; " +
+            $"lat={address.LatitudeDegrees:0.0000}; lon={address.LongitudeDegrees:0.0000}; " +
+            "lod=33/17; async=1; cancellation=1; safeUnload=1; fallback=retired.");
+        _planetSurfaceStreamingReadyPrinted = true;
     }
 
     private ArrayMesh BuildPlanetTerrainMesh(PlanetSurfaceTerrainProfile profile)
@@ -241,6 +361,51 @@ public partial class SalvageRepairSlice
             ("height", sample.Height.ToString("0.0", CultureInfo.InvariantCulture)),
             ("slope", sample.SlopeDegrees.ToString("0.0", CultureInfo.InvariantCulture)),
             ("resolution", profile.Resolution));
+    }
+
+    private string BuildPlanetSurfaceStreamingHudLine()
+    {
+        if (_planetSurfaceStreamer is null ||
+            CurrentTerrainProfile is null)
+        {
+            return L("ui.hud.planet_streaming.unavailable");
+        }
+
+        TerrainChunkProfilerSnapshot snapshot =
+            _planetSurfaceStreamer.CaptureProfilerSnapshot();
+        PlanetSurfaceGeodesicAddress address =
+            PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
+                PlanetSurfaceContentProfile.Environment.RadiusKm,
+                _player?.GlobalPosition.X ?? 0.0,
+                _player?.GlobalPosition.Z ?? 0.0);
+        return LF(
+            "ui.hud.planet_streaming.summary",
+            ("loaded", snapshot.LoadedChunks),
+            ("target", PlanetSurfaceStreamingRuntime.ExpectedActiveChunks),
+            ("collisions", snapshot.Collisions),
+            ("queue", snapshot.QueuedWork),
+            ("chunkX", _planetSurfaceStreamer.CurrentChunk.X),
+            ("chunkZ", _planetSurfaceStreamer.CurrentChunk.Y),
+            ("lat", address.LatitudeDegrees.ToString("0.000", CultureInfo.InvariantCulture)),
+            ("lon", address.LongitudeDegrees.ToString("0.000", CultureInfo.InvariantCulture)));
+    }
+
+    private void RunPlanetSurfaceStreamingAcceptance()
+    {
+        PlanetSurfaceStreamingAcceptanceReport report =
+            PlanetSurfaceStreamingAcceptanceRunner.Run(
+                PlanetEnvironmentCatalog,
+                EcologyCatalog,
+                PlanetaryPoiCatalog);
+        _planetSurfaceStreamingAcceptanceHud = report.BuildHudLine();
+        if (report.Passed)
+        {
+            GD.Print(report.BuildOutputLine());
+        }
+        else
+        {
+            GD.PushError(report.BuildOutputLine());
+        }
     }
 
     private void RunPlanetSurfaceTerrainAcceptance()

@@ -29,6 +29,7 @@ python3 tools/validate-task152-interplanetary-travel.py
 python3 tools/validate-task154-multi-planet-surface-content.py
 python3 tools/validate-task1541-runtime-acceptance-hotfix.py
 python3 tools/validate-task156-planet-surface-terrain.py
+python3 tools/validate-task158-planet-surface-streaming.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

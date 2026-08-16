@@ -112,6 +112,40 @@ public partial class TerrainChunkManager : Node3D
     public NodePath StatusLabelPath { get; set; } =
         new("../Hud/MarginContainer/PanelContainer/Label");
 
+    [Export]
+    public bool EnablePrototypeControls { get; set; } = true;
+
+    [Export]
+    public bool EnablePrototypeHud { get; set; } = true;
+
+    public PlanetSurfaceTerrainProfile? PlanetSurfaceProfile { get; private set; }
+
+    public bool UsePlanetSurfacePresentation { get; private set; }
+
+    public Color PlanetSurfaceBaseColor { get; private set; } =
+        new Color(0.32f, 0.44f, 0.28f, 1.0f);
+
+    public Vector2I CurrentChunk => _currentChunk;
+
+    public int TargetChunkCount
+    {
+        get
+        {
+            int side = (Math.Max(1, ActiveRadius) * 2) + 1;
+            return side * side;
+        }
+    }
+
+    public bool IsStreamingSettled =>
+        _completedRevision == _planRevision &&
+        _activeChunks.Count == TargetChunkCount &&
+        _pendingOperations.Count == 0 &&
+        _activeJobs.Count == 0 &&
+        _jobApplyOrder.Count == 0 &&
+        _readyJobs.Count == 0 &&
+        _completedJobs.IsEmpty &&
+        _failedJobs == 0;
+
     private readonly Dictionary<Vector2I, TerrainChunk> _activeChunks = new();
     private readonly Queue<ChunkOperation> _pendingOperations = new();
     private readonly ConcurrentQueue<CompletedChunkJob> _completedJobs = new();
@@ -187,7 +221,9 @@ public partial class TerrainChunkManager : Node3D
     public override void _Ready()
     {
         _player = GetNode<CharacterBody3D>(PlayerPath);
-        _statusLabel = GetNodeOrNull<Label>(StatusLabelPath);
+        _statusLabel = EnablePrototypeHud
+            ? GetNodeOrNull<Label>(StatusLabelPath)
+            : null;
         _currentChunk = WorldToChunkWithoutHysteresis(_player.GlobalPosition);
         _workerLimit = Math.Max(
             1,
@@ -217,6 +253,11 @@ public partial class TerrainChunkManager : Node3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
+        if (!EnablePrototypeControls)
+        {
+            return;
+        }
+
         if (@event is not InputEventKey eventKey ||
             !eventKey.Pressed ||
             eventKey.IsEcho())
@@ -595,7 +636,8 @@ public partial class TerrainChunkManager : Node3D
             spec.GenerateCollision,
             rebuildCollision,
             spec.StitchMask,
-            spec.SkirtMask);
+            spec.SkirtMask,
+            PlanetSurfaceProfile);
         return true;
     }
 
@@ -818,15 +860,29 @@ public partial class TerrainChunkManager : Node3D
                 coordinate));
         }
 
-        // Incoming chunks are generated first. Demotions precede promotions so
-        // no temporary high/high border appears without the required stitching.
-        // Outgoing chunks remain visible until every create/update result has
-        // been applied on the main thread.
-        EnqueueOperations(createOperations);
-        EnqueueOperations(demotionOperations);
-        EnqueueOperations(promotionOperations);
-        EnqueueOperations(neutralUpdateOperations);
-        EnqueueOperations(removeOperations);
+        if (PlanetSurfaceProfile is not null)
+        {
+            // Live traversal is collision-safety first: the newly entered 3x3
+            // collision band is promoted before visual-only outer chunks. Old
+            // collision remains until later demotions/removals, so a slow worker
+            // cannot open a temporary fall-through gap ahead of the player.
+            EnqueueOperations(promotionOperations);
+            EnqueueOperations(createOperations);
+            EnqueueOperations(demotionOperations);
+            EnqueueOperations(neutralUpdateOperations);
+            EnqueueOperations(removeOperations);
+        }
+        else
+        {
+            // Prototype-B historical ordering remains unchanged. Incoming chunks
+            // are generated first; demotions precede promotions so no temporary
+            // high/high border appears without the required stitching.
+            EnqueueOperations(createOperations);
+            EnqueueOperations(demotionOperations);
+            EnqueueOperations(promotionOperations);
+            EnqueueOperations(neutralUpdateOperations);
+            EnqueueOperations(removeOperations);
+        }
 
         _plannedCreates = createOperations.Count;
         _plannedUpdates = demotionOperations.Count +
@@ -1070,7 +1126,9 @@ public partial class TerrainChunkManager : Node3D
             ShowWorldGrid,
             ShowWireframe,
             ShowChunkBorders,
-            DebugGridSpacing);
+            DebugGridSpacing,
+            UsePlanetSurfacePresentation,
+            PlanetSurfaceBaseColor);
     }
 
     private Vector2I CalculateHystereticCenter(Vector3 worldPosition)
@@ -2091,6 +2149,57 @@ public partial class TerrainChunkManager : Node3D
         return enabled ? "вкл" : "выкл";
     }
 
+    public void ConfigurePlanetSurface(
+        PlanetSurfaceTerrainProfile profile,
+        Color baseColor)
+    {
+        ArgumentNullException.ThrowIfNull(profile);
+
+        bool profileChanged =
+            PlanetSurfaceProfile is null ||
+            !string.Equals(
+                PlanetSurfaceProfile.PlanetId,
+                profile.PlanetId,
+                StringComparison.Ordinal) ||
+            PlanetSurfaceProfile.WorldSeed != profile.WorldSeed ||
+            !string.Equals(
+                PlanetSurfaceProfile.Archetype,
+                profile.Archetype,
+                StringComparison.Ordinal);
+
+        PlanetSurfaceProfile = profile;
+        UsePlanetSurfacePresentation = true;
+        PlanetSurfaceBaseColor = baseColor;
+        HeightScale = (float)profile.HeightAmplitude;
+        NoiseFrequency = (float)profile.BaseFrequency;
+        NoiseSeed = unchecked((int)(profile.WorldSeed & 0x7FFFFFFF));
+
+        if (!IsInsideTree() || _player is null || !profileChanged)
+        {
+            return;
+        }
+
+        _planCancellation?.Cancel();
+        _pendingOperations.Clear();
+        _jobApplyOrder.Clear();
+        _readyJobs.Clear();
+
+        foreach (TerrainChunk chunk in _activeChunks.Values)
+        {
+            chunk.ReleaseGeneratedResources();
+            chunk.QueueFree();
+        }
+
+        _activeChunks.Clear();
+        _desiredSpecs.Clear();
+        _currentChunk = WorldToChunkWithoutHysteresis(_player.GlobalPosition);
+        _completedRevision = 0;
+        _failedJobs = 0;
+        _cancelledJobs = 0;
+        _discardedStaleJobs = 0;
+        PlanRefresh(executeImmediately: true);
+    }
+
     public TerrainChunkProfilerSnapshot CaptureProfilerSnapshot()
     {
         int vertices = 0;
@@ -2118,7 +2227,7 @@ public partial class TerrainChunkManager : Node3D
 
     private void UpdateHud()
     {
-        if (_statusLabel is null || _player is null)
+        if (!EnablePrototypeHud || _statusLabel is null || _player is null)
         {
             return;
         }

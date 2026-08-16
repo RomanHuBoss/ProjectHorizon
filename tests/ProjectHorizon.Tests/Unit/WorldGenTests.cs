@@ -543,4 +543,92 @@ public sealed class WorldGenTests
         });
     }
 
+    [Fact]
+    public void PlanetSurfaceStreaming_PlanIsBoundedAndUsesTwoLods()
+    {
+        PlanetSurfaceChunkCoordinate center = new(0, 0);
+        IReadOnlyList<PlanetSurfaceStreamingSpec> plan =
+            PlanetSurfaceStreamingRuntime.BuildPlan(center);
+
+        Assert.Equal(PlanetSurfaceStreamingRuntime.ExpectedActiveChunks, plan.Count);
+        Assert.Equal(
+            PlanetSurfaceStreamingRuntime.ExpectedHighDetailChunks,
+            plan.Count(spec => spec.LodLevel == 0));
+        Assert.Equal(
+            PlanetSurfaceStreamingRuntime.ExpectedLowDetailChunks,
+            plan.Count(spec => spec.LodLevel == 1));
+        Assert.Equal(
+            PlanetSurfaceStreamingRuntime.ExpectedCollisionChunks,
+            plan.Count(spec => spec.GenerateCollision));
+        PlanetSurfaceStreamingSpec eastHigh = plan.Single(spec =>
+            spec.Coordinate == new PlanetSurfaceChunkCoordinate(1, 0));
+        Assert.True((eastHigh.StitchMask & TerrainEdgeStitchMask.East) != 0);
+        Assert.Equal(20, PlanetSurfaceStreamingRuntime.ExpectedRetainedChunkCount(
+            new PlanetSurfaceChunkCoordinate(0, 0),
+            new PlanetSurfaceChunkCoordinate(1, 0)));
+        Assert.Equal(16, PlanetSurfaceStreamingRuntime.ExpectedRetainedChunkCount(
+            new PlanetSurfaceChunkCoordinate(0, 0),
+            new PlanetSurfaceChunkCoordinate(1, 1)));
+    }
+
+    [Fact]
+    public void PlanetSurfaceStreaming_ChunkSamplesAreDeterministicAndSeamSafe()
+    {
+        PlanetEnvironmentRuntime environment = new(
+            RepositoryFixture.PlanetEnvironments,
+            RepositoryFixture.Ecology);
+        PlanetSurfaceContentRuntime surface = new(
+            environment,
+            RepositoryFixture.Ecology,
+            RepositoryFixture.Pois);
+        GalaxyNavigationRuntime galaxy = new();
+        PlanetSurfaceContentProfile profile = surface.BuildProfile(
+            galaxy.CurrentSystem.Planets[3],
+            galaxy.CurrentSystem.StarType);
+        PlanetSurfaceChunkCoordinate coordinate = new(7, -4);
+
+        string first = PlanetSurfaceStreamingRuntime.BuildChunkSignature(
+            profile.Terrain,
+            coordinate);
+        string second = PlanetSurfaceStreamingRuntime.BuildChunkSignature(
+            profile.Terrain,
+            coordinate);
+
+        Assert.Equal(first, second);
+        Assert.InRange(
+            PlanetSurfaceStreamingRuntime.MeasureSharedEdgeError(
+                profile.Terrain,
+                new PlanetSurfaceChunkCoordinate(1, 0),
+                new PlanetSurfaceChunkCoordinate(2, 0)),
+            0.0,
+            0.000001);
+    }
+
+    [Fact]
+    public void PlanetSurfaceStreaming_TraversalAddressUsesPlanetRadius()
+    {
+        PlanetSurfaceChunkCoordinate origin =
+            PlanetSurfaceStreamingRuntime.WorldToChunk(0.0, 0.0);
+        PlanetSurfaceChunkCoordinate distant =
+            PlanetSurfaceStreamingRuntime.WorldToChunk(161.0, -97.0);
+        PlanetSurfaceGeodesicAddress small =
+            PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
+                20.0,
+                12_500.0,
+                -7_500.0);
+        PlanetSurfaceGeodesicAddress large =
+            PlanetSurfaceStreamingRuntime.BuildGeodesicAddress(
+                80.0,
+                12_500.0,
+                -7_500.0);
+
+        Assert.Equal(new PlanetSurfaceChunkCoordinate(0, 0), origin);
+        Assert.NotEqual(origin, distant);
+        Assert.InRange(small.LatitudeDegrees, -90.0, 90.0);
+        Assert.InRange(small.LongitudeDegrees, -180.0, 180.0);
+        Assert.True(large.CircumferenceMeters > small.CircumferenceMeters);
+        Assert.Equal(small.SurfaceDistanceMeters, large.SurfaceDistanceMeters, 6);
+        Assert.True(Math.Abs(small.LatitudeDegrees) > Math.Abs(large.LatitudeDegrees));
+    }
+
 }

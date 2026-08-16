@@ -20,7 +20,8 @@ public sealed class TerrainChunkBuildRequest
         bool generateCollision,
         bool rebuildCollision,
         TerrainEdgeStitchMask stitchMask,
-        TerrainEdgeStitchMask skirtMask)
+        TerrainEdgeStitchMask skirtMask,
+        PlanetSurfaceTerrainProfile? planetSurfaceProfile = null)
     {
         ChunkX = chunkX;
         ChunkZ = chunkZ;
@@ -36,6 +37,7 @@ public sealed class TerrainChunkBuildRequest
         RebuildCollision = rebuildCollision;
         StitchMask = stitchMask;
         SkirtMask = skirtMask;
+        PlanetSurfaceProfile = planetSurfaceProfile;
     }
 
     public int ChunkX { get; }
@@ -65,6 +67,8 @@ public sealed class TerrainChunkBuildRequest
     public TerrainEdgeStitchMask StitchMask { get; }
 
     public TerrainEdgeStitchMask SkirtMask { get; }
+
+    public PlanetSurfaceTerrainProfile? PlanetSurfaceProfile { get; }
 
     private static int NormalizeResolution(int requestedResolution)
     {
@@ -133,7 +137,9 @@ public static class TerrainChunkDataBuilder
         CancellationToken cancellationToken)
     {
         Stopwatch stopwatch = Stopwatch.StartNew();
-        FastNoiseLite noise = CreateNoise(request);
+        FastNoiseLite? noise = request.PlanetSurfaceProfile is null
+            ? CreateNoise(request)
+            : null;
         TerrainMeshData visualTopSurface = BuildTopSurface(
             request,
             request.VisualResolution,
@@ -164,7 +170,7 @@ public static class TerrainChunkDataBuilder
     private static TerrainMeshData BuildTopSurface(
         TerrainChunkBuildRequest request,
         int resolution,
-        FastNoiseLite noise,
+        FastNoiseLite? noise,
         TerrainEdgeStitchMask stitchMask,
         CancellationToken cancellationToken)
     {
@@ -182,10 +188,16 @@ public static class TerrainChunkDataBuilder
             {
                 float localX = (x * cellSize) - halfSize;
                 float localZ = (z * cellSize) - halfSize;
-                float sampleX = (request.ChunkX * request.ChunkSize) +
-                    (x * cellSize);
-                float sampleZ = (request.ChunkZ * request.ChunkSize) +
-                    (z * cellSize);
+                // Prototype B historically samples from the chunk minimum using
+                // x/z cell coordinates. Planet-surface mode must sample at the
+                // vertex's actual world position so TASK-156 grounding, streamed
+                // collision and the fallback mesh describe the same terrain.
+                float sampleX = request.PlanetSurfaceProfile is null
+                    ? (request.ChunkX * request.ChunkSize) + (x * cellSize)
+                    : (request.ChunkX * request.ChunkSize) + localX;
+                float sampleZ = request.PlanetSurfaceProfile is null
+                    ? (request.ChunkZ * request.ChunkSize) + (z * cellSize)
+                    : (request.ChunkZ * request.ChunkSize) + localZ;
                 float height = SampleHeight(
                     request,
                     noise,
@@ -313,16 +325,30 @@ public static class TerrainChunkDataBuilder
 
     private static float SampleHeight(
         TerrainChunkBuildRequest request,
-        FastNoiseLite noise,
+        FastNoiseLite? noise,
         float sampleX,
         float sampleZ)
     {
+        if (request.PlanetSurfaceProfile is not null)
+        {
+            return (float)PlanetSurfaceTerrainRuntime.SampleHeight(
+                request.PlanetSurfaceProfile,
+                sampleX,
+                sampleZ);
+        }
+
+        if (noise is null)
+        {
+            throw new InvalidOperationException(
+                "Legacy terrain generation requires a FastNoiseLite instance.");
+        }
+
         return noise.GetNoise2D(sampleX, sampleZ) * request.HeightScale;
     }
 
     private static Vector3 CalculateGlobalNormal(
         TerrainChunkBuildRequest request,
-        FastNoiseLite noise,
+        FastNoiseLite? noise,
         float sampleX,
         float sampleZ,
         float sampleStep)

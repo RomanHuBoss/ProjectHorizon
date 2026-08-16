@@ -4,9 +4,9 @@
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
-## TASK-156 — Planet-Specific Terrain & Surface Geometry
+## TASK-158 — Planetary Surface Streaming & Traversal Foundation
 
-The active landable planet now owns deterministic local relief rather than only a different surface color/content set. The 80x80 m bounded gameplay surface is rebuilt as a 65x65 mesh with matching trimesh collision, archetype-specific morphology, a gameplay-safe central terrace, wet-world basins, terrain-grounded ecology/POIs/base placement and heightfield NPC navigation. F5 includes `TASK-156 planet terrain acceptance`; see `docs/PLANET_SURFACE_TERRAIN.md` for the subsystem contract and manual acceptance procedure.
+The live landable-planet surface now uses the verified terrain chunk pipeline as a moving bounded gameplay window instead of ending at the TASK-156 80x80 m mesh. A 5x5 / 25-chunk residency follows the player (9 high-detail collision chunks plus 16 low-detail visual chunks), samples the current planet's deterministic morphology in background workers, retains LOD stitching/cancellation/safe unload, extends TASK-124 terrain-aware navigation with traversal, and retires the old local mesh only after the first streaming plan settles. F5 includes `TASK-158 planet surface streaming acceptance`; see `docs/PLANET_SURFACE_STREAMING.md`.
 
 ## Технологический стек
 
@@ -32,9 +32,9 @@ The active landable planet now owns deterministic local relief rather than only 
 
 ## Текущее состояние
 
-Stage 1 vertical slice и принятая TASK-150 planetary-environment foundation сохранены. После подтверждения владельца продукта «всё работает» TASK-150/TASK-151 считаются `VERIFIED` без реконструкции отсутствующих численных метрик. `TASK-152` реализовал реальный same-system planetary transfer; его формальный Windows/Godot runtime-tail `TASK-153` остаётся `IN_PROGRESS`. `TASK-154` уже связал физический перелёт с planet-scoped biome/ecology/POI/persistence. Текущая кодовая mega-итерация `TASK-156` закрывает следующий Stage 2 разрыв — **Planet-Specific Terrain & Surface Geometry**: активная поверхность получает детерминированный архетип-специфичный рельеф, matching trimesh collision, terrain-aware POI/ecology, heightfield NavigationServer3D и корректное grounding NPC/resources/base construction. Runtime/manual tail оформлен как `TASK-157`.
+Stage 1 remains intact and the Stage 2 planet stack now runs through environment → interplanetary travel → planet-scoped content → planet-specific relief → **bounded live surface streaming**. The product owner reported the TASK-156 revision as working and requested the next mega-iteration; TASK-156/TASK-157 are therefore recorded as accepted by owner waiver without reconstructing missing numeric build metrics. `TASK-158` promotes the already verified Prototype-B async terrain-chunk architecture into `SalvageRepairSlice`: 25-chunk bounded residency, 33/17 LODs, 3x3 collision, exact TASK-156 terrain sampling, safe fallback handoff, moving terrain-aware NPC navigation and planet-radius surface addressing. `TASK-159` remains the Windows/Godot runtime/manual acceptance tail. The live gameplay frame is still tangent-plane based; physical cube-sphere/floating-origin traversal is the next scaling layer, not claimed by TASK-158.
 
-### TASK-156 Planet-Specific Terrain & Surface Geometry mega-iteration — `IMPLEMENTED`, runtime acceptance — `IN_PROGRESS`
+### TASK-156 Planet-Specific Terrain & Surface Geometry mega-iteration — `VERIFIED` (product-owner acceptance)
 
 - deterministic terrain profile строится из `PlanetId/archetype/seed`; temperate/desert/frozen/volcanic имеют разные morphology signatures;
 - bounded `80 x 80 m` active surface заменяет плоский ground на `65 x 65` mesh (`4,225` vertices / `8,192` triangles) и matching trimesh collision;

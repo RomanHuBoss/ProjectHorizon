@@ -1,19 +1,74 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-15
-> **Подготовленный снимок:** `ProjectHorizon-main-task156-planet-specific-terrain.zip`
+> **Последняя актуализация:** 2026-08-16
+> **Подготовленный снимок:** `ProjectHorizon-main-task158-planet-surface-streaming.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
 
-## 0. Текущая mega-итерация 2026-08-15 — TASK-156 Planet-Specific Terrain & Surface Geometry
+## 0. Текущая mega-итерация 2026-08-16 — TASK-158 Planetary Surface Streaming & Traversal Foundation
+
+**Исходный снимок:** `ProjectHorizon-main-task156-planet-specific-terrain.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task158-planet-surface-streaming.zip`.  
+**Версия:** `0.1.0-alpha.158`.  
+**Статус:** TASK-158 `IMPLEMENTED`; Windows/Godot runtime/manual tail TASK-159 `IN_PROGRESS`.
+
+### Решение по предыдущей приёмке
+
+После TASK-156 пользователь сообщил: «вроде, работает всё» и явно запросил следующую mega-итерацию. По правилу product-owner acceptance waiver TASK-156/TASK-157 переводятся в `VERIFIED`; точные отсутствующие clean-build/F5/screenshots значения не выдумываются. Это подтверждает переход к следующему коду, но не используется как источник фиктивных числовых метрик.
+
+### Выбранный системный разрыв
+
+TASK-156 сделал planet-specific relief, однако playable ground всё ещё физически заканчивался на одном `80 x 80 m` mesh. В репозитории уже существовала verified Prototype-B chunk architecture: background workers, revision/cancellation/stale protection, LOD stitching, skirts, hysteresis и safe unload. TASK-158 не создаёт параллельный terrain engine, а **promotes этот проверенный pipeline в реальный `SalvageRepairSlice`** и связывает его с TASK-156 planet terrain sampler, TASK-124 navigation и TASK-148 surface residency.
+
+Связная подсистема итерации: **current planet profile → deterministic worker sampling → moving bounded chunk residency → LOD/collision handoff → traversal-aware NavMesh → world-context suspension → diagnostics/F5 acceptance**.
+
+### Реализация
+
+- `TerrainChunkManager` получил opt-in planet-surface mode через `ConfigurePlanetSurface`; Prototype-B defaults/controls остаются совместимыми.
+- Live surface residency: `5 x 5 = 25` visual chunks по `32 m`; центральные `3 x 3 = 9` — LOD0 `33 x 33` + collision `33 x 33`; внешние `16` — LOD1 `17 x 17`; collision дальше 1 chunk radius не держится.
+- Worker `TerrainChunkDataBuilder` при planet mode не создаёт Godot noise source: высота вычисляется чистым `PlanetSurfaceTerrainRuntime.SampleHeight`. Для streamed mode исправлено соответствие exact world vertex coordinate; legacy Prototype-B sampling оставлен неизменным.
+- Сохраняются уже verified background `Task.Run`, worker limit, cancellation token, plan revision, stale-result discard, ordered main-thread apply, LOD stitching и outer skirts.
+- TASK-156 `65 x 65` mesh остаётся временным визуальным/physics fallback. После `IsStreamingSettled` с полным 25-chunk планом fallback mesh/collision выключается. При смене planet profile fallback вновь активируется до завершения нового worker plan.
+- `NpcNavigationSurfaceNode` больше не ограничен `HalfExtent=40 m`: heightfield NavigationRegion3D продолжает 5x5 bounded streaming вокруг player внутри 8,192 m traversal envelope; streamed `TerrainChunk` исключён из static obstacles как собственно ground.
+- `PlanetSurfaceStreamer` включён в TASK-148 surface residency set: Orbit/Station/Hyperspace suspend его вместе с surface world.
+- Добавлен planet-radius geodesic address (`lat/lon`, circumference) из tangent displacement. Это diagnostic/addressing bridge к cube-sphere; TASK-158 **не заявляет** уже готовое физическое движение по кривой сфере или floating-origin.
+- HUD RU/EN показывает loaded/target chunks, collision count, queue, chunk sector и lat/lon. Runtime readiness строка фиксирует bounded residency, workers и retirement fallback.
+- F5 дополнен `TASK-158 planet surface streaming acceptance`; добавлены 3 xUnit regressions и `tools/validate-task158-planet-surface-streaming.py`; section-37 cmd/sh запускают новый gate.
+- Документация: `docs/PLANET_SURFACE_STREAMING.md`, README, CHANGELOG, VERSION и этот журнал.
+
+### Трассируемость к ТЗ
+
+Новые трактовки LFS-недоступного PDF не вводятся. Итерация опирается только на ранее зафиксированную карту требований: §9.1–9.3 (planet geometry/radius/quadtree LOD), Stage 2 3–5 planets и уже принятые Prototype-B/Prototype-C terrain/quadtree contracts. TASK-158 является runtime promotion существующей архитектуры, а не реконструкцией недоступного текста PDF.
+
+### Фактические проверки в среде подготовки
+
+Static contract: `TASK-158 PLANET SURFACE STREAMING CONTRACT PASS: active=25; lod0=9; lod1=16; collision=9; chunk=32m; async=1; cancellation=1; staleGuard=1; stitch=1; skirts=1; terrainSampler=1; fallbackHandoff=1; navTraversal=1; surfaceResidency=1; addressing=1; f5=1; xunit=3/3; localization=2/2.`
+
+Полный repository validator set после финальной интеграции: **18/18 PASS**, включая TASK-124/138/148/149.4/150/152/154/154.1/156 и новый TASK-158 gate. Независимая модель подтверждает exact window overlap (20 chunks при осевом shift, 16 при диагональном), `14,425` top-surface vertices при settled 25-chunk plan, `9,801` collision top vertices и full-relief probe на всех четырёх starter seeds. Изменённые 10 C# files проходят lexical/bracket scan; shell syntax и VERSION gate PASS. В среде подготовки нет `dotnet`, `csc/msbuild` и Godot, поэтому реальная C# compilation/xUnit/Godot runtime не заявляется.
+
+### Критерии runtime-приёмки TASK-159
+
+1. `tools\clean-build-windows10.cmd` → `0 warnings / 0 errors`; затем `tools\run-section37-quality.cmd`.
+2. F5 → `TASK-158 planet surface streaming acceptance PASS` с `starterPlanets=4/4; activeChunks=25/25; highDetail=9/9; lowDetail=16/16; collisionChunks=9/9; deterministic=1; seamSafe=1; boundedResidency=1; traversalPlans=1; planetAddressing=1; fullRelief=1`.
+3. Дождаться `TASK-158 planet surface streaming READY` с `active=25/25; collisions=9/9; queue=0; workers=0; fallback=retired`.
+4. Пешком/jetpack пройти за старую границу ±40 m и пересечь минимум 5 chunk centers (>160 m): terrain не должен обрываться/проваливаться; HUD sector меняется, resident count остаётся bounded.
+5. Проверить, что TASK-124 F5 остаётся PASS и NPC на активной поверхности не воспринимают terrain chunks как препятствия.
+6. Перелететь на другую landable planet: сначала разрешён временный TASK-156 fallback, затем новый `TASK-158 ... READY`; relief должен соответствовать destination archetype, без stale chunks предыдущей планеты.
+7. При FAIL прислать первую compile/runtime ошибку, полные TASK-124/TASK-156/TASK-158 строки и ближайшие `Terrain worker` diagnostics.
+
+**Known boundary:** это первый реальный streaming/traversal layer поверх vertical slice, но gameplay coordinate frame остаётся tangent-plane; ecology/POI/resource authoring пока остаётся существующим starter-region plan, а не planet-wide chunk content streaming. Следующий масштабный шаг — promotion Prototype-C cube-face/quadtree surface frame + floating origin/radial orientation без отказа от bounded 25-chunk residency; затем тот же surface address можно использовать для planet-wide content streaming.
+
+---
+
+## 0. Предыдущая mega-итерация 2026-08-15 — TASK-156 Planet-Specific Terrain & Surface Geometry
 
 **Исходный снимок:** `ProjectHorizon-main-task154.1-runtime-acceptance-hotfix.zip`.  
 **Подготовленный снимок:** `ProjectHorizon-main-task156-planet-specific-terrain.zip`.  
 **Версия:** `0.1.0-alpha.156`.  
-**Статус:** TASK-156 `IMPLEMENTED`; runtime/manual acceptance TASK-157 `IN_PROGRESS`.
+**Статус:** TASK-156/TASK-157 `VERIFIED` по product-owner acceptance waiver 2026-08-16: пользователь сообщил, что редакция работает, и явно запросил следующую mega-итерацию; отсутствующие численные build/F5 метрики не реконструируются.
 
 ### Основание для следующей mega-итерации
 
@@ -5515,10 +5570,31 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | `TERRAIN-108` | Ground NPC не форсятся на flat `_home.Y` | `IMPLEMENTED` | `GetNavigationHeight` after movement and territory clamp |
 | `TERRAIN-109` | Base/resource surface objects проецируются на terrain | `IMPLEMENTED` | build target/preview/module + generated resource grounding |
 | `TERRAIN-110` | Static/F5/xUnit acceptance проверяет подсистему целиком | `IMPLEMENTED` | TASK-156 validator; F5 acceptance; xUnit 3/3 source coverage |
-| `TERRAIN-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-157 Windows/Godot .NET acceptance |
-| `TERRAIN-ACC-101` | Section-37 + xUnit execution green | `IN_PROGRESS` | static gates PASS; actual dotnet unavailable in preparation environment |
-| `TERRAIN-ACC-102` | F5 TASK-156 PASS | `IN_PROGRESS` | выполнить TASK-157 |
-| `TERRAIN-ACC-103` | Manual visual relief + NPC/base/water smoke across starter planets | `IN_PROGRESS` | выполнить TASK-157 |
+| `TERRAIN-ACC-100` | Clean build `0/0` | `VERIFIED` | product-owner acceptance waiver 2026-08-16; exact numeric log not reconstructed |
+| `TERRAIN-ACC-101` | Section-37 + xUnit execution green | `VERIFIED` | product-owner acceptance waiver after reported working TASK-156 revision; exact xUnit log not reconstructed |
+| `TERRAIN-ACC-102` | F5 TASK-156 PASS | `VERIFIED` | product-owner acceptance waiver 2026-08-16; exact output metrics not reconstructed |
+| `TERRAIN-ACC-103` | Manual visual relief + NPC/base/water smoke across starter planets | `VERIFIED` | пользователь сообщил, что delivered TASK-156 revision работает, и запросил следующую mega-итерацию |
+
+### 8.28. Planetary Surface Streaming & Traversal Foundation
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---|---|
+| `STREAM-100` | Live surface использует verified chunk manager, а не отдельный parallel streamer | `IMPLEMENTED` | `TerrainChunkManager.ConfigurePlanetSurface`; Prototype-B mode retained |
+| `STREAM-101` | Residency bounded: 25 visual chunks | `IMPLEMENTED` | 5x5 plan around current chunk; exact target exposed by manager |
+| `STREAM-102` | Two-level LOD: 9 high-detail + 16 low-detail | `IMPLEMENTED` | 33x33 LOD0 center / 17x17 LOD1 ring |
+| `STREAM-103` | Physics collision bounded центральными 9 chunks | `IMPLEMENTED` | radius=1; 33x33 collision; outer LOD visual-only |
+| `STREAM-104` | Worker samples deterministic current-planet terrain at exact world vertex positions | `IMPLEMENTED` | `PlanetSurfaceProfile` branch in `TerrainChunkDataBuilder` |
+| `STREAM-105` | LOD seams/outer gaps скрываются verified stitch + skirt contract | `IMPLEMENTED` | existing edge stitch masks + 2 m outer skirts |
+| `STREAM-106` | Rapid movement/profile switch не применяет stale worker results | `IMPLEMENTED` | cancellation + plan revision + stale discard retained |
+| `STREAM-107` | Startup/profile switch сохраняет ground до готовности stream | `IMPLEMENTED` | TASK-156 fallback remains until `IsStreamingSettled`, then retired |
+| `STREAM-108` | TASK-124 heightfield navigation может следовать traversal beyond 80x80 | `IMPLEMENTED` | moving 5x5 nav regions within 8192 m envelope; streamed terrain excluded from obstacles |
+| `STREAM-109` | Non-surface world contexts suspend terrain streaming | `IMPLEMENTED` | `PlanetSurfaceStreamer` included in TASK-148 surface runtime nodes |
+| `STREAM-110` | Planet-radius surface address available without save schema change | `IMPLEMENTED` | deterministic exponential-map lat/lon diagnostic |
+| `STREAM-111` | Static/F5/xUnit acceptance покрывает подсистему | `IMPLEMENTED` | TASK-158 validator; F5 acceptance; 3 xUnit regressions |
+| `STREAM-ACC-100` | Clean build `0/0` | `IN_PROGRESS` | TASK-159 Windows/Godot .NET acceptance |
+| `STREAM-ACC-101` | Section-37 + xUnit execution green | `IN_PROGRESS` | static gates in preparation environment; real dotnet required |
+| `STREAM-ACC-102` | F5 TASK-158 PASS + READY settled 25/25 | `IN_PROGRESS` | выполнить TASK-159 |
+| `STREAM-ACC-103` | Manual traversal >160 m + destination planet re-stream | `IN_PROGRESS` | выполнить TASK-159 |
 
 ## 9. Очередь ближайших задач
 
@@ -5528,12 +5604,12 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 |---:|---|---|---|
 | 1 | `TASK-153` | Runtime acceptance Interplanetary Travel | F5 уже PASS; остаются clean build `0/0`, quality/xUnit и manual target→cruise→landing→cold restore |
 | 2 | `TASK-155` | Runtime acceptance Planet-Scoped Surface Content | F5 уже PASS; остаются quality/build evidence, manual variation on starter 4 planets и independent discovery/ecology cold restore |
-| 3 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | clean build + section-37 + F5 TASK-156 + visual relief/NPC/base/water smoke |
+| 3 | `TASK-159` | Runtime/manual acceptance Planetary Surface Streaming | clean build + section-37 + F5 TASK-158 + >160 m traversal + destination re-stream |
 | 4 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Принято владельцем продукта:** TASK-149 technical foundation и TASK-150/TASK-151 Multi-Planet Environment acceptance.  
-**Текущая кодовая реализация:** TASK-156 Planet-Specific Terrain & Surface Geometry (`IMPLEMENTED`) поверх verified F5 foundation TASK-154.1/TASK-154.  
-**Формально первая незакрытая приёмочная задача:** TASK-153; TASK-155 следует сразу после неё.
+**Принято владельцем продукта:** TASK-149 technical foundation, TASK-150/TASK-151 Multi-Planet Environment и TASK-156/TASK-157 Planet-Specific Terrain (qualitative acceptance waiver 2026-08-16).  
+**Текущая кодовая реализация:** TASK-158 Planetary Surface Streaming & Traversal Foundation (`IMPLEMENTED`) поверх verified TASK-156 terrain и Prototype-B streaming architecture.  
+**Формально первая незакрытая приёмочная задача:** TASK-153; затем TASK-155 и новый TASK-159. Явный запрос владельца продукта на mega-итерацию разрешает параллельно продолжать Stage 2 code progression без выдумывания отсутствующих acceptance metrics.
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`
 
