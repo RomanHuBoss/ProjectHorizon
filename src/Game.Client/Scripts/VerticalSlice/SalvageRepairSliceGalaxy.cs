@@ -262,6 +262,11 @@ public partial class SalvageRepairSlice
         }
 
         StageOneVoyage.ArriveAtOrbitalStationFromHyperspace();
+        // TASK-178: a planet target belongs to one star system. The galaxy jump
+        // clears its selection transactionally; synchronize the same-system
+        // travel state in the very same success path so no stale source/target
+        // can leak into the newly loaded system.
+        InterplanetaryTravel.SynchronizeSelection(GalaxyNavigation);
         _stationServicesOpenedFromVoyage = false;
         ActivateCurrentPlanetSurfaceContent();
         if (worldTransit)
@@ -286,6 +291,8 @@ public partial class SalvageRepairSlice
             $"jumps={GalaxyNavigation.JumpCount}; " +
             $"visited={GalaxyNavigation.VisitedSystemIds.Count}; " +
             $"fuel={ShipSystems.Fuel.ToString("0.###", CultureInfo.InvariantCulture)}; " +
+            $"planetTargetCleared={(string.IsNullOrWhiteSpace(GalaxyNavigation.SelectedPlanetId) ? 1 : 0)}; " +
+            $"interplanetarySync={(InterplanetaryTravel.IsSelectionConsistentWith(GalaxyNavigation) ? 1 : 0)}; " +
             $"result={description}");
         UpdateGalaxyMapPanel();
     }

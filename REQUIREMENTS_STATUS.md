@@ -2,11 +2,68 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task176.1-aerial-altitude-runtime-hotfix.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task178-spaceflight-navigation-subsystem.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
 ---
+
+## 0. Текущая mega-итерация 2026-08-16 — TASK-178 Spaceflight & Navigation Subsystem Closure
+
+**Исходный снимок:** `ProjectHorizon-main-task176.1-aerial-altitude-runtime-hotfix.zip`.  
+**Подготовленный снимок:** `ProjectHorizon-main-task178-spaceflight-navigation-subsystem.zip`.  
+**Версия:** `0.1.0-alpha.178`.  
+**Статус:** TASK-176.1 `VERIFIED` по внешнему Godot 4.7.1 runtime evidence; TASK-177 runtime-критерий закрыт, но отдельный section-37 build log пользователем не предоставлен и переносится в новый TASK-179 quality reacceptance; TASK-178 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.
+
+### Синхронизация внешней приёмки предыдущей итерации
+
+Пользовательский runtime-лог закрывает оба pending-критерия предыдущего цикла:
+
+- `TASK-126 aerial navigation acceptance PASS`: `activeFlying=3`, `altitude=1`, `altitudeProbe=1`, `altitudeRange=2.33..5.44m`, `altitudeViolations=none`, остальные §30.2/§30.3 navigation invariants `=1`; одна flying fauna была уничтожена до PASS, поэтому одновременно подтверждены lifecycle filter и независимый controller probe;
+- `TASK-176 planetary surface subsystem acceptance PASS`: `starterPlanets=4/4`, `contracts=11/11`, all model chains `=1`, all live invariants `=1`, `chunks=25/25`, `collisions=9/9`, `navRegions=25/25`, `minGuard=1.020m`.
+
+Следовательно TASK-176.1 переведён в `VERIFIED`; runtime-часть TASK-177 закрыта. Отдельное доказательство `tools\run-section37-quality.cmd` для alpha.176.1 не было приложено, поэтому этот quality-tail не выдумывается и поглощается более строгой внешней приёмкой alpha.178/TASK-179. Planetary surface функционально не переоткрывается.
+
+### Выбор следующей mega-итерации
+
+После закрытия TASK-150…176 ближайшая крупная уже существующая системная граница — **spaceflight/navigation**: TASK-110 ship systems → TASK-112 voyage → TASK-152 same-system interplanetary transfer → TASK-114 hyperspace/galaxy → TASK-128 star-system simulation → TASK-148 world-scene residency. Эти контракты ранее проходили по отдельности, но не существовало одного требования, доказывающего их совместную целостность.
+
+TASK-178 агрегирует 6 нормативных acceptance reports и дополнительно требует:
+
+- readiness chain: pre-repair block → commissioning → flight/hyperspace readiness → voyage/galaxy preconditions;
+- fuel chain: ship fuel lifecycle + takeoff + interplanetary + hyperspace debits;
+- transition chain: launch/dock/undock/land + planet arrival + hyperspace + system/world-scene handoff;
+- persistence chain: ship/voyage/galaxy cold restore + planet target/transfer + transactional world restore;
+- navigation identity: deterministic hierarchy/routes/star-system representation + same-system planet scope;
+- bounded residency: single world shell plus correct star-system surface activation pipeline.
+
+### Исправленный интеграционный дефект
+
+После успешного hyperspace jump `GalaxyNavigationRuntime` уже очищал `SelectedPlanetId`, однако `InterplanetaryTravelRuntime` мог хранить старый `TargetSelected` source/target предыдущей системы до следующей явной синхронизации. Это нарушало cross-system identity, хотя отдельные TASK-114 и TASK-152 могли оставаться зелёными.
+
+Исправлено:
+
+- `InterplanetaryTravelRuntime.IsSelectionConsistentWith()` проверяет current planet, source/target, phase, fuel/distance transaction и принадлежность target текущей системе;
+- successful `ConfirmGalaxyMapDestination()` сразу выполняет `InterplanetaryTravel.SynchronizeSelection(GalaxyNavigation)` в том же success path;
+- TASK-114 player-jump diagnostics дополнены `planetTargetCleared` и `interplanetarySync`;
+- TASK-178 live acceptance проверяет selection sync, exact world context/single shell, star-system binding, ship↔voyage readiness, current/target planet scope и residency policy;
+- общий F5 final state теперь зависит от TASK-178 PASS, поэтому closure нельзя проигнорировать.
+
+### Изменённые файлы
+
+`InterplanetaryTravelRuntime.cs`, `SalvageRepairSliceGalaxy.cs`, `SalvageRepairSliceDeveloperBridge.cs`, новые `SpaceflightNavigationSubsystemAcceptance.cs` и `SalvageRepairSliceSpaceflightNavigationSubsystem.cs`, `SalvageRepairSlice.cs`, `Section38ArchitectureTests.cs`, `docs/SPACEFLIGHT_NAVIGATION_SUBSYSTEM.md`, новый TASK-178 validator, section-37 runners, CI/release workflows, forward-version gates, `VERSION`, `CHANGELOG.md`, `README.md`, этот журнал.
+
+### Проверки / ограничения среды подготовки
+
+Обязательный статический gate TASK-178 проверяет 6-contract aggregation, все cross-contract chains, hyperspace target synchronization, F5/HUD/final-state wiring, xUnit regression и local/CI/release enforcement. В контейнере подготовки отсутствуют `.NET SDK` и Godot executable, поэтому `dotnet build/test` и реальный Godot F5 для alpha.178 здесь не заявляются.
+
+### Acceptance TASK-178
+
+1. `tools\run-section37-quality.cmd` — требуется clean build `0 errors / 0 warnings`, все тесты и `TASK-178 ... CONTRACT PASS`.
+2. New Game, дождаться `TASK-178 spaceflight navigation subsystem READY`.
+3. F5: требуется `TASK-178 ... acceptance PASS`, `contracts=6/6`; все six contract flags, six model chains и seven live flags = `1`.
+4. Регрессии TASK-126 и TASK-176 должны оставаться PASS.
+5. Manual cross-system smoke: repair/commission → orbital station → выбрать reachable другую систему → hyperspace. Строка `TASK-114 player hyperspace jump PASS` обязана иметь `planetTargetCleared=1; interplanetarySync=1`; после прыжка нельзя сохранять planet-target предыдущей системы.
 
 ## 0. Текущая emergency-итерация 2026-08-16 — TASK-176.1 Flying Fauna Terrain-Altitude Runtime Hotfix
 
@@ -6333,20 +6390,38 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | ID | Требование | Статус | Доказательство / следующее действие |
 |---|---|---:|---|
-| `AERIAL-HF-1742-0` | Dead/hidden flying fauna не участвуют в live altitude invariant | `IMPLEMENTED` | lifecycle predicate `Flying && Visible && Health>0`; static gate PASS |
-| `AERIAL-HF-1742-1` | Altitude acceptance не может пройти vacuously при 0 active flying fauna | `IMPLEMENTED` | independent `ApplyAltitudeEnvelope` probe + `AltitudeCorrections` counter |
-| `AERIAL-HF-1742-2` | TASK-126 diagnostics отражают lifecycle и controller probe | `IMPLEMENTED` | `activeFlying=<n>; altitudeProbe=<0/1>` |
-| `AERIAL-HF-ACC-100` | TASK-126 повторно PASS после уничтожения flying fauna | `IN_PROGRESS` | external Godot: F5 должен дать `altitude=1; altitudeProbe=1; faunaProbeSamples=4` |
-| `SURFACE-1760` | 11 нормативных planetary-surface acceptance runners образуют единый contract | `IMPLEMENTED` | model runner `contracts=11`; static gate PASS |
-| `SURFACE-1761` | Persistence chain согласована across planet/travel/content/weather/frame | `IMPLEMENTED` | `persistenceChain` + xUnit aggregate |
-| `SURFACE-1762` | Traversal chain согласована across streamer/rebase/seams/physical/curved | `IMPLEMENTED` | `traversalChain` + xUnit aggregate |
-| `SURFACE-1763` | Bounded residency остаётся 25 active / 9 collision | `IMPLEMENTED` | model + live streamer invariant |
-| `SURFACE-1764` | Cross-planet identity сохраняется для 4 starter planets | `IMPLEMENTED` | environment/content/terrain/world scoped identity chain |
-| `SURFACE-1765` | Live Godot stack проверяется как единая подсистема | `IMPLEMENTED` | 8 live invariants: streamer/nav/player/presentation/content/cold-start/weather/radial |
-| `SURFACE-1766` | Runtime READY/HUD/Output diagnostics | `IMPLEMENTED` | `TASK-176 ... READY`, `TASK-176 (F5)`, final PASS/FAIL line |
-| `SURFACE-1767` | Section-37, CI, release и xUnit regression | `IMPLEMENTED` | `validate-task176-planetary-surface-subsystem.py`; aggregate WorldGen test |
-| `SURFACE-ACC-176` | Clean build + F5 TASK-176 PASS | `IN_PROGRESS` | external Windows/Godot required; expected `contracts=11/11`, live 8/8, globe=1 |
+| `AERIAL-HF-1742-0` | Dead/hidden flying fauna не участвуют в live altitude invariant | `VERIFIED` | external TASK-126 PASS after flying-fauna death; activeFlying=3 |
+| `AERIAL-HF-1742-1` | Altitude acceptance не может пройти vacuously при 0 active flying fauna | `VERIFIED` | external `altitudeProbe=1`, faunaProbeSamples=4 |
+| `AERIAL-HF-1742-2` | TASK-126 diagnostics отражают lifecycle и controller probe | `VERIFIED` | external output: activeFlying=3; altitudeRange=2.33..5.44m; violations=none |
+| `AERIAL-HF-ACC-100` | TASK-126 повторно PASS после уничтожения flying fauna | `VERIFIED` | external Godot 4.7.1: altitude=1; altitudeProbe=1; activeFlying=3; violations=none |
+| `SURFACE-1760` | 11 нормативных planetary-surface acceptance runners образуют единый contract | `VERIFIED` | external F5 contracts=11/11 |
+| `SURFACE-1761` | Persistence chain согласована across planet/travel/content/weather/frame | `VERIFIED` | external F5 persistenceChain=1 |
+| `SURFACE-1762` | Traversal chain согласована across streamer/rebase/seams/physical/curved | `VERIFIED` | external F5 traversalChain=1 |
+| `SURFACE-1763` | Bounded residency остаётся 25 active / 9 collision | `VERIFIED` | external F5 bounded=1; chunks=25/25; collisions=9/9 |
+| `SURFACE-1764` | Cross-planet identity сохраняется для 4 starter planets | `VERIFIED` | external F5 starterPlanets=4/4; planetIdentity=1 |
+| `SURFACE-1765` | Live Godot stack проверяется как единая подсистема | `VERIFIED` | external F5 all eight live invariants=1 |
+| `SURFACE-1766` | Runtime READY/HUD/Output diagnostics | `VERIFIED` | external READY + final PASS line |
+| `SURFACE-1767` | Section-37, CI, release и xUnit regression | `VERIFIED` | implementation gate retained; runtime F5 closure externally proven |
+| `SURFACE-ACC-176` | Clean build + F5 TASK-176 PASS | `IN_PROGRESS` | F5 runtime externally VERIFIED: contracts=11/11; live 8/8; globe=1; separate section-37 build log not supplied and is rolled into TASK-179 |
 
+
+
+### 8.38. Spaceflight & Navigation Subsystem Closure — TASK-178
+
+| ID | Требование | Статус | Доказательство / следующее действие |
+|---|---|---:|---|
+| `FLIGHT-1780` | TASK-110/112/114/128/148/152 образуют единый 6-contract subsystem | `IMPLEMENTED` | `SpaceflightNavigationSubsystemAcceptanceRunner`; expected=6 |
+| `FLIGHT-1781` | Readiness chain согласована от damaged ship до flight/hyperspace preconditions | `IMPLEMENTED` | aggregate `ReadinessChain` |
+| `FLIGHT-1782` | Fuel lifecycle согласован across launch/interplanetary/hyperspace | `IMPLEMENTED` | aggregate `FuelChain` |
+| `FLIGHT-1783` | Voyage/planet/hyperspace/world transitions образуют непрерывную цепочку | `IMPLEMENTED` | aggregate `TransitionChain` |
+| `FLIGHT-1784` | Ship/voyage/galaxy/planet/world persistence образует единый restore contract | `IMPLEMENTED` | aggregate `PersistenceChain` |
+| `FLIGHT-1785` | Galaxy/star-system/planet target identity не расходится | `IMPLEMENTED` | `NavigationIdentity` + `IsSelectionConsistentWith` |
+| `FLIGHT-1786` | Hyperspace transaction не переносит planet target между системами | `IMPLEMENTED` | immediate `SynchronizeSelection` + player-jump diagnostics |
+| `FLIGHT-1787` | Live world shell/star system/ship-voyage/current-target scope/residency согласованы | `IMPLEMENTED` | seven live TASK-178 invariants |
+| `FLIGHT-1788` | F5 final acceptance state зависит от TASK-178 | `IMPLEMENTED` | nullable closure result participates in combined PASS/FAIL |
+| `FLIGHT-1789` | Section-37/CI/release/xUnit защищают closure | `IMPLEMENTED` | TASK-178 validator + architecture tests |
+| `FLIGHT-ACC-178` | Clean build + F5 TASK-178 PASS | `IN_PROGRESS` | external Windows/Godot required; expected contracts=6/6, model chains=6/6, live=7/7 |
+| `FLIGHT-MANUAL-178` | Cross-system smoke подтверждает target clear/sync | `IN_PROGRESS` | repair/commission → station → hyperspace; expected targetCleared=1, interplanetarySync=1 |
 
 
 ## 9. Очередь ближайших задач
@@ -6355,7 +6430,7 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 
 | Приоритет | ID | Задача | Результат |
 |---:|---|---|---|
-| 1 | `TASK-177` | External acceptance TASK-174.2 + TASK-176 | clean build/section-37; New Game; optional flying-fauna kills; F5 TASK-126 + TASK-176 PASS |
+| 1 | `TASK-179` | External acceptance TASK-178 | clean build/section-37; F5 contracts=6/6 + live=7/7; manual hyperspace target-clear smoke |
 | 2 | `TASK-163` | Runtime/manual acceptance Planet-Global Surface Frame | live >2048 m rebase; distant cold restore/persistence (F5 TASK-162 already externally PASS) |
 | 3 | `TASK-166` | Planetary Weather manual smoke/persistence | F5 already PASS; midnight/noon/storm/toxic smoke; save/restart time restore |
 | 4 | `TASK-161` | Runtime/manual acceptance Planet Surface World Composition | depletion across unload/restart/planet return; visual layer largely accepted |
@@ -6365,8 +6440,8 @@ PDF-ТЗ требует cube sphere, гравитацию к центру, хо�
 | 8 | `TASK-157` | Runtime/manual acceptance Planet-Specific Terrain | F5 PASS; manual visual/NPC/base/water smoke |
 | 9 | `TASK-006` | Записать SHA контрольного коммита | `BLOCKED`: в переданном ZIP нет `.git`; требуется SHA фактического GitHub commit |
 
-**Текущая разрабатываемая реализация:** TASK-174/TASK-174.1 `VERIFIED`; TASK-174.2 и TASK-176 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.  
-**Формально ближайший шаг:** TASK-177 — один внешний reacceptance-прогон должен одновременно подтвердить исправление TASK-126 после dead fauna и интеграционное закрытие planetary-surface subsystem. После его PASS следующий функциональный шаг выбирается уже за пределами TASK-150…174, а оставшиеся строки 153/155/157/159/161/163/166 остаются manual acceptance tails, а не поводом повторно реализовывать подсистемы.
+**Текущая разрабатываемая реализация:** TASK-176.1 `VERIFIED`; TASK-177 runtime criteria closed / standalone quality log superseded by TASK-179; TASK-178 `IMPLEMENTED / PENDING EXTERNAL BUILD+F5`.  
+**Формально ближайший шаг:** TASK-179 — внешний reacceptance нового Spaceflight & Navigation closure. Планетарный surface-stack закрыт и не является текущей зоной разработки; строки 153/155/157/159/161/163/166 остаются manual acceptance tails.
 
 
 ## 10. Runtime-приёмка `TASK-062/TASK-063`

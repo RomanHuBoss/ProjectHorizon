@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using System.Linq;
 
 public enum InterplanetaryTravelPhase
 {
@@ -68,6 +69,73 @@ public sealed class InterplanetaryTravelRuntime
         TargetPlanetId,
         PlannedDistanceMeters,
         FuelCost);
+
+    /// <summary>
+    /// TASK-178 cross-system navigation invariant. A planetary target is scoped
+    /// to the current star system and may never survive a hyperspace mutation.
+    /// This method deliberately validates both the galaxy selection and this
+    /// runtime's cached transaction state.
+    /// </summary>
+    public bool IsSelectionConsistentWith(GalaxyNavigationRuntime galaxy)
+    {
+        ArgumentNullException.ThrowIfNull(galaxy);
+        bool currentPlanetInScope = galaxy.CurrentSystem.Planets.Any(planet =>
+            string.Equals(
+                planet.PlanetId,
+                galaxy.CurrentPlanetId,
+                StringComparison.Ordinal));
+        if (!currentPlanetInScope)
+        {
+            return false;
+        }
+
+        if (Phase == InterplanetaryTravelPhase.Idle)
+        {
+            return string.IsNullOrWhiteSpace(galaxy.SelectedPlanetId) &&
+                string.IsNullOrWhiteSpace(SourcePlanetId) &&
+                string.IsNullOrWhiteSpace(TargetPlanetId) &&
+                Math.Abs(PlannedDistanceMeters) <= double.Epsilon &&
+                Math.Abs(FuelCost) <= double.Epsilon;
+        }
+
+        bool targetInScope = !string.IsNullOrWhiteSpace(TargetPlanetId) &&
+            galaxy.CurrentSystem.Planets.Any(planet => string.Equals(
+                planet.PlanetId,
+                TargetPlanetId,
+                StringComparison.Ordinal));
+        bool identityMatches =
+            targetInScope &&
+            string.Equals(
+                SourcePlanetId,
+                galaxy.CurrentPlanetId,
+                StringComparison.Ordinal) &&
+            string.Equals(
+                TargetPlanetId,
+                galaxy.SelectedPlanetId,
+                StringComparison.Ordinal) &&
+            !string.Equals(
+                SourcePlanetId,
+                TargetPlanetId,
+                StringComparison.Ordinal);
+        if (!identityMatches)
+        {
+            return false;
+        }
+
+        return Phase switch
+        {
+            InterplanetaryTravelPhase.TargetSelected =>
+                Math.Abs(PlannedDistanceMeters) <= double.Epsilon &&
+                Math.Abs(FuelCost) <= double.Epsilon,
+            InterplanetaryTravelPhase.Cruising =>
+                double.IsFinite(PlannedDistanceMeters) &&
+                PlannedDistanceMeters > ArrivalRadiusMeters &&
+                double.IsFinite(FuelCost) &&
+                FuelCost >= MinimumFuelCost &&
+                FuelCost <= MaximumFuelCost,
+            _ => false
+        };
+    }
 
     public void SynchronizeSelection(GalaxyNavigationRuntime galaxy)
     {

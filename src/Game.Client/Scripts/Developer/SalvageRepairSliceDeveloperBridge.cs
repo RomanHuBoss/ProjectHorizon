@@ -201,6 +201,7 @@ public partial class SalvageRepairSlice
         if (parts.Length != 4 || !int.TryParse(parts[1], out int x) || !int.TryParse(parts[2], out int y) || !int.TryParse(parts[3], out int z))
             return new DeveloperCommandResult(false, "usage: load_system x y z");
         GalaxySystemDefinition system = GalaxyNavigation.LoadSystemForDeveloper(x, y, z);
+        InterplanetaryTravel.SynchronizeSelection(GalaxyNavigation);
         _developerPlanetOverrideId = null;
         InitializeStarSystemSimulationRuntime();
         StructuredGameLogger.UpdateContext(SceneFilePath, GalaxyNavigation.UniverseSeed, system.SystemId);

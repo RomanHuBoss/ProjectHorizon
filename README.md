@@ -15,6 +15,14 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 Проект разрабатывается как одиночная игра с возможностью последующего расширения архитектуры для серверных функций и кооперативного режима.
 
+## TASK-178 — Spaceflight & Navigation Subsystem Closure
+
+Alpha.178 moves the next mega-iteration outside the now-verified planetary-surface stack. It closes the already implemented ship/readiness, Stage-1 voyage, galaxy/hyperspace, star-system simulation, interplanetary transfer and world-scene coordinator mechanics as **one spaceflight/navigation subsystem**. F5 aggregates six normative reports (TASK-110/112/114/128/148/152), then requires cross-contract readiness, fuel, transition, persistence, navigation-identity and bounded-residency chains plus seven live Godot coherence invariants.
+
+The iteration also fixes a real boundary defect: a same-system planet selection could remain cached in `InterplanetaryTravelRuntime` after `GalaxyNavigation` successfully mutated to another star system. The successful hyperspace transaction now synchronizes the interplanetary state immediately, and `IsSelectionConsistentWith()` rejects any source/target that does not belong to the current system. `TASK-114 player hyperspace jump PASS` reports `planetTargetCleared` and `interplanetarySync`; TASK-178 exposes the full closure on the existing F5 acceptance. See `docs/SPACEFLIGHT_NAVIGATION_SUBSYSTEM.md`.
+
+The previous alpha.176.1 runtime evidence is now accepted: TASK-126 passed with `activeFlying=3`, `altitude=1`, `altitudeProbe=1`, `altitudeRange=2.33..5.44m`, `altitudeViolations=none`; TASK-176 remained `contracts=11/11`. Therefore the surface stack is not reopened by alpha.178.
+
 ## TASK-176.1 — Flying Fauna Terrain-Altitude Runtime Hotfix
 
 External Godot 4.7.1 evidence verified the complete TASK-176 planetary-surface subsystem (`contracts=11/11`, live streamer/navigation/player/presentation/content/weather/radial stack all PASS), but exposed a remaining TASK-126 runtime defect with all four flying fauna alive: `altitudeProbe=1` while the live `altitude` invariant was `0`. The controller itself was correct; after it produced vertical correction, the old whole-vector maximum-speed normalization scaled that vertical authority down together with obstacle/separation/POI steering. On steep streamed terrain this could leave live fauna outside the required terrain-relative altitude corridor.

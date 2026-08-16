@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.178] - 2026-08-16
+
+### Added
+- TASK-178 model/live Spaceflight & Navigation Subsystem Closure over TASK-110/112/114/128/148/152.
+- Cross-contract readiness, fuel, transition, persistence, navigation identity and bounded residency acceptance chains.
+- F5 `TASK-178` HUD/Output diagnostics and section-37/CI/release static regression gate.
+- Architecture tests for interplanetary selection synchronization and six-contract closure.
+
+### Fixed
+- Successful hyperspace jumps now clear/synchronize same-system interplanetary target state in the same transaction, preventing a stale planet target from leaking across systems.
+- `InterplanetaryTravelRuntime` now has an explicit current-system selection-consistency invariant.
+
+### Verified from external Godot 4.7.1 evidence
+- TASK-176.1/TASK-126: `PASS`, `activeFlying=3`, `altitude=1`, `altitudeProbe=1`, `altitudeRange=2.33..5.44m`, `altitudeViolations=none`.
+- TASK-176 remains `PASS`, `contracts=11/11`, all live surface invariants green.
+
 ## [0.1.0-alpha.176.1] - 2026-08-16
 
 ### Fixed

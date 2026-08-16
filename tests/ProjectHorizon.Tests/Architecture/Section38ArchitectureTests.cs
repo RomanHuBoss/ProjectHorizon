@@ -115,6 +115,104 @@ public sealed class Section38ArchitectureTests
     }
 
     [Fact]
+    public void InterplanetarySelectionConsistencyRejectsStaleCrossSystemTarget()
+    {
+        GalaxyNavigationRuntime galaxy = new();
+        InterplanetaryTravelRuntime travel = new();
+        Assert.True(travel.IsSelectionConsistentWith(galaxy));
+
+        GalaxyPlanetDefinition target = galaxy.CurrentSystem.Planets[1];
+        Assert.True(galaxy.TrySelectPlanetDestination(target.PlanetId, out _));
+        Assert.False(travel.IsSelectionConsistentWith(galaxy));
+
+        travel.SynchronizeSelection(galaxy);
+        Assert.True(travel.IsSelectionConsistentWith(galaxy));
+
+        galaxy.ClearPlanetDestination();
+        Assert.False(travel.IsSelectionConsistentWith(galaxy));
+
+        travel.SynchronizeSelection(galaxy);
+        Assert.True(travel.IsSelectionConsistentWith(galaxy));
+        Assert.Equal(InterplanetaryTravelPhase.Idle, travel.Phase);
+        Assert.Empty(travel.TargetPlanetId);
+    }
+
+    [Fact]
+    public void SpaceflightNavigationClosureExposesSixNormativeContracts()
+    {
+        Assert.Equal(6,
+            SpaceflightNavigationSubsystemAcceptanceRunner.ExpectedContractCount);
+        Assert.NotNull(typeof(InterplanetaryTravelRuntime).GetMethod(
+            nameof(InterplanetaryTravelRuntime.IsSelectionConsistentWith)));
+    }
+
+    [Fact]
+    public void SpaceflightNavigationClosureRequiresEveryCrossContractChain()
+    {
+        ShipSystemsAcceptanceReport ship = new(
+            Passed: true, Result: "ok", ShipClasses: 6, Systems: 7, Modules: 18,
+            CatalogCoverage: true, ClassStats: true, InstallAll: true,
+            SlotLimits: true, DuplicateRejected: true, DerivedStats: true,
+            DamageLifecycle: true, RepairLifecycle: true, ModuleDisable: true,
+            FlightReadiness: true, HyperspaceReadiness: true, FuelLifecycle: true,
+            InventoryConservation: true, PreRepairBlocked: true,
+            PreRepairFlightReady: true, CommissionTransition: true,
+            PostRepairFlightReady: true, ResetCommissioned: true, ColdRestore: true,
+            LegacyFallback: true, ExactRoundTrip: true, LogWritten: true,
+            Diagnostics: null!, ElapsedMilliseconds: 1.0);
+        StageOneVoyageAcceptanceReport voyage = new(
+            Passed: true, Result: "ok", DerivedStatsApplied: true,
+            PreRepairBlocked: true, Takeoff: true, FuelDebited: true, Docking: true,
+            StationVisited: true, Undock: true, Landing: true, LoopCompleted: true,
+            ReadinessRejected: true, ColdRestore: true, LegacyFallback: true,
+            ExactRoundTrip: true, LogWritten: true, Diagnostics: null!,
+            ElapsedMilliseconds: 1.0);
+        GalaxyNavigationAcceptanceReport galaxy = new(
+            Passed: true, Result: "ok", DeterministicGeneration: true,
+            CoordinateHierarchy: true, StarCoverage: true, PlanetBounds: true,
+            RoutePlanning: true, Preconditions: true, HyperspaceJump: true,
+            FuelDebited: true, VisitedPersistence: true, Stress100: true,
+            ColdRestore: true, LegacyFallback: true, ExactRoundTrip: true,
+            LogWritten: true, Diagnostics: null!, ElapsedMilliseconds: 1.0);
+        StarSystemSimulationAcceptanceReport star = new(
+            Passed: true, DeterministicGeneration: true, BodyCoverage: true,
+            MoonBounds: true, AnalyticOrbits: true, RepresentationLevels: true,
+            SingleDetailedPlanet: true, SystemTransition: true, VisualProjection: true,
+            RuntimeSamples: true, SurfaceActivation: true, ActivationPipeline: true,
+            Bodies: 21, Planets: 4, Moons: 8, Stations: 1, ShipContacts: 7,
+            VisualNodes: 21, Rebuilds: 2, Result: "ok");
+        InterplanetaryTravelAcceptanceReport interplanetary = new(
+            Passed: true, StarterPlanetCoverage: true, TargetSelection: true,
+            TargetPersistence: true, FuelDebited: true, Guidance: true,
+            WorldHandoff: true, Arrival: true, TransferPersistence: true,
+            SameSystemInvariant: true, PlannedDistanceMeters: 192.0, FuelCost: 2.07,
+            SourcePlanetId: "planet.a", TargetPlanetId: "planet.b", Result: "ok");
+        WorldSceneCoordinatorAcceptanceReport world = new(
+            Passed: true, TransitionGraph: true, IllegalTransitionRejected: true,
+            HyperspaceSystemChange: true, ContextValidation: true, PackedScenes: true,
+            SingleLiveScene: true, LiveContextMatch: true, ResidencyPolicy: true,
+            LiveTransitionPath: true, TransactionalSwap: true, StateRestored: true,
+            LiveSteps: 7, MaxHostChildren: 1, TransitionCount: 6, Reloads: 7,
+            RejectedTransitions: 1, HyperspaceTransitions: 1, Result: "ok");
+
+        SpaceflightNavigationSubsystemModelAcceptanceReport pass =
+            SpaceflightNavigationSubsystemAcceptanceRunner.Run(
+                ship, voyage, galaxy, star, interplanetary, world);
+        Assert.True(pass.Passed);
+        Assert.Equal(6, pass.ContractsPassed);
+        Assert.True(pass.ReadinessChain && pass.FuelChain && pass.TransitionChain);
+        Assert.True(pass.PersistenceChain && pass.NavigationIdentity && pass.BoundedResidency);
+
+        SpaceflightNavigationSubsystemModelAcceptanceReport brokenFuel =
+            SpaceflightNavigationSubsystemAcceptanceRunner.Run(
+                ship, voyage with { FuelDebited = false }, galaxy, star,
+                interplanetary, world);
+        Assert.False(brokenFuel.Passed);
+        Assert.False(brokenFuel.FuelChain);
+        Assert.Equal(6, brokenFuel.ContractsPassed);
+    }
+
+    [Fact]
     public void LayeredAssembliesHaveOneWayDependencies()
     {
         var domainAssembly = typeof(IDomainEvent).Assembly;
