@@ -1,3 +1,16 @@
+## [0.1.0-alpha.218] - 2026-08-17
+
+### Added
+- TASK-218 deterministic 4×4 production hard-surface PBR atlas with four 1024×1024 authoring maps: BaseColor, Normal, MetallicRoughness and Emission.
+- Five additional resource model families — Ice, Gas, Salt, Glass and Exotic — bringing production resource presentation to ten families / thirty LOD GLBs.
+- Semantic resource-to-model routing covering all 42 resource definitions.
+- TASK-218 F5/xUnit/static/section-37/CI/release gates and `docs/PRODUCTION_SURFACE_ART.md`.
+
+### Changed
+- Explorer, Interceptor and orbital-station GLBs now carry UV0 and one embedded shared-atlas PBR material rather than multiple flat-color hard-surface materials.
+- Self-contained GLB validation now permits embedded images while still rejecting external buffer/image URIs.
+- TASK-216 geometry, LOD, mount-marker and separate-collision contracts remain regression-gated; its manual visual acceptance is still pending.
+
 ## [0.1.0-alpha.216] - 2026-08-17
 
 ### Added

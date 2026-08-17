@@ -13,7 +13,7 @@ def need(condition, message):
         fail.append(message)
 
 version = text('VERSION').strip()
-need(version in {'0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}, f'VERSION must preserve alpha.210 contract, got {version}')
+need(version in {'0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.210 contract, got {version}')
 runtime = text('src/Game.Client/Scripts/VerticalSlice/GalaxyExpeditionRuntime.cs')
 accept = text('src/Game.Client/Scripts/VerticalSlice/GalaxyExpeditionAcceptance.cs')
 slice210 = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceGalaxyExpedition.cs')

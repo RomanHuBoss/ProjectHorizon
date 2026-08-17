@@ -115,6 +115,7 @@ jobs:
           python3 tools/validate-task212-cross-platform-determinism.py
           python3 tools/validate-task214-endurance-soak.py
           python3 tools/validate-task216-production-model-art.py
+          python3 tools/validate-task218-production-surface-art.py
 
       - name: Unit tests and coverage
         run: >-

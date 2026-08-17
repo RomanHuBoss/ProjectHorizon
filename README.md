@@ -1,3 +1,7 @@
+## TASK-218 — Production PBR Texture Atlas & Resource Visual Diversity
+
+`0.1.0-alpha.218` adds the next production-art layer without pretending that TASK-216 manual visual acceptance is complete. Explorer, Interceptor and the orbital station now carry deterministic UV0 and a single reusable four-map 1024 PBR atlas material per GLB (BaseColor / Normal / MetallicRoughness / Emission). The resource library expands from five to ten silhouette families — Ore, Salvage, Crystal, Fiber, Organic, Ice, Gas, Salt, Glass and Exotic — with three LODs each and semantic routing for all 42 resource definitions. Collision remains separate. F5 adds `TASK-218 production surface art acceptance`; close-range visual review remains mandatory. See `docs/PRODUCTION_SURFACE_ART.md`.
+
 ## TASK-216 — Production 3D Model Art Overhaul
 
 `0.1.0-alpha.216` raises the visual-density baseline of the Explorer, Interceptor and orbital station and moves surface/cave/starter resources to five production GLB families with three LOD levels each. Selected close-range greeble modules use reviewed Kenney Space Kit CC0 authoring inputs; shipping collision/mount markers remain unchanged and raw authoring OBJ files are never runtime-loaded. Resource primitive meshes are emergency fallback only. F5 includes `TASK-216 production model art acceptance`; manual visual acceptance remains mandatory. See `docs/PRODUCTION_MODEL_ART_OVERHAUL.md`.

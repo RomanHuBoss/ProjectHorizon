@@ -14,11 +14,13 @@ import numpy as np
 import trimesh
 from trimesh.visual.material import PBRMaterial
 from trimesh.visual.texture import TextureVisuals
+from PIL import Image
 
 ROOT = Path(__file__).resolve().parents[2]
 OUT_SHIPS = ROOT / 'src/Game.Client/Assets/Models/Ships'
 OUT_STATIONS = ROOT / 'src/Game.Client/Assets/Models/Stations'
 OUT_RESOURCES = ROOT / 'src/Game.Client/Assets/Models/Resources'
+OUT_TEXTURES = ROOT / 'src/Game.Client/Assets/Textures/Production'
 VENDOR_KENNEY = ROOT / 'tools/content/vendor/kenney_space_kit'
 
 
@@ -51,10 +53,124 @@ RES_DARK = mat('MAT_Resource_Dark', [40, 45, 52, 255], .45, .55)
 RES_ACCENT = mat('MAT_Resource_Accent', [88, 172, 194, 255], .36, .28, [35, 135, 190, 255])
 RES_CORE = mat('MAT_Resource_Core', [62, 120, 148, 255], .20, .18, [55, 170, 225, 255])
 
+# TASK-218: one deterministic reusable 4x4 PBR atlas for close-range hard-surface art.
+# Semantic names intentionally preserve the established TASK-186 material vocabulary:
+# MAT_Hull_Graphite, MAT_Hull_Panel, MAT_Safety_Accent, MAT_Canopy_Smoked.
+ATLAS_SIZE = 1024
+ATLAS_GRID = 4
+ATLAS_TILES = {
+    'MAT_Hull_Graphite': (0, 0),
+    'MAT_Hull_Panel': (1, 0),
+    'MAT_Safety_Accent': (2, 0),
+    'MAT_Canopy_Smoked': (3, 0),
+    'MAT_Engine_Emissive': (0, 1),
+    'MAT_Station_Hull': (1, 1),
+    'MAT_Station_Panel': (2, 1),
+    'MAT_Station_Safety': (3, 1),
+    'MAT_Station_Dark': (0, 2),
+    'MAT_Station_Light': (1, 2),
+}
+ATLAS_BASE = {
+    'MAT_Hull_Graphite': ((39,47,57), .78, .30, (0,0,0)),
+    'MAT_Hull_Panel': ((91,101,112), .66, .34, (0,0,0)),
+    'MAT_Safety_Accent': ((196,91,28), .42, .38, (0,0,0)),
+    'MAT_Canopy_Smoked': ((8,18,28), .18, .08, (0,0,0)),
+    'MAT_Engine_Emissive': ((14,70,112), .16, .18, (45,175,255)),
+    'MAT_Station_Hull': ((72,80,90), .72, .36, (0,0,0)),
+    'MAT_Station_Panel': ((120,127,136), .58, .39, (0,0,0)),
+    'MAT_Station_Safety': ((190,88,29), .44, .40, (0,0,0)),
+    'MAT_Station_Dark': ((24,30,37), .68, .42, (0,0,0)),
+    'MAT_Station_Light': ((14,72,110), .16, .18, (44,168,235)),
+}
+_ATLAS_IMAGES = None
+_ATLAS_MATERIAL = None
+
+
+def build_surface_atlas_images():
+    """Build subtle macro-surface detail without expensive microdetail."""
+    global _ATLAS_IMAGES
+    if _ATLAS_IMAGES is not None:
+        return _ATLAS_IMAGES
+    size=ATLAS_SIZE; cell=size//ATLAS_GRID
+    base=np.zeros((size,size,4),dtype=np.uint8); base[:,:,3]=255
+    normal=np.zeros((size,size,3),dtype=np.uint8); normal[:]=[128,128,255]
+    mr=np.zeros((size,size,3),dtype=np.uint8); mr[:]=[255,180,40]
+    emissive=np.zeros((size,size,3),dtype=np.uint8)
+    for name,(cx,cy) in ATLAS_TILES.items():
+        color,metallic,roughness,emit=ATLAS_BASE[name]
+        x0,y0=cx*cell,cy*cell; x1,y1=x0+cell,y0+cell
+        yy,xx=np.mgrid[0:cell,0:cell]
+        macro=(5*np.sin(xx/21.0)+3*np.cos(yy/31.0)+2*np.sin((xx+yy)/47.0)).astype(np.int16)
+        tile=np.clip(np.asarray(color,dtype=np.int16)[None,None,:]+macro[:,:,None],0,255).astype(np.uint8)
+        base[y0:y1,x0:x1,:3]=tile
+        mr[y0:y1,x0:x1,1]=int(round(roughness*255))
+        mr[y0:y1,x0:x1,2]=int(round(metallic*255))
+        emissive[y0:y1,x0:x1,:]=np.asarray(emit,dtype=np.uint8)
+        # Repeated panel seams and fastener cues remain large enough to survive mipmapping.
+        seam=max(2,cell//96)
+        for off in (cell//4, cell//2, 3*cell//4):
+            base[y0+off-seam:y0+off+seam,x0+8:x1-8,:3]//=2
+            base[y0+8:y1-8,x0+off-seam:x0+off+seam,:3]//=2
+            normal[y0+off-seam:y0+off+seam,x0+8:x1-8,:]=[118,138,250]
+            normal[y0+8:y1-8,x0+off-seam:x0+off+seam,:]=[138,118,250]
+        # Deterministic sparse fasteners, not random noise.
+        for bx,by in ((20,20),(cell-20,20),(20,cell-20),(cell-20,cell-20),(cell//2,cell//2)):
+            rr=4; ys=slice(y0+by-rr,y0+by+rr+1); xs=slice(x0+bx-rr,x0+bx+rr+1)
+            base[ys,xs,:3]=np.clip(np.asarray(color)*.55,0,255).astype(np.uint8)
+            mr[ys,xs,1]=min(255,int(round(roughness*255))+24)
+        # Atlas-cell gutter prevents cross-tile sampling.
+        gutter=4
+        base[y0:y0+gutter,x0:x1,:3]=color; base[y1-gutter:y1,x0:x1,:3]=color
+        base[y0:y1,x0:x0+gutter,:3]=color; base[y0:y1,x1-gutter:x1,:3]=color
+    _ATLAS_IMAGES=(Image.fromarray(base,'RGBA'), Image.fromarray(normal,'RGB'),
+                   Image.fromarray(mr,'RGB'), Image.fromarray(emissive,'RGB'))
+    return _ATLAS_IMAGES
+
+
+def atlas_material():
+    global _ATLAS_MATERIAL
+    if _ATLAS_MATERIAL is None:
+        base,normal,mr,emissive=build_surface_atlas_images()
+        _ATLAS_MATERIAL=PBRMaterial(
+            name='MAT_Production_HardSurface_Atlas',
+            baseColorFactor=np.array([255,255,255,255],dtype=np.uint8),
+            metallicFactor=1.0, roughnessFactor=1.0,
+            emissiveFactor=np.array([1.0,1.0,1.0]),
+            baseColorTexture=base, normalTexture=normal,
+            metallicRoughnessTexture=mr, emissiveTexture=emissive)
+    return _ATLAS_MATERIAL
+
+
+def atlas_uv(mesh: trimesh.Trimesh, tile):
+    verts=np.asarray(mesh.vertices,float)
+    if len(verts)==0:
+        return np.zeros((0,2),dtype=float)
+    ext=np.ptp(verts,axis=0); axes=np.argsort(ext)[-2:]
+    uv=np.zeros((len(verts),2),dtype=float)
+    for out_axis,axis in enumerate(axes):
+        lo=float(verts[:,axis].min()); hi=float(verts[:,axis].max()); span=max(hi-lo,1e-6)
+        uv[:,out_axis]=(verts[:,axis]-lo)/span
+    cx,cy=tile; pad=.035; scale=(1.0-2*pad)/ATLAS_GRID
+    uv[:,0]=(cx+pad+uv[:,0]*(1-2*pad))/ATLAS_GRID
+    uv[:,1]=(cy+pad+uv[:,1]*(1-2*pad))/ATLAS_GRID
+    return uv
+
 
 def apply_material(mesh: trimesh.Trimesh, material: PBRMaterial):
-    mesh.visual = TextureVisuals(material=material)
+    tile=ATLAS_TILES.get(getattr(material,'name',None))
+    if tile is not None:
+        mesh.visual = TextureVisuals(uv=atlas_uv(mesh,tile), material=atlas_material())
+    else:
+        mesh.visual = TextureVisuals(material=material)
     return mesh
+
+
+def write_surface_atlas():
+    OUT_TEXTURES.mkdir(parents=True,exist_ok=True)
+    names=('TEX_HardSurface_BaseColor.png','TEX_HardSurface_Normal.png',
+           'TEX_HardSurface_MetallicRoughness.png','TEX_HardSurface_Emission.png')
+    for image,name in zip(build_surface_atlas_images(),names):
+        image.save(OUT_TEXTURES/name,optimize=True)
 
 
 def T(x=0, y=0, z=0, sx=1, sy=1, sz=1, rx=0, ry=0, rz=0):
@@ -452,6 +568,72 @@ def resource_organic(lod:int):
     return scene
 
 
+
+def resource_ice(lod:int):
+    scene=trimesh.Scene(); root=f'RES_Ice_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
+    count=(7,4,2)[lod]
+    for i in range(count):
+        a=i*2.18; rr=.16+.035*(i%3); h=(.92,.76,.60)[lod]*(.76+.08*(i%3))
+        add(scene,crystal_prism(rr,h,5 if lod<2 else 4,.18),f'IceShard_{i:02d}',RES_BASE,
+            T(x=math.cos(a)*(.20+.055*i),y=h*.44,z=math.sin(a)*(.20+.045*i),rx=(i%3-1)*12,ry=i*43,rz=(i%2*2-1)*10),root)
+    if lod<2:
+        add(scene,subdivide_octahedron(1 if lod==0 else 0,331,(.48,.18,.42)),'IceShelf',RES_DARK,T(y=.13,ry=18),root)
+    return scene
+
+
+def resource_gas(lod:int):
+    scene=trimesh.Scene(); root=f'RES_Gas_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
+    count=(8,5,3)[lod]; sections=(9,7,6)[lod]
+    for i in range(count):
+        a=i*math.tau/count; r=.10+.025*(i%3); h=.42+.10*(i%4)
+        add(scene,tapered_nacelle(-h/2,h/2,r*1.30,r*.72,sections,1.0),f'Vent_{i:02d}',RES_BASE if i%2 else RES_DARK,
+            T(x=math.cos(a)*(.26+.03*(i%2)),y=h*.48,z=math.sin(a)*(.26+.03*((i+1)%2)),rx=math.cos(a)*10,rz=-math.sin(a)*10,ry=i*37),root)
+        if lod==0:
+            lip=trimesh.creation.cylinder(radius=r*1.38,height=.035,sections=sections)
+            add(scene,lip,f'VentLip_{i:02d}',RES_ACCENT,T(x=math.cos(a)*(.26+.03*(i%2)),y=h*.92,z=math.sin(a)*(.26+.03*((i+1)%2)),rx=90),root)
+    add(scene,subdivide_octahedron(1 if lod==0 else 0,377,(.50,.18,.46)),'VentBed',RES_DARK,T(y=.13),root)
+    return scene
+
+
+def resource_salt(lod:int):
+    scene=trimesh.Scene(); root=f'RES_Salt_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
+    count=(9,5,3)[lod]
+    for i in range(count):
+        a=i*2.399963; x=math.cos(a)*(.12+.052*i); z=math.sin(a)*(.12+.044*i)
+        size=.18+.035*(i%3); height=.22+.07*(i%4)
+        cube=panel_box([size,size,height],.018)
+        add(scene,cube,f'SaltBlock_{i:02d}',RES_BASE if i%3 else RES_ACCENT,
+            T(x=x,y=height*.48,z=z,rx=(i%2)*5,ry=i*29,rz=(i%3-1)*6),root)
+    if lod<2:
+        add(scene,panel_box([.60,.12,.54],.04),'SaltShelf',RES_DARK,T(y=.08,ry=22),root)
+    return scene
+
+
+def resource_glass(lod:int):
+    scene=trimesh.Scene(); root=f'RES_Glass_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
+    count=(8,5,3)[lod]
+    for i in range(count):
+        a=i*math.tau/count; w=.12+.035*(i%3); h=.58+.09*(i%4)
+        pts=[(-w,-h*.45),(-w*.55,h*.28),(0,h*.50),(w*.62,h*.22),(w,-h*.42)]
+        add(scene,prism_polygon(pts,.055 if lod==0 else .08,.0),f'GlassShard_{i:02d}',RES_DARK if i%2 else RES_BASE,
+            T(x=math.cos(a)*.30,y=h*.43,z=math.sin(a)*.30,rx=(i%3-1)*12,ry=i*41,rz=(i%2*2-1)*8),root)
+    if lod<2:
+        add(scene,subdivide_octahedron(1 if lod==0 else 0,419,(.38,.13,.42)),'GlassMatrix',RES_ACCENT,T(y=.12),root)
+    return scene
+
+
+def resource_exotic(lod:int):
+    scene=trimesh.Scene(); root=f'RES_Exotic_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
+    core_level=(2,1,0)[lod]
+    add(scene,subdivide_octahedron(core_level,511,(.34,.28,.38)),'ExoticCore',RES_CORE,T(y=.36,ry=17),root)
+    spokes=(10,6,4)[lod]
+    for i in range(spokes):
+        a=i*math.tau/spokes; y=.34+.12*math.sin(a*2); start=(math.cos(a)*.24,y,math.sin(a)*.24); end=(math.cos(a)*.66,y+.10*math.cos(a*3),math.sin(a)*.66)
+        add(scene,beam_between(start,end,.035 if lod==0 else .05,6),f'FieldSpoke_{i:02d}',RES_ACCENT,parent=root)
+        if lod==0 and i%2==0:
+            add(scene,crystal_prism(.075,.32,5,.22),f'ExoticNode_{i:02d}',RES_BASE,T(x=end[0],y=end[1],z=end[2],rx=90,ry=i*36),root)
+    return scene
+
 def export_scene(scene,path:Path):
     path.parent.mkdir(parents=True,exist_ok=True); path.write_bytes(scene.export(file_type='glb'))
 
@@ -459,7 +641,8 @@ def export_scene(scene,path:Path):
 def write_resource_wrappers():
     specs={
         'RES_Ore_01':'Ore','RES_Salvage_01':'Salvage','RES_Crystal_01':'Crystal',
-        'RES_Fiber_01':'Fiber','RES_Organic_01':'Organic'}
+        'RES_Fiber_01':'Fiber','RES_Organic_01':'Organic','RES_Ice_01':'Ice',
+        'RES_Gas_01':'Gas','RES_Salt_01':'Salt','RES_Glass_01':'Glass','RES_Exotic_01':'Exotic'}
     for family in specs:
         text=f'''[gd_scene load_steps=5 format=3]\n\n[ext_resource type="Script" path="res://Scripts/Presentation/ProductionModelLodController.cs" id="1_lod"]\n[ext_resource type="PackedScene" path="res://Assets/Models/Resources/{family}_LOD0.glb" id="2_lod0"]\n[ext_resource type="PackedScene" path="res://Assets/Models/Resources/{family}_LOD1.glb" id="3_lod1"]\n[ext_resource type="PackedScene" path="res://Assets/Models/Resources/{family}_LOD2.glb" id="4_lod2"]\n\n[node name="MeshInstance3D" type="MeshInstance3D"]\nmetadata/production_resource_visual = true\n\n[node name="LodController" type="Node3D" parent="."]\nscript = ExtResource("1_lod")\nLod1DistanceMeters = 18.0\nLod2DistanceMeters = 45.0\n\n[node name="LOD0" parent="LodController" instance=ExtResource("2_lod0")]\n[node name="LOD1" parent="LodController" instance=ExtResource("3_lod1")]\nvisible = false\n[node name="LOD2" parent="LodController" instance=ExtResource("4_lod2")]\nvisible = false\n'''
         (OUT_RESOURCES/f'{family}.tscn').write_text(text,encoding='utf-8')
@@ -467,6 +650,7 @@ def write_resource_wrappers():
 
 def main():
     parser=argparse.ArgumentParser(); parser.add_argument('--check',action='store_true'); parser.parse_args()
+    write_surface_atlas()
     targets=[]
     for lod in range(3):
         targets += [(explorer(lod),OUT_SHIPS/f'SHP_Explorer_01_LOD{lod}.glb'),
@@ -476,9 +660,15 @@ def main():
                     (resource_ore(lod,True),OUT_RESOURCES/f'RES_Salvage_01_LOD{lod}.glb'),
                     (resource_crystal(lod),OUT_RESOURCES/f'RES_Crystal_01_LOD{lod}.glb'),
                     (resource_fiber(lod),OUT_RESOURCES/f'RES_Fiber_01_LOD{lod}.glb'),
-                    (resource_organic(lod),OUT_RESOURCES/f'RES_Organic_01_LOD{lod}.glb')]
+                    (resource_organic(lod),OUT_RESOURCES/f'RES_Organic_01_LOD{lod}.glb'),
+                    (resource_ice(lod),OUT_RESOURCES/f'RES_Ice_01_LOD{lod}.glb'),
+                    (resource_gas(lod),OUT_RESOURCES/f'RES_Gas_01_LOD{lod}.glb'),
+                    (resource_salt(lod),OUT_RESOURCES/f'RES_Salt_01_LOD{lod}.glb'),
+                    (resource_glass(lod),OUT_RESOURCES/f'RES_Glass_01_LOD{lod}.glb'),
+                    (resource_exotic(lod),OUT_RESOURCES/f'RES_Exotic_01_LOD{lod}.glb')]
     for scene,path in targets: export_scene(scene,path)
     write_resource_wrappers()
-    print('TASK-216 PRODUCTION MODEL ART PASS: glb=24; families=8; ships=2; station=1; resourceFamilies=5; LOD=3; collisionSeparate=1; runtimeGeneration=0.')
+    print('TASK-216 PRODUCTION MODEL ART PASS: baselineFamilies=8; ships=2; station=1; baselineResourceFamilies=5; LOD=3; collisionSeparate=1; runtimeGeneration=0.')
+    print('TASK-218 PRODUCTION SURFACE ART PASS: glb=39; heroFamilies=3; resourceFamilies=10; resourceGlb=30; atlas=1024; maps=4; sharedHardSurfaceMaterial=1; collisionSeparate=1.')
 
 if __name__=='__main__': main()

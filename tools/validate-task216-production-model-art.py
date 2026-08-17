@@ -73,7 +73,7 @@ def node_names(doc):
     return {n.get('name','') for n in doc.get('nodes', [])}
 
 version = text(VERSION).strip()
-if version != '0.1.0-alpha.216': fail(f'VERSION must be alpha.216, got {version}')
+if version not in {'0.1.0-alpha.216','0.1.0-alpha.218'}: fail(f'VERSION must preserve alpha.216 contract, got {version}')
 
 gen = text(GEN)
 for token in ['TASK-216 production model authoring','vendor_mesh(', 'VENDOR_KENNEY',
@@ -98,7 +98,7 @@ for family,(folder,min_tri,min_parts) in MODEL_FAMILIES.items():
         doc=glb_json(folder/f'{family}_LOD{lod}.glb')
         names=node_names(doc)
         if any('Collision' in n for n in names): fail(f'{family} LOD{lod} embeds collision')
-        if doc.get('images') or any(b.get('uri') for b in doc.get('buffers', [])):
+        if any(b.get('uri') for b in doc.get('buffers', [])) or any(i.get('uri') for i in doc.get('images', [])):
             fail(f'{family} LOD{lod} is not self-contained')
         if len(doc.get('materials', [])) > 5: fail(f'{family} LOD{lod} material count >5')
         chain.append(triangles(doc)); parts.append(len(doc.get('meshes', [])))

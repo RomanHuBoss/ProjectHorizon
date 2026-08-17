@@ -13,7 +13,7 @@ def need(condition, message):
         fail.append(message)
 
 version = text('VERSION').strip()
-need(version in {'0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}, f'VERSION must preserve alpha.200 or later accepted revision, got {version}')
+need(version in {'0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.200 or later accepted revision, got {version}')
 policy = text('src/Game.Domain/Architecture/RuntimePerformanceBudgetPolicy.cs')
 telemetry = text('src/Game.Client/Scripts/VerticalSlice/RuntimePerformanceTelemetry.cs')
 acceptance = text('src/Game.Client/Scripts/VerticalSlice/RuntimePerformanceAcceptance.cs')

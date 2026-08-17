@@ -17,7 +17,7 @@ def need(condition: bool, message: str) -> None:
         fail.append(message)
 
 version = text('VERSION').strip()
-need(version in {'0.1.0-alpha.214','0.1.0-alpha.216'}, f'VERSION must preserve alpha.214 or later accepted revision, got {version}')
+need(version in {'0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.214 or later accepted revision, got {version}')
 policy = text('src/Game.Domain/EnduranceSoakPolicy.cs')
 runtime = text('src/Game.Client/Scripts/VerticalSlice/EnduranceSoakRuntime.cs')
 integration = text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceEnduranceSoak.cs')

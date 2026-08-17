@@ -56,7 +56,7 @@ def triangles(doc):
                 total += doc['accessors'][prim['indices']]['count']//3
     return total
 
-if VERSION.read_text().strip() not in {'0.1.0-alpha.184', '0.1.0-alpha.184.1','0.1.0-alpha.186','0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}: fail('VERSION must be alpha.184/184.1/186')
+if VERSION.read_text().strip() not in {'0.1.0-alpha.184', '0.1.0-alpha.184.1','0.1.0-alpha.186','0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}: fail('VERSION must be alpha.184/184.1/186')
 
 all_glb=[]
 family_triangles={}
@@ -75,7 +75,7 @@ for family, folder in FAMILIES.items():
         if lod == 0: marker_total += markers
         materials=doc.get('materials',[])
         if len(materials) > 5: fail(f'{path.name} materials={len(materials)} > 5')
-        if doc.get('images') or any(b.get('uri') for b in doc.get('buffers', [])): fail(f'{path.name} must be self-contained GLB')
+        if any(b.get('uri') for b in doc.get('buffers', [])) or any(i.get('uri') for i in doc.get('images', [])): fail(f'{path.name} must be self-contained GLB with embedded buffers/images')
         t=triangles(doc)
         if t <= 0: fail(f'{path.name} has no triangles')
         tris.append(t)

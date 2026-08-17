@@ -45,6 +45,36 @@ public static class ProceduralSurfaceVisualFactory
         {
             return "Salvage";
         }
+        if (string.Equals(definition.ResourceId, "resource.raw_compotium", StringComparison.Ordinal) ||
+            definition.Tags.Contains("compotium", StringComparer.Ordinal) ||
+            definition.Tags.Contains("iridium", StringComparer.Ordinal) ||
+            definition.Tags.Contains("exotic", StringComparer.Ordinal))
+        {
+            return "Exotic";
+        }
+        if (definition.Tags.Contains("glass", StringComparer.Ordinal) ||
+            definition.Tags.Contains("volcanic", StringComparer.Ordinal))
+        {
+            return "Glass";
+        }
+        if (definition.Tags.Contains("ice", StringComparer.Ordinal) ||
+            definition.Tags.Contains("clathrate", StringComparer.Ordinal))
+        {
+            return "Ice";
+        }
+        if (definition.Tags.Contains("gas", StringComparer.Ordinal) ||
+            definition.Tags.Contains("xenon", StringComparer.Ordinal) ||
+            definition.Tags.Contains("argon", StringComparer.Ordinal) ||
+            definition.Tags.Contains("inert", StringComparer.Ordinal))
+        {
+            return "Gas";
+        }
+        if (definition.Tags.Contains("salt", StringComparer.Ordinal) ||
+            definition.Tags.Contains("dust", StringComparer.Ordinal) ||
+            definition.Tags.Contains("catalyst", StringComparer.Ordinal))
+        {
+            return "Salt";
+        }
 
         return (family ?? ResolveResourceFamily(definition)) switch
         {

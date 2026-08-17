@@ -79,6 +79,7 @@ python3 tools/validate-task210-galaxy-expedition.py
 python3 tools/validate-task212-cross-platform-determinism.py
 python3 tools/validate-task214-endurance-soak.py
 python3 tools/validate-task216-production-model-art.py
+python3 tools/validate-task218-production-surface-art.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

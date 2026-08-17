@@ -1,3 +1,52 @@
+## 0. Мега-итерация 2026-08-17 — TASK-218 Production PBR Texture Atlas & Resource Visual Diversity
+
+**Исходный снимок:** `ProjectHorizon-main(1).zip` (`0.1.0-alpha.216`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task218-production-surface-art.zip`.  
+**Версия:** `0.1.0-alpha.218`  
+**ТЗ:** §26.1–26.2; §33.1–33.4; сохранение TASK-184/TASK-186/TASK-216 contracts  
+**Фокус:** production surface materials / shared PBR atlas / resource silhouette diversity  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 69/69 / OWNER CLEAN BUILD + F5 + MANUAL VISUAL ACCEPTANCE PENDING`
+
+### Основание
+
+TASK-216 поднял геометрическую детализацию кораблей, станции и пяти семейств ресурсов, но close-range surface treatment оставался в основном flat-color PBR, а 42 добываемых ресурса сводились к пяти силуэтам. Следующий art-step закрывает именно эту границу, не подменяя обязательную ручную визуальную приёмку TASK-216.
+
+### Реализация TASK-218
+
+- Генератор production GLB теперь строит общий 4×4 hard-surface PBR atlas и четыре 1024×1024 карты: BaseColor, Normal, MetallicRoughness и Emission.
+- Explorer, Interceptor и orbital station имеют UV0 и используют один atlas material в каждом LOD GLB; карты встроены в self-contained GLB без внешних URI.
+- Семантические atlas-cells сохраняют визуальный язык graphite/panel/safety/canopy/engine и station hull/panel/safety/dark/light, добавляя крупномасштабные panel seams/fastener cues без дорогой микродетализации.
+- Production resource library расширена до десяти distinct families: Ore, Salvage, Crystal, Fiber, Organic, Ice, Gas, Salt, Glass, Exotic; у каждой LOD0/LOD1/LOD2.
+- `ProceduralSurfaceVisualFactory.ResolveResourceAssetKey` маршрутизирует все 42 resource definitions по semantic tags; для ice/gas/salt/glass/exotic добавлены собственные модели, а procedural primitives остаются только fallback.
+- Gameplay collision по-прежнему не встраивается в GLB; mount markers и существующие LOD wrappers кораблей/станции не меняются.
+- Добавлены TASK-218 F5/xUnit/static/section-37/CI/release gates и документация `docs/PRODUCTION_SURFACE_ART.md`.
+
+### Ключевые изменённые файлы
+
+- `tools/content/generate-production-glb.py`; `src/Game.Client/Assets/Textures/Production/TEX_HardSurface_*.png`; 39 regenerated production GLB + 10 resource wrappers.
+- `src/Game.Client/Scripts/VerticalSlice/ProceduralSurfaceVisualFactory.cs`; `ProductionSurfaceArtAcceptance.cs`; `SalvageRepairSliceProductionSurfaceArt.cs`; central `SalvageRepairSlice.cs`.
+- `tests/ProjectHorizon.Tests/Unit/ProductionSurfaceArtTests.cs`; `tools/validate-task218-production-surface-art.py`; section-37/CI/release gates.
+- `README.md`, `CHANGELOG.md`, `docs/PRODUCTION_SURFACE_ART.md`, `REQUIREMENTS_STATUS.md`, `VERSION`; previous task validators accept alpha.218 as a regression-preserving successor.
+
+### Проверки этой итерации
+
+- Production asset regeneration: `TASK-218 ... glb=39; resourceFamilies=10; resourceGlb=30; atlas=1024; maps=4`.
+- Python/static regression: `69/69 PASS` (version + JSON/Godot text resources + architecture + TASK-146…TASK-218 gates).
+- TASK-218 asset metrics: hero GLB `9`, resource families `10`, resource GLB `30`, catalog routes `42/42`, atlas maps `4×1024²`, embedded hard-surface materials `1/GLB`, external GLB texture URI `0`.
+- Changed C# delimiter/source sanity: balanced braces/parentheses for TASK-218 acceptance, resource routing and central F5 integration.
+- В текущем контейнере отсутствуют `dotnet` и Godot runtime; `tools/run-section37-quality.sh` доходит до VERSION PASS и останавливается на `dotnet: command not found`, поэтому clean C# build, xUnit и F5 не выдаются за выполненные и остаются owner/CI gate. Финальный ZIP: `unzip -t` PASS, ошибок compressed data = 0.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`; TASK-216 и TASK-218 static gates PASS.
+2. F5: `TASK-218 production surface art acceptance PASS ... atlasMaps=4; atlasDimension=1; hardSurfaceLod=9; resourceFamilies=10; resourceGlb=30; fallbacks=0; collisionSeparate=1`.
+3. Explorer и Interceptor: на близкой дистанции проверить масштаб швов/fasteners, читаемую разницу hull/panel/accent/canopy и отсутствие растянутых/перескакивающих UV.
+4. Station: проверить atlas material при подлёте/стыковке, emissive surfaces и отсутствие material-pop между LOD.
+5. На поверхности/в пещерах осмотреть все 10 resource families, в особенности Ice/Gas/Salt/Glass/Exotic; силуэты должны различаться без опоры только на цвет.
+6. TASK-216 остаётся `IMPLEMENTED`, пока отдельная ручная visual acceptance его моделей не выполнена. TASK-218 также не переводится в VERIFIED по static evidence.
+
+---
+
 ## 0. Мега-итерация 2026-08-17 — TASK-216 Production 3D Model Art Overhaul
 
 **Исходный снимок:** `ProjectHorizon-main-task214-eight-hour-endurance.zip` (`0.1.0-alpha.214`).  

@@ -511,6 +511,7 @@ public partial class SalvageRepairSlice : Node3D
         PrintProductionAssetPipelineReady();
         PrintHardSurfaceVisualRedesignReady();
         PrintProductionModelArtReady();
+        PrintProductionSurfaceArtReady();
         PrintPlanetaryWaterReady();
         PrintPlanetAtmosphereCloudReady();
         PrintPlanetaryCaveReady();
@@ -5602,6 +5603,7 @@ public partial class SalvageRepairSlice : Node3D
         RunProductionAssetPipelineAcceptance();
         RunHardSurfaceVisualRedesignAcceptance();
         RunProductionModelArtAcceptance();
+        RunProductionSurfaceArtAcceptance();
         RunPlanetaryWaterAcceptance();
         RunPlanetAtmosphereCloudAcceptance();
         RunPlanetaryCaveAcceptance();
@@ -5625,7 +5627,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-218/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6828,6 +6830,7 @@ public partial class SalvageRepairSlice : Node3D
             _productionAssetPipelineAcceptancePassed is null ||
             _hardSurfaceVisualRedesignAcceptancePassed is null ||
             _productionModelArtAcceptancePassed is null ||
+            _productionSurfaceArtAcceptancePassed is null ||
             _planetaryWaterAcceptancePassed is null ||
             _planetAtmosphereCloudAcceptancePassed is null ||
             _planetaryCaveAcceptancePassed is null ||
@@ -6871,6 +6874,7 @@ public partial class SalvageRepairSlice : Node3D
             _productionAssetPipelineAcceptancePassed == true &&
             _hardSurfaceVisualRedesignAcceptancePassed == true &&
             _productionModelArtAcceptancePassed == true &&
+            _productionSurfaceArtAcceptancePassed == true &&
             _planetaryWaterAcceptancePassed == true &&
             _planetAtmosphereCloudAcceptancePassed == true &&
             _planetaryCaveAcceptancePassed == true &&
@@ -6889,8 +6893,8 @@ public partial class SalvageRepairSlice : Node3D
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-218/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-218/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7883,6 +7887,7 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-184 (F5): {_productionAssetPipelineAcceptanceHud}",
             $"TASK-186 (F5): {_hardSurfaceVisualRedesignAcceptanceHud}",
             $"TASK-216 (F5): {_productionModelArtAcceptanceHud}",
+            $"TASK-218 (F5): {_productionSurfaceArtAcceptanceHud}",
             $"TASK-188 (F5): {_planetaryWaterAcceptanceHud}",
             $"TASK-190 (F5): {_planetAtmosphereCloudAcceptanceHud}",
             $"TASK-192 (F5): {_planetaryCaveAcceptanceHud}",
