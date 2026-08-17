@@ -11,6 +11,10 @@
 - Self-contained GLB validation now permits embedded images while still rejecting external buffer/image URIs.
 - TASK-216 geometry, LOD, mount-marker and separate-collision contracts remain regression-gated; its manual visual acceptance is still pending.
 
+### Fixed
+- Godot 4.7.1 .NET build ambiguity between `Godot.Environment` and `System.Environment` in system-capability, performance-telemetry and endurance-soak code.
+- Nullable warnings in atmosphere cloud texture binding and TASK-216 resource LOD acceptance.
+
 ## [0.1.0-alpha.216] - 2026-08-17
 
 ### Added

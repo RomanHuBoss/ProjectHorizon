@@ -33,9 +33,9 @@ public static class SystemCapabilityDiagnostics
         string osName = OS.GetName();
         bool windows = string.Equals(osName, "Windows", StringComparison.OrdinalIgnoreCase);
         bool linux = string.Equals(osName, "Linux", StringComparison.OrdinalIgnoreCase);
-        bool supportedOs = linux || (windows && Environment.OSVersion.Version.Major >= 10);
-        bool is64Bit = Environment.Is64BitOperatingSystem && Environment.Is64BitProcess;
-        int processors = Math.Max(1, Environment.ProcessorCount);
+        bool supportedOs = linux || (windows && System.Environment.OSVersion.Version.Major >= 10);
+        bool is64Bit = System.Environment.Is64BitOperatingSystem && System.Environment.Is64BitProcess;
+        int processors = Math.Max(1, System.Environment.ProcessorCount);
         long physicalMemory = ReadPhysicalMemoryBytes();
         bool physicalKnown = physicalMemory > 0;
 

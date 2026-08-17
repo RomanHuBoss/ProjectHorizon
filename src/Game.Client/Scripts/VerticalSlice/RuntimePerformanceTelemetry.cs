@@ -97,7 +97,7 @@ public sealed class RuntimePerformanceTelemetryRuntime
             Math.Max(0, fullAiCount),
             Math.Max(0, simplifiedAiCount),
             videoMemory,
-            Math.Max(0L, Environment.WorkingSet),
+            Math.Max(0L, System.Environment.WorkingSet),
             allocatedPerFrame,
             renderingAvailable,
             videoMemoryAvailable);

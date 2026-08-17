@@ -252,8 +252,14 @@ void fragment() {
             }
             Shader shader = new() { Code = CloudShaderSource };
             ShaderMaterial material = new() { Shader = shader };
-            material.SetShaderParameter("noise_a", _noiseA);
-            material.SetShaderParameter("noise_b", _noiseB);
+            if (_noiseA is Texture2D noiseA)
+            {
+                material.SetShaderParameter("noise_a", noiseA);
+            }
+            if (_noiseB is Texture2D noiseB)
+            {
+                material.SetShaderParameter("noise_b", noiseB);
+            }
             material.SetShaderParameter("layer_phase", index * 0.173f);
             _cloudMaterials[index] = material;
             float radius = (float)(_profile.CloudBaseRadiusMeters +

@@ -80,7 +80,7 @@ public partial class SalvageRepairSlice
             bool production = visual is not null &&
                 visual.HasMeta("production_resource_visual") &&
                 visual.GetMeta("production_resource_visual").AsBool();
-            if (production)
+            if (production && visual is not null)
             {
                 productionResources++;
                 resourceLodReady &= visual.GetNodeOrNull<ProductionModelLodController>("LodController") is not null;

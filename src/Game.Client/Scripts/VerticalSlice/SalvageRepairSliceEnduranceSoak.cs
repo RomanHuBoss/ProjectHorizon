@@ -396,7 +396,7 @@ public partial class SalvageRepairSlice
                 checkpoint
             };
             string json = JsonSerializer.Serialize(payload);
-            File.AppendAllText(_enduranceSoakHeartbeatPath, json + Environment.NewLine);
+            File.AppendAllText(_enduranceSoakHeartbeatPath, json + System.Environment.NewLine);
             string temporary = _enduranceSoakLatestPath + ".tmp";
             File.WriteAllText(temporary, json);
             File.Move(temporary, _enduranceSoakLatestPath, overwrite: true);
