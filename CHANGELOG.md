@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.1.0-alpha.194] - 2026-08-17
+
+### Added — TASK-194 world streaming
+
+- Added a kilometre-scale macro streaming coordinator for Technical Specification §10 with full-detail active zones of 2 km on foot, 5 km for ground vehicles and 15 km in atmospheric flight.
+- Added simplified outer-region residency and movement-directed preload regions without expanding the collision terrain window into thousands of 32 m meshes.
+- Added the six required scheduling priorities: player region, direction of movement, collision, visible, far and pre-generation.
+- Added cancellable data-only background macro planning with the required `max(1, min(4, logical_processor_count - 2))` worker policy.
+- Added 2/5/10 ms main-thread application budgets for regular frames, forced preload and loading-screen work.
+- Added TASK-194 F5/xUnit/static/section-37/CI/release acceptance and `docs/WORLD_STREAMING_RUNTIME.md`.
+
+### Changed
+
+- TerrainChunkManager now time-slices mesh/collision application instead of relying only on operation counts, and its micro-chunk queue follows the first four §10.2 priorities.
+- Surface/orbit residency keeps the existing 25-chunk/9-collision safety window while macro region planning supplies the kilometre-scale visibility/simplification layer.
+
 ## [0.1.0-alpha.192.1] - 2026-08-16
 
 ### Fixed — TASK-192.1 acceptance coherence hotfix

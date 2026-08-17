@@ -1,10 +1,49 @@
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
-> **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task192-planetary-caves.zip`
+> **Последняя актуализация:** 2026-08-17
+> **Подготовленный снимок:** `ProjectHorizon-main-task194-world-streaming.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-194 World Streaming, Residency Budgets & Priority Scheduling
+
+**Исходный снимок:** `ProjectHorizon-main-task192.1-acceptance-coherence-hotfix.zip` (`0.1.0-alpha.192.1`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task194-world-streaming.zip`.  
+**Версия:** `0.1.0-alpha.194`.  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD+F5+TRAVERSAL PENDING`.
+
+### Основание
+
+После alpha.192.1 пользователь оценил состояние как «более-менее» и разрешил следующую мега-итерацию. Специфическая cave/F5 runtime-приёмка TASK-192 этим сообщением не подтверждена, поэтому TASK-192 не переводится фиктивно в VERIFIED. Следующий последовательный gap PDF-ТЗ v2.0 — §10 World Streaming.
+
+До TASK-194 проект уже имел bounded TASK-158 terrain micro-streaming (25 визуальных чанков, 9 collision chunks), cancellation и worker-side height/vertex generation. Однако отсутствовал единый километровый active-zone contract 2/5/15 km, полный шестиступенчатый priority scheduler и явные main-thread time budgets 2/5/10 ms.
+
+### Реализация TASK-194
+
+- `WorldStreamingRuntime`: 1 km macro-regions; full-detail radii 2 km on-foot, 5 km ground-vehicle, 15 km atmospheric-flight; simplified outer ring and forward preload corridor.
+- Шесть приоритетов §10.2: player region → movement direction → collision → visible → far → pre-generation.
+- `WorldStreamingCoordinatorNode`: background `Task.Run` планирует только обычные records/arrays, revision `CancellationTokenSource` отменяет устаревшие планы; SceneTree/Godot resources на worker не используются.
+- Worker policy соответствует §10.3: `max(1, min(4, logical_processor_count - 2))`.
+- Main-thread budgets: regular=2 ms, forced preload=5 ms, loading=10 ms. Остаток apply/eviction queue переносится на следующий tick.
+- `TerrainChunkManager`: micro-streamer сохраняет 25/9 collision-safe residency, но теперь использует Stopwatch time slice и первые четыре priority classes; это предотвращает попытку расширить collision mesh window до километров.
+- Cave-session observer закрепляется за exterior entrance region; при inactive PlanetRuntime macro streaming suspends.
+- Добавлены `WorldStreamingAcceptance`, xUnit, static validator, section-37/CI/release gate и `docs/WORLD_STREAMING_RUNTIME.md`.
+
+### Acceptance
+
+1. Clean build: `0 warnings / 0 errors`; `TASK-194 WORLD STREAMING CONTRACT PASS`.
+2. Startup: `TASK-194 world streaming READY: activeZone=onFoot:2km/ground:5km/atmospheric:15km ... priorities=... workers=... mainThreadBudget=2ms/5ms-forced/10ms-loading`.
+3. На поверхности двигаться пешком через несколько logical regions; terrain `failed=0`, без длинных main-thread stalls.
+4. После посадки в корабль/взлёта mode меняется на AtmosphericFlight и full-detail macro radius становится 15 km, но local terrain остаётся bounded 25/9.
+5. Быстро изменить направление/пройти несколько region boundaries: obsolete macro plans отменяются, stale result не применяется.
+6. F5 HUD: `TASK-194 (F5): PASS ... pri=6 budget=2ms`; Output — `TASK-194 world streaming acceptance PASS`.
+
+### Граница итерации
+
+TASK-194 не создаёт тысячи дальних Godot Node/CollisionShape объектов. Simplified/far/preload tiers являются bounded macro residency descriptors; физическая поверхность остаётся локальным micro-streamer. Это соответствует §10.3: фон возвращает данные, а SceneTree/GPU ownership остаётся у main thread.
 
 ---
 

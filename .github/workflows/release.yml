@@ -106,6 +106,7 @@ jobs:
           python3 tools/validate-task190-atmosphere-clouds.py
           python3 tools/validate-task192-planetary-caves.py
           python3 tools/validate-task1921-acceptance-coherence-hotfix.py
+          python3 tools/validate-task194-world-streaming.py
 
       - name: Unit tests and coverage
         run: >-

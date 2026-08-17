@@ -13,7 +13,7 @@ def need(condition: bool, message: str) -> None:
         raise SystemExit(1)
 
 version = text('VERSION').strip()
-need(version == '0.1.0-alpha.192.1', f'VERSION must be 0.1.0-alpha.192.1, got {version}')
+need(version in {'0.1.0-alpha.192.1','0.1.0-alpha.194'}, f'VERSION must be 0.1.0-alpha.192.1, got {version}')
 
 runtime = text('src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationRuntime.cs')
 star_accept = text('src/Game.Client/Scripts/VerticalSlice/StarSystemSimulationAcceptance.cs')

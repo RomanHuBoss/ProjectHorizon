@@ -1,3 +1,11 @@
+# Project Horizon
+
+## TASK-194 — World Streaming, Residency Budgets & Priority Scheduling
+
+Alpha.194 implements Technical Specification §10 as a two-tier streaming stack. A new 1 km macro-region coordinator maintains full-detail active zones of 2 km on foot, 5 km for ground vehicles and 15 km during atmospheric flight, with simplified outer regions and a movement-directed preload corridor. Work is ordered as player → movement direction → collision → visible → far → pre-generation. Macro planning runs as cancellable data-only worker work; all Godot scene/resource application remains on the main thread.
+
+The existing TASK-158 micro terrain streamer remains the authoritative collision layer (25 local chunks / 9 collision chunks), but now applies work through explicit 2 ms regular, 5 ms forced-preload and 10 ms loading-screen budgets instead of draining a fixed operation count regardless of frame time. This avoids multiplying 32 m collision meshes merely to satisfy kilometre-scale visibility requirements. F5 includes `TASK-194 world streaming acceptance`; see `docs/WORLD_STREAMING_RUNTIME.md`.
+
 
 ## Alpha 0.1.0-alpha.170 — Radial Surface Frame & Cube-Face Traversal Foundation
 
@@ -8,8 +16,6 @@ This is the safe foundation for later full radial collision/navigation. Alpha.17
 ## Alpha 0.1.0-alpha.168 — Planetary Globe & Geodesic Surface Topology
 
 TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world as a bounded detailed current-planet globe in Orbit/Interplanetary contexts. Surface gameplay keeps the stable 25-chunk floating-origin tangent streamer, but now shares a planet-global spherical address model with normalized latitude/longitude, great-circle distance and radius-derived distant-horizon curvature. See `docs/PLANETARY_GLOBE.md`. TASK-170 supplies the radial tangent/gravity/face-address foundation; alpha.174 now bends the bounded collision/navigation patch by the real planet radius while keeping global collision residency streamed rather than permanent.
-
-# Project Horizon
 
 ## TASK-192 — Cave Prefabs, Subsurface POIs & Resource Deposits
 

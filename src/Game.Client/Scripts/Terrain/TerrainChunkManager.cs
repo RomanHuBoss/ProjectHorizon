@@ -21,7 +21,13 @@ public sealed record TerrainChunkProfilerSnapshot(
     int StaleJobs,
     bool CurvedSurface,
     double CurvatureRadiusMeters,
-    int CurvatureRevision);
+    int CurvatureRevision,
+    double MainThreadBudgetMilliseconds,
+    double ForcedPreloadBudgetMilliseconds,
+    double LoadingScreenBudgetMilliseconds,
+    double LastMainThreadSliceMilliseconds,
+    double PeakMainThreadSliceMilliseconds,
+    int MainThreadBudgetOverruns);
 
 public partial class TerrainChunkManager : Node3D
 {
@@ -63,6 +69,15 @@ public partial class TerrainChunkManager : Node3D
 
     [Export(PropertyHint.Range, "1,4,1")]
     public int MaxOperationsPerStep { get; set; } = 1;
+
+    [Export(PropertyHint.Range, "0.5,5.0,0.1")]
+    public float MainThreadBudgetMilliseconds { get; set; } = 2.0f;
+
+    [Export(PropertyHint.Range, "2.0,10.0,0.5")]
+    public float ForcedPreloadBudgetMilliseconds { get; set; } = 5.0f;
+
+    [Export(PropertyHint.Range, "5.0,15.0,0.5")]
+    public float LoadingScreenBudgetMilliseconds { get; set; } = 10.0f;
 
     [Export]
     public bool RuntimeRefreshCoalescingEnabled { get; set; } = true;
@@ -235,6 +250,10 @@ public partial class TerrainChunkManager : Node3D
     private int _surfaceCurvatureRevision;
     private bool _runtimeCollisionEnabled = true;
     private int _coalescedRuntimeRefreshSkips;
+    private double _currentMainThreadBudgetMilliseconds = 2.0;
+    private double _lastMainThreadSliceMilliseconds;
+    private double _peakMainThreadSliceMilliseconds;
+    private int _mainThreadBudgetOverruns;
 
     public int CoalescedRuntimeRefreshSkips => _coalescedRuntimeRefreshSkips;
 
@@ -435,10 +454,23 @@ public partial class TerrainChunkManager : Node3D
     {
         _operationsCompletedLastStep = 0;
         int operationBudget = Math.Max(1, MaxOperationsPerStep);
+        double timeBudget = Math.Max(0.5, _currentMainThreadBudgetMilliseconds);
+        Stopwatch sliceStopwatch = Stopwatch.StartNew();
 
-        ApplyCompletedJobs(operationBudget);
+        ApplyCompletedJobs(operationBudget, sliceStopwatch, timeBudget);
         StartGenerationJobs();
-        ExecuteReadyRemovals(operationBudget);
+        ExecuteReadyRemovals(operationBudget, sliceStopwatch, timeBudget);
+
+        sliceStopwatch.Stop();
+        _lastMainThreadSliceMilliseconds = sliceStopwatch.Elapsed.TotalMilliseconds;
+        _peakMainThreadSliceMilliseconds = Math.Max(
+            _peakMainThreadSliceMilliseconds,
+            _lastMainThreadSliceMilliseconds);
+        if (_operationsCompletedLastStep > 0 &&
+            _lastMainThreadSliceMilliseconds > timeBudget + 0.50)
+        {
+            _mainThreadBudgetOverruns++;
+        }
 
         if (IsRefreshComplete())
         {
@@ -451,12 +483,17 @@ public partial class TerrainChunkManager : Node3D
         }
     }
 
-    private void ApplyCompletedJobs(int operationBudget)
+    private void ApplyCompletedJobs(
+        int operationBudget,
+        Stopwatch sliceStopwatch,
+        double timeBudgetMilliseconds)
     {
         DrainCompletedJobs();
 
         while (_operationsCompletedLastStep < operationBudget &&
-            _jobApplyOrder.Count > 0)
+            _jobApplyOrder.Count > 0 &&
+            (_operationsCompletedLastStep == 0 ||
+                sliceStopwatch.Elapsed.TotalMilliseconds < timeBudgetMilliseconds))
         {
             long nextJobId = _jobApplyOrder.Peek();
 
@@ -768,7 +805,10 @@ public partial class TerrainChunkManager : Node3D
         });
     }
 
-    private void ExecuteReadyRemovals(int operationBudget)
+    private void ExecuteReadyRemovals(
+        int operationBudget,
+        Stopwatch sliceStopwatch,
+        double timeBudgetMilliseconds)
     {
         if (_activeJobs.Count > 0 || _jobApplyOrder.Count > 0)
         {
@@ -777,6 +817,8 @@ public partial class TerrainChunkManager : Node3D
 
         while (_pendingOperations.Count > 0 &&
             _operationsCompletedLastStep < operationBudget &&
+            (_operationsCompletedLastStep == 0 ||
+                sliceStopwatch.Elapsed.TotalMilliseconds < timeBudgetMilliseconds) &&
             _pendingOperations.Peek().Type == ChunkOperationType.Remove)
         {
             ExecuteRemove(_pendingOperations.Dequeue());
@@ -851,6 +893,9 @@ public partial class TerrainChunkManager : Node3D
 
     private void PlanRefresh(bool executeImmediately)
     {
+        _currentMainThreadBudgetMilliseconds = executeImmediately
+            ? Math.Max(2.0, ForcedPreloadBudgetMilliseconds)
+            : Math.Max(0.5, MainThreadBudgetMilliseconds);
         int discardedReadyJobCount = _readyJobs.Count;
         int discardedReadyFailedJobCount = 0;
 
@@ -1018,6 +1063,9 @@ public partial class TerrainChunkManager : Node3D
     {
         _operationTimer?.Stop();
         _completedRevision = _planRevision;
+        _currentMainThreadBudgetMilliseconds = Math.Max(
+            0.5,
+            MainThreadBudgetMilliseconds);
         CountLodChunks(out int highDetailCount, out int lowDetailCount);
 
         GD.Print(
@@ -1367,44 +1415,61 @@ public partial class TerrainChunkManager : Node3D
 
     private int CompareDesiredPriority(Vector2I first, Vector2I second)
     {
+        int firstPriority = ResolveDesiredPriority(first);
+        int secondPriority = ResolveDesiredPriority(second);
+        int priorityComparison = firstPriority.CompareTo(secondPriority);
+        if (priorityComparison != 0)
+        {
+            return priorityComparison;
+        }
+
         int firstDistance = ChebyshevDistance(first, _currentChunk);
         int secondDistance = ChebyshevDistance(second, _currentChunk);
         int distanceComparison = firstDistance.CompareTo(secondDistance);
-
         if (distanceComparison != 0)
         {
             return distanceComparison;
-        }
-
-        if (_player is not null)
-        {
-            Vector2 velocity = new(_player.Velocity.X, _player.Velocity.Z);
-
-            if (velocity.LengthSquared() > 0.01f)
-            {
-                Vector2 direction = velocity.Normalized();
-                Vector2 firstOffset = new(
-                    first.X - _currentChunk.X,
-                    first.Y - _currentChunk.Y);
-                Vector2 secondOffset = new(
-                    second.X - _currentChunk.X,
-                    second.Y - _currentChunk.Y);
-                float firstForwardScore = firstOffset.Dot(direction);
-                float secondForwardScore = secondOffset.Dot(direction);
-                int directionComparison =
-                    secondForwardScore.CompareTo(firstForwardScore);
-
-                if (directionComparison != 0)
-                {
-                    return directionComparison;
-                }
-            }
         }
 
         int zComparison = first.Y.CompareTo(second.Y);
         return zComparison != 0
             ? zComparison
             : first.X.CompareTo(second.X);
+    }
+
+    private int ResolveDesiredPriority(Vector2I coordinate)
+    {
+        // TASK-194 / PDF §10.2: player -> movement direction -> collision ->
+        // visible. Macro far/preload priorities are owned by
+        // WorldStreamingCoordinatorNode.
+        if (coordinate == _currentChunk)
+        {
+            return 1;
+        }
+
+        if (_player is not null)
+        {
+            Vector2 velocity = new(_player.Velocity.X, _player.Velocity.Z);
+            if (velocity.LengthSquared() > 0.01f)
+            {
+                Vector2 direction = velocity.Normalized();
+                Vector2 offset = new(
+                    coordinate.X - _currentChunk.X,
+                    coordinate.Y - _currentChunk.Y);
+                if (offset.LengthSquared() > 0.0f &&
+                    offset.Normalized().Dot(direction) >= 0.45f)
+                {
+                    return 2;
+                }
+            }
+        }
+
+        if (_desiredSpecs.TryGetValue(coordinate, out ChunkSpec spec) &&
+            spec.GenerateCollision)
+        {
+            return 3;
+        }
+        return 4;
     }
 
     private void CountLodChunks(
@@ -2419,7 +2484,13 @@ public partial class TerrainChunkManager : Node3D
             _totalDiscardedStaleJobs,
             _planetSurfaceRadiusMeters > 0.0 && PlanetSurfaceProfile is not null,
             _planetSurfaceRadiusMeters,
-            _surfaceCurvatureRevision);
+            _surfaceCurvatureRevision,
+            MainThreadBudgetMilliseconds,
+            ForcedPreloadBudgetMilliseconds,
+            LoadingScreenBudgetMilliseconds,
+            _lastMainThreadSliceMilliseconds,
+            _peakMainThreadSliceMilliseconds,
+            _mainThreadBudgetOverruns);
     }
 
     private void UpdateHud()
