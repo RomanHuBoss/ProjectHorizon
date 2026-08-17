@@ -83,7 +83,12 @@ for token in ['PhysicsHz = 60.0','PlayerControllerHz = 60.0','NearbyAiHz = 10.0'
 require('SystemFrequencyPolicy.NearbyAiHz' in text(SRC/'VerticalSlice/NpcFactionAgentNode.cs'), 'ground NPC decisions not gated at nearby AI frequency')
 require('SystemFrequencyPolicy.NearbyAiHz' in text(SRC/'VerticalSlice/NpcShipNavigationNode.cs'), 'NPC ship decisions not gated at nearby AI frequency')
 ecology=text(SRC/'VerticalSlice/EcologyRuntime.cs')
-require('SystemFrequencyPolicy.NearbyAiHz' in ecology and 'SystemFrequencyPolicy.DistantAiHz' in ecology, 'ecology tiers do not use section 38 frequencies')
+fauna_behavior=text(SRC/'VerticalSlice/FaunaBehaviorRuntime.cs')
+require('FaunaBehaviorRuntime.GetDecisionFrequencyHz' in ecology and
+        'SystemFrequencyPolicy.NearbyAiHz' in fauna_behavior and
+        'SystemFrequencyPolicy.DistantAiHz' in fauna_behavior and
+        'MidHighFrequencyHz = 5.0' in fauna_behavior,
+        'ecology tiers do not preserve section 38 near/distant frequencies with TASK-198 mid tier')
 logger=text(SRC/'Infrastructure/StructuredGameLogger.cs')
 require('PendingLines' in logger and 'FlushPending' in logger, 'telemetry is not batched')
 require('SystemFrequencyPolicy.TelemetryFlushHz' in slice_arch, 'telemetry flush frequency not scheduled')

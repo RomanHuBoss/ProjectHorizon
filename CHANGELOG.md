@@ -1,4 +1,146 @@
+## [0.1.0-alpha.216] - 2026-08-17
+
+### Added
+- TASK-216 production 3D model art overhaul for Explorer, Interceptor, orbital station and five resource visual families.
+- Fifteen resource GLBs (Ore/Salvage/Crystal/Fiber/Organic × LOD0/LOD1/LOD2) with production LOD wrappers.
+- Reviewed Kenney Space Kit CC0 authoring inputs for selected close-range ship/station detail geometry, with upstream license retained.
+- TASK-216 F5/xUnit/static/section-37/CI/release gates and manual visual-acceptance documentation.
+
+### Changed
+- Explorer LOD0 raised to 49 mesh parts and >2.6k triangles with service/sensor/radiator/gear-door detail.
+- Interceptor LOD0 raised to 26 mesh parts and >1.6k triangles with weapon/sensor/avionics detail.
+- Orbital station LOD0 raised to 178 mesh parts and >5.8k triangles with industrial truss/comms/cargo/conduit detail.
+- Surface/cave/starter resource nodes prefer self-contained GLB presentation; procedural resource meshes are fallback-only.
+- Authoritative gameplay collision and mount-marker contracts remain unchanged.
+
+## [0.1.0-alpha.214] - 2026-08-17
+
+### Added
+- TASK-214 eight-hour real-time endurance certification harness for Technical Specification §41.16.
+- 1 s health sampling, 30 s deterministic galaxy/streaming/terrain probes, 60 s JSONL heartbeats, 5 min isolated transactional saves and 15 min SQLite integrity checks.
+- Hard failure detection for terrain worker errors, queue stalls, excessive managed-memory growth, database corruption/concurrent writers and artifact-write failures.
+- Interrupted-run recovery marker; an interrupted `Running` checkpoint cannot be resumed into a valid certificate.
+- Developer `endurance_soak start|status|stop`, `--endurance-soak=8` auto-start and Windows/Linux convenience launchers.
+- TASK-214 F5 harness acceptance, xUnit/static/section-37/CI/release gates and endurance documentation.
+
+### Changed
+- Terrain profiler snapshots expose cumulative failed-job and completed-revision counters to long-run health monitoring.
+- TASK-136 developer console contract now contains 17 commands.
+
+## [0.1.0-alpha.212] - 2026-08-17
+
+### Added
+- TASK-212 cross-platform deterministic-world contract for Technical Specification §41 criteria 1-2 and §42.14.
+- Canonical invariant SHA-256 over representative galaxy, planet, terrain and POI generation, including culture-invariance checks.
+- Dedicated Windows/Linux `determinism-parity` CI and release matrix using the same reviewed golden seed manifest.
+- Offline-first production-source audit forbidding mandatory `System.Net`/HTTP/socket/WebSocket/gRPC/SignalR dependencies in single-player runtime code.
+- TASK-212 F5/xUnit/static/section-37/CI/release gates and cross-platform/offline documentation.
+
+### Changed
+- Cross-platform parity is now a native two-OS build/test requirement rather than an Ubuntu-only golden test assumption.
+- `ProjectHorizonGenerator.Version` deliberately remains `3`; TASK-212 adds evidence around the existing generator instead of silently changing its output.
+
+## [0.1.0-alpha.210] - 2026-08-17
+
+### Added
+- TASK-210 executable version-1.0 acceptance for Technical Specification §41: 100 distinct procedural star systems visited through the real hyperspace navigation path.
+- Deterministic replay, procedural non-starter IDs, planet identity/seed validation, visited-state round-trip and bounded live system-definition residency checks.
+- TASK-210 F5/xUnit/static/section-37/CI/release gate and `docs/GALAXY_100_SYSTEM_EXPEDITION.md`.
+
+### Changed
+- Galaxy scalability acceptance now distinguishes 100 **distinct visited systems** from the older TASK-114 stress loop that exercised 100 jumps between two systems.
+- The 100-system expedition retains historical discovery as stable IDs only; it does not pre-generate or keep the 100 system definitions resident.
+
+## [0.1.0-alpha.208] - 2026-08-17
+
+### Added
+- TASK-208 executable texture-class budgets for Technical Specification §26.2 plus release-time shipping PNG dimension checks.
+- Shared atlas/reusable-material policy and preservation of the TASK-184 <=5 production material-slot ceiling.
+- 4 Hz local-light residency culling for surface, cave, orbit and station-interior contexts with bounded shadow eligibility.
+- TASK-208 F5/xUnit/static/section-37/CI/release gates and texture/material/lighting documentation.
+
+### Changed
+- Station-interior wall/floor reusable materials now provide a low-cost static emissive baseline beneath the bounded authored dynamic lights.
+- Distant/over-budget local Omni/Spot lights are presentation-culled without changing the authoritative surface directional star, gameplay physics, AI or persistence.
+
+## [0.1.0-alpha.206] - 2026-08-17
+
+### Added
+- TASK-206 executable system-capability preflight for Technical Specification §28.
+- Live Windows/Linux x64, CPU, RAM, renderer, GPU identity/type, video-memory-use and user-data free-space diagnostics.
+- Minimum/Recommended/Unsupported policy and advisory Compatibility/Low/Medium graphics recommendation.
+- TASK-206 F5/xUnit/static/section-37/CI/release gates and capability documentation.
+
+### Changed
+- Main Menu and vertical-slice startup now emit the same system-capability evidence.
+- Unknown portable SSD medium and total VRAM capacity are reported explicitly instead of being guessed or treated as false hard failures.
+- TASK-206 never mutates the user's TASK-202 graphics selection; renderer safety remains owned by TASK-202.
+
+## [0.1.0-alpha.204] - 2026-08-17
+
+### Added
+- TASK-204 accessibility runtime closure for Technical Specification 31.2/31.4.
+- Persistent gamepad dead-zone/response-curve and subtitle-size settings.
+- Runtime closed-caption overlay for voice, damage and low-oxygen audio cues.
+- Color-independent HP/SH/O2/HZ status tokens with OK/LOW/CRIT severity.
+- TASK-204 F5/xUnit/static/section-37/CI/release gates.
+
+### Changed
+- On-foot and ship analog action values now pass through the configured response curve while keyboard full-scale input remains unchanged.
+- TASK-130 settings round-trip now covers inversion, gamepad tuning and subtitle scale.
+
 # Changelog
+
+## [0.1.0-alpha.202] - 2026-08-17
+
+### Added
+- TASK-202 persistent Low, Medium, High and Compatibility graphics profiles for Technical Specification §26.4.
+- Profile scaling for regional vegetation density/distance, TASK-194 presentation residency, directional shadow range/mode, clouds, atmosphere, water, underwater post-processing, glow and particle emission.
+- Compatibility simplified-shader path and live renderer override plus TASK-202 F5/xUnit/static/section-37/CI/release acceptance.
+
+### Changed
+- TASK-200 adaptive quality now composes beneath the selected graphics ceiling; Low/Compatibility use the Low performance budget and Medium/High retain the Medium performance budget.
+- Settings persistence and TASK-130 settings round-trip now include the graphics profile without changing gameplay/save authority.
+
+## [0.1.0-alpha.200] - 2026-08-17
+
+### Added
+- TASK-200 runtime performance policy for Technical Specification §27 with exact Medium frame/scene/AI/memory/allocation budgets and a Low profile reduced by at least 30 percent.
+- 2 Hz Godot performance telemetry for frame, physics, navigation, draw calls, rendered primitives, video memory, active physics, node/resource counts plus .NET working-set and managed-allocation sampling.
+- Hysteretic Nominal/Constrained/Critical performance governor with presentation-only adaptation for regional vegetation and cloud layers.
+- TASK-200 F5/xUnit/static/section-37/CI/release acceptance and runtime performance documentation.
+
+### Changed
+- Compatibility rendering selects the Low performance profile while Mobile/RenderingDevice uses Medium.
+- TASK-196 vegetation and TASK-190 cloud presentation can reduce visual cost under sustained pressure without changing gameplay authority, persistence, collision or AI frequencies.
+
+## [0.1.0-alpha.198] - 2026-08-17
+
+### Added
+- TASK-198 modular fauna runtime for Technical Specification §12: six fixed skeleton families and deterministic compatible head/torso/limb/tail/horn/shell modules.
+- Hierarchical state-machine layers with utility scoring for all 11 fauna states.
+- Ground-fauna NavigationAgent3D integration with the existing TASK-124 navigation surface and simplified boids separation/cohesion/alignment.
+- 10 Hz near, 5/2 Hz medium and 0.5 Hz statistical far-fauna simulation with per-frame visual interpolation.
+- TASK-198 F5/xUnit/static/section-37/CI/release acceptance and modular fauna runtime documentation.
+
+### Changed
+- TASK-116 simplified fauna is now an aggregate statistical population instead of a generic 2 Hz counter; persistence remains seed+deltas with no save-schema bump.
+- Existing TASK-126 flying-fauna steering remains authoritative for aerial obstacle avoidance and altitude control.
+
+## [0.1.0-alpha.196] - 2026-08-17
+
+### Added — TASK-196 regional vegetation LOD and interactive promotion
+
+- Partitioned deterministic flora rendering by 32 m region and species instead of one scene-wide MultiMesh per flora type.
+- Added separate LOD0/LOD1 MultiMesh geometry, distance culling for small natural objects and independent region visibility.
+- Integrated vegetation detail with TASK-194 Full/Simplified/Preload residency without expanding the collision terrain window.
+- Added all §11.3 promotion triggers: proximity, scanner targeting, damage, harvest and active quest relevance, with distance demotion and quest pinning.
+- Added TASK-196 F5/xUnit/static/section-37/CI/release acceptance and `docs/REGIONAL_VEGETATION_RUNTIME.md`.
+
+### Changed
+
+- TASK-116 flora scene binding now reports regional groups/regions and uses the regional LOD renderer while preserving seed+deltas persistence.
+- Flora LOD1 geometry uses reduced primitive segment counts; promoted entities retain the MultiMesh visual and add only authoritative interaction/hitscan physics.
 
 ## [0.1.0-alpha.194] - 2026-08-17
 

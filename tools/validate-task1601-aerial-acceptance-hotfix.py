@@ -18,8 +18,10 @@ aerial = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAerialNav
 ecology = text("src/Game.Client/Scripts/VerticalSlice/EcologyRuntime.cs")
 tests = text("tests/ProjectHorizon.Tests/Architecture/Section38ArchitectureTests.cs")
 
-need("if (distanceMeters <= 50.0)" in ecology and "return 0.0;" in ecology,
-     "ecology distance-tier premise changed; review traversal regression", failures)
+need("FaunaBehaviorRuntime.GetDecisionFrequencyHz(distanceMeters)" in ecology and
+     "MidLowDistanceMeters = 150.0" in text("src/Game.Client/Scripts/VerticalSlice/FaunaBehaviorRuntime.cs") and
+     "return FaunaSimulationTier.Statistical" in text("src/Game.Client/Scripts/VerticalSlice/FaunaBehaviorRuntime.cs"),
+     "TASK-198 fauna distance-tier/statistical traversal premise changed; review aerial regression", failures)
 need("public bool StepAerialForAcceptance()" in fauna,
      "distance-independent flying-fauna acceptance probe missing", failures)
 need("_ = ApplyFlyingSteering(direction * speed, speed);" in fauna,
@@ -51,7 +53,7 @@ if failures:
 
 print(
     "TASK-160.1 AERIAL ACCEPTANCE HOTFIX CONTRACT PASS: "
-    "distanceTier=50m; farTraversal=160m; faunaProbe=shared-runtime; "
+    "distanceTier=10/5/2Hz-to-150m; farTraversal=160m-statistical; faunaProbe=shared-runtime; "
     "statePreserved=1; deadFaunaNotResurrected=1; baselineOrdered=1; "
     "diagnostics=1; xunit=1."
 )

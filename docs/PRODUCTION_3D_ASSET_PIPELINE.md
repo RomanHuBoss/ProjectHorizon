@@ -57,3 +57,7 @@ Expected Output prefix:
 `TASK-184 production asset pipeline acceptance PASS:`
 
 Manual smoke: external/chase view of player ship, station approach from >3 km to docking range, and NPC traffic observation while changing distance. No visible double-model overlap, LOD disappearance, or collision/docking regression is acceptable.
+
+## TASK-216 production-art extension
+
+The pipeline now exports 24 self-contained shipping GLBs: the original three ship/station families plus five resource families, each with LOD0/LOD1/LOD2. Resource wrappers use the same `ProductionModelLodController` contract as larger assets. Reviewed CC0 OBJ inputs are allowed only under `tools/content/vendor/`; raw authoring files must never be placed in `src/Game.Client/Assets/Models`. Collision remains a separate Godot concern and resource procedural geometry is fallback-only.

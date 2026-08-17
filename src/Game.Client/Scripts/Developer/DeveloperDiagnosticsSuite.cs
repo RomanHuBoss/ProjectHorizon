@@ -10,7 +10,7 @@ public partial class DeveloperDiagnosticsSuite : CanvasLayer
     {
         "teleport", "surface_warp", "spawn", "give", "damage", "heal", "set_time", "set_weather",
         "load_system", "load_planet", "show_chunks", "show_navmesh", "show_ai",
-        "profile_worldgen", "save", "reload_content"
+        "profile_worldgen", "save", "reload_content", "endurance_soak"
     };
 
     private PanelContainer? _panel;

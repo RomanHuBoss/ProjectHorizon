@@ -15,22 +15,28 @@ uniform vec4 deep_color : source_color = vec4(0.015, 0.08, 0.16, 0.92);
 uniform float wave_height = 0.12;
 uniform float wave_scale = 0.085;
 uniform float wave_speed = 0.75;
+uniform float wave_quality = 1.0;
+uniform float depth_quality = 1.0;
+uniform bool simplified_shading = false;
 uniform sampler2D depth_texture : hint_depth_texture, repeat_disable, filter_nearest;
 void vertex() {
     float w1 = sin((VERTEX.x + VERTEX.z * 0.55) * wave_scale + TIME * wave_speed);
     float w2 = sin((VERTEX.z - VERTEX.x * 0.35) * wave_scale * 1.63 - TIME * wave_speed * 0.71);
-    VERTEX.y += (w1 * 0.68 + w2 * 0.32) * wave_height;
+    VERTEX.y += (w1 * 0.68 + w2 * 0.32) * wave_height * wave_quality;
 }
 void fragment() {
     float facing = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 4.0);
-    float raw_depth = texture(depth_texture, SCREEN_UV).r;
-    vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, raw_depth);
-    vec4 scene_view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
-    scene_view.xyz /= max(scene_view.w, 0.00001);
-    float scene_depth = max(0.0, -scene_view.z);
-    float water_depth = max(0.0, -VERTEX.z);
-    float depth_below_surface = clamp((scene_depth - water_depth) / 12.0, 0.0, 1.0);
+    float depth_below_surface = 0.28;
+    if (!simplified_shading) {
+        float raw_depth = texture(depth_texture, SCREEN_UV).r;
+        vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, raw_depth);
+        vec4 scene_view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+        scene_view.xyz /= max(scene_view.w, 0.00001);
+        float scene_depth = max(0.0, -scene_view.z);
+        float water_depth = max(0.0, -VERTEX.z);
+        depth_below_surface = clamp(((scene_depth - water_depth) / 12.0) * depth_quality, 0.0, 1.0);
+    }
     ALBEDO = mix(shallow_color.rgb, deep_color.rgb, 0.18 + depth_below_surface * 0.68);
     ROUGHNESS = mix(0.10, 0.26, depth_below_surface);
     METALLIC = 0.0;
@@ -43,9 +49,11 @@ shader_type canvas_item;
 uniform sampler2D screen_texture : hint_screen_texture, repeat_disable, filter_linear;
 uniform vec4 underwater_tint : source_color = vec4(0.02, 0.18, 0.28, 1.0);
 uniform float intensity : hint_range(0.0, 1.0) = 0.6;
+uniform float distortion_scale : hint_range(0.0, 1.5) = 1.0;
+uniform bool simplified_shading = false;
 void fragment() {
     vec2 uv = SCREEN_UV;
-    float wobble = sin((uv.y + TIME * 0.11) * 42.0) * 0.0018 * intensity;
+    float wobble = simplified_shading ? 0.0 : sin((uv.y + TIME * 0.11) * 42.0) * 0.0018 * intensity * distortion_scale;
     uv.x = clamp(uv.x + wobble, 0.001, 0.999);
     vec3 scene = texture(screen_texture, uv).rgb;
     float radial = length(SCREEN_UV - vec2(0.5));
@@ -59,6 +67,10 @@ void fragment() {
     private Node3D? _lakes;
     private ShaderMaterial? _material;
     private string _geometrySignature = string.Empty;
+    private float _graphicsWaveScale = 1.0f;
+    private float _graphicsDepthScale = 1.0f;
+    private bool _graphicsSimplifiedShaders;
+    public bool GraphicsQualityConfigured { get; private set; }
 
     public bool OceanGeometryReady => _ocean?.Mesh is not null;
     public bool LocalLakeGeometryReady =>
@@ -66,6 +78,22 @@ void fragment() {
     public int VisibleSurfaceCount =>
         (_ocean?.Visible == true ? 1 : 0) +
         (_lakes?.Visible == true ? _lakes.GetChildCount() : 0);
+
+    public void SetGraphicsQuality(
+        double waveScale,
+        double depthScale,
+        double underwaterDistortionScale,
+        bool simplifiedShaders)
+    {
+        _ = underwaterDistortionScale;
+        _graphicsWaveScale = (float)Math.Clamp(waveScale, 0.25, 1.25);
+        _graphicsDepthScale = (float)Math.Clamp(depthScale, 0.25, 1.25);
+        _graphicsSimplifiedShaders = simplifiedShaders;
+        _material?.SetShaderParameter("wave_quality", _graphicsWaveScale);
+        _material?.SetShaderParameter("depth_quality", _graphicsDepthScale);
+        _material?.SetShaderParameter("simplified_shading", simplifiedShaders);
+        GraphicsQualityConfigured = true;
+    }
 
     public void Configure(
         PlanetaryWaterProfile profile,
@@ -128,6 +156,9 @@ void fragment() {
             0.92f);
         _material.SetShaderParameter("shallow_color", baseColor);
         _material.SetShaderParameter("deep_color", deep);
+        _material.SetShaderParameter("wave_quality", _graphicsWaveScale);
+        _material.SetShaderParameter("depth_quality", _graphicsDepthScale);
+        _material.SetShaderParameter("simplified_shading", _graphicsSimplifiedShaders);
     }
 
     private void RebuildGeometry(

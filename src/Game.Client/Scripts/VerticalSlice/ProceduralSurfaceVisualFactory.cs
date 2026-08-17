@@ -13,6 +13,52 @@ public static class ProceduralSurfaceVisualFactory
     {
         ArgumentNullException.ThrowIfNull(definition);
         string family = ResolveResourceFamily(definition);
+        string assetKey = ResolveResourceAssetKey(definition, family);
+        string scenePath = $"res://Assets/Models/Resources/RES_{assetKey}_01.tscn";
+        PackedScene? packed = ResourceLoader.Load<PackedScene>(scenePath);
+        if (packed is not null)
+        {
+            MeshInstance3D? production = packed.Instantiate<MeshInstance3D>();
+            if (production is not null)
+            {
+                production.Name = "MeshInstance3D";
+                production.SetMeta("surface_visual_family", family);
+                production.SetMeta("surface_visual_asset", assetKey);
+                production.SetMeta("surface_visual_parts", 3);
+                production.SetMeta("production_resource_visual", true);
+                return production;
+            }
+        }
+
+        MeshInstance3D fallback = CreateProceduralResourceFallback(definition, family);
+        fallback.SetMeta("production_resource_visual", false);
+        return fallback;
+    }
+
+    public static string ResolveResourceAssetKey(
+        GameResourceDefinition definition,
+        string? family = null)
+    {
+        ArgumentNullException.ThrowIfNull(definition);
+        if (string.Equals(definition.ResourceId, "resource.salvage_alloy", StringComparison.Ordinal) ||
+            definition.Tags.Contains("salvage", StringComparer.Ordinal))
+        {
+            return "Salvage";
+        }
+
+        return (family ?? ResolveResourceFamily(definition)) switch
+        {
+            "crystal" => "Crystal",
+            "fiber" => "Fiber",
+            "organic" => "Organic",
+            _ => "Ore"
+        };
+    }
+
+    private static MeshInstance3D CreateProceduralResourceFallback(
+        GameResourceDefinition definition,
+        string family)
+    {
         MeshInstance3D root = new()
         {
             Name = "MeshInstance3D",

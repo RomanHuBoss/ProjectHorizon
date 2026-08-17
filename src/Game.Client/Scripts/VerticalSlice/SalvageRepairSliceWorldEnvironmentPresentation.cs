@@ -71,8 +71,8 @@ public partial class SalvageRepairSlice
                 GetNodeOrNull<DirectionalLight3D>("DirectionalLight3D");
             if (surfaceDirectional is not null)
             {
-                surfaceDirectional.ShadowEnabled = _surfaceRuntimeActive;
-                surfaceDirectional.Set("directional_shadow_max_distance", 320.0f);
+                surfaceDirectional.ShadowEnabled = _surfaceRuntimeActive && GraphicsShadowsEnabled;
+                surfaceDirectional.Set("directional_shadow_max_distance", (float)Math.Max(1.0, GraphicsShadowMaxDistanceMeters));
             }
 
             if (changed)
@@ -202,7 +202,7 @@ public partial class SalvageRepairSlice
             // owns bounded 320 m shadows; orbit/transit/interior use direct light
             // without distant dynamic shadows.
             directional.ShadowEnabled = false;
-            directional.Set("directional_shadow_max_distance", 320.0f);
+            directional.Set("directional_shadow_max_distance", (float)Math.Max(1.0, GraphicsShadowMaxDistanceMeters));
         }
 
         _lastWorldEnvironmentPresentationProfile = effectiveProfile;

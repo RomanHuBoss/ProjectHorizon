@@ -24,8 +24,7 @@ public sealed class EcologyRuntime
         new(StringComparer.Ordinal);
     private readonly HashSet<string> _removedFloraInstanceIds =
         new(StringComparer.Ordinal);
-    private double _simplifiedAccumulator;
-    private long _simplifiedTicks;
+    private readonly FaunaStatisticalSimulationRuntime _farFaunaSimulation;
 
     public EcologyRuntime(
         EcologyCatalog catalog,
@@ -61,6 +60,7 @@ public sealed class EcologyRuntime
         _plan = plan;
         _worldSeed = worldSeed;
         _regionKey = regionKey;
+        _farFaunaSimulation = new FaunaStatisticalSimulationRuntime(plan.SimplifiedFauna);
 
         if (plan.ActiveFauna.Count > catalog.ActiveFaunaLimit ||
             plan.SimplifiedFauna.Count > catalog.SimplifiedFaunaLimit)
@@ -137,7 +137,10 @@ public sealed class EcologyRuntime
 
     public int DiscoveryPoints => CalculateDiscoveryPoints();
 
-    public long SimplifiedTicks => _simplifiedTicks;
+    public long SimplifiedTicks => _farFaunaSimulation.TickCount;
+
+    public FaunaStatisticalSnapshot FarFaunaSnapshot =>
+        _farFaunaSimulation.CreateSnapshot();
 
     public IReadOnlyCollection<string> DiscoveredFloraIds =>
         _discoveredFloraIds.OrderBy(id => id, StringComparer.Ordinal).ToArray();
@@ -253,13 +256,7 @@ public sealed class EcologyRuntime
             throw new ArgumentOutOfRangeException(nameof(deltaSeconds));
         }
 
-        _simplifiedAccumulator += deltaSeconds;
-        double interval = 1.0 / SystemFrequencyPolicy.DistantAiHz;
-        while (_simplifiedAccumulator >= interval)
-        {
-            _simplifiedAccumulator -= interval;
-            _simplifiedTicks++;
-        }
+        _farFaunaSimulation.Tick(deltaSeconds);
     }
 
     public EcologySaveData CreateSaveData()
@@ -273,98 +270,13 @@ public sealed class EcologyRuntime
             RemovedFloraInstanceIds.ToArray());
     }
 
-    public static double GetUpdateFrequencyHz(double distanceMeters)
-    {
-        if (!double.IsFinite(distanceMeters) || distanceMeters < 0.0)
-        {
-            return 0.0;
-        }
-
-        if (distanceMeters <= 20.0)
-        {
-            return SystemFrequencyPolicy.NearbyAiHz;
-        }
-
-        if (distanceMeters <= 50.0)
-        {
-            return SystemFrequencyPolicy.DistantAiHz;
-        }
-
-        return 0.0;
-    }
+    public static double GetUpdateFrequencyHz(double distanceMeters) =>
+        FaunaBehaviorRuntime.GetDecisionFrequencyHz(distanceMeters);
 
     public static string SelectBehavior(
         EcologyFaunaDefinition definition,
-        EcologyBehaviorContext context)
-    {
-        ArgumentNullException.ThrowIfNull(definition);
-        ArgumentNullException.ThrowIfNull(context);
-        bool Has(string behavior) => definition.Behaviors.Contains(
-            behavior,
-            StringComparer.Ordinal);
-
-        if (context.HitRecently)
-        {
-            if (definition.Aggression >= 0.60 &&
-                context.DistanceToThreat <= 8.0 &&
-                Has("Attack"))
-            {
-                return "Attack";
-            }
-
-            if (Has("Flee"))
-            {
-                return "Flee";
-            }
-        }
-
-        if (context.DistanceFromTerritory > definition.TerritoryRadius &&
-            Has("ReturnToTerritory"))
-        {
-            return "ReturnToTerritory";
-        }
-
-        if (context.Fatigue >= 0.82 && Has("Sleep"))
-        {
-            return "Sleep";
-        }
-
-        if (context.Thirst >= 0.74 &&
-            context.AtWater &&
-            Has("Drink"))
-        {
-            return "Drink";
-        }
-
-        if (context.Hunger >= 0.70 &&
-            string.Equals(
-                definition.Diet,
-                "Herbivore",
-                StringComparison.Ordinal) &&
-            Has("Graze"))
-        {
-            return "Graze";
-        }
-
-        if (context.GroupDistance >= 12.0 && Has("FollowGroup"))
-        {
-            return "FollowGroup";
-        }
-
-        if (definition.Aggression >= 0.35 &&
-            context.DistanceToThreat <= 10.0 &&
-            Has("Threaten"))
-        {
-            return "Threaten";
-        }
-
-        if (context.DistanceToThreat <= 18.0 && Has("Investigate"))
-        {
-            return "Investigate";
-        }
-
-        return Has("Wander") ? "Wander" : "Idle";
-    }
+        EcologyBehaviorContext context) =>
+        FaunaBehaviorRuntime.SelectBehavior(definition, context);
 
     private int CalculateDiscoveryPoints()
     {

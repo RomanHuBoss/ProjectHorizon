@@ -55,6 +55,8 @@ public partial class SalvageRepairSlice
         {
             GameUserSettingsService.ApplyToShip(_voyageShip);
         }
+        ApplyGraphicsQualityFromUserSettings(printReady: false);
+        ApplyAccessibilityRuntimeSettings();
         GD.Print(
             "TASK-130 settings applied: " +
             $"onFootSensitivity={settings.OnFootMouseSensitivity:0.0000}; " +
@@ -62,7 +64,11 @@ public partial class SalvageRepairSlice
             $"fov={settings.FieldOfViewDegrees:0}; uiScale={settings.UiScale:0.00}; " +
             $"subtitles={(settings.SubtitlesEnabled ? 1 : 0)}; " +
             $"cameraShake={(settings.CameraShakeEnabled ? 1 : 0)}; " +
-            $"motionBlur={(settings.MotionBlurEnabled ? 1 : 0)}.");
+            $"motionBlur={(settings.MotionBlurEnabled ? 1 : 0)}; " +
+            $"gamepadDeadZone={settings.GamepadDeadZone:0.00}; " +
+            $"gamepadResponse={settings.GamepadResponseExponent:0.00}; " +
+            $"subtitleScale={settings.SubtitleScale:0.00}; " +
+            $"graphics={settings.GraphicsQualityProfile}.");
     }
 
     public void RequestReturnToMainMenu()
@@ -116,6 +122,14 @@ public partial class SalvageRepairSlice
             roundTrip.SubtitlesEnabled == before.SubtitlesEnabled &&
             roundTrip.CameraShakeEnabled == before.CameraShakeEnabled &&
             roundTrip.MotionBlurEnabled == before.MotionBlurEnabled &&
+            Math.Abs(roundTrip.GamepadDeadZone - before.GamepadDeadZone) < 0.0001f &&
+            Math.Abs(roundTrip.GamepadResponseExponent - before.GamepadResponseExponent) < 0.0001f &&
+            Math.Abs(roundTrip.SubtitleScale - before.SubtitleScale) < 0.0001f &&
+            roundTrip.InvertOnFootX == before.InvertOnFootX &&
+            roundTrip.InvertOnFootY == before.InvertOnFootY &&
+            roundTrip.InvertShipPitch == before.InvertShipPitch &&
+            roundTrip.InvertShipYaw == before.InvertShipYaw &&
+            roundTrip.GraphicsQualityProfile == before.GraphicsQualityProfile &&
             roundTrip.KeyboardBindings.OrderBy(pair => pair.Key)
                 .SequenceEqual(before.KeyboardBindings.OrderBy(pair => pair.Key));
 
@@ -155,6 +169,9 @@ public partial class SalvageRepairSlice
             before.MusicVolume is >= 0.0f and <= 1.0f &&
             before.EffectsVolume is >= 0.0f and <= 1.0f &&
             before.SpeechVolume is >= 0.0f and <= 1.0f &&
+            before.GamepadDeadZone is >= AccessibilityControlPolicy.MinimumGamepadDeadZone and <= AccessibilityControlPolicy.MaximumGamepadDeadZone &&
+            before.GamepadResponseExponent is >= AccessibilityControlPolicy.MinimumGamepadResponseExponent and <= AccessibilityControlPolicy.MaximumGamepadResponseExponent &&
+            before.SubtitleScale is >= AccessibilityControlPolicy.MinimumSubtitleScale and <= AccessibilityControlPolicy.MaximumSubtitleScale &&
             audioBuses;
         bool profileContract = string.Equals(
             GameProfilePaths.PrimarySlotId,

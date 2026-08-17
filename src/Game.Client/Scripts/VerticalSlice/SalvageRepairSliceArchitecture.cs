@@ -237,8 +237,10 @@ public partial class SalvageRepairSlice
                 distantTicks >= 19 && distantTicks <= 21 &&
                 Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(8.0) -
                     SystemFrequencyPolicy.NearbyAiHz) < 0.001 &&
-                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) -
-                    SystemFrequencyPolicy.DistantAiHz) < 0.001;
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) - 5.0) < 0.001 &&
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(100.0) -
+                    SystemFrequencyPolicy.DistantAiHz) < 0.001 &&
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(180.0)) < 0.001;
             bool liveContract = DomainEvents.SubscriptionCount == 11;
             bool passed = eventContract && frequencyContract && liveContract;
             _task142AcceptanceHud = passed ? "PASS" : "FAIL";

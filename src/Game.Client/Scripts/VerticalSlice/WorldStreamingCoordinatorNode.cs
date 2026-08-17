@@ -47,8 +47,23 @@ public partial class WorldStreamingCoordinatorNode : Node
     private double _peakApplyMilliseconds;
     private bool _active;
     private bool _hasObserver;
+    private double _presentationDistanceScale = 1.0;
 
     public int WorkerLimit { get; private set; } = 1;
+
+    public double PresentationDistanceScale => _presentationDistanceScale;
+
+    public void SetPresentationDistanceScale(double scale)
+    {
+        double clamped = Math.Clamp(scale, 0.45, 1.25);
+        if (Math.Abs(clamped - _presentationDistanceScale) < 0.0001)
+        {
+            return;
+        }
+        _presentationDistanceScale = clamped;
+        _replanAccumulator = WorldStreamingRuntime.ReplanIntervalSeconds;
+        _planCancellation?.Cancel();
+    }
 
     public override void _Ready()
     {
@@ -152,7 +167,10 @@ public partial class WorldStreamingCoordinatorNode : Node
         int revision = ++_revision;
         _planTask = Task.Run(() =>
         {
-            WorldStreamingPlan plan = WorldStreamingRuntime.BuildPlan(observer, token);
+            WorldStreamingPlan plan = WorldStreamingRuntime.BuildPlan(
+                observer,
+                _presentationDistanceScale,
+                token);
             return new PendingPlan(revision, plan);
         }, token);
     }

@@ -63,9 +63,10 @@ need("AddVisualDetails(definition, material)" in poi and
      'Name = "VisualDetails"' in poi and
      "PadBeacon" in poi and "SensorCrown" in poi,
      "POI compound visual details missing", failures)
-need("AddBodyPlanVisualDetails(definition, material)" in fauna and
-     "WingL" in fauna and "TailFin" in fauna and "Leg" in fauna,
-     "fauna body-plan details missing", failures)
+need("AddBodyPlanVisualDetails(definition, material, _visualRoot, _morphology)" in fauna and
+     "WingL_" in fauna and "Tail_" in fauna and "Leg" in fauna and
+     "FaunaMorphologyProfile" in fauna,
+     "TASK-198 modular fauna body-plan details missing", failures)
 need('"Pad" => new CylinderMesh' in flora and
      '"Fungus" => new CylinderMesh' in flora,
      "flora silhouette upgrade missing", failures)

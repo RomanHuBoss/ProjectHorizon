@@ -112,9 +112,16 @@ public static class WorldStreamingRuntime
 
     public static WorldStreamingPlan BuildPlan(
         WorldStreamingObserverSample observer,
+        CancellationToken cancellationToken = default) =>
+        BuildPlan(observer, 1.0, cancellationToken);
+
+    public static WorldStreamingPlan BuildPlan(
+        WorldStreamingObserverSample observer,
+        double presentationDistanceScale,
         CancellationToken cancellationToken = default)
     {
-        double fullRadius = ResolveFullDetailRadiusMeters(observer.TravelMode);
+        double scale = Math.Clamp(presentationDistanceScale, 0.45, 1.25);
+        double fullRadius = ResolveFullDetailRadiusMeters(observer.TravelMode) * scale;
         double simplifiedRadius = fullRadius * SimplifiedRadiusMultiplier;
         double planningRadius = simplifiedRadius + PreloadAheadMeters;
         WorldStreamingRegionCoordinate center = WorldToRegion(

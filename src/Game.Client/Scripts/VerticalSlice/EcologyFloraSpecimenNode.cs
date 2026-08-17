@@ -11,6 +11,7 @@ public partial class EcologyFloraSpecimenNode : StaticBody3D, IInteractable, IHi
     public string FloraId => _definition?.FloraId ?? string.Empty;
 
     public event Action<EcologyFloraSpecimenNode, Node3D>? HarvestRequested;
+    public event Action<EcologyFloraSpecimenNode, Node3D>? Damaged;
 
     public void Configure(
         EcologyFloraDefinition definition,
@@ -77,6 +78,7 @@ public partial class EcologyFloraSpecimenNode : StaticBody3D, IInteractable, IHi
         Vector3 normal)
     {
         _hits++;
+        Damaged?.Invoke(this, source);
         if (_hits >= 2)
         {
             HarvestRequested?.Invoke(this, source);
@@ -91,56 +93,62 @@ public partial class EcologyFloraSpecimenNode : StaticBody3D, IInteractable, IHi
 
     public static PrimitiveMesh CreateMesh(
         EcologyFloraDefinition definition,
-        Material material)
+        Material material) => CreateLodMesh(definition, material, lod: 0);
+
+    public static PrimitiveMesh CreateLodMesh(
+        EcologyFloraDefinition definition,
+        Material material,
+        int lod)
     {
+        bool simplified = lod > 0;
         PrimitiveMesh mesh = definition.Shape switch
         {
             "Canopy" => new SphereMesh
             {
                 Radius = 0.55f,
                 Height = 1.10f,
-                RadialSegments = 10,
-                Rings = 5
+                RadialSegments = simplified ? 6 : 10,
+                Rings = simplified ? 3 : 5
             },
             "Pad" => new CylinderMesh
             {
                 TopRadius = 0.52f,
                 BottomRadius = 0.44f,
                 Height = 0.22f,
-                RadialSegments = 14,
-                Rings = 2
+                RadialSegments = simplified ? 7 : 14,
+                Rings = simplified ? 1 : 2
             },
             "Fungus" => new CylinderMesh
             {
                 TopRadius = 0.50f,
                 BottomRadius = 0.16f,
                 Height = 0.72f,
-                RadialSegments = 12,
-                Rings = 3
+                RadialSegments = simplified ? 6 : 12,
+                Rings = simplified ? 1 : 3
             },
             "Tuft" => new CylinderMesh
             {
                 TopRadius = 0.12f,
                 BottomRadius = 0.42f,
                 Height = 1.15f,
-                RadialSegments = 7,
-                Rings = 2
+                RadialSegments = simplified ? 4 : 7,
+                Rings = 1
             },
             "Frond" => new CylinderMesh
             {
                 TopRadius = 0.34f,
                 BottomRadius = 0.16f,
                 Height = 1.35f,
-                RadialSegments = 6,
-                Rings = 2
+                RadialSegments = simplified ? 4 : 6,
+                Rings = 1
             },
             _ => new CylinderMesh
             {
                 TopRadius = 0.10f,
                 BottomRadius = 0.30f,
                 Height = 1.55f,
-                RadialSegments = 7,
-                Rings = 2
+                RadialSegments = simplified ? 4 : 7,
+                Rings = 1
             }
         };
         mesh.Material = material;

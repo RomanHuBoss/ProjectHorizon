@@ -175,11 +175,13 @@ public partial class SalvageRepairSlice
     private void PlayDialogueVoiceAudio()
     {
         _audioDirector?.PlayVoiceRadio();
+        PublishAccessibilityCaption("ui.access.caption.radio", 2.6);
     }
 
     private void PlayPlayerDamageAudio()
     {
         _audioDirector?.PlayDamageAlert();
+        PublishAccessibilityCaption("ui.access.caption.damage", 2.0);
     }
 
     private void UpdateLifeSupportAudio(double delta)
@@ -197,6 +199,7 @@ public partial class SalvageRepairSlice
         if (oxygenRatio <= 0.18 && _lifeSupportAlarmCooldown <= 0.0)
         {
             _audioDirector.PlayLifeSupportAlarm();
+            PublishAccessibilityCaption("ui.access.caption.oxygen_low", 3.2);
             _lifeSupportAlarmCooldown = 4.5;
         }
         else if (oxygenRatio >= 0.25)

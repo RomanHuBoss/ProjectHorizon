@@ -16,11 +16,15 @@ public sealed class GameUserSettings
     public bool InvertOnFootY { get; set; }
     public bool InvertShipPitch { get; set; }
     public bool InvertShipYaw { get; set; }
+    public float GamepadDeadZone { get; set; } = AccessibilityControlPolicy.DefaultGamepadDeadZone;
+    public float GamepadResponseExponent { get; set; } = AccessibilityControlPolicy.DefaultGamepadResponseExponent;
+    public float SubtitleScale { get; set; } = AccessibilityControlPolicy.DefaultSubtitleScale;
     public float FieldOfViewDegrees { get; set; } = 75.0f;
     public float UiScale { get; set; } = 1.0f;
     public bool SubtitlesEnabled { get; set; } = true;
     public bool CameraShakeEnabled { get; set; }
     public bool MotionBlurEnabled { get; set; }
+    public GraphicsQualityProfile GraphicsQualityProfile { get; set; } = GraphicsQualityProfile.Medium;
     public float MusicVolume { get; set; } = 0.75f;
     public float EffectsVolume { get; set; } = 0.85f;
     public float SpeechVolume { get; set; } = 0.90f;
@@ -51,11 +55,15 @@ public sealed class GameUserSettings
             InvertOnFootY = InvertOnFootY,
             InvertShipPitch = InvertShipPitch,
             InvertShipYaw = InvertShipYaw,
+            GamepadDeadZone = GamepadDeadZone,
+            GamepadResponseExponent = GamepadResponseExponent,
+            SubtitleScale = SubtitleScale,
             FieldOfViewDegrees = FieldOfViewDegrees,
             UiScale = UiScale,
             SubtitlesEnabled = SubtitlesEnabled,
             CameraShakeEnabled = CameraShakeEnabled,
             MotionBlurEnabled = MotionBlurEnabled,
+            GraphicsQualityProfile = GraphicsQualityProfile,
             MusicVolume = MusicVolume,
             EffectsVolume = EffectsVolume,
             SpeechVolume = SpeechVolume
@@ -153,11 +161,16 @@ public static class GameUserSettingsService
         settings.InvertOnFootY = ReadBool(config, SectionControls, "invert_on_foot_y", false);
         settings.InvertShipPitch = ReadBool(config, SectionControls, "invert_ship_pitch", false);
         settings.InvertShipYaw = ReadBool(config, SectionControls, "invert_ship_yaw", false);
+        settings.GamepadDeadZone = ReadFloat(config, SectionControls, "gamepad_dead_zone", AccessibilityControlPolicy.DefaultGamepadDeadZone);
+        settings.GamepadResponseExponent = ReadFloat(config, SectionControls, "gamepad_response_exponent", AccessibilityControlPolicy.DefaultGamepadResponseExponent);
+        settings.SubtitleScale = ReadFloat(config, SectionGeneral, "subtitle_scale", AccessibilityControlPolicy.DefaultSubtitleScale);
         settings.FieldOfViewDegrees = ReadFloat(config, SectionGeneral, "fov_degrees", 75.0f);
         settings.UiScale = ReadFloat(config, SectionGeneral, "ui_scale", 1.0f);
         settings.SubtitlesEnabled = ReadBool(config, SectionGeneral, "subtitles", true);
         settings.CameraShakeEnabled = ReadBool(config, SectionGeneral, "camera_shake", false);
         settings.MotionBlurEnabled = ReadBool(config, SectionGeneral, "motion_blur", false);
+        settings.GraphicsQualityProfile = (GraphicsQualityProfile)ReadLong(
+            config, SectionGeneral, "graphics_quality_profile", (long)GraphicsQualityProfile.Medium);
         settings.MusicVolume = ReadFloat(config, SectionAudio, "music", 0.75f);
         settings.EffectsVolume = ReadFloat(config, SectionAudio, "effects", 0.85f);
         settings.SpeechVolume = ReadFloat(config, SectionAudio, "speech", 0.90f);
@@ -184,11 +197,15 @@ public static class GameUserSettingsService
         config.SetValue(SectionControls, "invert_on_foot_y", settings.InvertOnFootY);
         config.SetValue(SectionControls, "invert_ship_pitch", settings.InvertShipPitch);
         config.SetValue(SectionControls, "invert_ship_yaw", settings.InvertShipYaw);
+        config.SetValue(SectionControls, "gamepad_dead_zone", settings.GamepadDeadZone);
+        config.SetValue(SectionControls, "gamepad_response_exponent", settings.GamepadResponseExponent);
+        config.SetValue(SectionGeneral, "subtitle_scale", settings.SubtitleScale);
         config.SetValue(SectionGeneral, "fov_degrees", settings.FieldOfViewDegrees);
         config.SetValue(SectionGeneral, "ui_scale", settings.UiScale);
         config.SetValue(SectionGeneral, "subtitles", settings.SubtitlesEnabled);
         config.SetValue(SectionGeneral, "camera_shake", settings.CameraShakeEnabled);
         config.SetValue(SectionGeneral, "motion_blur", settings.MotionBlurEnabled);
+        config.SetValue(SectionGeneral, "graphics_quality_profile", (long)settings.GraphicsQualityProfile);
         config.SetValue(SectionAudio, "music", settings.MusicVolume);
         config.SetValue(SectionAudio, "effects", settings.EffectsVolume);
         config.SetValue(SectionAudio, "speech", settings.SpeechVolume);
@@ -218,6 +235,7 @@ public static class GameUserSettingsService
         Normalize(settings);
         GameLocalizationService.ApplyConfiguredLanguage(settings.LanguageCode);
         ApplyInputMap(settings);
+        GameAccessibilityRuntime.ApplyInputMap(settings);
         ApplyAudio(settings);
         if (Engine.GetMainLoop() is SceneTree tree)
         {
@@ -233,6 +251,7 @@ public static class GameUserSettingsService
         player.MouseSensitivity = settings.OnFootMouseSensitivity;
         player.InvertLookX = settings.InvertOnFootX;
         player.InvertLookY = settings.InvertOnFootY;
+        player.GamepadResponseExponent = settings.GamepadResponseExponent;
         player.SetFieldOfView(settings.FieldOfViewDegrees);
     }
 
@@ -244,6 +263,7 @@ public static class GameUserSettingsService
         ship.MouseSensitivity = settings.ShipMouseSensitivity;
         ship.InvertPitchLook = settings.InvertShipPitch;
         ship.InvertYawLook = settings.InvertShipYaw;
+        ship.GamepadResponseExponent = settings.GamepadResponseExponent;
         ship.SetFieldOfView(settings.FieldOfViewDegrees);
     }
 
@@ -403,11 +423,18 @@ public static class GameUserSettingsService
         }
         settings.OnFootMouseSensitivity = Mathf.Clamp(settings.OnFootMouseSensitivity, 0.0005f, 0.01f);
         settings.ShipMouseSensitivity = Mathf.Clamp(settings.ShipMouseSensitivity, 0.0005f, 0.015f);
+        settings.GamepadDeadZone = AccessibilityControlPolicy.NormalizeDeadZone(settings.GamepadDeadZone);
+        settings.GamepadResponseExponent = AccessibilityControlPolicy.NormalizeResponseExponent(settings.GamepadResponseExponent);
+        settings.SubtitleScale = AccessibilityControlPolicy.NormalizeSubtitleScale(settings.SubtitleScale);
         settings.FieldOfViewDegrees = Mathf.Clamp(settings.FieldOfViewDegrees, 60.0f, 110.0f);
         settings.UiScale = Mathf.Clamp(settings.UiScale, 0.8f, 1.5f);
         settings.MusicVolume = Mathf.Clamp(settings.MusicVolume, 0.0f, 1.0f);
         settings.EffectsVolume = Mathf.Clamp(settings.EffectsVolume, 0.0f, 1.0f);
         settings.SpeechVolume = Mathf.Clamp(settings.SpeechVolume, 0.0f, 1.0f);
+        if (!GraphicsQualityProfilePolicy.IsValid(settings.GraphicsQualityProfile))
+        {
+            settings.GraphicsQualityProfile = GraphicsQualityProfile.Medium;
+        }
         foreach ((string action, Key key) in DefaultKeyboardBindings)
         {
             if (!settings.KeyboardBindings.ContainsKey(action))

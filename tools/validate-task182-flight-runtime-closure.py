@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194"}, "VERSION must be alpha.182 or later accepted revision", f)
+need(version in {"0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194", "0.1.0-alpha.196", "0.1.0-alpha.198","0.1.0-alpha.200", "0.1.0-alpha.202", "0.1.0-alpha.204", "0.1.0-alpha.206","0.1.0-alpha.208", "0.1.0-alpha.210", "0.1.0-alpha.212", "0.1.0-alpha.214", "0.1.0-alpha.216"}, "VERSION must be alpha.182 or later accepted revision", f)
 
 # The TASK-180.3 virtual stick remains the input representation, but live pilot
 # input must return to neutral after a short idle hold rather than preserving an
@@ -67,7 +67,8 @@ need(abs(number(ship_scene, "MouseVirtualStickAutoCenterDelaySeconds") - 0.08) <
      "ship scene does not carry TASK-182 spring-centering tuning", f)
 need("BuildVirtualStickAttitudeCommand" in controller and
      "MouseTranslationCouplingEnabled = false" in controller and
-     'Input.GetAxis("ship_strafe_left", "ship_strafe_right")' in controller,
+     ('Input.GetAxis(\"ship_strafe_left\", \"ship_strafe_right\")' in controller or
+      'GameAccessibilityRuntime.ReadAxis(\"ship_strafe_left\", \"ship_strafe_right\"' in controller),
      "TASK-182 regressed roll/pitch attitude or separated keyboard strafe", f)
 need("else if (AutoStabilizationEnabled || command.Brake)" in controller and
      "AngularVelocityLocal = AngularVelocityLocal.MoveToward(" in controller and

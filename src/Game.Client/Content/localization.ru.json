@@ -1392,6 +1392,19 @@
     "ui.cave.entered": "Вход: {cave}. Следуйте по освещённому проходу; E у маркера выхода возвращает на поверхность.",
     "ui.cave.exited": "Возврат на поверхность планеты.",
     "ui.cave.entry_unavailable": "Вход в пещеру доступен только пешком при активной поверхности планеты.",
-    "ui.cave.prefab_missing": "Для этого входа пещерный prefab недоступен."
+    "ui.cave.prefab_missing": "Для этого входа пещерный prefab недоступен.",
+    "ui.settings.graphics_section": "Графика",
+    "ui.settings.graphics_quality": "Качество графики",
+    "ui.settings.graphics.low": "Низкое",
+    "ui.settings.graphics.medium": "Среднее",
+    "ui.settings.graphics.high": "Высокое",
+    "ui.settings.graphics.compatibility": "Совместимость",
+    "ui.settings.graphics.note": "Профиль меняет только визуальное представление. «Совместимость» сразу применяет облегчённые настройки; сам OpenGL Compatibility Renderer требует соответствующей сборки/профиля запуска.",
+    "ui.settings.gamepad_dead_zone": "Мёртвая зона геймпада",
+    "ui.settings.gamepad_response": "Кривая отклика геймпада",
+    "ui.settings.subtitle_scale": "Размер субтитров",
+    "ui.access.caption.radio": "[ГОЛОС] Радиопередача / канал диалога открыт.",
+    "ui.access.caption.damage": "[ТРЕВОГА] Получен урон.",
+    "ui.access.caption.oxygen_low": "[O2] Критически низкий уровень кислорода."
   }
 }

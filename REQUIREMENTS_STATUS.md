@@ -1,8 +1,404 @@
+## 0. Мега-итерация 2026-08-17 — TASK-216 Production 3D Model Art Overhaul
+
+**Исходный снимок:** `ProjectHorizon-main-task214-eight-hour-endurance.zip` (`0.1.0-alpha.214`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task216-production-model-art.zip`.  
+**Версия:** `0.1.0-alpha.216`  
+**Фокус:** production 3D art / ships / station / resources  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 67/67 / OWNER CLEAN BUILD + F5 + MANUAL VISUAL ACCEPTANCE PENDING`
+
+### Реализация TASK-216
+
+- Explorer/Interceptor/orbital station получили новый close-range production-art pass с существенно более высокой детализацией LOD0 при сохранении TASK-184 LOD, mount-marker и separate-collision contracts.
+- Проверенные CC0 authoring inputs Kenney Space Kit используются только как нормализованные greeble/detail meshes; лицензия сохранена в `tools/content/vendor/kenney_space_kit/License.txt`.
+- Добавлены пять resource families: Ore, Salvage, Crystal, Fiber, Organic; каждая имеет LOD0/LOD1/LOD2 GLB и `ProductionModelLodController` wrapper.
+- `ProceduralSurfaceVisualFactory` сначала загружает production resource scene; старые SphereMesh/CylinderMesh остаются аварийным fallback. `SalvageResourceNode` рекурсивно применяет catalog material к вложенным импортированным MeshInstance3D.
+- Gameplay collision ресурсных узлов, корабля и станции не переносится в GLB и не меняется.
+- F5 проверяет detail signatures, live resource GLB replacement, отсутствие fallback и separation collision; визуальное качество требует отдельной owner/manual оценки.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-216 PRODUCTION MODEL ART CONTRACT PASS`.
+2. Внешний/chase вид Explorer: проверить силуэт, панельный ритм, двигатели, gear/service/sensor детали.
+3. Interceptor в полёте: отдельный боевой силуэт и читаемые weapon/sensor/avionics детали.
+4. Подлёт/стыковка к станции: industrial ring, truss, communications, cargo, conduits без изменения физической коллизии.
+5. Осмотреть Ore/Salvage/Crystal/Fiber/Organic на поверхности и в пещере; не должно быть старых примитивных SphereMesh/CylinderMesh при штатной загрузке.
+6. F5: `TASK-216 production model art acceptance PASS ... fallbacks=0; collisionSeparate=1`.
+7. Manual visual acceptance остаётся обязательной; при неудовлетворительном виде дальнейший art pass должен менять сами модели, а не только thresholds.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-214 Eight-Hour Automated Endurance & Recovery Soak
+
+**Исходный снимок:** `ProjectHorizon-main-task212-cross-platform-determinism.zip` (`0.1.0-alpha.212`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task214-eight-hour-endurance.zip`.  
+**Версия:** `0.1.0-alpha.214`  
+**ТЗ:** §41 критерий 16; связанные §27, §36, §42.17–18  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 66/66 / OWNER UNINTERRUPTED 8H CERTIFICATION PENDING`
+
+### Основание
+
+В проекте уже существовал локальный terrain soak примерно на 120 секунд, а TASK-138 закрывал unit/stress/persistence tests, но §41.16 требует отдельного восьмичасового автоматического прогона без критического сбоя. Короткий terrain test не может считаться эквивалентом 8-часового системного endurance evidence.
+
+### Реализация TASK-214
+
+- `EnduranceSoakPolicy`: обязательная сертификационная длительность 8 часов, sample 1 s, heartbeat 60 s, synthetic workload 30 s, isolated save 5 min, SQLite integrity 15 min.
+- `EnduranceSoakRuntime`: monotonic long-run state machine `Idle/Running/Passed/Failed/Cancelled`, coverage accounting и hard-fail guards.
+- Hard FAIL: новый terrain worker failure; `integrity_check != ok`; более одного SaveDatabase writer; managed-memory growth >768 MiB от baseline; queued terrain/world/database work без progress >120 s; synthetic workload/artifact failure.
+- `EnduranceSyntheticWorkloadRuntime`: domain-only deterministic galaxy generation/replay + TASK-194 world-streaming planning + terrain sampling; Godot Node/Mesh/SceneTree API не вызываются из worker task.
+- Persistence workload не использует primary gameplay slot: для каждого run создаётся отдельная `user://diagnostics/task214-endurance-<UTC>.db`.
+- Heartbeat history — append-only JSONL; `task214-endurance-latest.json` обновляется атомарно. Если предыдущий marker остался `Running`, новый запуск пишет `previous endurance interruption DETECTED`; предыдущий run не может быть продолжен как valid certificate.
+- Developer command: `endurance_soak start [hours]`, `status`, `stop`; CLI auto-start `--developer --endurance-soak=8`; добавлены Windows/Linux launchers.
+- F5 проверяет harness/failure semantics ускоренной виртуальной моделью, но прямо сообщает `ownerCertification=8h-real-time-required` и не выдаёт короткий тест за §41.16 evidence.
+- Terrain profiler дополнен `FailedJobs` и `CompletedRevision` для внешнего long-run monitoring.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-214 EIGHT-HOUR ENDURANCE CONTRACT PASS`.
+2. F5: `TASK-214 endurance soak harness acceptance PASS... ownerCertification=8h-real-time-required`; это проверка harness, не финальная сертификация.
+3. Запустить `tools\run-task214-endurance.cmd <Godot-4.7.1-mono.exe>` либо developer console `endurance_soak start 8`.
+4. Run должен идти непрерывно не менее 8 часов. В `user://diagnostics` heartbeat должен обновляться примерно раз в минуту, checkpoint/save — раз в 5 min, DB checks — раз в 15 min.
+5. Финальная строка: `TASK-214 eight-hour endurance CERTIFICATION PASS ... ownerCertification=1`; FAIL/CANCELLED/interrupted run не принимается.
+6. При FAIL предоставить `task214-endurance-<run>.jsonl`, `task214-endurance-latest.json`, последние 200 строк Godot Output и значение failure reason.
+
+### Граница итерации
+
+Текущая подготовительная среда не выполняет восьмичасовой wall-clock Godot run и не имеет `dotnet`/Godot runtime. Поэтому даже при полном static/xUnit contract TASK-214 остаётся `IMPLEMENTED` до фактического непрерывного 8h owner-run. Harness намеренно не мутирует основной save как тестовую БД и не считает resume после аварии сертификационным продолжением.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-212 Cross-Platform Determinism & Offline-First Runtime
+
+**Исходный снимок:** `ProjectHorizon-main-task210-galaxy-expedition.zip` (`0.1.0-alpha.210`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task212-cross-platform-determinism.zip`.  
+**Версия:** `0.1.0-alpha.212`  
+**ТЗ:** §41 критерии 1–2, 11; §42 запрет 14  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 65/65 / OWNER WINDOWS+LINUX BUILD/F5 PENDING`
+
+### Основание
+
+TASK-138 уже имел versioned golden-seed manifest, а TASK-210 закрыл посещение 100 distinct systems, но shared golden выполнялся только основным Linux CI job и не являлся отдельным Windows/Linux parity gate. Одновременно offline single-player из §41.11 не имел source-level запрета на обязательный network stack. TASK-212 объединяет эти требования, не меняя output генератора.
+
+### Реализация TASK-212
+
+- `CrossPlatformDeterminismPolicy`: Windows x64 + Linux x64, обязательный seed parity, explicit generator-version bump для intentional world changes, `SinglePlayerRequiresInternet=false`, optional cloud features и zero mandatory production network dependencies.
+- `CrossPlatformDeterminismRuntime`: canonical UTF-8/SHA-256 signature по 4 coordinate-generated systems, их planet definitions, starter environment, fixed terrain samples и baseline POI fixture; float canonicalization — 6 decimals + `InvariantCulture`.
+- Runtime acceptance повторяет signature под `en-US`, `ru-RU`, `tr-TR` и восстанавливает исходные `CurrentCulture/CurrentUICulture`.
+- `ProjectHorizonGenerator.Version` остаётся `3`; существующий TASK-138 golden manifest не переписывается и продолжает требовать явный version bump при изменении world output.
+- CI и Release получили `determinism-parity` matrix `ubuntu-latest + windows-latest`; обе ОС запускают одни и те же `GoldenSeedTests` и `CrossPlatformDeterminismTests` против общего checked-in golden manifest.
+- Static TASK-212 gate сканирует production `src/**/*.cs` на обязательные `System.Net/HttpClient/TCP/UDP/Socket/WebSocket/gRPC/SignalR` зависимости; разрешённый счётчик = 0.
+- Добавлены F5/xUnit/static/section-37/CI/release gate и `docs/CROSS_PLATFORM_DETERMINISM_OFFLINE.md`.
+
+### Owner acceptance
+
+1. Clean Windows build/section-37: 0 warnings/errors; F5 `TASK-212 ... PASS`.
+2. Native Linux CI/build должен пройти тот же shared golden manifest; Windows/Linux matrix обязана быть зелёной.
+3. F5: `platforms=1; cultures=1; generatorVersion=1; golden=1; surface=1; offline=1; networkPolicy=1`.
+4. Запуск single-player без сетевого соединения: New Game/load/save/crafting/flight должны работать; TASK-212 не добавляет network initialization.
+5. Любое intentional изменение генерации в будущем должно сопровождаться bump `ProjectHorizonGenerator.Version` и reviewed golden update; silent world-output drift остаётся запрещён.
+
+### Граница итерации
+
+TASK-212 не заявляет выполненный ручной graphical launch на двух ОС из текущего контейнера. Он добавляет native Windows/Linux .NET golden parity в CI/release и live F5 canonical replay в конкретном Godot процессе. Полный критерий §41.1 всё ещё требует owner/native launch smoke Windows 10/11 и Linux; сам генератор и save schema в этой итерации не меняются.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-210 100-System Procedural Expedition & Galaxy Residency Validation
+
+**Исходный снимок:** `ProjectHorizon-main-task208-texture-lighting-budgets.zip` (`0.1.0-alpha.208`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task210-galaxy-expedition.zip`.  
+**Версия:** `0.1.0-alpha.210`  
+**ТЗ:** §41 критерий 3; §42 запреты 2–3  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 64/64 / OWNER CLEAN BUILD + F5 PENDING`
+
+### Основание
+
+TASK-114 уже содержал stress-цикл из 100 hyperspace jumps, но он чередовал только два сектора и поэтому не доказывал норматив §41: игрок должен иметь возможность посетить не менее 100 **различных процедурных систем** без ручного контента. Одновременно §42 запрещает держать всю галактику в памяти и заранее генерировать все планеты. TASK-210 превращает оба требования в единый executable integration contract.
+
+### Реализация TASK-210
+
+- `GalaxyExpeditionRuntime` проходит starter + 99 последовательных соседних секторов `(1..99,0,0)`; каждый переход использует существующие `PlanRoute`, `TryJumpToSelected`, ship hyperdrive preconditions и fuel debit path.
+- Каждый non-starter system обязан иметь coordinate-derived `system.g1.x...` ID; отдельный authored per-system registry не вводится.
+- Для каждого посещённого system выполняется deterministic replay signature; planet count/indices/moons/seeds и глобальная уникальность planet IDs проверяются на всём маршруте.
+- Acceptance требует `visited=100`, `jumps=99`; `GalaxyNavigationSaveData` round-trip обязан восстановить все 100 visited stable IDs и точный current system.
+- Live residency измеряется отдельно от historical metadata: одновременно допускаются только current + selected destination system definitions (`<=2` unique references), а история хранится как IDs. Это прямо запрещает 100-system resident graph.
+- Добавлены F5/xUnit/static/section-37/CI/release gate и `docs/GALAXY_100_SYSTEM_EXPEDITION.md`.
+
+### Проверки в подготовительной среде
+
+- `validate-*.py`: `64/64 PASS`, включая TASK-114/128/178 и новый TASK-210.
+- `TASK-140 VERSION PASS`: `0.1.0-alpha.210`, changelog coherence `1`.
+- `ci.yml`/`release.yml`: YAML PASS; `run-section37-quality.sh`: syntax PASS.
+- Новые/затронутые C# файлы TASK-210: lexical delimiter/string/comment structure PASS.
+- Детерминированный mirror-check corridor `(0..99,0,0)`: adjacent jump distance `124.4..239.2 ly`, что существенно ниже validation ceiling `550 ly`.
+- В среде отсутствуют `dotnet`, `godot`, `godot4`, `csc`, `mcs`, `msbuild`; поэтому CoreCompile/xUnit/Godot F5 здесь не заявляются.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-210 GALAXY EXPEDITION CONTRACT PASS`.
+2. Startup: `TASK-210 100-system procedural expedition READY... wholeGalaxyResident=0`.
+3. F5: HUD `TASK-210 (F5): PASS systems=100 resident<=2 ...`; Output `TASK-210 100-system procedural expedition acceptance PASS...`.
+4. В Output должны быть `distinct=1; deterministic=1; reachable=1; proceduralIds=1; planetIds=1; restore=1; boundedResidency=1; wholeGalaxyResident=0; systems=100; jumps=99`.
+5. TASK-114/128/178 должны оставаться PASS: TASK-210 не заменяет normal player navigation, а расширяет acceptance до нормативных 100 distinct systems.
+
+### Граница итерации
+
+Это accelerated integration acceptance, а не требование вручную лететь через 100 систем во время каждого теста. Он использует тот же gameplay hyperspace transaction, но refuel выполняется между переходами, потому что §41 проверяет посещаемость/процедурность/масштабируемость, а не автономный рейс без дозаправки. TASK-210 не создаёт galaxy cache и не меняет save schema.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-208 Texture/Material Budget & Lighting Residency
+
+**Исходный снимок:** `ProjectHorizon-main-task206-system-capability.zip` (`0.1.0-alpha.206`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task208-texture-lighting-budgets.zip`.  
+**Версия:** `0.1.0-alpha.208`  
+**ТЗ:** §26.2 «Размеры текстур», §26.3 «Освещение»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + LIGHTING/F5 PENDING`
+
+### Основание
+
+§32 уже закрыт TASK-134, а §26.4/§27/§28 закрыты TASK-202/200/206. Реальный оставшийся графический gap — нормативные texture/material ceilings и единый runtime light-residency contract. До TASK-208 локальные OmniLight3D могли накапливаться из POI/base/cave/interior content без общего budget/culling слоя.
+
+### Реализация TASK-208
+
+- `TextureLightingBudgetPolicy`: максимумы 2048 для player/large ship/NPC/large building/tiled surface, 1024 для ordinary object/plant и 512 для UI icon; texture atlases/reusable materials обязательны, production material slots <=5.
+- Build validator проверяет размеры всех shipping PNG в `Assets`; неизвестный raster role получает консервативный глобальный ceiling 2048.
+- Runtime culler 4 Hz: Surface <=6 local lights/0 local shadows/96 m; cave <=4/0/56 m; StationInterior <=8/2/140 m; Orbit/transit <=4/0/420 m.
+- Приоритет local lights: instrument/dock > hangar/cave > discovery/guide > ordinary, затем расстояние. Over-budget/far local lights получают zero energy; исходная энергия/предавторское shadow state восстанавливаются при возврате в residency.
+- Authoritative surface DirectionalLight3D и WorldEnvironment ambient не входят в local-light culling.
+- StationInterior reusable wall/floor materials получили слабую static emissive baseline; реальный LightmapGI bake остаётся art-authoring acceptance и не симулируется без Godot.
+- Добавлены xUnit/static/section-37/CI/release/F5 gate и `docs/TEXTURE_MATERIAL_LIGHTING_BUDGETS.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-208 TEXTURE/MATERIAL/LIGHTING CONTRACT PASS`.
+2. Startup: `TASK-208 texture/material/lighting READY...` и первая `TASK-208 lighting residency PASS...`.
+3. На поверхности: star/ambient сохраняются; при большом числе POI/base lights одновременно active local <=6, local shadow=0.
+4. Cave: active local <=4; StationInterior: <=8, shadowed local <=2; визуально не должно быть резкого исчезновения критичных Dock/Hangar/Cave lights рядом с игроком.
+5. F5: `TASK-208 (F5): PASS ...`; Output `TASK-208 texture/material/lighting acceptance PASS...`.
+6. TASK-200 performance sample не должен ухудшаться из-за накопления local lights; gameplay collision/AI/save не меняются.
+
+### Граница итерации
+
+TASK-208 не заявляет выполненный LightmapGI bake: в текущей подготовительной среде нет Godot/editor baking. Он вводит обязательную baked/static interior baseline policy, low-cost static emissive baseline для текущего hangar shell и жёстко ограничивает динамические local lights. Финальный baked-lightmap art pass остаётся отдельным content-authoring acceptance.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-206 System Capability Preflight & Safe Graphics Recommendation
+
+**Исходный снимок:** `ProjectHorizon-main-task204-accessibility-runtime.zip` (`0.1.0-alpha.204`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task206-system-capability.zip`.  
+**Версия:** `0.1.0-alpha.206`  
+**ТЗ:** §28.2 «Минимальная конфигурация игрока», §28.3 «Рекомендуемая конфигурация»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + LIVE CAPABILITY/F5 PENDING`
+
+### Основание
+
+Перед реализацией повторно проверены §22 и §36.4: SQLite/WAL/backup/recovery и нормативные stress-сценарии уже существуют, поэтому TASK-206 не дублирует сохранения или тестовый harness. Реальный незакрытый gap — требования §28 были только текстом и не имели исполняемого startup contract.
+
+### Реализация TASK-206
+
+- `SystemCapabilityPolicy` фиксирует player thresholds: CPU 4/6 logical portable proxy, RAM 8/16 GiB, dedicated VRAM policy 4/6 GiB, free storage 20/30 GiB, Windows 10+ x64/Linux x86_64 и Vulkan/OpenGL Compatibility renderer.
+- `SystemCapabilityDiagnostics` собирает live evidence через Godot/.NET: OS/x64, processor count, `OS.GetMemoryInfo`, renderer/driver, adapter name/vendor/type/API, current video-memory usage и free space filesystem для `user://`.
+- SSD medium и total VRAM capacity не угадываются: при отсутствии переносимого runtime evidence они остаются `unknown`; известное нарушение минимального требования даёт `Unsupported`.
+- Классификация: `Unsupported / Minimum / Recommended`; recommendation: Compatibility / Low / Medium. TASK-206 advisory-only и не меняет сохранённый TASK-202 graphics profile.
+- Main Menu и vertical-slice startup печатают одинаковую `TASK-206 system capability ...` evidence строку; F5 проверяет synthetic minimum/recommended/compatibility/unknown cases и live capture.
+- Добавлены xUnit/static/section-37/CI/release gate и `docs/SYSTEM_CAPABILITY_PREFLIGHT.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-206 SYSTEM CAPABILITY CONTRACT PASS`.
+2. Startup: скопировать `TASK-206 system capability ...`; на текущей машине должны быть заполнены OS/x64/CPU/RAM/renderer/GPU/storageFree, а `ssd=unknown; vramCapacity=unknown` допустимы и ожидаемы.
+3. Проверить, что рекомендация не меняет вручную выбранный Graphics Quality в Settings после перезапуска.
+4. F5: `TASK-206 (F5): PASS ...`; Output `TASK-206 system capability acceptance PASS ...`.
+5. Если `minimum=0`, прислать всю capability строку: это диагностическое предупреждение о конкретном known minimum failure, а не повод скрывать FAIL/подменять профиль.
+
+### Граница итерации
+
+TASK-206 не пытается определять SSD/NVMe или общий объём VRAM по имени GPU и не содержит vendor lookup table. Такие эвристики быстро устаревают. Он также не принудительно меняет пользовательский graphics preset: выбранный профиль остаётся собственностью TASK-202, а TASK-200 — адаптивным presentation-only governor.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-204 Accessibility Runtime Closure & Gamepad Tuning
+
+**Исходный снимок:** `ProjectHorizon-main-task202-graphics-quality-profiles.zip` (`0.1.0-alpha.202`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task204-accessibility-runtime.zip`.  
+**Версия:** `0.1.0-alpha.204`  
+**ТЗ:** §31.2 «Управление», §31.4 «Доступность»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + GAMEPAD/CAPTIONS/F5 PENDING`
+
+### Основание
+
+Ревизия alpha.202 уже содержала persistent mouse-axis inversion, UI scale, FOV, subtitles, camera-shake/motion-blur toggles и раздельные Music/SFX/Voice volumes. Реальный незакрытый хвост §31 состоял в отсутствии настраиваемой analog gamepad tuning и в том, что subtitle/color-independent accessibility не имели общего live runtime contract.
+
+### Реализация TASK-204
+
+- `AccessibilityControlPolicy`: dead-zone 0.05..0.45, response exponent 0.75..2.00, subtitle scale 0.80..1.50, pure severity tokens OK/LOW/CRIT.
+- `GameUserSettings`/`GameSettingsPanel`: новые gamepad dead-zone, response curve и subtitle-size параметры сохраняются в `settings.cfg`; существующая on-foot/ship inversion сохранена.
+- `GameAccessibilityRuntime`: dead-zone применяется к analog InputMap actions; post-action axis/vector получает bounded response curve; keyboard full-scale 0/1 semantics сохранены.
+- `SalvageRepairSliceAccessibility`: runtime subtitle/caption overlay для radio/voice cue, damage alert и low-O2 alarm; размер зависит от subtitle scale и toggle.
+- Постоянный non-color HUD duplicate: `[HP]/[SH]/[O2]/[HZ] + OK/LOW/CRIT`, без зависимости от цвета.
+- TASK-130 settings round-trip расширен новыми полями; TASK-204 включён в F5/final matrix.
+- Добавлены xUnit/static/section-37/CI/release gate и `docs/ACCESSIBILITY_RUNTIME.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-204 ACCESSIBILITY RUNTIME CONTRACT PASS`.
+2. Settings: изменить dead-zone, response curve, subtitle size и Apply; значения должны сохраниться после перезапуска.
+3. Gamepad: dead-zone убирает дрейф стика; response <1 делает малые отклонения агрессивнее, >1 — точнее около центра; клавиатура остаётся полной 0/1.
+4. Вызвать NPC/station dialogue, получить урон и довести O2 до low threshold: при subtitles=1 появляются captions, при subtitles=0 — нет.
+5. HUD показывает `[HP]/[SH]/[O2]/[HZ]` и `OK/LOW/CRIT` независимо от цвета.
+6. F5: `TASK-204 (F5): PASS ...`; Output `TASK-204 accessibility runtime acceptance PASS`.
+
+### Граница итерации
+
+TASK-204 не добавляет screen reader/TTS и не меняет gameplay physics/AI. Camera shake и motion-blur toggles остаются reduced-motion preferences; в текущем vertical slice эти эффекты не являются обязательными для gameplay и по умолчанию отключены.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-202 Graphics Quality Profiles & Runtime Scalability
+
+**Исходный снимок:** `ProjectHorizon-main-task200-runtime-performance.zip` (`0.1.0-alpha.200`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task202-graphics-quality-profiles.zip`.  
+**Версия:** `0.1.0-alpha.202`  
+**ТЗ:** §26.4 «Графические профили»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + PROFILE VISUAL/F5 PENDING`
+
+### Основание
+
+TASK-200 создал измеряемые §27 runtime budgets и presentation-only adaptive governor, но пользователь не имел нормативного persistent выбора Low/Medium/High/Compatibility из §26.4. TASK-202 вводит этот пользовательский ceiling и связывает его с существующими TASK-190/188/194/196/200 presentation systems без изменения gameplay authority.
+
+### Реализация TASK-202
+
+- `GraphicsQualityProfilePolicy`: четыре фиксированных профиля; Low использует 58% surface/vegetation distance, Medium — базовый 100%, High — 118–120%, Compatibility — 45–50% density/distance и simplified shaders.
+- `GameUserSettings`/`GameSettingsPanel`: профиль сохраняется в `settings.cfg`, локализован RU/EN и применяется live. Compatibility renderer принудительно выбирает эффективный Compatibility profile.
+- TASK-196 vegetation: детерминированная profile density + distance ceiling; близкие интерактивные экземпляры не удаляются density filtering.
+- TASK-194 macro streaming: presentation-radius overload 0.45..1.25; micro terrain/collision 25/9 остаётся неизменным.
+- TASK-190/TASK-188: profile cloud cap, atmosphere scale, simplified cloud shading, water wave/depth/refraction quality.
+- Directional shadows, WorldEnvironment glow and particle amount scale профилируются как presentation-only.
+- TASK-200 governor компонуется ниже пользовательского ceiling: vegetation distance перемножается, cloud cap берётся по минимуму; authoritative physics/AI/economy/persistence не меняются.
+- Добавлены TASK-202 F5/xUnit/static/section-37/CI/release gate и `docs/GRAPHICS_QUALITY_PROFILES.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-202 GRAPHICS QUALITY PROFILE CONTRACT PASS`.
+2. Settings: последовательно выбрать Low/Medium/High; после Apply профиль должен сохраниться и немедленно изменить presentation без рестарта gameplay scene.
+3. Low: заметно меньшая vegetation/surface presentation distance, low shadows, максимум один cloud layer, simplified/lower-cost water/post/particles.
+4. High: больше presentation distance и shadow range, полный cloud/water/post presentation; физический terrain/collision window остаётся прежним.
+5. Compatibility preset: shadows/glow disabled, максимум один cloud layer, simplified cloud/water shaders. Сам выбор preset не является доказательством переключения renderer backend; проверяется startup renderer diagnostics.
+6. TASK-200: Low/Compatibility используют Low budget, Medium/High — Medium; governor может только снижать presentation относительно выбранного профиля.
+7. F5: `TASK-202 (F5): PASS ...`; Output `TASK-202 graphics quality acceptance PASS`.
+
+### Граница итерации
+
+TASK-202 не переключает Godot renderer backend во время gameplay. Compatibility profile является presentation preset и принудительным ceiling при фактическом Compatibility renderer. Окончательное визуальное сравнение Low/Medium/High и реальный renderer/backend остаются owner runtime evidence.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-200 Runtime Performance Budgets, Frame Telemetry & Adaptive Quality
+
+**Версия:** `0.1.0-alpha.200`  
+**ТЗ:** §27.1–27.5 «Производительность»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + RUNTIME/F5 + PROFILING PENDING`
+
+### Основание
+
+После TASK-194 world streaming, TASK-196 regional vegetation и TASK-198 modular fauna следующий обязательный для content-alpha крупный риск — измеряемая производительность. Сервер §24 не является обязательным для одиночной игры, а cloud saves относятся к более позднему 1.0 этапу. До TASK-200 проект имел локальные streaming/AI budgets, но не имел единого §27 runtime budget contract для frame time, draw calls, visible primitives, physics, AI, memory и managed allocations.
+
+### Реализация TASK-200
+
+- `RuntimePerformanceBudgetPolicy`: Medium = 60 FPS / 16.6 ms, 1500 draw calls, 2M rendered primitives, 500 active physics, 20 full AI, 80 simplified AI, 4 GiB VRAM, 6 GiB RAM, <=256 KiB managed allocation/frame; Low = 30 FPS / 33.3 ms and >=30% reduced scene/AI/memory budgets.
+- `RuntimePerformanceTelemetryRuntime`: 2 Hz sampling through Godot `Performance` monitors plus `.NET` working set and GC total-allocation delta amortized per frame.
+- `RuntimePerformanceAdaptiveGovernor`: hysteresis 4 over-budget samples -> Constrained, 12 or >=1.35x pressure -> Critical, 20 clean samples per recovery step.
+- Adaptive action is presentation-only: TASK-196 vegetation LOD/cull distances contract and TASK-190 cloud layer count/secondary opacity reduce. AI frequencies, physics, collisions, persistence, quests/economy and procedural seeds are unchanged.
+- GPU 16.6/33.3 ms remains a normative policy target; no fake runtime GPU time is inferred where Godot does not expose a portable monitor. Owner profiler evidence is required for final performance verification.
+- Added TASK-200 F5/xUnit/static/section-37/CI/release gate and `docs/RUNTIME_PERFORMANCE_BUDGETS.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-200 RUNTIME PERFORMANCE CONTRACT PASS`.
+2. Startup: `TASK-200 runtime performance READY: profile=Medium ... telemetry=Godot-Performance+GC+working-set@2Hz`.
+3. During ordinary surface traversal inspect periodic `TASK-200 performance sample`: draw/primitives/physics/AI/memory/allocation counters must be finite and update; `budget=OVER...` is diagnostic, not hidden.
+4. Under sustained load the governor may transition `Nominal -> Constrained -> Critical`; only vegetation/cloud presentation may change. Gameplay results and collision must not change.
+5. F5: `TASK-200 (F5): PASS <profile> samples=<N> budget=<status>` and Output `TASK-200 runtime performance acceptance PASS`.
+6. Final §27 verification still requires measured Godot/GPU profiling on Medium and Low target hardware; static/F5 instrumentation alone does not certify 60/30 FPS.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-198 Modular Fauna Bodies, Hierarchical AI & Tiered Simulation
+
+**Версия:** `0.1.0-alpha.198`  
+**ТЗ:** §12.1–12.3 «Фауна»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD + RUNTIME/F5 PENDING`
+
+### Основание
+
+Owner-run `alpha.194` ранее подтвердил world streaming, после чего TASK-196 закрыл §11 regional vegetation. Следующий последовательный крупный gap PDF-ТЗ v2.0 — §12. Существующий TASK-116 уже содержал 20 fauna definitions, 6 названий body plan и все 11 behavior tokens, но live body construction оставалось в основном primitive-body based, наземная fauna не была привязана к NavigationAgent3D, FollowGroup не имел полноценного boids feedback, а mid-distance decision tier был только 2 Hz.
+
+### Реализация TASK-198
+
+- `FaunaBodyPlanRuntime`: 6 versioned fixed skeleton families; deterministic per-instance compatible modules head/torso/limbs/tail/horns/shell; bounded proportions/material variation; cross-skeleton assembly rejected.
+- `FaunaBehaviorRuntime`: HFSM layers Survival→Territory→Needs→Social→Awareness→Ambient with utility scoring and all 11 specification states.
+- `EcologyFaunaNode`: modular visual root, per-frame interpolation, distance simulation tier diagnostics, shared ground `NavigationAgent3D`, existing flying TASK-126 steering and boids contribution.
+- `FaunaFlockRuntime`: simplified same-species separation/cohesion/alignment.
+- `FaunaStatisticalSimulationRuntime`: the 80 simplified fauna are grouped by species and simulated statistically at 0.5 Hz without creating scene nodes.
+- Distance policy: near 10 Hz (≤25 m), medium 5 Hz (≤70 m), medium-far 2 Hz (≤150 m), farther entities statistical.
+- TASK-116 catalog/discovery/save schema remains unchanged; persistence is still seed+deltas.
+- Added TASK-198 F5/xUnit/static/section-37/CI/release gate and `docs/MODULAR_FAUNA_RUNTIME.md`.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 warnings / 0 errors`, `TASK-198 MODULAR FAUNA CONTRACT PASS`.
+2. Startup: `TASK-198 modular fauna READY: bodyPlans=6-fixed-skeletons ... tiers=near:10Hz/mid:5..2Hz/far:statistical-0.5Hz`.
+3. On surface observe several different fauna: body plans must remain recognizable and no creature may receive limbs/modules from another skeleton family.
+4. Ground fauna must continue moving across streamed navmesh; flying fauna must retain TASK-126 altitude/avoidance behavior; group species should show non-identical but coherent flock motion.
+5. Long-distance travel must not spawn the 80 simplified fauna as physical nodes; active fauna remains bounded while statistical population stays 80.
+6. F5: `TASK-198 (F5): PASS body=6 states=11 active=<N> far=<N>` and Output `TASK-198 modular fauna acceptance PASS`.
+
+### Граница итерации
+
+TASK-198 does not introduce authored skeletal animation clips or runtime retargeting. Fixed skeleton descriptors are the compatibility contract for procedural assembly; cross-skeleton retargeting remains explicitly unsupported per §12.1.
+
+---
+
+## 0. Мега-итерация 2026-08-17 — TASK-196 Regional Vegetation LOD & Interactive Promotion
+
+**Версия:** `0.1.0-alpha.196`  
+**ТЗ:** §11.1–11.3 «Растительность и природные объекты»  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER RUNTIME PENDING`
+
+### Основание
+
+Owner-run `alpha.194` подтвердил стабильный world-streaming smoke: TASK-194 стартует, micro terrain сохраняет 25/9 bounded residency, `failed=0`, PlanetRuntime корректно деактивируется после ухода из surface residency, graceful-exit сохраняется. Следующий крупный незакрытый блок PDF-ТЗ — §11.
+
+### Реализация TASK-196
+
+- Сохранена детерминированная seed-driven flora TASK-116, но GPU-рендеринг теперь разбит по ключу `32m region × flora species`.
+- Каждый regional batch содержит независимые LOD0/LOD1 MultiMesh; мелкие Tuft/Pad/Fungus объекты отключаются после 52 м.
+- Detail policy связан с TASK-194: Full → LOD0/LOD1, Simplified → LOD1, Preload/non-resident → culled.
+- Реализованы все пять trigger §11.3 для promotion GPU-instance → full interaction/hitscan entity: proximity, scan, damage, harvest, active quest.
+- Demotion выполняется по дистанции, но активная quest relevance удерживает необходимый specimen promoted.
+- Persistence не менялась: удалённые растения по-прежнему сохраняются как TASK-116 seed+deltas, save schema не повышалась.
+
+### Owner acceptance
+
+1. Clean build/section-37: `0 errors / 0 warnings`, `TASK-196 REGIONAL VEGETATION CONTRACT PASS`.
+2. Startup: `TASK-196 regional vegetation READY: partition=region+species; region=32m; lod=LOD0/LOD1/cull ...`.
+3. На поверхности пройти 80–100 м через несколько vegetation regions: рядом flora остаётся детальной, средняя дистанция переключается на LOD1, мелкие объекты исчезают раньше крупных; terrain streamer остаётся `failed=0`.
+4. Проверить `V` scanner, damage/hitscan и harvest — интерактивность не должна исчезать из-за GPU-instancing.
+5. Активный procedural quest ScanSpecies/CollectResource должен удерживать ближайшую релевантную flora как full entity даже вне обычного 5 м proximity envelope.
+6. F5: `TASK-196 (F5): PASS ... promo=5/5`; Output — `TASK-196 regional vegetation acceptance PASS`.
+
+### Ограничения
+
+TASK-196 не увеличивает число исходных flora placements сверх текущего content plan и не вводит новые art assets. Это архитектурный/LOD/promotion pass §11; финальная художественная плотность растительности остаётся отдельным content-art вопросом.
+
+---
+
 # Project Horizon — журнал реализации требований ТЗ
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-17
-> **Подготовленный снимок:** `ProjectHorizon-main-task194-world-streaming.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task202-graphics-quality-profiles.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
 
@@ -13,7 +409,7 @@
 **Исходный снимок:** `ProjectHorizon-main-task192.1-acceptance-coherence-hotfix.zip` (`0.1.0-alpha.192.1`).  
 **Подготовленный снимок:** `ProjectHorizon-main-task194-world-streaming.zip`.  
 **Версия:** `0.1.0-alpha.194`.  
-**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS / OWNER CLEAN BUILD+F5+TRAVERSAL PENDING`.
+**Статус:** `IMPLEMENTED / OWNER RUNTIME SMOKE PASSED / F5 PENDING`.
 
 ### Основание
 

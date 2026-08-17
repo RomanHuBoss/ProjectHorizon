@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194"}, "VERSION must be alpha.180.2 or later hotfix", f)
+need(version in {"0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194", "0.1.0-alpha.196", "0.1.0-alpha.198","0.1.0-alpha.200", "0.1.0-alpha.202", "0.1.0-alpha.204", "0.1.0-alpha.206","0.1.0-alpha.208", "0.1.0-alpha.210", "0.1.0-alpha.212", "0.1.0-alpha.214", "0.1.0-alpha.216"}, "VERSION must be alpha.180.2 or later hotfix", f)
 need('ShouldRenderSurfaceSun' in world_runtime and
      'worldKind == WorldSceneKind.Surface' in world_runtime and
      'ShouldRenderSurfaceSun(' in world and
@@ -80,7 +80,8 @@ need('BuildVirtualStickAttitudeCommand' in assist and
      'StatefulVirtualFlightStickEnabled = true' in controller and
      'MouseAngularResponseMultiplier' in controller,
      "mouse does not drive the superseding stateful roll-dominant attitude controller", f)
-need('float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right")' in controller and
+need(('float strafe = Input.GetAxis(\"ship_strafe_left\", \"ship_strafe_right\")' in controller or
+      'float strafe = GameAccessibilityRuntime.ReadAxis(\"ship_strafe_left\", \"ship_strafe_right\"' in controller) and
      'MouseTranslationCouplingEnabled = false' in controller,
      "mouse is still coupled to lateral strafe", f)
 need(controller.count('RotateObjectLocal(') >= 3 and

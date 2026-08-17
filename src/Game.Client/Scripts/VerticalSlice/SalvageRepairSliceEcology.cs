@@ -9,8 +9,11 @@ using Godot;
 public partial class SalvageRepairSlice
 {
     private sealed record EcologyMultiMeshGroup(
-        MultiMeshInstance3D Node,
-        IReadOnlyList<EcologyFloraPlacement> Placements);
+        MultiMeshInstance3D Lod0Node,
+        MultiMeshInstance3D Lod1Node,
+        IReadOnlyList<EcologyFloraPlacement> Placements,
+        VegetationRegionCoordinate Region,
+        bool SmallObject);
 
     private EcologyCatalog? _ecologyCatalog;
     private EcologyPlan? _ecologyPlan;
@@ -22,6 +25,8 @@ public partial class SalvageRepairSlice
     private readonly Dictionary<string, EcologyFloraSpecimenNode>
         _promotedFloraNodes = new(StringComparer.Ordinal);
     private readonly List<EcologyMultiMeshGroup> _ecologyFloraGroups = new();
+    private readonly Dictionary<string, HashSet<VegetationPromotionReason>>
+        _vegetationPromotionReasons = new(StringComparer.Ordinal);
     private bool _ecologyCatalogOpen;
     private bool _ecologyFaunaTab;
     private int _ecologyCatalogSelection;
@@ -110,6 +115,7 @@ public partial class SalvageRepairSlice
         }
         _ecologyFaunaNodes.Clear();
         _promotedFloraNodes.Clear();
+        _vegetationPromotionReasons.Clear();
         _ecologyFloraGroups.Clear();
 
         if (_planetSurfaceContentProfile?.WaterHabitatEnabled != false)
@@ -140,53 +146,7 @@ public partial class SalvageRepairSlice
             _ecologyRoot.AddChild(habitat);
         }
 
-        foreach (IGrouping<string, EcologyFloraPlacement> group in EcologyPlan.Flora
-            .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))
-            .GroupBy(placement => placement.FloraId, StringComparer.Ordinal)
-            .OrderBy(group => group.Key, StringComparer.Ordinal))
-        {
-            EcologyFloraDefinition definition = EcologyCatalog.GetFlora(group.Key);
-            EcologyFloraPlacement[] placements = group.ToArray();
-            StandardMaterial3D material = new()
-            {
-                AlbedoColor = new Color(
-                    (float)definition.ColorR,
-                    (float)definition.ColorG,
-                    (float)definition.ColorB,
-                    1.0f),
-                Roughness = 0.90f
-            };
-            MultiMesh multiMesh = new()
-            {
-                TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-                Mesh = EcologyFloraSpecimenNode.CreateMesh(definition, material),
-                InstanceCount = placements.Length
-            };
-            for (int index = 0; index < placements.Length; index++)
-            {
-                EcologyFloraPlacement placement = placements[index];
-                float angle = Mathf.DegToRad((float)placement.RotationDegrees);
-                float scale = (float)placement.Scale;
-                Basis basis = Basis.Identity.Rotated(Vector3.Up, angle).Scaled(
-                    Vector3.One * scale);
-                multiMesh.SetInstanceTransform(
-                    index,
-                    new Transform3D(
-                        basis,
-                        new Vector3(
-                            (float)placement.PositionX,
-                            (float)FloraSurfaceY(placement),
-                            (float)placement.PositionZ)));
-            }
-
-            MultiMeshInstance3D instance = new()
-            {
-                Name = $"Flora_{GetShortContentId(group.Key)}",
-                Multimesh = multiMesh
-            };
-            _ecologyRoot.AddChild(instance);
-            _ecologyFloraGroups.Add(new EcologyMultiMeshGroup(instance, placements));
-        }
+        BuildRegionalVegetationMultiMeshes();
 
         foreach (EcologyFaunaSpawn spawn in EcologyPlan.ActiveFauna)
         {
@@ -203,26 +163,57 @@ public partial class SalvageRepairSlice
             _ecologyFaunaNodes.Add(faunaNode);
         }
 
+        PrintFaunaModularReady();
         PromoteNearbyFlora(force: true);
         GD.Print(
             "TASK-116 ecology scene binding PASS: " +
             $"floraInstances={EcologyPlan.Flora.Count - Ecology.RemovedFloraCount}; " +
-            $"multiMeshGroups={_ecologyFloraGroups.Count}; " +
+            $"multiMeshGroups={_ecologyFloraGroups.Count * 2}; " +
+            $"vegetationBatches={_ecologyFloraGroups.Count}; " +
+            $"vegetationRegions={_ecologyFloraGroups.Select(group => group.Region).Distinct().Count()}; " +
             $"activeFauna={_ecologyFaunaNodes.Count}; " +
             $"simplifiedFauna={EcologyPlan.SimplifiedFauna.Count}; " +
-            "promotion=proximity; persistence=seed+deltas.");
+            "lod=regional-near/mid/cull; promotion=proximity+scan+damage+harvest+quest; " +
+            "residency=TASK-194; persistence=seed+deltas.");
     }
 
     private void UpdateEcology(double delta)
     {
-        if (_ecologyRuntime is null || _ecologyPlan is null ||
-            _stageOneVoyageRuntime?.Piloted == true)
+        if (_ecologyRuntime is null || _ecologyPlan is null)
         {
             return;
         }
-
+        UpdateRegionalVegetationVisibility();
+        UpdateFaunaFlocking();
+        if (_stageOneVoyageRuntime?.Piloted == true)
+        {
+            return;
+        }
         Ecology.TickSimplified(delta);
         PromoteNearbyFlora(force: false);
+    }
+
+    private void UpdateFaunaFlocking()
+    {
+        if (_ecologyFaunaNodes.Count == 0)
+        {
+            return;
+        }
+        FaunaFlockSample[] population = _ecologyFaunaNodes
+            .Where(node => GodotObject.IsInstanceValid(node))
+            .Select(node => node.CreateFlockSample())
+            .ToArray();
+        foreach (EcologyFaunaNode node in _ecologyFaunaNodes)
+        {
+            if (!GodotObject.IsInstanceValid(node))
+            {
+                continue;
+            }
+            node.SetFlockSteering(FaunaFlockRuntime.Compute(
+                node.CreateFlockSample(),
+                population));
+        }
+        _faunaFlockUpdatePasses++;
     }
 
     private void PromoteNearbyFlora(bool force)
@@ -235,7 +226,7 @@ public partial class SalvageRepairSlice
 
         Vector3 observer = _player.GlobalPosition;
         Vector3 logicalObserver = WorldToPlanetSurfaceLogicalPosition(observer);
-        EcologyFloraPlacement[] desired = EcologyPlan.Flora
+        EcologyFloraPlacement[] nearby = EcologyPlan.Flora
             .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))
             .Select(placement => new
             {
@@ -245,11 +236,32 @@ public partial class SalvageRepairSlice
                     (float)FloraSurfaceY(placement),
                     (float)placement.PositionZ))
             })
-            .Where(item => item.Distance <= 5.0f)
+            .Where(item => VegetationRegionRuntime.ShouldPromote(
+                VegetationPromotionReason.Proximity, item.Distance))
             .OrderBy(item => item.Distance)
-            .Take(8)
+            .Take(VegetationRegionRuntime.MaximumNearbyPromotions)
             .Select(item => item.Placement)
             .ToArray();
+        EcologyFloraPlacement[] quest = EcologyPlan.Flora
+            .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId) &&
+                IsFloraQuestRelevant(placement))
+            .OrderBy(placement => logicalObserver.DistanceSquaredTo(new Vector3(
+                (float)placement.PositionX, 0.0f, (float)placement.PositionZ)))
+            .Take(VegetationRegionRuntime.MaximumQuestPromotions)
+            .ToArray();
+        EcologyFloraPlacement[] desired = nearby
+            .Concat(quest)
+            .GroupBy(placement => placement.InstanceId, StringComparer.Ordinal)
+            .Select(group => group.First())
+            .ToArray();
+        foreach (EcologyFloraPlacement placement in nearby)
+        {
+            RecordVegetationPromotionReason(placement.InstanceId, VegetationPromotionReason.Proximity);
+        }
+        foreach (EcologyFloraPlacement placement in quest)
+        {
+            RecordVegetationPromotionReason(placement.InstanceId, VegetationPromotionReason.Quest);
+        }
         HashSet<string> desiredIds = desired
             .Select(placement => placement.InstanceId)
             .ToHashSet(StringComparer.Ordinal);
@@ -258,7 +270,10 @@ public partial class SalvageRepairSlice
             _promotedFloraNodes.ToArray())
         {
             float distance = node.GlobalPosition.DistanceTo(observer);
-            if (!desiredIds.Contains(instanceId) && (force || distance > 7.0f))
+            TryFindFloraPlacement(instanceId, out EcologyFloraPlacement? placement);
+            bool questRelevant = placement is not null && IsFloraQuestRelevant(placement);
+            if (!desiredIds.Contains(instanceId) &&
+                (force || VegetationRegionRuntime.ShouldDemote(distance, questRelevant)))
             {
                 node.QueueFree();
                 _promotedFloraNodes.Remove(instanceId);
@@ -267,28 +282,10 @@ public partial class SalvageRepairSlice
 
         foreach (EcologyFloraPlacement placement in desired)
         {
-            if (_promotedFloraNodes.ContainsKey(placement.InstanceId))
-            {
-                continue;
-            }
-
-            EcologyFloraSpecimenNode specimen = new();
-            // The MultiMesh remains the visual representation. Promotion adds
-            // only an interactive physics proxy, avoiding duplicate geometry
-            // and z-fighting while keeping the plant harvestable.
-            EcologyFloraPlacement terrainPlacement = placement with
-            {
-                PositionY = SamplePlanetSurfacePhysicalHeight(
-                    placement.PositionX,
-                    placement.PositionZ)
-            };
-            specimen.Configure(
-                EcologyCatalog.GetFlora(placement.FloraId),
-                terrainPlacement,
-                renderMesh: false);
-            specimen.HarvestRequested += OnEcologyFloraHarvestRequested;
-            _ecologyRoot.AddChild(specimen);
-            _promotedFloraNodes[placement.InstanceId] = specimen;
+            VegetationPromotionReason reason = IsFloraQuestRelevant(placement)
+                ? VegetationPromotionReason.Quest
+                : VegetationPromotionReason.Proximity;
+            EnsureFloraPromoted(placement, reason);
         }
     }
 
@@ -509,6 +506,7 @@ public partial class SalvageRepairSlice
         }
         else if (flora is not null)
         {
+            EnsureFloraPromoted(flora, VegetationPromotionReason.Scan);
             changed = Ecology.TryScanFlora(
                 flora.InstanceId,
                 out EcologyFloraDefinition definition,
@@ -577,6 +575,7 @@ public partial class SalvageRepairSlice
         {
             return;
         }
+        RecordVegetationPromotionReason(node.InstanceId, VegetationPromotionReason.Harvest);
         bool changed = Ecology.TryHarvestFlora(
             node.InstanceId,
             out EcologyFloraDefinition definition,
@@ -607,99 +606,37 @@ public partial class SalvageRepairSlice
 
     private void RebuildEcologyFloraMultiMeshes()
     {
-        foreach (EcologyMultiMeshGroup group in _ecologyFloraGroups)
-        {
-            if (group.Node.GetParent() is Node parent)
-            {
-                parent.RemoveChild(group.Node);
-            }
-            group.Node.QueueFree();
-        }
-        _ecologyFloraGroups.Clear();
-        if (_ecologyRoot is null || _ecologyRuntime is null || _ecologyPlan is null)
-        {
-            return;
-        }
-
-        foreach (IGrouping<string, EcologyFloraPlacement> group in EcologyPlan.Flora
-            .Where(placement => !Ecology.IsFloraRemoved(placement.InstanceId))
-            .GroupBy(placement => placement.FloraId, StringComparer.Ordinal)
-            .OrderBy(group => group.Key, StringComparer.Ordinal))
-        {
-            EcologyFloraDefinition definition = EcologyCatalog.GetFlora(group.Key);
-            EcologyFloraPlacement[] placements = group.ToArray();
-            StandardMaterial3D material = new()
-            {
-                AlbedoColor = new Color(
-                    (float)definition.ColorR,
-                    (float)definition.ColorG,
-                    (float)definition.ColorB,
-                    1.0f),
-                Roughness = 0.90f
-            };
-            MultiMesh multiMesh = new()
-            {
-                TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
-                Mesh = EcologyFloraSpecimenNode.CreateMesh(definition, material),
-                InstanceCount = placements.Length
-            };
-            for (int index = 0; index < placements.Length; index++)
-            {
-                EcologyFloraPlacement placement = placements[index];
-                Basis basis = Basis.Identity.Rotated(
-                    Vector3.Up,
-                    Mathf.DegToRad((float)placement.RotationDegrees)).Scaled(
-                    Vector3.One * (float)placement.Scale);
-                multiMesh.SetInstanceTransform(
-                    index,
-                    new Transform3D(
-                        basis,
-                        new Vector3(
-                            (float)placement.PositionX,
-                            (float)FloraSurfaceY(placement),
-                            (float)placement.PositionZ)));
-            }
-            MultiMeshInstance3D instance = new()
-            {
-                Name = $"Flora_{GetShortContentId(group.Key)}",
-                Multimesh = multiMesh
-            };
-            _ecologyRoot.AddChild(instance);
-            _ecologyFloraGroups.Add(new EcologyMultiMeshGroup(instance, placements));
-        }
+        ClearRegionalVegetationMultiMeshes();
+        BuildRegionalVegetationMultiMeshes();
+        UpdateRegionalVegetationVisibility();
     }
 
     private void AdjustEcologyFloraCurvatureAnchor(
         PlanetSurfaceCurvedPatchDescriptor previousPatch,
         PlanetSurfaceCurvedPatchDescriptor nextPatch)
     {
-        // TASK-174: most flora is rendered through MultiMeshInstance3D rather
-        // than one Node3D per specimen. Those instance transforms therefore do
-        // not participate in the grouped Node3D curvature-anchor remap. Preserve
-        // each specimen's semantic terrain height explicitly when the floating
-        // tangent origin changes.
         foreach (EcologyMultiMeshGroup group in _ecologyFloraGroups)
         {
-            if (!GodotObject.IsInstanceValid(group.Node) ||
-                group.Node.Multimesh is not MultiMesh multiMesh)
+            foreach (MultiMeshInstance3D node in new[] { group.Lod0Node, group.Lod1Node })
             {
-                continue;
-            }
-
-            int count = Math.Min(multiMesh.InstanceCount, group.Placements.Count);
-            for (int index = 0; index < count; index++)
-            {
-                EcologyFloraPlacement placement = group.Placements[index];
-                Transform3D transform = multiMesh.GetInstanceTransform(index);
-                double semanticHeight = transform.Origin.Y +
-                    previousPatch.TangentSagMeters(
-                        placement.PositionX, placement.PositionZ);
-                transform.Origin = new Vector3(
-                    transform.Origin.X,
-                    (float)(semanticHeight - nextPatch.TangentSagMeters(
-                        placement.PositionX, placement.PositionZ)),
-                    transform.Origin.Z);
-                multiMesh.SetInstanceTransform(index, transform);
+                if (!GodotObject.IsInstanceValid(node) || node.Multimesh is not MultiMesh multiMesh)
+                {
+                    continue;
+                }
+                int count = Math.Min(multiMesh.InstanceCount, group.Placements.Count);
+                for (int index = 0; index < count; index++)
+                {
+                    EcologyFloraPlacement placement = group.Placements[index];
+                    Transform3D transform = multiMesh.GetInstanceTransform(index);
+                    double semanticHeight = transform.Origin.Y +
+                        previousPatch.TangentSagMeters(placement.PositionX, placement.PositionZ);
+                    transform.Origin = new Vector3(
+                        transform.Origin.X,
+                        (float)(semanticHeight - nextPatch.TangentSagMeters(
+                            placement.PositionX, placement.PositionZ)),
+                        transform.Origin.Z);
+                    multiMesh.SetInstanceTransform(index, transform);
+                }
             }
         }
     }

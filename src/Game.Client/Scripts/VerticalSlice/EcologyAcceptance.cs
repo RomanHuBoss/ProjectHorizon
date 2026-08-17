@@ -94,11 +94,10 @@ public static class EcologyAcceptanceRunner
                 left.ActiveFauna.All(spawn => !spawn.Simplified) &&
                 left.SimplifiedFauna.All(spawn => spawn.Simplified);
             bool updateTiers =
-                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(8.0) - 10.0) <
-                    0.001 &&
-                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) - 2.0) <
-                    0.001 &&
-                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(80.0)) < 0.001;
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(8.0) - 10.0) < 0.001 &&
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(35.0) - 5.0) < 0.001 &&
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(100.0) - 2.0) < 0.001 &&
+                Math.Abs(EcologyRuntime.GetUpdateFrequencyHz(180.0)) < 0.001;
 
             EcologyFaunaDefinition attacker = catalog.Fauna.Values.First(
                 fauna => fauna.Aggression >= 0.60 &&

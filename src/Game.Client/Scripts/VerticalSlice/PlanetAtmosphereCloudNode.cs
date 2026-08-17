@@ -25,6 +25,7 @@ uniform float atmosphere_opacity : hint_range(0.0, 0.8) = 0.32;
 uniform float horizon_amplification : hint_range(1.0, 4.0) = 2.0;
 uniform float sunset_factor : hint_range(0.0, 1.0) = 0.0;
 uniform float daylight : hint_range(0.0, 1.0) = 1.0;
+uniform bool simplified_shading = false;
 
 varying vec3 shell_dir;
 
@@ -37,8 +38,8 @@ void fragment() {
     float vertical = abs(direction.y);
     float horizon = pow(clamp(1.0 - vertical, 0.0, 1.0), horizon_amplification);
     vec3 star_dir = normalize(star_direction);
-    float star_facing = pow(max(dot(direction, star_dir), 0.0), 3.0);
-    float dusk_band = sunset_factor * horizon * (0.30 + 0.70 * star_facing);
+    float star_facing = simplified_shading ? 0.0 : pow(max(dot(direction, star_dir), 0.0), 3.0);
+    float dusk_band = simplified_shading ? 0.0 : sunset_factor * horizon * (0.30 + 0.70 * star_facing);
     vec3 day_color = mix(zenith_color, horizon_color, horizon);
     vec3 color = mix(day_color, sunset_color, clamp(dusk_band, 0.0, 0.72));
     float night_floor = mix(0.20, 1.0, daylight);
@@ -63,6 +64,7 @@ uniform vec3 star_direction = vec3(0.0, 0.7, -0.7);
 uniform float density : hint_range(0.0, 1.0) = 0.55;
 uniform float opacity : hint_range(0.0, 1.0) = 0.70;
 uniform float layer_phase = 0.0;
+uniform bool simplified_shading = false;
 
 varying vec3 shell_dir;
 
@@ -74,8 +76,8 @@ void fragment() {
     vec2 uv_a = UV * vec2(3.2, 1.8) + scroll_a * TIME + vec2(layer_phase, 0.0);
     vec2 uv_b = UV * vec2(6.4, 3.6) + scroll_b * TIME - vec2(0.0, layer_phase * 0.7);
     float n1 = texture(noise_a, uv_a).r;
-    float n2 = texture(noise_b, uv_b).r;
-    float noise_value = n1 * 0.68 + n2 * 0.32;
+    float n2 = simplified_shading ? n1 : texture(noise_b, uv_b).r;
+    float noise_value = simplified_shading ? n1 : n1 * 0.68 + n2 * 0.32;
     float threshold = mix(0.72, 0.38, density);
     float mask = smoothstep(threshold, threshold + 0.14, noise_value);
     vec3 star_dir = normalize(star_direction);
@@ -94,11 +96,45 @@ void fragment() {
     private PlanetAtmosphereCloudProfile? _profile;
     private Texture2D? _noiseA;
     private Texture2D? _noiseB;
+    private int _performanceCloudLayerLimit = 2;
+    private float _performanceSecondaryOpacityScale = 1.0f;
+    private int _graphicsCloudLayerLimit = 2;
+    private float _graphicsSecondaryOpacityScale = 1.0f;
+    private float _graphicsAtmosphereQualityScale = 1.0f;
+    private bool _graphicsSimplifiedShaders;
 
     public int ActiveCloudLayerCount { get; private set; }
     public bool AtmosphereShellActive =>
         _atmosphere is not null && GodotObject.IsInstanceValid(_atmosphere) && _atmosphere.Visible;
     public bool NoiseTexturesReady => _noiseA is not null && _noiseB is not null;
+
+    public int PerformanceCloudLayerLimit => _performanceCloudLayerLimit;
+    public int EffectiveCloudLayerLimit => Math.Min(_performanceCloudLayerLimit, _graphicsCloudLayerLimit);
+    public bool GraphicsQualityConfigured { get; private set; }
+
+    public void SetPerformanceQuality(int maximumCloudLayers, double secondaryOpacityScale)
+    {
+        _performanceCloudLayerLimit = Math.Clamp(maximumCloudLayers, 0, 2);
+        _performanceSecondaryOpacityScale = (float)Math.Clamp(secondaryOpacityScale, 0.0, 1.0);
+    }
+
+    public void SetGraphicsQuality(
+        int maximumCloudLayers,
+        double secondaryOpacityScale,
+        double atmosphereQualityScale,
+        bool simplifiedShaders)
+    {
+        _graphicsCloudLayerLimit = Math.Clamp(maximumCloudLayers, 0, 2);
+        _graphicsSecondaryOpacityScale = (float)Math.Clamp(secondaryOpacityScale, 0.0, 1.0);
+        _graphicsAtmosphereQualityScale = (float)Math.Clamp(atmosphereQualityScale, 0.35, 1.25);
+        _graphicsSimplifiedShaders = simplifiedShaders;
+        GraphicsQualityConfigured = true;
+        _atmosphereMaterial?.SetShaderParameter("simplified_shading", simplifiedShaders);
+        foreach (ShaderMaterial? material in _cloudMaterials)
+        {
+            material?.SetShaderParameter("simplified_shading", simplifiedShaders);
+        }
+    }
 
     public override void _Ready()
     {
@@ -139,7 +175,8 @@ void fragment() {
         if (_atmosphereMaterial is not null)
         {
             _atmosphereMaterial.SetShaderParameter("star_direction", starDirection);
-            _atmosphereMaterial.SetShaderParameter("atmosphere_opacity", (float)frame.AtmosphereOpacity);
+            _atmosphereMaterial.SetShaderParameter("atmosphere_opacity", (float)(frame.AtmosphereOpacity * _graphicsAtmosphereQualityScale));
+            _atmosphereMaterial.SetShaderParameter("simplified_shading", _graphicsSimplifiedShaders);
             _atmosphereMaterial.SetShaderParameter("sunset_factor", (float)frame.SunsetFactor);
             _atmosphereMaterial.SetShaderParameter("daylight", (float)frame.Daylight);
         }
@@ -151,7 +188,8 @@ void fragment() {
         {
             ShaderMaterial? material = _cloudMaterials[index];
             MeshInstance3D? cloud = _clouds[index];
-            bool active = index < _profile.CloudLayers;
+            int activeLayerCount = Math.Min(_profile.CloudLayers, EffectiveCloudLayerLimit);
+            bool active = index < activeLayerCount;
             if (cloud is not null)
             {
                 cloud.Visible = active;
@@ -162,12 +200,14 @@ void fragment() {
             }
             float layer = index + 1.0f;
             material.SetShaderParameter("star_direction", starDirection);
-            material.SetShaderParameter("density", (float)frame.CloudDensity);
-            material.SetShaderParameter("opacity", (float)(frame.CloudOpacity * (index == 0 ? 1.0 : 0.78)));
+            material.SetShaderParameter("density", (float)(frame.CloudDensity * Math.Clamp(_graphicsAtmosphereQualityScale, 0.55, 1.12)));
+            material.SetShaderParameter("simplified_shading", _graphicsSimplifiedShaders);
+            double layerOpacity = index == 0 ? 1.0 : 0.78 * _performanceSecondaryOpacityScale * _graphicsSecondaryOpacityScale;
+            material.SetShaderParameter("opacity", (float)(frame.CloudOpacity * layerOpacity));
             material.SetShaderParameter("scroll_a", wind * (windScale * layer));
             material.SetShaderParameter("scroll_b", new Vector2(-wind.Y, wind.X) * (windScale * 0.61f * layer));
         }
-        ActiveCloudLayerCount = _profile.CloudLayers;
+        ActiveCloudLayerCount = Math.Min(_profile.CloudLayers, EffectiveCloudLayerLimit);
     }
 
 

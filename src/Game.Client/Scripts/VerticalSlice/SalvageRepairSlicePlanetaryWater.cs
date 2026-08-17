@@ -44,6 +44,11 @@ public partial class SalvageRepairSlice
                 Name = "PlanetaryWater"
             };
             gameplay.AddChild(_planetaryWaterNode);
+            _planetaryWaterNode.SetGraphicsQuality(
+                _graphicsQualitySettings.WaterWaveScale,
+                _graphicsQualitySettings.WaterDepthScale,
+                _graphicsQualitySettings.UnderwaterDistortionScale,
+                _graphicsQualitySettings.SimplifiedShaders);
         }
 
         CanvasLayer? hud = GetNodeOrNull<CanvasLayer>("Hud");
@@ -73,6 +78,12 @@ public partial class SalvageRepairSlice
             };
             hud.AddChild(_underwaterPostOverlay);
             hud.MoveChild(_underwaterPostOverlay, 0);
+            _underwaterPostMaterial.SetShaderParameter(
+                "distortion_scale",
+                (float)_graphicsQualitySettings.UnderwaterDistortionScale);
+            _underwaterPostMaterial.SetShaderParameter(
+                "simplified_shading",
+                _graphicsQualitySettings.SimplifiedShaders);
         }
     }
 

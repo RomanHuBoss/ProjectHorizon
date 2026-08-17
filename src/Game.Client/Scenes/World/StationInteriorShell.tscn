@@ -6,11 +6,17 @@
 albedo_color = Color(0.055, 0.075, 0.11, 1)
 metallic = 0.58
 roughness = 0.38
+emission_enabled = true
+emission = Color(0.012, 0.018, 0.03, 1)
+emission_energy_multiplier = 0.32
 
 [sub_resource type="StandardMaterial3D" id="HangarFloorMaterial"]
 albedo_color = Color(0.07, 0.09, 0.12, 1)
 metallic = 0.72
 roughness = 0.3
+emission_enabled = true
+emission = Color(0.014, 0.02, 0.028, 1)
+emission_energy_multiplier = 0.28
 
 [sub_resource type="StandardMaterial3D" id="HangarGuideMaterial"]
 albedo_color = Color(0.03, 0.55, 0.95, 1)

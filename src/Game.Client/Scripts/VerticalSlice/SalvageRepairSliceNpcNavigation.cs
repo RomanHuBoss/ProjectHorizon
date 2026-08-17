@@ -63,9 +63,19 @@ public partial class SalvageRepairSlice
             agent.EnableNavigation(_npcNavigationSurface);
             attached++;
         }
+        int faunaAttached = 0;
+        foreach (EcologyFaunaNode fauna in _ecologyFaunaNodes)
+        {
+            if (!string.Equals(fauna.MovementMode, "Ground", StringComparison.Ordinal))
+            {
+                continue;
+            }
+            fauna.EnableGroundNavigation(_npcNavigationSurface);
+            faunaAttached++;
+        }
         GD.Print(
             "TASK-124 NPC NavigationAgent3D binding READY: " +
-            $"dynamicAgents={attached}; boundedStreaming=1; obstacleRecovery=1; avoidance=1.");
+            $"dynamicAgents={attached}; faunaAgents={faunaAttached}; boundedStreaming=1; obstacleRecovery=1; avoidance=1.");
     }
 
     private void DetachNpcNavigationAgents()
@@ -80,6 +90,10 @@ public partial class SalvageRepairSlice
             {
                 agent.PrepareNavigationMapChange();
             }
+        }
+        foreach (EcologyFaunaNode fauna in _ecologyFaunaNodes)
+        {
+            fauna.PrepareGroundNavigationMapChange();
         }
     }
 

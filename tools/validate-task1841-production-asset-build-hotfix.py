@@ -16,7 +16,7 @@ def need(cond: bool, msg: str):
         raise SystemExit(1)
 
 version = VERSION.read_text(encoding='utf-8').strip()
-need(version in {'0.1.0-alpha.184.1', '0.1.0-alpha.186','0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194'}, 'VERSION must preserve alpha.184.1 hotfix or later accepted revision')
+need(version in {'0.1.0-alpha.184.1', '0.1.0-alpha.186','0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}, 'VERSION must preserve alpha.184.1 hotfix or later accepted revision')
 live = LIVE.read_text(encoding='utf-8')
 need('ProductionGlbResources.Count(path => ResourceLoader.Exists(path))' in live,
      'ResourceLoader.Exists must be adapted with an explicit string lambda')

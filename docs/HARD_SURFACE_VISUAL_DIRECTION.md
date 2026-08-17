@@ -28,3 +28,7 @@ The palette is restrained graphite/steel with limited safety-orange accents, smo
 ## Acceptance boundary
 
 Structural/runtime acceptance can verify that the redesigned assets import, contain the required hard-surface signature nodes, preserve LOD/collision contracts and replace the old presentation. **Manual visual acceptance** is still required because no static metric can prove that an art direction is attractive. Owner screenshots of player exterior, nearby NPC and station approach are the acceptance evidence for the aesthetic portion.
+
+## TASK-216 production-art supersession
+
+TASK-216 supersedes the TASK-186 density baseline without changing its silhouette/collision principles. Close-range Explorer/Interceptor/station presentation now uses substantially higher-detail LOD0 assets and reviewed CC0 kit geometry for selected greeble modules; resource deposits also move to production GLBs. TASK-186 remains the visual-language regression floor, while TASK-216 is the current manual visual-acceptance target.

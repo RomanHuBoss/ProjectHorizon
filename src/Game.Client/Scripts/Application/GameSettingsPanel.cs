@@ -9,6 +9,7 @@ public partial class GameSettingsPanel : PanelContainer
     private GameUserSettings _working = new();
     private Label? _status;
     private OptionButton? _languageOption;
+    private OptionButton? _graphicsQualityOption;
     private string? _captureAction;
 
     public event Action? CloseRequested;
@@ -115,6 +116,7 @@ public partial class GameSettingsPanel : PanelContainer
         scroll.AddChild(content);
 
         BuildLanguage(content);
+        BuildGraphicsQuality(content);
         BuildPointerAndAccessibility(content);
         BuildKeyboardBindings(content);
         BuildAudio(content);
@@ -166,6 +168,40 @@ public partial class GameSettingsPanel : PanelContainer
         _refreshers.Add(RefreshLanguageSelection);
     }
 
+    private void BuildGraphicsQuality(VBoxContainer root)
+    {
+        root.AddChild(new HSeparator());
+        root.AddChild(SectionLabel("ui.settings.graphics_section"));
+        HBoxContainer row = new();
+        row.AddThemeConstantOverride("separation", 12);
+        row.AddChild(new Label
+        {
+            Text = "ui.settings.graphics_quality",
+            SizeFlagsHorizontal = SizeFlags.ExpandFill,
+            VerticalAlignment = VerticalAlignment.Center
+        });
+        _graphicsQualityOption = new OptionButton { CustomMinimumSize = new Vector2(220, 40) };
+        _graphicsQualityOption.AddItem("ui.settings.graphics.low");
+        _graphicsQualityOption.AddItem("ui.settings.graphics.medium");
+        _graphicsQualityOption.AddItem("ui.settings.graphics.high");
+        _graphicsQualityOption.AddItem("ui.settings.graphics.compatibility");
+        _graphicsQualityOption.ItemSelected += index => _working.GraphicsQualityProfile = index switch
+        {
+            0 => GraphicsQualityProfile.Low,
+            2 => GraphicsQualityProfile.High,
+            3 => GraphicsQualityProfile.Compatibility,
+            _ => GraphicsQualityProfile.Medium
+        };
+        row.AddChild(_graphicsQualityOption);
+        root.AddChild(row);
+        root.AddChild(new Label
+        {
+            Text = "ui.settings.graphics.note",
+            AutowrapMode = TextServer.AutowrapMode.WordSmart
+        });
+        _refreshers.Add(RefreshGraphicsQualitySelection);
+    }
+
     private void BuildPointerAndAccessibility(VBoxContainer root)
     {
         root.AddChild(new HSeparator());
@@ -187,7 +223,16 @@ public partial class GameSettingsPanel : PanelContainer
         AddCheck(root, "ui.settings.invert_onfoot_y", () => _working.InvertOnFootY, v => _working.InvertOnFootY = v);
         AddCheck(root, "ui.settings.invert_ship_pitch", () => _working.InvertShipPitch, v => _working.InvertShipPitch = v);
         AddCheck(root, "ui.settings.invert_ship_yaw", () => _working.InvertShipYaw, v => _working.InvertShipYaw = v);
+        AddSlider(root, "ui.settings.gamepad_dead_zone", 0.05, 0.45, 0.01,
+            () => _working.GamepadDeadZone, value => _working.GamepadDeadZone = (float)value,
+            value => $"{value * 100.0:0}%");
+        AddSlider(root, "ui.settings.gamepad_response", 0.75, 2.00, 0.05,
+            () => _working.GamepadResponseExponent, value => _working.GamepadResponseExponent = (float)value,
+            value => $"{value:0.00}×");
         AddCheck(root, "ui.settings.subtitles", () => _working.SubtitlesEnabled, v => _working.SubtitlesEnabled = v);
+        AddSlider(root, "ui.settings.subtitle_scale", 0.80, 1.50, 0.05,
+            () => _working.SubtitleScale, value => _working.SubtitleScale = (float)value,
+            value => $"{value:0.00}×");
         AddCheck(root, "ui.settings.camera_shake", () => _working.CameraShakeEnabled, v => _working.CameraShakeEnabled = v);
         AddCheck(root, "ui.settings.motion_blur", () => _working.MotionBlurEnabled, v => _working.MotionBlurEnabled = v);
         root.AddChild(new Label { Text = "ui.settings.color_note", AutowrapMode = TextServer.AutowrapMode.WordSmart });
@@ -298,6 +343,21 @@ public partial class GameSettingsPanel : PanelContainer
         };
     }
 
+    private void RefreshGraphicsQualitySelection()
+    {
+        if (_graphicsQualityOption is null)
+        {
+            return;
+        }
+        _graphicsQualityOption.Selected = _working.GraphicsQualityProfile switch
+        {
+            GraphicsQualityProfile.Low => 0,
+            GraphicsQualityProfile.High => 2,
+            GraphicsQualityProfile.Compatibility => 3,
+            _ => 1
+        };
+    }
+
     private void RefreshLocalization()
     {
         GameLocalizationService.LocalizeControlTree(this);
@@ -306,6 +366,13 @@ public partial class GameSettingsPanel : PanelContainer
             _languageOption.SetItemText(0, GameLocalizationService.Text("ui.settings.language.auto"));
             _languageOption.SetItemText(1, GameLocalizationService.Text("ui.settings.language.en"));
             _languageOption.SetItemText(2, GameLocalizationService.Text("ui.settings.language.ru"));
+        }
+        if (_graphicsQualityOption is not null)
+        {
+            _graphicsQualityOption.SetItemText(0, GameLocalizationService.Text("ui.settings.graphics.low"));
+            _graphicsQualityOption.SetItemText(1, GameLocalizationService.Text("ui.settings.graphics.medium"));
+            _graphicsQualityOption.SetItemText(2, GameLocalizationService.Text("ui.settings.graphics.high"));
+            _graphicsQualityOption.SetItemText(3, GameLocalizationService.Text("ui.settings.graphics.compatibility"));
         }
         RefreshUiFromWorkingCopy();
     }

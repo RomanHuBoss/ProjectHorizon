@@ -68,6 +68,17 @@ python3 tools/validate-task190-atmosphere-clouds.py
 python3 tools/validate-task192-planetary-caves.py
 python3 tools/validate-task1921-acceptance-coherence-hotfix.py
 python3 tools/validate-task194-world-streaming.py
+python3 tools/validate-task196-regional-vegetation.py
+python3 tools/validate-task198-modular-fauna.py
+python3 tools/validate-task200-runtime-performance.py
+python3 tools/validate-task202-graphics-quality-profiles.py
+python3 tools/validate-task204-accessibility-runtime.py
+python3 tools/validate-task206-system-capability.py
+python3 tools/validate-task208-texture-lighting-budgets.py
+python3 tools/validate-task210-galaxy-expedition.py
+python3 tools/validate-task212-cross-platform-determinism.py
+python3 tools/validate-task214-endurance-soak.py
+python3 tools/validate-task216-production-model-art.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

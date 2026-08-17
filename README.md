@@ -1,4 +1,49 @@
+## TASK-216 — Production 3D Model Art Overhaul
+
+`0.1.0-alpha.216` raises the visual-density baseline of the Explorer, Interceptor and orbital station and moves surface/cave/starter resources to five production GLB families with three LOD levels each. Selected close-range greeble modules use reviewed Kenney Space Kit CC0 authoring inputs; shipping collision/mount markers remain unchanged and raw authoring OBJ files are never runtime-loaded. Resource primitive meshes are emergency fallback only. F5 includes `TASK-216 production model art acceptance`; manual visual acceptance remains mandatory. See `docs/PRODUCTION_MODEL_ART_OVERHAUL.md`.
+
+## TASK-214 - Eight-Hour Automated Endurance & Recovery Soak
+
+`0.1.0-alpha.214` turns Technical Specification §41 criterion 16 into a real-time certification harness. F5 validates the harness itself, while the release certificate still requires one uninterrupted eight-hour owner run. The live harness samples health every second, runs bounded galaxy/streaming/terrain probes every 30 seconds, writes JSONL heartbeats every minute, saves to an isolated diagnostic SQLite database every 5 minutes and runs `integrity_check` every 15 minutes. It hard-fails on new terrain worker failures, corrupt diagnostic DB state, multiple SaveDatabase writers, >768 MiB managed-memory growth, >120 s queue stalls, workload invariant failure or loss of heartbeat/checkpoint output. The primary player save is not used as the endurance workload database. Start with `endurance_soak start 8` or `tools\run-task214-endurance.cmd`. See `docs/EIGHT_HOUR_ENDURANCE_SOAK.md`.
+
+## TASK-212 - Cross-Platform Determinism & Offline-First Runtime
+
+`0.1.0-alpha.212` turns Technical Specification §41 criteria 1, 2 and 11 plus §42.14 into an executable parity/offline contract without changing world-generation output. A canonical invariant SHA-256 covers representative star systems, planets, starter environment/terrain samples and the baseline POI fixture; F5 repeats it under en-US/ru-RU/tr-TR. The shared reviewed `golden-seeds.v1.json` is now executed in dedicated Windows and Linux CI/release matrix jobs. Production single-player C# is statically audited for mandatory network client/socket dependencies, which remain forbidden. `ProjectHorizonGenerator.Version` stays at 3; any intentional world-generation change still requires an explicit version/golden update. See `docs/CROSS_PLATFORM_DETERMINISM_OFFLINE.md`.
+
+## TASK-210 - 100-System Procedural Expedition & Galaxy Residency Validation
+
+`0.1.0-alpha.210` turns Technical Specification §41 criterion 3 into an executable integration contract. F5 performs an accelerated expedition through exactly 100 distinct deterministic systems (starter + 99 neighboring procedural sectors) using the real `GalaxyNavigationRuntime` route/jump/fuel path, verifies stable planet IDs/seeds and persistence of all visited IDs, and rejects any design that requires the whole galaxy or all 100 `GalaxySystemDefinition` objects to remain resident. Non-starter systems remain coordinate-generated with no authored per-system table. See `docs/GALAXY_100_SYSTEM_EXPEDITION.md`.
+
+## TASK-208 - Texture/Material Budget & Lighting Residency
+
+`0.1.0-alpha.208` turns Technical Specification §§26.2-26.3 into executable content/runtime policy. Shipping raster textures are checked against role ceilings (2048 for player/large ship/building/tiled surfaces, up to 2048 for NPC, 1024 for ordinary objects/plants, 512 for UI icons), while atlas/reusable-material and production material-count rules remain explicit. Runtime lighting now keeps one authoritative surface star plus ambient lighting and a bounded 4 Hz local-light residency budget: surface <=6 local lights with no local shadows, caves <=4, station interiors <=8 with at most two pre-authored shadow casters, and distant local lights are disabled. See `docs/TEXTURE_MATERIAL_LIGHTING_BUDGETS.md`; F5 includes TASK-208.
+
+## TASK-206 - System Capability Preflight & Safe Graphics Recommendation
+
+`0.1.0-alpha.206` turns Technical Specification §28 player system requirements into a live advisory startup contract. The client now captures supported OS/x64, logical CPU count, physical RAM when available, active renderer/driver, adapter identity/type/API, current video-memory usage and free space backing `user://`. It classifies known evidence as `Unsupported`, `Minimum` or `Recommended` and recommends Compatibility/Low/Medium without mutating the user's saved TASK-202 profile. Portable SSD medium and total VRAM capacity are reported as unknown rather than guessed. F5 includes TASK-206; see `docs/SYSTEM_CAPABILITY_PREFLIGHT.md`.
+
+## TASK-204 - Accessibility Runtime Closure & Gamepad Tuning
+
+`0.1.0-alpha.204` closes the remaining runtime portion of Technical Specification 31.2/31.4: persistent gamepad dead-zone/response curve, scalable closed captions for voice/warning cues, and non-color HP/SH/O2/HZ status tokens. Existing mouse inversion, UI scale, FOV, subtitles, reduced-motion toggles and separate Music/SFX/Voice volumes remain integrated. F5 now includes TASK-204.
+
+## TASK-202 — Graphics Quality Profiles & Runtime Scalability
+
+`0.1.0-alpha.202` implements Technical Specification §26.4 as persistent Low / Medium / High / Compatibility presentation profiles. Profiles scale regional vegetation density/distance, TASK-194 macro presentation distance, directional shadows, cloud layers, atmosphere/water quality, underwater refraction, glow and particle emission. Compatibility forces simplified shaders and removes heavy effects; a live Compatibility renderer also forces the effective Compatibility preset. TASK-200 remains a presentation-only adaptive governor and may reduce quality below the selected ceiling but never raise it above the user profile. F5 includes `TASK-202 graphics quality acceptance`; see `docs/GRAPHICS_QUALITY_PROFILES.md`.
+
+## TASK-200 — Runtime Performance Budgets, Frame Telemetry & Adaptive Quality
+
+`0.1.0-alpha.200` implements Technical Specification §27 as a measurable runtime contract. Medium uses the normative 60 FPS / 16.6 ms, 1500 draw-call, 2M rendered-primitive, 500 active-physics, 20 full-AI, 80 simplified-AI, 4 GiB VRAM and 6 GiB RAM budgets; Low targets 30 FPS and reduces scene/AI/memory budgets by at least 30%. Godot performance monitors plus .NET working-set/GC allocation telemetry are sampled at 2 Hz. Sustained pressure drives a hysteretic presentation-only governor that contracts regional vegetation LOD distances and caps cloud layers without modifying authoritative gameplay. F5 includes `TASK-200 runtime performance acceptance`; see `docs/RUNTIME_PERFORMANCE_BUDGETS.md`.
+
+## TASK-196 — Regional Vegetation LOD & Interactive Promotion
+
+Alpha.196 implements Technical Specification §11 on top of TASK-116 ecology and TASK-194 world streaming. Flora MultiMeshes are partitioned by 32 m region and species, with separate near/mid LOD geometry, distance culling for small objects, and Full/Simplified/Preload residency coupling. GPU instances promote to full interaction/hitscan entities for proximity, scanning, damage, harvesting or active quest relevance, then demote when safely distant unless quest-pinned. F5 includes `TASK-196 regional vegetation acceptance`; see `docs/REGIONAL_VEGETATION_RUNTIME.md`.
+
 # Project Horizon
+
+## TASK-198 — Modular Fauna Bodies, Hierarchical AI & Tiered Simulation
+
+`0.1.0-alpha.198` closes Technical Specification §12. Fauna now uses six fixed skeleton families (`Biped`, `Quadruped`, `Hexapod`, `Flying`, `Aquatic`, `Crawler`) with deterministic skeleton-compatible procedural modules for head, torso, limbs, tail, horns and shell. Behavior selection is a hierarchical state machine with utility scoring over the complete 11-state contract. Ground creatures use the shared TASK-124 navmesh, social groups receive simplified boids steering, flying creatures preserve TASK-126 aerial steering, and AI decisions run at 10/5/2 Hz before falling back to species-level statistical simulation. Visual interpolation remains per-frame. F5 prints `TASK-198 (F5)` and gates the combined runtime matrix.
+
 
 ## TASK-194 — World Streaming, Residency Budgets & Priority Scheduling
 
@@ -643,7 +688,7 @@ TASK-148 world scene coordinator (F5): PASS transitionGraph=1, illegalRejected=1
 TASK-130 application shell (F5): PASS mainMenu=1, newGame=1, load=1, settings=1, pauseOverlay=1, deathScreen=1, settingsRoundTrip=1, profileContract=1, keyboardRemap=1, inventory=1, planetMap=1, gamepad=1, accessibility=1
 TASK-132 localization (F5): PASS locales=2, keys=1336, parity=1, missingValues=0, missingKeys=0, keyOnlyContent=1, sceneKeys=1, liveSwitch=1, settingsLanguage=1
 TASK-134 audio architecture (F5): PASS buses=8/8, cues=19/19, pool2d=8, pool3d=16, activeTransient<=24, maxConcurrent=29, poolSteals>0, positional=1, attenuation=1, atmosphere=1, water=1, interior=1, vacuum=1, externalVacuumSuppressed=1, internalVacuumAllowed=1, musicCrossfade=1, ui=1, voice=1, settingsRouting=1
-TASK-136 developer diagnostics (F5): PASS tools=5/5, commands=16/16, devGate=1, seedExplorer=1, planetPreview=1, chunkProfiler=1, saveInspector=1, debugConsole=1, logCategories=14/14, redaction=1, secretLeak=0, jsonl=1
+TASK-136 developer diagnostics (F5): PASS tools=5/5, commands=17/17, devGate=1, seedExplorer=1, planetPreview=1, chunkProfiler=1, saveInspector=1, debugConsole=1, logCategories=14/14, redaction=1, secretLeak=0, jsonl=1
 TASK-138 verification suite (F5): PASS generatorVersion=3, goldenSystems=4/4, goldenPoi=1, controlHeights=1, checksums=1, unitGroups=10/10, saveScenarios=8/8, loadScenarios=8/8, landingStress=100/100, visualSmoke=1, visualComponents=1, coverageThresholds=80/70/80
 TASK-142 architecture hardening (F5): PASS typedEvents=11/11, liveSubscriptions=11/11, nearbyTicks≈100, distantTicks≈20, physicsHz=60, playerHz=60, nearbyAiHz=10, distantAiHz=2, backgroundEconomyHz=0.5, eventBus=1, frequencyPolicy=1
 ```
@@ -793,7 +838,7 @@ python tools/validate-audio-contract.py
 TASK-134 AUDIO CONTRACT PASS: buses=8/8; cues=19; pool2d=8; pool3d=16; maxTransient=24; maxConcurrent=29; environments=4; musicStates=6; positional=1; attenuation=1; pooling=1; vacuumRule=1; gameplayHooks=6; settingsRouting=1; localization=1; sourceAudioAssets=0.
 
 python tools/validate-developer-diagnostics-contract.py
-TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS: tools=5/5; commands=16/16; logCategories=14/14; logFields=10/10; devGate=1; seedExplorer=1; planetPreview=1; chunkProfiler=1; saveInspector=1; debugConsole=1; redaction=1.
+TASK-136 DEVELOPER DIAGNOSTICS CONTRACT PASS: tools=5/5; commands=17/17; logCategories=14/14; logFields=10/10; devGate=1; seedExplorer=1; planetPreview=1; chunkProfiler=1; saveInspector=1; debugConsole=1; redaction=1.
 
 python tools/validate-section36-testing-contract.py
 TASK-138 SECTION-36 CONTRACT PASS: unitGroups=10/10; saveScenarios=8/8; loadScenarios=8/8+abnormal; goldenVersion=2; goldenSystems=4; goldenPoi=20; coverage=80/70/80; visualSmoke=1; standaloneDotnet=1; f5Smoke=1.

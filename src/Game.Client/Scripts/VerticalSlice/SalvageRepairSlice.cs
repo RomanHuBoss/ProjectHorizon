@@ -510,6 +510,7 @@ public partial class SalvageRepairSlice : Node3D
         PrintFlightRuntimeClosureReady();
         PrintProductionAssetPipelineReady();
         PrintHardSurfaceVisualRedesignReady();
+        PrintProductionModelArtReady();
         PrintPlanetaryWaterReady();
         PrintPlanetAtmosphereCloudReady();
         PrintPlanetaryCaveReady();
@@ -522,6 +523,14 @@ public partial class SalvageRepairSlice : Node3D
         InitializeDeveloperDiagnosticsRuntime();
         InitializeTestingRuntime();
         InitializeArchitectureRuntime();
+        InitializeGraphicsQualityProfiles();
+        InitializeRuntimePerformanceBudgeting();
+        InitializeAccessibilityRuntime();
+        InitializeSystemCapabilityPreflight();
+        InitializeTextureLightingBudgets();
+        PrintGalaxyExpeditionReady();
+        PrintCrossPlatformDeterminismReady();
+        InitializeEnduranceSoakRuntime();
         _generatedResourcePlacements =
             GenerateMissingCatalogResourceNodes(catalog);
         RepositionSurfaceBoundObjects();
@@ -704,7 +713,7 @@ public partial class SalvageRepairSlice : Node3D
             $"fauna={EcologyCatalog.Fauna.Count}; " +
             $"instanced={EcologyPlan.Flora.Count}; " +
             $"active/simplified={EcologyPlan.ActiveFauna.Count}/{EcologyPlan.SimplifiedFauna.Count}; " +
-            "scanner=V; catalog=O; ai=utility+steering; persistence=seed+deltas; F5=acceptance; " +
+            "scanner=V; catalog=O; ai=hfsm+utility+steering+navmesh+boids; tiers=10/5/2/statistical; persistence=seed+deltas; F5=acceptance; " +
             $"atmosphere={(_voyageShip?.HasAtmosphereReference == true ? "bound" : "missing")}.");
         GD.Print(
             "TASK-118 procedural quests READY: " +
@@ -764,6 +773,7 @@ public partial class SalvageRepairSlice : Node3D
         _closeRequested = false;
         DisposeArchitectureRuntime();
         DisposeLocalizationRuntime();
+        DisposeEnduranceSoakRuntime();
         GetTree().AutoAcceptQuit = _previousAutoAcceptQuit;
         _lifetimeCancellation.Cancel();
         _autosave?.Dispose();
@@ -832,6 +842,10 @@ public partial class SalvageRepairSlice : Node3D
         UpdateAudioRuntime(delta);
         UpdateDeveloperDiagnosticsRuntime(delta);
         UpdateArchitectureRuntime(delta);
+        UpdateRuntimePerformanceBudgeting(delta);
+        UpdateAccessibilityRuntime(delta);
+        UpdateTextureLightingBudgets(delta);
+        UpdateEnduranceSoakRuntime(delta);
         _baseConstructionRuntime?.Tick(delta);
         UpdateBaseBuildPreview();
         PollAutosave();
@@ -5587,10 +5601,21 @@ public partial class SalvageRepairSlice : Node3D
         RunFlightRuntimeClosureAcceptance();
         RunProductionAssetPipelineAcceptance();
         RunHardSurfaceVisualRedesignAcceptance();
+        RunProductionModelArtAcceptance();
         RunPlanetaryWaterAcceptance();
         RunPlanetAtmosphereCloudAcceptance();
         RunPlanetaryCaveAcceptance();
         RunWorldStreamingAcceptance();
+        RunVegetationRegionalAcceptance();
+        RunFaunaModularAcceptance();
+        RunRuntimePerformanceAcceptance();
+        RunGraphicsQualityAcceptance();
+        RunAccessibilityAcceptance();
+        RunSystemCapabilityAcceptance();
+        RunTextureLightingBudgetAcceptance();
+        RunGalaxyExpeditionAcceptance();
+        RunCrossPlatformDeterminismAcceptance();
+        RunEnduranceSoakAcceptance();
         RequestSpaceflightNavigationSubsystemAcceptance();
         RunApplicationShellAcceptance();
         RunLocalizationAcceptance();
@@ -5600,7 +5625,7 @@ public partial class SalvageRepairSlice : Node3D
         RunArchitectureAcceptance();
         RunPlatformArchitectureAcceptance();
         _status =
-            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-188/TASK-190/TASK-192/TASK-194/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
+            "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-128/TASK-150/TASK-152/TASK-154/TASK-156/TASK-158/TASK-160/TASK-162.2/TASK-164/TASK-166/TASK-168/TASK-170/TASK-172/TASK-174/TASK-174.1/TASK-176/TASK-162/TASK-148/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214/TASK-130/TASK-132/TASK-134/TASK-136/TASK-138/TASK-142 runtime acceptance running";
     }
 
     private void BeginReset()
@@ -6802,10 +6827,21 @@ public partial class SalvageRepairSlice : Node3D
             _flightRuntimeClosureAcceptancePassed is null ||
             _productionAssetPipelineAcceptancePassed is null ||
             _hardSurfaceVisualRedesignAcceptancePassed is null ||
+            _productionModelArtAcceptancePassed is null ||
             _planetaryWaterAcceptancePassed is null ||
             _planetAtmosphereCloudAcceptancePassed is null ||
             _planetaryCaveAcceptancePassed is null ||
-            _worldStreamingAcceptancePassed is null)
+            _worldStreamingAcceptancePassed is null ||
+            _vegetationRegionalAcceptancePassed is null ||
+            _faunaModularAcceptancePassed is null ||
+            _runtimePerformanceAcceptancePassed is null ||
+            _graphicsQualityAcceptancePassed is null ||
+            _accessibilityAcceptancePassed is null ||
+            _systemCapabilityAcceptancePassed is null ||
+            _textureLightingAcceptancePassed is null ||
+            _galaxyExpeditionAcceptancePassed is null ||
+            _crossPlatformDeterminismAcceptancePassed is null ||
+            _enduranceSoakAcceptancePassed is null)
         {
             return;
         }
@@ -6834,16 +6870,27 @@ public partial class SalvageRepairSlice : Node3D
             _flightRuntimeClosureAcceptancePassed == true &&
             _productionAssetPipelineAcceptancePassed == true &&
             _hardSurfaceVisualRedesignAcceptancePassed == true &&
+            _productionModelArtAcceptancePassed == true &&
             _planetaryWaterAcceptancePassed == true &&
             _planetAtmosphereCloudAcceptancePassed == true &&
             _planetaryCaveAcceptancePassed == true &&
-            _worldStreamingAcceptancePassed == true;
+            _worldStreamingAcceptancePassed == true &&
+            _vegetationRegionalAcceptancePassed == true &&
+            _faunaModularAcceptancePassed == true &&
+            _runtimePerformanceAcceptancePassed == true &&
+            _graphicsQualityAcceptancePassed == true &&
+            _accessibilityAcceptancePassed == true &&
+            _systemCapabilityAcceptancePassed == true &&
+            _textureLightingAcceptancePassed == true &&
+            _galaxyExpeditionAcceptancePassed == true &&
+            _crossPlatformDeterminismAcceptancePassed == true &&
+            _enduranceSoakAcceptancePassed == true;
         _state = passed
             ? SalvageRepairSliceState.Passed
             : SalvageRepairSliceState.Failed;
         _status = passed
-            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-188/TASK-190/TASK-192/TASK-194 runtime acceptance passed"
-            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-188/TASK-190/TASK-192/TASK-194 runtime acceptance failed";
+            ? "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance passed"
+            : "TASK-076/TASK-110/TASK-112/TASK-114/TASK-116/TASK-118/TASK-120/TASK-122/TASK-124/TASK-126/TASK-178/TASK-178.2/TASK-178.3/TASK-178.4/TASK-178.5/TASK-178.6/TASK-178.7/TASK-180/TASK-180.1/TASK-180.2/TASK-180.3/TASK-182/TASK-184/TASK-186/TASK-216/TASK-188/TASK-190/TASK-192/TASK-194/TASK-196/TASK-198/TASK-200/TASK-202/TASK-204/TASK-206/TASK-208/TASK-210/TASK-212/TASK-214 runtime acceptance failed";
     }
 
     private void PollProductionQueueAcceptanceTask()
@@ -7835,10 +7882,21 @@ public partial class SalvageRepairSlice : Node3D
             $"TASK-182 (F5): {_flightRuntimeClosureAcceptanceHud}",
             $"TASK-184 (F5): {_productionAssetPipelineAcceptanceHud}",
             $"TASK-186 (F5): {_hardSurfaceVisualRedesignAcceptanceHud}",
+            $"TASK-216 (F5): {_productionModelArtAcceptanceHud}",
             $"TASK-188 (F5): {_planetaryWaterAcceptanceHud}",
             $"TASK-190 (F5): {_planetAtmosphereCloudAcceptanceHud}",
             $"TASK-192 (F5): {_planetaryCaveAcceptanceHud}",
             $"TASK-194 (F5): {_worldStreamingAcceptanceHud}",
+            $"TASK-196 (F5): {_vegetationRegionalAcceptanceHud}",
+            $"TASK-198 (F5): {_faunaModularAcceptanceHud}",
+            $"TASK-200 (F5): {_runtimePerformanceAcceptanceHud}",
+            $"TASK-202 (F5): {_graphicsQualityAcceptanceHud}",
+            $"TASK-204 (F5): {_accessibilityAcceptanceHud}",
+            $"TASK-206 (F5): {_systemCapabilityAcceptanceHud}",
+            $"TASK-208 (F5): {_textureLightingAcceptanceHud}",
+            $"TASK-210 (F5): {_galaxyExpeditionAcceptanceHud}",
+            $"TASK-212 (F5): {_crossPlatformDeterminismAcceptanceHud}",
+            $"TASK-214 (F5): {_enduranceSoakAcceptanceHud}",
             $"TASK-132 (F5): {(_task132AcceptancePrinted ? "DONE" : "READY")}",
             $"TASK-134 (F5): {_task134AcceptanceHud}",
             $"TASK-136 (F5): {_task136AcceptanceHud}",

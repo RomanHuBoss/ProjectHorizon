@@ -1392,6 +1392,19 @@
     "ui.cave.entered": "Entered {cave}. Follow the illuminated route; E at the exit marker returns to the surface.",
     "ui.cave.exited": "Returned to the planetary surface.",
     "ui.cave.entry_unavailable": "Cave entry is available only on foot while the planetary surface is active.",
-    "ui.cave.prefab_missing": "The cave prefab is unavailable for this entrance."
+    "ui.cave.prefab_missing": "The cave prefab is unavailable for this entrance.",
+    "ui.settings.graphics_section": "Graphics",
+    "ui.settings.graphics_quality": "Graphics quality",
+    "ui.settings.graphics.low": "Low",
+    "ui.settings.graphics.medium": "Medium",
+    "ui.settings.graphics.high": "High",
+    "ui.settings.graphics.compatibility": "Compatibility",
+    "ui.settings.graphics.note": "Quality changes presentation only. Compatibility applies the low-end visual preset immediately; the OpenGL compatibility renderer itself requires the Compatibility build/profile.",
+    "ui.settings.gamepad_dead_zone": "Gamepad dead zone",
+    "ui.settings.gamepad_response": "Gamepad response curve",
+    "ui.settings.subtitle_scale": "Subtitle size",
+    "ui.access.caption.radio": "[VOICE] Radio transmission / dialogue channel opened.",
+    "ui.access.caption.damage": "[ALERT] Player damage detected.",
+    "ui.access.caption.oxygen_low": "[O2] Oxygen critically low."
   }
 }

@@ -23,6 +23,16 @@ public partial class SalvageRepairSlice
         _planetAtmosphereCloudProfile = PlanetAtmosphereCloudRuntime.BuildProfile(environment);
         EnsurePlanetAtmosphereCloudNode();
         _planetAtmosphereCloudNode?.Configure(_planetAtmosphereCloudProfile);
+        _planetAtmosphereCloudNode?.SetPerformanceQuality(
+            _runtimePerformanceQualitySettings.MaximumCloudLayers,
+            _runtimePerformanceQualitySettings.SecondaryCloudOpacityScale);
+        _planetAtmosphereCloudNode?.SetGraphicsQuality(
+            Math.Min(_graphicsQualitySettings.MaximumCloudLayers,
+                _runtimePerformanceQualitySettings.MaximumCloudLayers),
+            Math.Min(_graphicsQualitySettings.SecondaryCloudOpacityScale,
+                _runtimePerformanceQualitySettings.SecondaryCloudOpacityScale),
+            _graphicsQualitySettings.AtmosphereQualityScale,
+            _graphicsQualitySettings.SimplifiedShaders);
         RetireLegacyCloudClusters();
     }
 
@@ -43,6 +53,13 @@ public partial class SalvageRepairSlice
             Name = "PlanetAtmosphereCloudShells"
         };
         gameplay.AddChild(_planetAtmosphereCloudNode);
+        _planetAtmosphereCloudNode.SetGraphicsQuality(
+            Math.Min(_graphicsQualitySettings.MaximumCloudLayers,
+                _runtimePerformanceQualitySettings.MaximumCloudLayers),
+            Math.Min(_graphicsQualitySettings.SecondaryCloudOpacityScale,
+                _runtimePerformanceQualitySettings.SecondaryCloudOpacityScale),
+            _graphicsQualitySettings.AtmosphereQualityScale,
+            _graphicsQualitySettings.SimplifiedShaders);
     }
 
     private void RetireLegacyCloudClusters()

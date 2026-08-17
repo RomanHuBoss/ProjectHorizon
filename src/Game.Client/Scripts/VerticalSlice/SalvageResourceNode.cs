@@ -84,6 +84,7 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
 
         if (_mesh is not null)
         {
+            UpgradeProductionVisual(definition);
             ApplyDefinitionMaterial(definition);
         }
     }
@@ -140,29 +141,62 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
         }
 
         ResourceVisualDefinition visual = definition.Visual;
-        ApplyMaterialRecursive(_mesh, visual, 1.0f);
+        int detailIndex = 0;
+        ApplyMaterialRecursive(_mesh, visual, ref detailIndex);
     }
 
     private static void ApplyMaterialRecursive(
-        MeshInstance3D mesh,
+        Node node,
         ResourceVisualDefinition visual,
-        float brightness)
+        ref int detailIndex)
     {
-        mesh.MaterialOverride =
-            ProceduralSurfaceVisualFactory.BuildResourceMaterial(
-                visual,
-                brightness);
-        int detailIndex = 0;
-        foreach (Node child in mesh.GetChildren())
+        if (node is MeshInstance3D mesh && mesh.Mesh is not null)
         {
-            if (child is not MeshInstance3D detail)
+            int brightnessBand = detailIndex % 4;
+            float brightness = brightnessBand switch
             {
-                continue;
-            }
-            float detailBrightness = detailIndex % 2 == 0 ? 1.12f : 0.84f;
-            ApplyMaterialRecursive(detail, visual, detailBrightness);
+                0 => 1.00f,
+                1 => 1.10f,
+                2 => 0.82f,
+                _ => 0.94f
+            };
+            mesh.MaterialOverride =
+                ProceduralSurfaceVisualFactory.BuildResourceMaterial(
+                    visual,
+                    brightness);
             detailIndex++;
         }
+
+        foreach (Node child in node.GetChildren())
+        {
+            ApplyMaterialRecursive(child, visual, ref detailIndex);
+        }
+    }
+
+    private void UpgradeProductionVisual(GameResourceDefinition definition)
+    {
+        if (_mesh is null ||
+            _mesh.HasMeta("production_resource_visual") &&
+            _mesh.GetMeta("production_resource_visual").AsBool())
+        {
+            return;
+        }
+
+        MeshInstance3D production =
+            ProceduralSurfaceVisualFactory.CreateResourceVisual(definition);
+        if (!production.HasMeta("production_resource_visual") ||
+            !production.GetMeta("production_resource_visual").AsBool())
+        {
+            return;
+        }
+
+        RemoveChild(_mesh);
+        _mesh.QueueFree();
+        AddChild(production);
+        _mesh = production;
+        GD.Print(
+            $"TASK-216 resource visual upgraded: node={ResourceNodeId}; " +
+            $"asset={production.GetMeta("surface_visual_asset")}; lod=3; collision=unchanged.");
     }
 
     private void ApplyFallbackMaterial()

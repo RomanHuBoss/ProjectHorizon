@@ -30,6 +30,9 @@ public partial class PlayerController : CharacterBody3D
     [Export]
     public bool InvertLookY { get; set; }
 
+    [Export(PropertyHint.Range, "0.75,2.0,0.05")]
+    public float GamepadResponseExponent { get; set; } = AccessibilityControlPolicy.DefaultGamepadResponseExponent;
+
     [Export(PropertyHint.Range, "1.0,6.0,0.1")]
     public float InteractionFallbackRadius { get; set; } = 2.75f;
 
@@ -297,11 +300,12 @@ public partial class PlayerController : CharacterBody3D
         bool jumpHeld = Input.IsActionPressed("jump");
         bool sprintRequested = Input.IsActionPressed("player_sprint");
         bool crouchRequested = Input.IsActionPressed("player_crouch");
-        Vector2 input = Input.GetVector(
+        Vector2 input = GameAccessibilityRuntime.ReadVector(
             "move_left",
             "move_right",
             "move_forward",
-            "move_backward");
+            "move_backward",
+            GamepadResponseExponent);
 
         IsCrouching = !IsSwimming && crouchRequested;
         UpdateCrouchGeometry(IsCrouching);

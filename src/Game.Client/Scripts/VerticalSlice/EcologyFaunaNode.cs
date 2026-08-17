@@ -22,6 +22,17 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     private PlanetSurfaceCurvedPatchDescriptor? _curvedPatch;
     private float _weatherSpeedMultiplier = 1.0f;
     private Vector3 _weatherWindVelocity = Vector3.Zero;
+    private FaunaMorphologyProfile? _morphology;
+    private Node3D? _visualRoot;
+    private FaunaSimulationTier _simulationTier = FaunaSimulationTier.Near;
+    private FaunaFlockSteering _flockSteering = new(
+        Vector3.Zero, Vector3.Zero, Vector3.Zero, Vector3.Zero, 0);
+    private NavigationAgent3D? _groundNavigationAgent;
+    private NpcNavigationSurfaceNode? _groundNavigationSurface;
+    private double _nextGroundTargetRefreshAt;
+    private Vector3 _groundNavigationTarget;
+    private int _groundNavigationSamples;
+    private int _visualInterpolationFrames;
 
     public string InstanceId { get; private set; } = string.Empty;
 
@@ -36,6 +47,20 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
     public int DecisionCount { get; private set; }
 
     public string MovementMode => _definition?.MovementMode ?? string.Empty;
+
+    public FaunaSimulationTier SimulationTier => _simulationTier;
+
+    public FaunaMorphologyProfile? Morphology => _morphology;
+
+    public bool GroundNavigationBound => _groundNavigationAgent is not null &&
+        _groundNavigationSurface is not null &&
+        string.Equals(MovementMode, "Ground", StringComparison.Ordinal);
+
+    public int FlockNeighbors => _flockSteering.Neighbors;
+
+    public int GroundNavigationSamples => _groundNavigationSamples;
+
+    public int VisualInterpolationFrames => _visualInterpolationFrames;
 
     public bool AerialSteeringBound => _aerialSteering is not null &&
         string.Equals(MovementMode, "Flying", StringComparison.Ordinal);
@@ -146,15 +171,25 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         AddToGroup("interactable");
         AddToGroup("ecology_fauna");
 
+        _morphology = FaunaBodyPlanRuntime.Build(definition, spawn.InstanceId);
+        float variation = (float)_morphology.ColorVariation;
         StandardMaterial3D material = new()
         {
             AlbedoColor = new Color(
-                (float)definition.ColorR,
-                (float)definition.ColorG,
-                (float)definition.ColorB,
+                Mathf.Clamp((float)definition.ColorR + variation * 0.18f, 0.02f, 1.0f),
+                Mathf.Clamp((float)definition.ColorG + variation * 0.10f, 0.02f, 1.0f),
+                Mathf.Clamp((float)definition.ColorB - variation * 0.08f, 0.02f, 1.0f),
                 1.0f),
-            Roughness = 0.76f
+            Roughness = (float)_morphology.MaterialRoughness
         };
+        _visualRoot = new Node3D
+        {
+            Name = "FaunaVisualRoot"
+        };
+        _visualRoot.SetMeta("skeleton_family", _morphology.SkeletonId);
+        _visualRoot.SetMeta("fixed_joint_count", _morphology.JointCount);
+        AddChild(_visualRoot);
+
         SphereMesh body = new()
         {
             Radius = 0.62f,
@@ -163,13 +198,17 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             Rings = 6,
             Material = material
         };
-        MeshInstance3D bodyNode = new()
+        Vector3 baseBodyScale = BodyScale(definition);
+        Vector3 bodyScale = new(
+            baseBodyScale.X * (float)_morphology.WidthScale,
+            baseBodyScale.Y * (float)_morphology.HeightScale,
+            baseBodyScale.Z * (float)_morphology.LengthScale);
+        _visualRoot.AddChild(new MeshInstance3D
         {
-            Name = "Body",
+            Name = "Torso_" + ModuleLeaf(_morphology.TorsoModule),
             Mesh = body,
-            Scale = BodyScale(definition)
-        };
-        AddChild(bodyNode);
+            Scale = bodyScale
+        });
 
         SphereMesh head = new()
         {
@@ -179,15 +218,17 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             Rings = 5,
             Material = material
         };
-        MeshInstance3D headNode = new()
+        _visualRoot.AddChild(new MeshInstance3D
         {
-            Name = "Head",
+            Name = "Head_" + ModuleLeaf(_morphology.HeadModule),
             Mesh = head,
-            Position = HeadOffset(definition),
-            Scale = Vector3.One * 0.82f
-        };
-        AddChild(headNode);
-        AddBodyPlanVisualDetails(definition, material);
+            Position = ScaleHeadOffset(
+                HeadOffset(definition),
+                (float)_morphology.HeightScale,
+                (float)_morphology.LengthScale),
+            Scale = Vector3.One * 0.82f * (float)_morphology.WidthScale
+        });
+        AddBodyPlanVisualDetails(definition, material, _visualRoot, _morphology);
 
         AddChild(new CollisionShape3D
         {
@@ -211,6 +252,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
         _ageSeconds += delta;
         double distance = GlobalPosition.DistanceTo(_player.GlobalPosition);
+        _simulationTier = FaunaBehaviorRuntime.ResolveSimulationTier(distance);
         double frequency = EcologyRuntime.GetUpdateFrequencyHz(distance);
         if (frequency <= 0.0)
         {
@@ -236,12 +278,87 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         ApplySteering((float)delta);
     }
 
+    public override void _Process(double delta)
+    {
+        if (_visualRoot is null || !Visible)
+        {
+            return;
+        }
+        Vector3 tangentVelocity = ProjectToSurfaceTangent(Velocity);
+        float speed = tangentVelocity.Length();
+        float targetYaw = speed > 0.05f
+            ? Mathf.Atan2(-tangentVelocity.X, -tangentVelocity.Z)
+            : _visualRoot.Rotation.Y;
+        Vector3 rotation = _visualRoot.Rotation;
+        rotation.Y = Mathf.LerpAngle(rotation.Y, targetYaw, Math.Clamp((float)delta * 7.0f, 0.0f, 1.0f));
+        rotation.Z = Mathf.Lerp(rotation.Z, -Mathf.Clamp(speed * 0.018f, -0.10f, 0.10f), Math.Clamp((float)delta * 4.0f, 0.0f, 1.0f));
+        _visualRoot.Rotation = rotation;
+        float bob = BehaviorState is "Sleep" or "Idle"
+            ? 0.0f
+            : Mathf.Sin((float)_ageSeconds * (3.0f + speed * 0.25f)) * Math.Min(0.045f, speed * 0.008f);
+        _visualRoot.Position = new Vector3(0.0f, bob, 0.0f);
+        _visualInterpolationFrames++;
+    }
+
+    public FaunaFlockSample CreateFlockSample() => new(
+        InstanceId,
+        FaunaId,
+        GlobalPosition,
+        Velocity,
+        Visible && Health > 0.0);
+
+    public void SetFlockSteering(FaunaFlockSteering steering)
+    {
+        ArgumentNullException.ThrowIfNull(steering);
+        _flockSteering = steering;
+    }
+
+    public void EnableGroundNavigation(NpcNavigationSurfaceNode navigationSurface)
+    {
+        ArgumentNullException.ThrowIfNull(navigationSurface);
+        if (!string.Equals(MovementMode, "Ground", StringComparison.Ordinal))
+        {
+            return;
+        }
+        _groundNavigationSurface = navigationSurface;
+        if (_groundNavigationAgent is null)
+        {
+            _groundNavigationAgent = new NavigationAgent3D
+            {
+                Name = "FaunaNavigationAgent3D",
+                PathDesiredDistance = 0.75f,
+                TargetDesiredDistance = 0.90f,
+                Radius = 0.40f,
+                Height = 1.25f,
+                MaxSpeed = (float)Math.Max(0.5, _definition?.Speed ?? 1.0),
+                NavigationLayers = 1,
+                AvoidanceEnabled = false,
+                KeepYVelocity = false,
+                Use3DAvoidance = false
+            };
+            AddChild(_groundNavigationAgent);
+        }
+        _groundNavigationAgent.SetNavigationMap(navigationSurface.NavigationMap);
+        _nextGroundTargetRefreshAt = 0.0;
+    }
+
+    public void PrepareGroundNavigationMapChange()
+    {
+        if (_groundNavigationAgent is null)
+        {
+            return;
+        }
+        _groundNavigationAgent.SetNavigationMap(new Rid());
+        _groundNavigationAgent.Velocity = Vector3.Zero;
+        _groundNavigationSurface = null;
+    }
+
     /// <summary>
     /// Exercises the same shared aerial-steering path used by live flying fauna
     /// without moving the node or depending on the player's current distance.
     /// This keeps TASK-126 acceptance valid after planet-scale traversal, where
-    /// the authored ecology population may legitimately be outside the 50 m live
-    /// AI update radius.
+    /// the authored ecology population may legitimately be outside the 150 m tiered
+    /// per-entity AI radius.
     /// </summary>
     public bool StepAerialForAcceptance()
     {
@@ -305,7 +422,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 Hunger(),
                 Thirst(),
                 Fatigue(),
-                4.0,
+                _flockSteering.Neighbors > 0 ? 6.0 : 18.0,
                 GlobalPosition.DistanceTo(TerritoryCenterGlobal()),
                 IsAtWater(),
                 true));
@@ -340,7 +457,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 Hunger(),
                 Thirst(),
                 Fatigue(),
-                6.0 + (3.0 * Math.Sin(_ageSeconds * 0.17)),
+                _flockSteering.Neighbors > 0 ? 6.0 : 18.0,
                 GlobalPosition.DistanceTo(TerritoryCenterGlobal()),
                 IsAtWater(),
                 hitRecently));
@@ -396,6 +513,21 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
 
         float speed = (float)_definition.Speed * speedFactor * _weatherSpeedMultiplier;
         Vector3 targetVelocity = desiredDirection * speed;
+        if (_flockSteering.Neighbors > 0 &&
+            (string.Equals(BehaviorState, "FollowGroup", StringComparison.Ordinal) ||
+             string.Equals(BehaviorState, "Wander", StringComparison.Ordinal)))
+        {
+            Vector3 flock = _flockSteering.Combined;
+            if (!string.Equals(_definition.MovementMode, "Flying", StringComparison.Ordinal))
+            {
+                flock = ProjectToSurfaceTangent(flock);
+            }
+            targetVelocity += flock * speed * 0.42f;
+        }
+        if (string.Equals(_definition.MovementMode, "Ground", StringComparison.Ordinal))
+        {
+            targetVelocity = ApplyGroundNavigation(targetVelocity, speed);
+        }
         if (string.Equals(
             _definition.MovementMode,
             "Flying",
@@ -467,6 +599,36 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         }
     }
 
+
+    private Vector3 ApplyGroundNavigation(Vector3 targetVelocity, float speed)
+    {
+        if (_groundNavigationAgent is null || _groundNavigationSurface is null ||
+            !_groundNavigationSurface.ReadyForQueries || speed <= 0.01f ||
+            !_groundNavigationSurface.IsPointInActiveArea(GlobalPosition))
+        {
+            return ProjectToSurfaceTangent(targetVelocity);
+        }
+        Vector3 tangent = ProjectToSurfaceTangent(targetVelocity);
+        Vector3 direction = tangent.LengthSquared() > 0.001f
+            ? tangent.Normalized()
+            : Vector3.Zero;
+        if (_ageSeconds >= _nextGroundTargetRefreshAt ||
+            _groundNavigationTarget.DistanceTo(GlobalPosition) < 1.0f)
+        {
+            Vector3 desiredTarget = GlobalPosition + direction * Math.Max(3.0f, speed * 1.35f);
+            _groundNavigationTarget = _groundNavigationSurface.GetClosestNavigationPoint(desiredTarget);
+            _groundNavigationAgent.TargetPosition = _groundNavigationTarget;
+            _nextGroundTargetRefreshAt = _ageSeconds + 0.55;
+            _groundNavigationSamples++;
+        }
+        Vector3 next = _groundNavigationAgent.IsNavigationFinished()
+            ? _groundNavigationTarget
+            : _groundNavigationAgent.GetNextPathPosition();
+        Vector3 pathDirection = ProjectToSurfaceTangent(next - GlobalPosition);
+        return pathDirection.LengthSquared() > 0.01f
+            ? pathDirection.Normalized() * speed
+            : tangent;
+    }
 
     private Vector3 ApplyFlyingSteering(Vector3 targetVelocity, float speed)
     {
@@ -704,16 +866,18 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         return 0.5 + (0.5 * Math.Sin(_ageSeconds * 0.031 + 2.1));
     }
 
-    private void AddBodyPlanVisualDetails(
+    private static void AddBodyPlanVisualDetails(
         EcologyFaunaDefinition definition,
-        StandardMaterial3D material)
+        StandardMaterial3D material,
+        Node3D visualRoot,
+        FaunaMorphologyProfile morphology)
     {
         Node3D details = new()
         {
-            Name = "VisualDetails"
+            Name = "Modules"
         };
         float scale = (float)definition.Scale;
-        AddChild(details);
+        visualRoot.AddChild(details);
 
         if (string.Equals(definition.BodyPlan, "Flying", StringComparison.Ordinal))
         {
@@ -721,7 +885,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             {
                 details.AddChild(new MeshInstance3D
                 {
-                    Name = side < 0 ? "WingL" : "WingR",
+                    Name = side < 0 ? "WingL_" + ModuleLeaf(morphology.LimbModule) : "WingR_" + ModuleLeaf(morphology.LimbModule),
                     Mesh = new BoxMesh
                     {
                         Material = material,
@@ -731,39 +895,14 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                     Rotation = new Vector3(0.0f, side * -0.18f, side * 0.12f)
                 });
             }
-            details.AddChild(new MeshInstance3D
-            {
-                Name = "Tail",
-                Mesh = new CylinderMesh
-                {
-                    Material = material,
-                    TopRadius = 0.05f * scale,
-                    BottomRadius = 0.16f * scale,
-                    Height = 0.92f * scale,
-                    RadialSegments = 6
-                },
-                Position = new Vector3(0.0f, 0.0f, 0.72f) * scale,
-                Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f)
-            });
         }
         else if (string.Equals(definition.BodyPlan, "Aquatic", StringComparison.Ordinal))
         {
-            details.AddChild(new MeshInstance3D
-            {
-                Name = "TailFin",
-                Mesh = new BoxMesh
-                {
-                    Material = material,
-                    Size = new Vector3(0.12f, 0.62f, 0.66f) * scale
-                },
-                Position = new Vector3(0.0f, 0.0f, 0.88f) * scale,
-                Rotation = new Vector3(0.0f, 0.0f, 0.12f)
-            });
             for (int side = -1; side <= 1; side += 2)
             {
                 details.AddChild(new MeshInstance3D
                 {
-                    Name = side < 0 ? "FinL" : "FinR",
+                    Name = side < 0 ? "FinL_" + ModuleLeaf(morphology.LimbModule) : "FinR_" + ModuleLeaf(morphology.LimbModule),
                     Mesh = new BoxMesh
                     {
                         Material = material,
@@ -776,9 +915,13 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
         }
         else
         {
-            int legPairs = string.Equals(definition.BodyPlan, "Hexapod", StringComparison.Ordinal)
-                ? 3
-                : 2;
+            int legPairs = definition.BodyPlan switch
+            {
+                "Biped" => 1,
+                "Hexapod" => 3,
+                "Crawler" => 2,
+                _ => 2
+            };
             for (int pair = 0; pair < legPairs; pair++)
             {
                 float z = ((pair - (legPairs - 1) * 0.5f) * 0.46f) * scale;
@@ -786,7 +929,7 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
                 {
                     details.AddChild(new MeshInstance3D
                     {
-                        Name = $"Leg{pair}{(side < 0 ? "L" : "R")}",
+                        Name = $"Leg{pair}{(side < 0 ? "L" : "R")}_{ModuleLeaf(morphology.LimbModule)}",
                         Mesh = new CylinderMesh
                         {
                             Material = material,
@@ -802,8 +945,81 @@ public partial class EcologyFaunaNode : CharacterBody3D, IHitscanTarget, IIntera
             }
         }
 
+        if (!morphology.TailModule.EndsWith(".none", StringComparison.Ordinal))
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "Tail_" + ModuleLeaf(morphology.TailModule),
+                Mesh = new CylinderMesh
+                {
+                    Material = material,
+                    TopRadius = 0.04f * scale,
+                    BottomRadius = 0.14f * scale,
+                    Height = 0.82f * scale,
+                    RadialSegments = 6
+                },
+                Position = new Vector3(0.0f, 0.02f, 0.78f) * scale,
+                Rotation = new Vector3(Mathf.Pi * 0.5f, 0.0f, 0.0f)
+            });
+        }
+
+        if (!morphology.HornModule.EndsWith(".none", StringComparison.Ordinal))
+        {
+            for (int side = -1; side <= 1; side += 2)
+            {
+                details.AddChild(new MeshInstance3D
+                {
+                    Name = side < 0 ? "HornL_" + ModuleLeaf(morphology.HornModule) : "HornR_" + ModuleLeaf(morphology.HornModule),
+                    Mesh = new CylinderMesh
+                    {
+                        Material = material,
+                        TopRadius = 0.015f * scale,
+                        BottomRadius = 0.07f * scale,
+                        Height = 0.34f * scale,
+                        RadialSegments = 5
+                    },
+                    Position = HeadOffset(definition) + new Vector3(side * 0.16f, 0.20f, -0.05f) * scale,
+                    Rotation = new Vector3(0.35f, 0.0f, side * -0.22f)
+                });
+            }
+        }
+
+        if (!morphology.ShellModule.EndsWith(".none", StringComparison.Ordinal))
+        {
+            details.AddChild(new MeshInstance3D
+            {
+                Name = "Shell_" + ModuleLeaf(morphology.ShellModule),
+                Mesh = new SphereMesh
+                {
+                    Material = material,
+                    Radius = 0.52f * scale,
+                    Height = 0.58f * scale,
+                    RadialSegments = 8,
+                    Rings = 4
+                },
+                Position = new Vector3(0.0f, 0.28f, 0.12f) * scale,
+                Scale = new Vector3(1.05f, 0.42f, 0.86f)
+            });
+        }
+
         details.SetMeta("surface_visual_parts", details.GetChildCount());
+        details.SetMeta("skeleton_family", morphology.SkeletonId);
+        details.SetMeta("module_compatibility", FaunaBodyPlanRuntime.IsCompatible(morphology));
     }
+
+    private static string ModuleLeaf(string module)
+    {
+        int separator = module.IndexOf('.');
+        return separator >= 0 && separator + 1 < module.Length
+            ? module[(separator + 1)..]
+            : module;
+    }
+
+    private static Vector3 ScaleHeadOffset(
+        Vector3 offset,
+        float heightScale,
+        float lengthScale) =>
+        new(offset.X, offset.Y * heightScale, offset.Z * lengthScale);
 
     private static Vector3 BodyScale(EcologyFaunaDefinition definition)
     {

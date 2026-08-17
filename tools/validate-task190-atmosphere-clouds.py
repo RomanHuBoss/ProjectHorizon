@@ -9,7 +9,7 @@ def need(cond,msg):
 def text(path): return (ROOT/path).read_text(encoding='utf-8')
 
 version=text('VERSION').strip()
-need(version in {'0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194'}, f'VERSION must be 0.1.0-alpha.192, got {version}')
+need(version in {'0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}, f'VERSION must be 0.1.0-alpha.192, got {version}')
 runtime=text('src/Game.Client/Scripts/VerticalSlice/PlanetAtmosphereCloudRuntime.cs')
 node=text('src/Game.Client/Scripts/VerticalSlice/PlanetAtmosphereCloudNode.cs')
 integration=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetAtmosphereClouds.cs')

@@ -157,14 +157,14 @@ public partial class SalvageRepairSlice
                 OrbitalHandoffPresentationRuntime.Evaluate(
                     _voyageShip?.AltitudeAboveSurface ?? double.PositiveInfinity)
                     .SurfaceSkyOwned);
-        sun.ShadowEnabled = surfaceLightingOwned;
+        sun.ShadowEnabled = surfaceLightingOwned && GraphicsShadowsEnabled;
         // TASK-174: the procedural sky is rotated with radial Up. Godot rotates
         // its procedural sun disk with sky_rotation too, which would diverge
         // from the actual directional light. Keep lighting only here; the
         // explicit PlanetSurfaceSunVisual is the canonical stellar disc.
         sun.Set("sky_mode", 1); // LIGHT_ONLY
         sun.Set("light_angular_distance", (float)profile.SunAngularDiameterDegrees);
-        sun.Set("directional_shadow_max_distance", 320.0f);
+        sun.Set("directional_shadow_max_distance", (float)Math.Max(1.0, GraphicsShadowMaxDistanceMeters));
         sun.Set("directional_shadow_fade_start", 0.82f);
         Vector3 lightRay = -SurfaceLocalDirectionToWorld(towardSun).Normalized();
         sun.Position = Vector3.Zero;

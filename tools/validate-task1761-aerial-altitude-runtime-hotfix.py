@@ -19,7 +19,7 @@ aerial = text("src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceAerialNav
 tests = text("tests/ProjectHorizon.Tests/Architecture/Section38ArchitectureTests.cs")
 version = text("VERSION").strip()
 
-need(version in {"0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194"}, "VERSION must be alpha.176.1/178", failures)
+need(version in {"0.1.0-alpha.176.1", "0.1.0-alpha.178", "0.1.0-alpha.178.1", "0.1.0-alpha.178.2", "0.1.0-alpha.178.3", "0.1.0-alpha.178.4", "0.1.0-alpha.178.5", "0.1.0-alpha.178.6", "0.1.0-alpha.178.7", "0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194", "0.1.0-alpha.196", "0.1.0-alpha.198","0.1.0-alpha.200", "0.1.0-alpha.202", "0.1.0-alpha.204", "0.1.0-alpha.206","0.1.0-alpha.208", "0.1.0-alpha.210", "0.1.0-alpha.212", "0.1.0-alpha.214", "0.1.0-alpha.216"}, "VERSION must be alpha.176.1/178", failures)
 need("ClampHorizontalAndVerticalSpeed" in steering and
      "horizontal = horizontal.Normalized() * maximumHorizontalSpeed" in steering and
      "Math.Clamp(localVelocity.Y, -maximumVerticalSpeed, maximumVerticalSpeed)" in steering,

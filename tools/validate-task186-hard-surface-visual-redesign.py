@@ -66,7 +66,7 @@ def nodes(doc):
     return {node.get('name', '') for node in doc.get('nodes', [])}
 
 
-if VERSION.read_text().strip() not in {'0.1.0-alpha.186', '0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194'}:
+if VERSION.read_text().strip() not in {'0.1.0-alpha.186', '0.1.0-alpha.188','0.1.0-alpha.192','0.1.0-alpha.192.1','0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216'}:
     fail('VERSION must preserve alpha.186 visual redesign or later accepted revision')
 
 gen = text(GEN)

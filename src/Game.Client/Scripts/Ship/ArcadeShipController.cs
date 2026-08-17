@@ -112,6 +112,9 @@ public partial class ArcadeShipController : CharacterBody3D
     [Export]
     public bool InvertYawLook { get; set; }
 
+    [Export(PropertyHint.Range, "0.75,2.0,0.05")]
+    public float GamepadResponseExponent { get; set; } = AccessibilityControlPolicy.DefaultGamepadResponseExponent;
+
     [Export(PropertyHint.Range, "0.5,20.0,0.1")]
     public float MouseInputDecay { get; set; } = 7.5f; // legacy impulse controller only
 
@@ -681,14 +684,14 @@ public partial class ArcadeShipController : CharacterBody3D
         // ship backwards. External/autopilot commands can still request signed
         // Forward values explicitly when a manoeuvre actually needs reverse
         // thrust.
-        float forward = Input.GetActionStrength("ship_forward");
+        float forward = GameAccessibilityRuntime.ReadStrength("ship_forward", GamepadResponseExponent);
         bool brake = Input.IsActionPressed("ship_brake") ||
             Input.IsActionPressed("ship_reverse");
-        float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right");
-        float lift = Input.GetAxis("ship_lift_down", "ship_lift_up");
-        float rollKeyboard = Input.GetAxis("ship_roll_left", "ship_roll_right");
-        float pitchKeyboard = Input.GetAxis("ship_pitch_down", "ship_pitch_up");
-        float yawKeyboard = Input.GetAxis("ship_yaw_right", "ship_yaw_left");
+        float strafe = GameAccessibilityRuntime.ReadAxis("ship_strafe_left", "ship_strafe_right", GamepadResponseExponent);
+        float lift = GameAccessibilityRuntime.ReadAxis("ship_lift_down", "ship_lift_up", GamepadResponseExponent);
+        float rollKeyboard = GameAccessibilityRuntime.ReadAxis("ship_roll_left", "ship_roll_right", GamepadResponseExponent);
+        float pitchKeyboard = GameAccessibilityRuntime.ReadAxis("ship_pitch_down", "ship_pitch_up", GamepadResponseExponent);
+        float yawKeyboard = GameAccessibilityRuntime.ReadAxis("ship_yaw_right", "ship_yaw_left", GamepadResponseExponent);
         Vector3 mouseAttitude = ArcadeFlightAssistRuntime.BuildVirtualStickAttitudeCommand(
             _mouseVirtualStick,
             MouseVirtualStickDeadZone,

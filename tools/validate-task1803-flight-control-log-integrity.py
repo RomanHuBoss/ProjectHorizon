@@ -42,7 +42,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194"}, "VERSION must be alpha.180.3 or alpha.182", f)
+need(version in {"0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1", "0.1.0-alpha.194", "0.1.0-alpha.196", "0.1.0-alpha.198","0.1.0-alpha.200", "0.1.0-alpha.202", "0.1.0-alpha.204", "0.1.0-alpha.206","0.1.0-alpha.208", "0.1.0-alpha.210", "0.1.0-alpha.212", "0.1.0-alpha.214", "0.1.0-alpha.216"}, "VERSION must be alpha.180.3 or alpha.182", f)
 
 # Mouse input must be a persistent virtual control position. A raw delta may move
 # the stick but may not directly become a one-frame yaw/pitch command or decay away.
@@ -66,7 +66,8 @@ need(0.03 <= number(scene, "MouseVirtualStickDeadZone") <= 0.08 and
      number(scene, "MouseCoordinatedYawFactor") <= 0.25 and
      0.75 <= number(scene, "MouseFlightGain") <= 1.75,
      "virtual-stick tuning is outside the controllable envelope", f)
-need('float strafe = Input.GetAxis("ship_strafe_left", "ship_strafe_right")' in controller and
+need(('float strafe = Input.GetAxis(\"ship_strafe_left\", \"ship_strafe_right\")' in controller or
+      'float strafe = GameAccessibilityRuntime.ReadAxis(\"ship_strafe_left\", \"ship_strafe_right\"' in controller) and
      "MouseTranslationCouplingEnabled = false" in controller and
      controller.count("RotateObjectLocal(") >= 3,
      "mouse attitude is coupled to strafe or full local-axis attitude integration is missing", f)

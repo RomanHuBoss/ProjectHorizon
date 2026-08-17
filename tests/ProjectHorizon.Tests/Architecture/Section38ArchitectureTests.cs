@@ -59,9 +59,10 @@ public sealed class Section38ArchitectureTests
     {
         Assert.Equal(SystemFrequencyPolicy.NearbyAiHz,
             EcologyRuntime.GetUpdateFrequencyHz(8.0), 6);
+        Assert.Equal(5.0, EcologyRuntime.GetUpdateFrequencyHz(35.0), 6);
         Assert.Equal(SystemFrequencyPolicy.DistantAiHz,
-            EcologyRuntime.GetUpdateFrequencyHz(35.0), 6);
-        Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(80.0), 6);
+            EcologyRuntime.GetUpdateFrequencyHz(100.0), 6);
+        Assert.Equal(0.0, EcologyRuntime.GetUpdateFrequencyHz(180.0), 6);
     }
 
     [Fact]
