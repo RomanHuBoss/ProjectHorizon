@@ -1,3 +1,29 @@
+# Changelog
+
+## [0.1.0-alpha.192.1] - 2026-08-16
+
+### Fixed — TASK-192.1 acceptance coherence hotfix
+
+- Repaired TASK-128 representation-level acceptance so it validates the deterministic distance classifier instead of requiring a Statistical body in a star-focused snapshot whose generated orbital radius cannot reach the statistical threshold.
+- Repaired TASK-178.2 visual hierarchy acceptance to compare each moon against its own parent planet instead of comparing the globally smallest planet against the globally largest moon.
+- Repaired TASK-178.6 live mouse acceptance for the TASK-182 spring-centered virtual-stick architecture (scene gain 1.45); removed the obsolete impulse-decay gate. Runtime mouse samples remain diagnostic evidence and are no longer required before F5 can pass.
+- Added TASK-192.1 xUnit/static regression coverage and CI/release/section-37 gating.
+
+## [0.1.0-alpha.192] - 2026-08-16
+
+### Added
+- Added TASK-192 deterministic planetary cave-prefab subsystem for PDF-TZ §9.9 with three subsurface archetypes: basalt lava tube, crystal grotto and hydrothermal hollow.
+- Added collision-backed isolated cave interiors, surface cave-mouth presentation, interactive entry/exit and three persistent catalog resource deposits per cave.
+- Added stable `cave.deposit.*` identities so cave depletion uses the existing resource/autosave persistence path without a cave-specific save schema.
+- Added TASK-192 F5/xUnit/static/section-37/CI/release acceptance and cave runtime documentation.
+
+### Changed
+- Saves requested while the player is inside an isolated cave prefab now persist the safe exterior logical position instead of an underground coordinate.
+- Planetary water submersion is explicitly suspended while the player is inside a cave prefab.
+
+### Constraints
+- Global procedural cave networks remain disabled and planetary terrain deformation/voxel digging remains unsupported, matching the v1.0 scope of §9.9.
+
 ## [0.1.0-alpha.190] - 2026-08-16
 
 ### Added
@@ -8,8 +34,6 @@
 
 ### Fixed
 - Added a stable-clearance surface-contact latch so one low-altitude recovery episode no longer alternates `surface floor correction` / `RECOVERED` every few frames; lethal planet-impact thresholds are unchanged.
-
-# Changelog
 
 ## [0.1.0-alpha.188] - 2026-08-16
 

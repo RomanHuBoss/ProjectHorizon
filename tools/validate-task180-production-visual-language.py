@@ -31,7 +31,7 @@ quality_cmd = text("tools/run-section37-quality.cmd")
 ci = text(".github/workflows/ci.yml")
 release = text(".github/workflows/release.yml")
 
-need(version in {"0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.190"}, "VERSION must be alpha.180 or alpha.180.1", f)
+need(version in {"0.1.0-alpha.180", "0.1.0-alpha.180.1", "0.1.0-alpha.180.2", "0.1.0-alpha.180.3", "0.1.0-alpha.182", "0.1.0-alpha.184", "0.1.0-alpha.184.1", "0.1.0-alpha.186", "0.1.0-alpha.188", "0.1.0-alpha.192", "0.1.0-alpha.192.1"}, "VERSION must be alpha.180 or alpha.180.1", f)
 for node in (
     'name="LeftChine"', 'name="RightChine"', 'name="DorsalSpine"',
     'name="CockpitInterior"', 'name="InstrumentPanel"', 'name="PrimaryDisplay"',

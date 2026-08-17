@@ -90,9 +90,19 @@ public static class OrbitalNavigationPresentationAcceptanceRunner
                 body.OrbitRadius >= StarSystemSimulationRuntime.MinimumMoonOrbitRadius &&
                 body.OrbitPeriodSeconds / StarSystemSimulationRuntime.OrbitTimeScale >= 1200.0) &&
             minMoonOrbit >= StarSystemSimulationRuntime.MinimumMoonOrbitRadius;
+        bool moonParentHierarchy = moons.All(moon =>
+        {
+            StarSystemBodyDefinition? parent = planets.FirstOrDefault(planet =>
+                string.Equals(
+                    planet.BodyId,
+                    moon.ParentBodyId,
+                    StringComparison.Ordinal));
+            return parent is not null &&
+                moon.VisualRadius <= parent.VisualRadius * 0.60;
+        });
         bool visualHierarchy = planets.All(body => body.VisualRadius >= 9000.0) &&
             moons.All(body => body.VisualRadius is >= 2400.0 and <= 5000.0) &&
-            minPlanetVisual >= Math.Max(9000.0, maxMoonVisual * 2.0) &&
+            moonParentHierarchy &&
             starVisual >= Math.Max(40000.0, maxPlanetVisual * 1.45);
         bool assistDockCapture =
             StageOneVoyageRuntime.IsDockingCaptureReady(

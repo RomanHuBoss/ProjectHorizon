@@ -1385,6 +1385,13 @@
     "ui.weather.storm": "storm",
     "ui.weather.toxic": "toxic weather",
     "ui.death.planet_impact": "Catastrophic planetary impact • orbital collision envelope breached • simulation paused",
-    "ui.death.star_impact": "Catastrophic stellar impact • thermal/structural failure • simulation paused"
+    "ui.death.star_impact": "Catastrophic stellar impact • thermal/structural failure • simulation paused",
+    "cave.basalt_lava_tube": "Basalt Lava Tube",
+    "cave.crystal_grotto": "Crystal Grotto",
+    "cave.hydrothermal_hollow": "Hydrothermal Hollow",
+    "ui.cave.entered": "Entered {cave}. Follow the illuminated route; E at the exit marker returns to the surface.",
+    "ui.cave.exited": "Returned to the planetary surface.",
+    "ui.cave.entry_unavailable": "Cave entry is available only on foot while the planetary surface is active.",
+    "ui.cave.prefab_missing": "The cave prefab is unavailable for this entrance."
   }
 }

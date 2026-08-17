@@ -9,7 +9,7 @@ def need(cond,msg):
 def text(path): return (ROOT/path).read_text(encoding='utf-8')
 
 version=text('VERSION').strip()
-need(version=='0.1.0-alpha.190', f'VERSION must be 0.1.0-alpha.190, got {version}')
+need(version in {'0.1.0-alpha.192','0.1.0-alpha.192.1'}, f'VERSION must be 0.1.0-alpha.192, got {version}')
 runtime=text('src/Game.Client/Scripts/VerticalSlice/PlanetAtmosphereCloudRuntime.cs')
 node=text('src/Game.Client/Scripts/VerticalSlice/PlanetAtmosphereCloudNode.cs')
 integration=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSlicePlanetAtmosphereClouds.cs')
@@ -50,7 +50,7 @@ need('LethalNormalImpactSpeed' not in safety or 'PlanetaryImpactRuntime.IsLethal
 need('RunPlanetAtmosphereCloudAcceptance();' in slice_cs and 'TASK-190 (F5)' in slice_cs and '_planetAtmosphereCloudAcceptancePassed == true' in slice_cs, 'TASK-190 F5/final gate missing')
 need('PlanetAtmosphereCloudAcceptanceRunner' in tests and 'SurfaceContactLatchRequiresStableClearanceBeforeRecovery' in tests, 'TASK-190 xUnit coverage missing')
 need('TASK-190' in text('README.md'), 'README TASK-190 section missing')
-need('## [0.1.0-alpha.190]' in text('CHANGELOG.md'), 'CHANGELOG alpha.190 section missing')
+need('## [0.1.0-alpha.192]' in text('CHANGELOG.md'), 'CHANGELOG alpha.190 section missing')
 need('TASK-190' in text('REQUIREMENTS_STATUS.md'), 'requirements journal TASK-190 missing')
 need((ROOT/'docs/PLANETARY_ATMOSPHERE_CLOUDS.md').exists(), 'TASK-190 runtime doc missing')
 

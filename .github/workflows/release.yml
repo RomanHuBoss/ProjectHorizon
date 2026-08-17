@@ -104,6 +104,8 @@ jobs:
           python3 tools/validate-task186-hard-surface-visual-redesign.py
           python3 tools/validate-task188-planetary-water.py
           python3 tools/validate-task190-atmosphere-clouds.py
+          python3 tools/validate-task192-planetary-caves.py
+          python3 tools/validate-task1921-acceptance-coherence-hotfix.py
 
       - name: Unit tests and coverage
         run: >-

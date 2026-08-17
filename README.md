@@ -11,6 +11,12 @@ TASK-168 promotes the verified cube-sphere prototype into the live Stage-2 world
 
 # Project Horizon
 
+## TASK-192 — Cave Prefabs, Subsurface POIs & Resource Deposits
+
+Alpha.192 closes Technical Specification §9.9 without introducing a destructive voxel terrain system. The existing `poi.cave_entrance` now opens one deterministic isolated subsurface prefab selected from three archetypes (basalt lava tube, crystal grotto, hydrothermal hollow). Each cave has a collision-backed walkable shell, local low-cost lighting, an interactive return portal and three catalog-backed resource deposits with stable `cave.deposit.*` identities. Resource depletion therefore persists through the established resource/session/autosave path.
+
+The cave pocket is deliberately separate from the planet terrain mesh: no global procedural cave field is generated and the player cannot dig or modify the planetary heightfield. Saves made while inside a cave serialize the safe exterior logical position, and water submersion is suppressed inside the prefab pocket. F5 includes `TASK-192 planetary cave prefab acceptance`; see `docs/PLANETARY_CAVE_PREFABS.md`.
+
 ## TASK-190 — Atmospheric Scattering & Spherical Cloud Layers
 
 Alpha.190 implements Technical Specification §§9.7–9.8 as a bounded low-cost atmosphere/cloud rendering stack. Surface presentation now adds a radial-up spherical atmosphere shell with star-direction scattering, horizon amplification, density-controlled opacity and sunset tint; there is no volumetric multi-step ray marching. The previous local `CloudCluster/Lobe` ellipsoids are retired and replaced by at most two spherical cloud shells using deterministic scrolling PNG noise textures. Weather controls cloud density/wind drift, while a bounded cloud-shadow factor dims the directional surface light instead of rendering an expensive projected volumetric shadow field.
@@ -1433,3 +1439,7 @@ Esc        close
 The mission graph is `Objective -> Return (when required) -> Claim`. Accepting, progressing, returning and claiming are persistent. Rewards grant credits through the existing Station Services economy; completed-state faction reputation remains deterministic and restorable. Mission progress is hooked to resource collection, runtime crafting/production, trade, starter/system repair, base construction, POI scan/resolve, ecology scan/harvest, planetary landing and hyperspace system exploration. `DeliverItem` consumes the exact shared inventory quantity at the giver. `ReturnToNpc` and return-required nodes advance only at the real trader/orbital service checkpoint.
 
 `save_settings.procedural_quests` stores only non-default board deltas (status/progress) plus seed/revision; the 20 definitions are regenerated from content and seed on load. SQLite schema remains 2 and legacy saves receive a fresh zero-progress board. `F8` resets the board. `F5` uses `save_1.procedural-quests-test.db` and validates exact 15-type support, deterministic generation, feasibility rejection, active limit, full state-graph lifecycle, reward integrity, a playable current board with real DefeatTarget/ProtectTarget NPC IDs, cold restore, legacy fallback, round-trip, autosave log, one-writer discipline and SQLite integrity.
+## TASK-192.1 — Acceptance Coherence Hotfix
+
+Owner F5 evidence exposed three stale/phase-dependent acceptance assumptions rather than runtime failures: TASK-128 now verifies Proxy/Marker/Statistical/Detailed thresholds deterministically, TASK-178.2 validates moon scale against each moon's parent planet, and TASK-178.6 validates the current TASK-182 spring-centered virtual-stick configuration instead of legacy mouse decay. Mouse motion samples are diagnostic only, so F5 may be run before the pilot moves the mouse.
+

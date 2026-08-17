@@ -105,6 +105,24 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
             {
                 Size = size
             };
+            if (string.Equals(definition.Category, "Cave", StringComparison.Ordinal))
+            {
+                // Cave presentation is authored by AddCaveEntranceDetails. Keep
+                // only a shallow interaction/collision portal instead of the
+                // generic solid POI box obscuring the entrance.
+                meshInstance.Visible = false;
+                collisionShape.Shape = new BoxShape3D
+                {
+                    Size = new Vector3(
+                        size.X * 0.78f,
+                        size.Y * 0.78f,
+                        Math.Min(0.38f, Math.Max(0.18f, size.Z * 0.22f)))
+                };
+                collisionShape.Position = new Vector3(
+                    0.0f,
+                    0.0f,
+                    -size.Z * 0.46f);
+            }
         }
 
         _collisionShape = collisionShape;
@@ -148,7 +166,11 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
         bool industrial = definition.Category is "Settlement" or "Commerce" or
             "Industry" or "Hostile" or "Shelter" or "Vault";
 
-        if (string.Equals(definition.Category, "Landing", StringComparison.Ordinal))
+        if (string.Equals(definition.Category, "Cave", StringComparison.Ordinal))
+        {
+            AddCaveEntranceDetails(details, definition, material);
+        }
+        else if (string.Equals(definition.Category, "Landing", StringComparison.Ordinal))
         {
             details.AddChild(new MeshInstance3D
             {
@@ -255,6 +277,62 @@ public partial class PlanetaryPoiNode : StaticBody3D, IInteractable
         }
 
         details.SetMeta("surface_visual_parts", details.GetChildCount());
+    }
+
+    private static void AddCaveEntranceDetails(
+        Node3D details,
+        PlanetaryPoiDefinition definition,
+        StandardMaterial3D material)
+    {
+        float width = (float)definition.Size.X;
+        float height = (float)definition.Size.Y;
+        float depth = (float)definition.Size.Z;
+        StandardMaterial3D mouth = new()
+        {
+            AlbedoColor = new Color(0.008f, 0.010f, 0.014f),
+            EmissionEnabled = false,
+            Metallic = 0.0f,
+            Roughness = 1.0f
+        };
+        details.AddChild(new MeshInstance3D
+        {
+            Name = "CaveMouth",
+            Mesh = new BoxMesh
+            {
+                Material = mouth,
+                Size = new Vector3(width * 0.72f, height * 0.78f, 0.18f)
+            },
+            Position = new Vector3(0.0f, -height * 0.02f, -depth * 0.54f)
+        });
+        for (int index = 0; index < 7; index++)
+        {
+            float t = index / 6.0f;
+            float angle = Mathf.Lerp(Mathf.Pi, 0.0f, t);
+            float x = Mathf.Cos(angle) * width * 0.48f;
+            float y = Mathf.Sin(angle) * height * 0.55f - height * 0.13f;
+            details.AddChild(new MeshInstance3D
+            {
+                Name = $"RockArch{index}",
+                Mesh = new BoxMesh
+                {
+                    Material = material,
+                    Size = new Vector3(0.72f, 0.74f, depth * 0.82f)
+                },
+                Position = new Vector3(x, y, 0.0f),
+                Rotation = new Vector3(0.12f * (index % 2), index * 0.31f, 0.16f * Mathf.Cos(angle))
+            });
+        }
+        details.AddChild(new MeshInstance3D
+        {
+            Name = "CaveLintel",
+            Mesh = new BoxMesh
+            {
+                Material = material,
+                Size = new Vector3(width * 0.80f, 0.45f, depth * 0.95f)
+            },
+            Position = new Vector3(0.0f, height * 0.40f, 0.0f),
+            Rotation = new Vector3(0.06f, -0.12f, 0.03f)
+        });
     }
 
     public void ApplyState(bool discovered, bool resolved)

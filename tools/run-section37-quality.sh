@@ -65,6 +65,8 @@ python3 tools/validate-task1841-production-asset-build-hotfix.py
 python3 tools/validate-task186-hard-surface-visual-redesign.py
 python3 tools/validate-task188-planetary-water.py
 python3 tools/validate-task190-atmosphere-clouds.py
+python3 tools/validate-task192-planetary-caves.py
+python3 tools/validate-task1921-acceptance-coherence-hotfix.py
 dotnet test tests/ProjectHorizon.Tests/ProjectHorizon.Tests.csproj -c Debug --no-build --no-restore \
   --collect:"XPlat Code Coverage" --settings tests/coverlet.runsettings \
   --results-directory "$RESULTS" --logger "trx;LogFileName=section36.trx"

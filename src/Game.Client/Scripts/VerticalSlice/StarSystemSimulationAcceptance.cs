@@ -72,15 +72,29 @@ public static class StarSystemSimulationAcceptanceRunner
             GalaxySystemDefinition coverageSystem = FindCoverageSystem(navigation);
             StarSystemSimulationRuntime coverage = new(coverageSystem, 0.0);
             string coverageFocus = coverageSystem.Planets[0].PlanetId;
-            string coverageStar = $"{coverageSystem.SystemId}.star";
-            StarSystemSimulationSnapshot coverageSnapshot = coverage.CreateSnapshot(
-                coverageStar,
-                coverageFocus,
-                detailedPlanetRequested: false);
             bool representationLevels =
-                coverageSnapshot.ProxyCount > 0 &&
-                coverageSnapshot.MarkerCount > 0 &&
-                coverageSnapshot.StatisticalCount > 0;
+                StarSystemSimulationRuntime.ResolveRepresentationForDistance(
+                    StarSystemBodyKind.Planet,
+                    StarSystemSimulationRuntime.ProxyDistance * 0.5) ==
+                    StarSystemRepresentation.Proxy &&
+                StarSystemSimulationRuntime.ResolveRepresentationForDistance(
+                    StarSystemBodyKind.Planet,
+                    (StarSystemSimulationRuntime.ProxyDistance +
+                     StarSystemSimulationRuntime.MarkerDistance) * 0.5) ==
+                    StarSystemRepresentation.Marker &&
+                StarSystemSimulationRuntime.ResolveRepresentationForDistance(
+                    StarSystemBodyKind.Planet,
+                    StarSystemSimulationRuntime.MarkerDistance + 1.0) ==
+                    StarSystemRepresentation.Statistical &&
+                StarSystemSimulationRuntime.ResolveRepresentationForDistance(
+                    StarSystemBodyKind.Planet,
+                    0.0,
+                    detailedPlanet: true) ==
+                    StarSystemRepresentation.DetailedPlanet &&
+                StarSystemSimulationRuntime.ResolveRepresentationForDistance(
+                    StarSystemBodyKind.ShipContact,
+                    StarSystemSimulationRuntime.ProxyDistance * 0.5) ==
+                    StarSystemRepresentation.Marker;
             StarSystemSimulationSnapshot detailSnapshot = coverage.CreateSnapshot(
                 coverageFocus,
                 coverageFocus,

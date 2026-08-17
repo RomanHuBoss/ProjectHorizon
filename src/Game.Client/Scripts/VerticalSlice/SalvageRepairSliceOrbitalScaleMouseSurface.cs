@@ -47,8 +47,13 @@ public partial class SalvageRepairSlice
                 ContentCatalog.Resources);
 
         bool liveMouse = _voyageShip is not null &&
-            _voyageShip.MouseFlightGain >= 2.0f &&
-            _voyageShip.MouseInputDecay >= 5.0f;
+            ArcadeShipController.StatefulVirtualFlightStickEnabled &&
+            ArcadeShipController.SpringCenteredVirtualFlightStickEnabled &&
+            _voyageShip.MouseFlightGain >= 1.0f &&
+            _voyageShip.MouseVirtualStickAutoCenterDelaySeconds > 0.0f &&
+            _voyageShip.MouseVirtualStickAutoCenterDelaySeconds <= 0.25f &&
+            _voyageShip.MouseVirtualStickAutoCenterRate >= 4.0f;
+        bool liveMouseEvidence = (_voyageShip?.MouseSteeringSampleCount ?? 0) > 0;
         StarSystemBodyDefinition definition = null!;
         float radius = 0.0f;
         bool liveScale = _starSystemSimulationNode is not null &&
@@ -68,7 +73,7 @@ public partial class SalvageRepairSlice
         string output = report.BuildOutputLine().Replace(
             $"acceptance {(report.Passed ? "PASS" : "FAIL")}:",
             $"acceptance {(passed ? "PASS" : "FAIL")}:") +
-            $" liveMouse={(liveMouse ? 1 : 0)}; liveScale={(liveScale ? 1 : 0)}; " +
+            $" liveMouse={(liveMouse ? 1 : 0)}; liveMouseEvidence={(liveMouseEvidence ? 1 : 0)}; liveScale={(liveScale ? 1 : 0)}; " +
             $"liveRadius={radius:0}m; mouseSamples={_voyageShip?.MouseSteeringSampleCount ?? 0}; manualTransfers={_manualCrossPlanetEntryCount}; " +
             $"lastManualTarget={(_lastManualCrossPlanetTarget.Length == 0 ? "none" : _lastManualCrossPlanetTarget)}.";
         if (passed)

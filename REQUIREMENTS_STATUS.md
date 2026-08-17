@@ -2,9 +2,56 @@
 
 > **Назначение:** единая точка контроля соответствия проекта техническому заданию.
 > **Последняя актуализация:** 2026-08-16
-> **Подготовленный снимок:** `ProjectHorizon-main-task190-atmosphere-clouds.zip`
+> **Подготовленный снимок:** `ProjectHorizon-main-task192-planetary-caves.zip`
 > **Git-состояние:** архив не содержит `.git`, поэтому ветка и SHA статически не подтверждаются.
 > **Правило:** задача считается завершённой только после обновления этого журнала и фиксации проверяемых доказательств.
+
+---
+
+## 0. HOTFIX 2026-08-16 — TASK-192.1 Acceptance Coherence Hotfix
+
+**Статус:** IMPLEMENTED / OWNER F5 RECHECK REQUIRED.
+
+Owner F5 на alpha.192 выявил четыре связанных ложных FAIL: TASK-128 `representationLevels=0`, TASK-178.2 `visualHierarchy=0`, каскадный TASK-178 `navigationIdentity=0` и TASK-178.6 `liveMouse=0`. Причины локализованы в устаревших acceptance-инвариантах: star-focused snapshot физически не обязан содержать Statistical LOD; moon hierarchy сравнивал несвязанные глобальные min/max тела; live mouse gate продолжал требовать pre-TASK-182 gain/decay. Runtime orbital simulation, scale, surface activation and docking contracts по evidence оставались исправны.
+
+Исправление: representation LOD проверяется общей distance-classifier функцией; moon scale — относительно parent planet; live mouse — по stateful spring-centered virtual-stick configuration. TASK-178 navigation identity восстанавливается каскадно после корректного TASK-128.
+
+## 0. Мега-итерация 2026-08-16 — TASK-192 Cave Prefabs, Subsurface POIs & Resource Deposits
+
+**Исходный снимок:** `ProjectHorizon-main-task190-atmosphere-clouds.zip` (`0.1.0-alpha.190`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task192-planetary-caves.zip`.  
+**Версия:** `0.1.0-alpha.192.1`.  
+**Статус:** `IMPLEMENTED / OWNER TASK-190 VISUAL+RUNTIME SMOKE PASSED / TASK-192 CLEAN BUILD+MANUAL CAVE+F5 PENDING`.
+
+### Основание и owner evidence
+
+Owner оценил TASK-190 sky как «более-менее» и разрешил следующую итерацию. Новый alpha.190 Output содержит 0 `ERROR`, 0 `WARNING`, 0 `Exception`; старт, repair/boarding/takeoff, atmosphere handoff и lethal planet impact работают. Regression latch также materially подтверждён: в логе есть только одна `surface floor correction` после lethal crash и нет ни одного `surface contact RECOVERED`, то есть прежнее многократное correction/recovery chatter не вернулось.
+
+Следующий последовательный gap PDF-ТЗ v2.0 — §9.9. Версия 1.0 прямо запрещает глобальные процедурные пещеры и изменение планетарного рельефа пользователем, но допускает отдельные cave-prefab объекты и требует добывать ресурсы из объектов/месторождений.
+
+### Реализация TASK-192
+
+- `PlanetaryCaveRuntime`: детерминированный выбор из 3 cave-prefab archetypes по planet + cave POI identity; стабильные `cave.deposit.*` IDs; явные `GlobalProceduralCaveNetwork=false` и `TerrainDeformationEnabled=false`.
+- `PlanetaryCavePrefabNode`: изолированный subsurface pocket >=36 m ниже поверхности, collision-backed floor/ceiling/walls/ribs/chamber, archetype details и bounded local lighting.
+- `PlanetaryCaveExitNode`: интерактивный return portal; вход остаётся стандартным `poi.cave_entrance` и требует существующего scan/discovery flow.
+- Cave entrance presentation заменяет generic POI accent на тёмный mouth + rock arch.
+- В каждой пещере 3 `SalvageResourceNode` deposits из существующего resource catalog; добыча использует штатный `TryCollectResource -> ResourceMined -> autosave`.
+- Cold-save safety: snapshot внутри cave сохраняет exterior logical position; на load/reset cave transient state всегда выключен.
+- Water isolation: отрицательный локальный Y cave-pocket не интерпретируется как погружение в планетарный океан.
+- Добавлены TASK-192 F5/xUnit/static/section-37/CI/release gate и `docs/PLANETARY_CAVE_PREFABS.md`.
+
+### Acceptance
+
+1. Clean build: `0 warnings / 0 errors`; `TASK-192 PLANETARY CAVE PREFAB CONTRACT PASS`.
+2. На поверхности найти/сканировать `poi.cave_entrance`, нажать E: `TASK-192 cave entry PASS`.
+3. Внутри есть collision-backed walkable prefab, локальное освещение, 3 resource deposits; добыча одного deposit создаёт обычный `ResourceMined` и autosave.
+4. E у `CaveExitPortal` возвращает к сохранённой внешней позиции; terrain mesh до/после не меняется.
+5. Save/exit внутри cave и последующая Load восстанавливают игрока снаружи у входа, а уже добытый `cave.deposit.*` не появляется снова.
+6. F5 HUD: `TASK-192 (F5): PASS prefab=1 arch=3 deposits=3 deform=0`; Output содержит `TASK-192 planetary cave prefab acceptance PASS`.
+
+### Граница итерации
+
+TASK-192 намеренно не добавляет глобальный cave noise/SDF, marching cubes, voxel chunks, разрушение/копание heightfield или persistence terrain deltas. Это отложено за пределы стабильной v1.0 согласно §9.9. Следующий крупный subsystem — §10 World Streaming.
 
 ---
 

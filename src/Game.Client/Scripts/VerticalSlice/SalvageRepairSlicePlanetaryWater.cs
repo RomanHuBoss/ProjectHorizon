@@ -124,7 +124,7 @@ public partial class SalvageRepairSlice
         RefreshPlanetaryWaterSurfaceGeometry();
 
         bool interactive = _surfaceRuntimeActive && !StageOneVoyage.Piloted &&
-            _planetaryWaterProfile.HasWater;
+            !IsPlayerInsidePlanetaryCave && _planetaryWaterProfile.HasWater;
         if (!interactive)
         {
             SetPlanetaryWaterState(false, false, default, "none");

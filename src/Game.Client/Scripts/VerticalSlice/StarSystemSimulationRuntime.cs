@@ -260,17 +260,40 @@ public sealed class StarSystemSimulationRuntime
         string? detailedPlanetId,
         bool detailedPlanetRequested)
     {
-        if (detailedPlanetRequested &&
+        bool detailedPlanet = detailedPlanetRequested &&
             definition.Kind == StarSystemBodyKind.Planet &&
             string.Equals(
                 definition.BodyId,
                 detailedPlanetId,
-                StringComparison.Ordinal))
+                StringComparison.Ordinal);
+        return ResolveRepresentationForDistance(
+            definition.Kind,
+            distance,
+            detailedPlanet);
+    }
+
+    /// <summary>
+    /// Deterministic representation classifier shared by the runtime and
+    /// acceptance suite. Keeping threshold verification independent from
+    /// procedural orbital phase prevents F5 from demanding a representation
+    /// level that a particular snapshot cannot geometrically contain.
+    /// </summary>
+    public static StarSystemRepresentation ResolveRepresentationForDistance(
+        StarSystemBodyKind kind,
+        double distance,
+        bool detailedPlanet = false)
+    {
+        if (!double.IsFinite(distance) || distance < 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(distance));
+        }
+
+        if (detailedPlanet && kind == StarSystemBodyKind.Planet)
         {
             return StarSystemRepresentation.DetailedPlanet;
         }
 
-        if (definition.Kind == StarSystemBodyKind.ShipContact)
+        if (kind == StarSystemBodyKind.ShipContact)
         {
             return distance <= MarkerDistance
                 ? StarSystemRepresentation.Marker
