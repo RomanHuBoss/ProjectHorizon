@@ -35,23 +35,28 @@ def mat(name, color, metallic, roughness, emissive=None):
         kwargs['emissiveFactor'] = np.array(emissive[:3], dtype=float) / 255.0
     return PBRMaterial(**kwargs)
 
-# Restrained production palette; no texture-per-part explosion.
-HULL = mat('MAT_Hull_Graphite', [39, 47, 57, 255], .78, .30)
-PANEL = mat('MAT_Hull_Panel', [91, 101, 112, 255], .66, .34)
-ACCENT = mat('MAT_Safety_Accent', [196, 91, 28, 255], .42, .38)
-CANOPY = mat('MAT_Canopy_Smoked', [8, 18, 28, 255], .18, .08)
-ENGINE = mat('MAT_Engine_Emissive', [14, 70, 112, 255], .16, .18, [45, 175, 255, 255])
+# TASK-220 visual recovery palette.  The previous graphite-first balance made the
+# player ship read as a black mass under the mobile renderer.  Primary structure
+# is now a light industrial alloy; dark values are reserved for canopy/recesses.
+# Legacy material names are retained because they are stable content contracts.
+HULL = mat('MAT_Hull_Graphite', [174, 181, 186, 255], .54, .38)
+PANEL = mat('MAT_Hull_Panel', [86, 98, 108, 255], .62, .42)
+ACCENT = mat('MAT_Safety_Accent', [210, 104, 32, 255], .34, .44)
+CANOPY = mat('MAT_Canopy_Smoked', [18, 34, 48, 255], .12, .12)
+ENGINE = mat('MAT_Engine_Emissive', [24, 96, 145, 255], .12, .20, [70, 190, 255, 255])
 
-STN = mat('MAT_Station_Hull', [72, 80, 90, 255], .72, .36)
-STN_PANEL = mat('MAT_Station_Panel', [120, 127, 136, 255], .58, .39)
-STN_ACCENT = mat('MAT_Station_Safety', [190, 88, 29, 255], .44, .40)
-STN_DARK = mat('MAT_Station_Dark', [24, 30, 37, 255], .68, .42)
-STN_LIGHT = mat('MAT_Station_Light', [14, 72, 110, 255], .16, .18, [44, 168, 235, 255])
+STN = mat('MAT_Station_Hull', [132, 142, 150, 255], .58, .40)
+STN_PANEL = mat('MAT_Station_Panel', [88, 99, 108, 255], .62, .43)
+STN_ACCENT = mat('MAT_Station_Safety', [202, 103, 30, 255], .34, .45)
+STN_DARK = mat('MAT_Station_Dark', [42, 50, 58, 255], .58, .48)
+STN_LIGHT = mat('MAT_Station_Light', [22, 92, 138, 255], .12, .20, [62, 180, 245, 255])
 
-RES_BASE = mat('MAT_Resource_Base', [88, 94, 104, 255], .30, .62)
-RES_DARK = mat('MAT_Resource_Dark', [40, 45, 52, 255], .45, .55)
-RES_ACCENT = mat('MAT_Resource_Accent', [88, 172, 194, 255], .36, .28, [35, 135, 190, 255])
-RES_CORE = mat('MAT_Resource_Core', [62, 120, 148, 255], .20, .18, [55, 170, 225, 255])
+# Resource materials are only the GLB authoring baseline. Runtime catalog tinting
+# is applied semantically by SalvageResourceNode, preserving relief/value contrast.
+RES_BASE = mat('MAT_Resource_Base', [112, 120, 128, 255], .24, .58)
+RES_DARK = mat('MAT_Resource_Dark', [54, 61, 68, 255], .34, .64)
+RES_ACCENT = mat('MAT_Resource_Accent', [104, 184, 210, 255], .18, .25, [48, 145, 205, 255])
+RES_CORE = mat('MAT_Resource_Core', [78, 142, 182, 255], .10, .18, [70, 190, 245, 255])
 
 # TASK-218: one deterministic reusable 4x4 PBR atlas for close-range hard-surface art.
 # Semantic names intentionally preserve the established TASK-186 material vocabulary:
@@ -71,16 +76,16 @@ ATLAS_TILES = {
     'MAT_Station_Light': (1, 2),
 }
 ATLAS_BASE = {
-    'MAT_Hull_Graphite': ((39,47,57), .78, .30, (0,0,0)),
-    'MAT_Hull_Panel': ((91,101,112), .66, .34, (0,0,0)),
-    'MAT_Safety_Accent': ((196,91,28), .42, .38, (0,0,0)),
-    'MAT_Canopy_Smoked': ((8,18,28), .18, .08, (0,0,0)),
-    'MAT_Engine_Emissive': ((14,70,112), .16, .18, (45,175,255)),
-    'MAT_Station_Hull': ((72,80,90), .72, .36, (0,0,0)),
-    'MAT_Station_Panel': ((120,127,136), .58, .39, (0,0,0)),
-    'MAT_Station_Safety': ((190,88,29), .44, .40, (0,0,0)),
-    'MAT_Station_Dark': ((24,30,37), .68, .42, (0,0,0)),
-    'MAT_Station_Light': ((14,72,110), .16, .18, (44,168,235)),
+    'MAT_Hull_Graphite': ((174,181,186), .54, .38, (0,0,0)),
+    'MAT_Hull_Panel': ((86,98,108), .62, .42, (0,0,0)),
+    'MAT_Safety_Accent': ((210,104,32), .34, .44, (0,0,0)),
+    'MAT_Canopy_Smoked': ((18,34,48), .12, .12, (0,0,0)),
+    'MAT_Engine_Emissive': ((24,96,145), .12, .20, (70,190,255)),
+    'MAT_Station_Hull': ((132,142,150), .58, .40, (0,0,0)),
+    'MAT_Station_Panel': ((88,99,108), .62, .43, (0,0,0)),
+    'MAT_Station_Safety': ((202,103,30), .34, .45, (0,0,0)),
+    'MAT_Station_Dark': ((42,50,58), .58, .48, (0,0,0)),
+    'MAT_Station_Light': ((22,92,138), .12, .20, (62,180,245)),
 }
 _ATLAS_IMAGES = None
 _ATLAS_MATERIAL = None
@@ -226,6 +231,27 @@ def prism_polygon(points_xz, thickness, y_center=0.0):
     return trimesh.Trimesh(verts,np.asarray(faces,int),process=True)
 
 
+def chamfered_prism_polygon(points_xz, thickness, y_center=0.0, bevel=.055, inset=.035):
+    """Convex hard-surface plate with a real top/bottom edge chamfer."""
+    p=np.asarray(points_xz,float); n=len(p); center=p.mean(axis=0)
+    inner=center+(p-center)*(1.0-inset)
+    y0=y_center-thickness/2; y1=y_center+thickness/2
+    b=min(bevel,thickness*.42)
+    rings=[(inner,y0),(p,y0+b),(p,y1-b),(inner,y1)]
+    verts=np.vstack([np.column_stack([ring[:,0],np.full(n,y),ring[:,1]]) for ring,y in rings])
+    faces=[]
+    # bottom/top caps
+    for i in range(1,n-1):
+        faces += [[0,i+1,i],[3*n,3*n+i,3*n+i+1]]
+    # connect four rings
+    for r in range(3):
+        a=r*n; q=(r+1)*n
+        for i in range(n):
+            ni=(i+1)%n
+            faces += [[a+i,q+i,q+ni],[a+i,q+ni,a+ni]]
+    return trimesh.Trimesh(np.asarray(verts,float),np.asarray(faces,int),process=True)
+
+
 def tapered_nacelle(z0,z1,r0,r1,sections=12,y_scale=.78):
     verts=[]
     for z,r in [(z0,r0),(z1,r1)]:
@@ -296,8 +322,8 @@ def explorer(lod:int):
     add(scene,loft_hull(sections,sides),'PrimaryHull',HULL,parent=root)
     port=[(-.72,-2.65),(-3.85,-.72),(-3.64,.20),(-3.20,1.80),(-1.28,3.02),(-.94,1.35)]
     star=[(-x,z) for x,z in port]
-    add(scene,prism_polygon(port,.14 if lod==0 else .20,-.04),'WingPort',PANEL if lod<2 else HULL,parent=root)
-    add(scene,prism_polygon(star,.14 if lod==0 else .20,-.04),'WingStarboard',PANEL if lod<2 else HULL,parent=root)
+    add(scene,(chamfered_prism_polygon(port,.18,-.04,.055,.030) if lod==0 else prism_polygon(port,.20,-.04)),'WingPort',HULL,parent=root)
+    add(scene,(chamfered_prism_polygon(star,.18,-.04,.055,.030) if lod==0 else prism_polygon(star,.20,-.04)),'WingStarboard',HULL,parent=root)
     if lod<2:
         canopy=[(-2.95,.28,.04,.70),(-2.58,.55,.17,.83),(-1.75,.72,.26,.91),(-.90,.62,.24,.88),(-.45,.34,.09,.79)]
         add(scene,loft_hull(canopy,12 if lod==0 else 8),'Canopy',CANOPY,parent=root)
@@ -315,6 +341,10 @@ def explorer(lod:int):
         add(scene,prism_polygon([(-.38,-3.15),(-.52,2.75),(.52,2.75),(.38,-3.15)],.07,.72),'DorsalArmor',PANEL,parent=root)
         add(scene,prism_polygon([(-3.63,-.75),(-3.38,-.40),(-1.02,-2.12),(-.82,-2.48)],.035,.09),'LeadingEdgePort',ACCENT,parent=root)
         add(scene,prism_polygon([(3.63,-.75),(3.38,-.40),(1.02,-2.12),(.82,-2.48)],.035,.09),'LeadingEdgeStarboard',ACCENT,parent=root)
+        wing_inset=[(-1.08,-1.86),(-3.02,-.64),(-2.76,.08),(-2.42,1.08),(-1.50,1.82),(-1.24,.74)]
+        wing_inset_star=[(-x,z) for x,z in wing_inset]
+        add(scene,chamfered_prism_polygon(wing_inset,.065,.105,.022,.030),'WingInsetPort',PANEL,parent=root)
+        add(scene,chamfered_prism_polygon(wing_inset_star,.065,.105,.022,.030),'WingInsetStarboard',PANEL,parent=root)
         # dorsal sensor blister + vent banks + access panels + RCS pods
         add(scene,panel_box([.72,.22,1.12],.08),'SensorSpine',HULL,T(y=.76,z=.72),root)
         add(scene,vendor_mesh('spaceCraft1.obj',(1.05,.24,.82),(90,0,0)),
@@ -359,8 +389,13 @@ def interceptor(lod:int):
         'PrimaryHull',HULL,parent=root)
     port=[(-.42,-2.05),(-2.95,-.65),(-2.70,.42),(-2.24,1.65),(-.76,2.08)]
     star=[(-x,z) for x,z in port]
-    add(scene,prism_polygon(port,.10 if lod==0 else .16,-.02),'BladeWingPort',ACCENT if lod==0 else PANEL,parent=root)
-    add(scene,prism_polygon(star,.10 if lod==0 else .16,-.02),'BladeWingStarboard',ACCENT if lod==0 else PANEL,parent=root)
+    add(scene,(chamfered_prism_polygon(port,.14,-.02,.045,.028) if lod==0 else prism_polygon(port,.16,-.02)),'BladeWingPort',HULL,parent=root)
+    add(scene,(chamfered_prism_polygon(star,.14,-.02,.045,.028) if lod==0 else prism_polygon(star,.16,-.02)),'BladeWingStarboard',HULL,parent=root)
+    if lod==0:
+        inset=[(-.72,-1.55),(-2.35,-.55),(-2.12,.18),(-1.78,1.14),(-.92,1.48)]
+        inset_star=[(-x,z) for x,z in inset]
+        add(scene,chamfered_prism_polygon(inset,.055,.07,.018,.030),'BladeInsetPort',PANEL,parent=root)
+        add(scene,chamfered_prism_polygon(inset_star,.055,.07,.018,.030),'BladeInsetStarboard',PANEL,parent=root)
     if lod<2:
         add(scene,loft_hull([(-2.05,.20,.04,.45),(-1.66,.39,.14,.58),(-.90,.43,.16,.59),(-.38,.25,.07,.50)],
                             10 if lod==0 else 7),'Canopy',CANOPY,parent=root)
@@ -499,139 +534,191 @@ def crystal_prism(radius,height,sections=6,tip=.28):
     return trimesh.Trimesh(np.asarray(verts,float),np.asarray(faces,int),process=True)
 
 
+def upright(mesh: trimesh.Trimesh):
+    """Rotate authored +Z longitudinal primitives so +Y is world-up in Godot.
+
+    TASK-218 accidentally translated Z-axis crystal/vent geometry along Y without
+    rotating the geometry itself.  The resulting deposits were wider than tall
+    and read as flat pancakes.  TASK-220 bakes the axis correction into the mesh.
+    """
+    result=mesh.copy()
+    result.apply_transform(T(rx=-90))
+    return result
+
+
 def resource_ore(lod:int, salvage=False):
     scene=trimesh.Scene(); key='Salvage' if salvage else 'Ore'; root=f'RES_{key}_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
     level=(2,1,0)[lod]
     if salvage:
-        # Bent manufactured scrap cluster rather than a rock.
-        parts=(10,6,3)[lod]
+        # Distinct manufactured wreckage: layered plates, a broken coupler and beams.
+        parts=(12,7,4)[lod]
         for i in range(parts):
-            a=i*math.tau/max(parts,1); x=math.cos(a)*(.48+.10*(i%2)); z=math.sin(a)*(.42+.08*((i+1)%2))
-            size=[.58 if i%3 else .82,.12+.05*(i%2),.42+.08*(i%3)]
-            add(scene,panel_box(size,.07),f'ScrapPlate_{i:02d}',RES_BASE if i%3 else RES_DARK,
-                T(x=x,y=.18+.06*(i%3),z=z,rx=(i%4)*9,ry=i*29,rz=(i%5)*11),root)
+            a=i*2.399963; x=math.cos(a)*(.30+.045*i); z=math.sin(a)*(.26+.038*i)
+            sx=.42+.11*(i%3); sy=.08+.035*(i%2); sz=.32+.10*((i+1)%3)
+            add(scene,panel_box([sx,sy,sz],.055),f'ScrapPlate_{i:02d}',RES_BASE if i%3 else RES_DARK,
+                T(x=x,y=.10+.065*(i%4),z=z,rx=(i%4-1.5)*8,ry=i*31,rz=(i%5-2)*8),root)
         if lod<2:
-            add(scene,tapered_nacelle(-.38,.38,.20,.25,8 if lod==0 else 6,1.0),'SalvageCoupler',RES_ACCENT,T(y=.38,rx=90),root)
+            coupler=upright(tapered_nacelle(-.34,.34,.19,.26,10 if lod==0 else 7,1.0))
+            add(scene,coupler,'SalvageCoupler',RES_ACCENT,T(x=.06,y=.38,z=-.02,rz=18),root)
+            beam_count=3 if lod==0 else 1
+            for i in range(beam_count):
+                add(scene,beam_between((-.52+i*.23,.18,-.26),(.28+i*.13,.48,.34),.045,6),
+                    f'SalvageBeam_{i:02d}',RES_DARK,parent=root)
     else:
-        add(scene,subdivide_octahedron(level,91,(.72,.58,.82)),'OreMass',RES_BASE,T(y=.40),root)
-        count=(4,2,1)[lod]
+        # Low, irregular host rock with clearly raised mineral nodules and exposed veins.
+        add(scene,subdivide_octahedron(level,91,(.72,.48,.78)),'OreMass',RES_BASE,T(y=.42),root)
+        count=(6,3,1)[lod]
         for i in range(count):
-            a=i*math.tau/count; add(scene,subdivide_octahedron(max(level-1,0),101+i,(.32,.26,.36)),f'OreNodule_{i:02d}',RES_DARK,
-                T(x=math.cos(a)*.52,y=.25+(.10*(i%2)),z=math.sin(a)*.44,rx=i*13,ry=i*31),root)
+            a=i*math.tau/max(count,1)
+            add(scene,subdivide_octahedron(max(level-1,0),101+i,(.28,.22+.04*(i%2),.31)),
+                f'OreNodule_{i:02d}',RES_DARK,
+                T(x=math.cos(a)*.48,y=.46+(.11*(i%2)),z=math.sin(a)*.40,rx=i*13,ry=i*31),root)
         if lod<2:
-            for i in range(3 if lod==0 else 1):
-                add(scene,prism_polygon([(-.06,-.45),(-.12,.35),(.12,.48),(.08,-.38)],.035,.55+i*.02),f'MetalVein_{i:02d}',RES_ACCENT,T(ry=i*120),root)
+            for i in range(4 if lod==0 else 2):
+                vein=upright(prism_polygon([(-.055,-.42),(-.105,.22),(.02,.56),(.095,.18)],.035,.0))
+                add(scene,vein,f'MetalVein_{i:02d}',RES_ACCENT,
+                    T(x=math.cos(i*math.tau/4)*.38,y=.48,z=math.sin(i*math.tau/4)*.32,ry=i*90,rz=(i-1.5)*11),root)
     return scene
 
 
 def resource_crystal(lod:int):
     scene=trimesh.Scene(); root=f'RES_Crystal_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(9,5,3)[lod]; sections=6
+    # TASK-220: tall faceted prisms, not Z-axis pancakes. Central spires are intentionally
+    # taller than the footprint so the deposit reads as a crystal cluster at a glance.
+    count=(11,7,4)[lod]; sections=(7,6,5)[lod]
+    base_h=(1.55,1.28,1.02)[lod]
     for i in range(count):
-        a=i*2.399963; rr=.18+.06*(i%3); h=(1.05,.88,.72)[lod]*(.72+.08*(i%4))
-        x=math.cos(a)*(.25+.055*i); z=math.sin(a)*(.25+.045*i)
-        add(scene,crystal_prism(rr,h,sections,.24),f'Crystal_{i:02d}',RES_BASE if i%3 else RES_ACCENT,
-            T(x=x,y=h*.47,z=z,rx=(i%3-1)*9,rz=(i%2*2-1)*7,ry=i*37),root)
-    if lod<2:
-        add(scene,crystal_prism(.20,.72,6,.22),'CrystalCore',RES_CORE,T(y=.42,ry=22),root)
+        a=i*2.399963; rr=.105+.032*(i%4); h=base_h*(.72+.11*(i%5))
+        radius=.12+.040*i
+        x=math.cos(a)*radius; z=math.sin(a)*radius
+        mesh=upright(crystal_prism(rr,h,sections,.23))
+        role=RES_ACCENT if i in (0,4,8) else RES_BASE
+        add(scene,mesh,f'CrystalSpire_{i:02d}',role,
+            T(x=x,y=h*.46,z=z,rx=(i%3-1)*7,ry=i*37,rz=(i%4-1.5)*6),root)
+    core_h=(2.05,1.60,1.18)[lod]
+    add(scene,upright(crystal_prism(.16 if lod==0 else .14,core_h,7 if lod<2 else 5,.20)),
+        'CrystalCore',RES_CORE,T(y=core_h*.45,ry=17,rz=-4),root)
+    add(scene,subdivide_octahedron(1 if lod==0 else 0,271,(.62,.16,.58)),
+        'CrystalMatrix',RES_DARK,T(y=.15,ry=14),root)
     return scene
 
 
 def resource_fiber(lod:int):
     scene=trimesh.Scene(); root=f'RES_Fiber_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    stems=(7,4,2)[lod]; sections=(10,7,6)[lod]
+    stems=(10,6,3)[lod]; sections=(10,8,6)[lod]
     for i in range(stems):
-        a=i*math.tau/max(stems,1); r=.23+.04*(i%2); h=.82+.14*(i%3)
-        add(scene,tapered_nacelle(-h/2,h/2,r,r*.42,sections,y_scale=.82),f'FiberStem_{i:02d}',RES_BASE,
-            T(x=math.cos(a)*.34,y=h*.48,z=math.sin(a)*.34,rx=math.cos(a)*13,rz=-math.sin(a)*13,ry=i*41),root)
-        if lod==0:
-            add(scene,panel_box([.12,.12,.34],.035),f'FiberNode_{i:02d}',RES_ACCENT,
-                T(x=math.cos(a)*.48,y=.48,z=math.sin(a)*.48,ry=i*41),root)
-    if lod<2:
-        add(scene,tapered_nacelle(-.30,.30,.32,.27,sections,1.0),'FiberCore',RES_DARK,T(y=.28,rx=90),root)
+        a=i*2.399963; r=.075+.018*(i%3); h=(1.28,1.02,.78)[lod]*(.78+.08*(i%4))
+        mesh=upright(tapered_nacelle(-h/2,h/2,r,r*.42,sections,y_scale=.82))
+        d=.18+.035*i
+        add(scene,mesh,f'FiberStem_{i:02d}',RES_BASE,
+            T(x=math.cos(a)*d,y=h*.49,z=math.sin(a)*d,rx=math.cos(a)*11,ry=i*41,rz=-math.sin(a)*11),root)
+        if lod==0 and i%2==0:
+            add(scene,panel_box([.10,.20,.10],.025),f'FiberNode_{i:02d}',RES_ACCENT,
+                T(x=math.cos(a)*d,y=h*.62,z=math.sin(a)*d,ry=i*41),root)
+    core_h=(.78,.62,.46)[lod]
+    add(scene,upright(tapered_nacelle(-core_h/2,core_h/2,.26,.20,sections,1.0)),
+        'FiberCore',RES_DARK,T(y=core_h*.48),root)
     return scene
 
 
 def resource_organic(lod:int):
     scene=trimesh.Scene(); root=f'RES_Organic_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(6,4,2)[lod]; level=(2,1,0)[lod]
+    count=(8,5,3)[lod]; level=(2,1,0)[lod]
     for i in range(count):
-        a=i*math.tau/count; sc=(.44+.07*(i%3),.28+.05*(i%2),.50+.06*((i+1)%3))
+        a=i*math.tau/count; sc=(.34+.055*(i%3),.40+.07*(i%2),.38+.05*((i+1)%3))
         add(scene,subdivide_octahedron(level,200+i,sc),f'OrganicLobe_{i:02d}',RES_BASE if i%2 else RES_DARK,
-            T(x=math.cos(a)*.34,y=.30+.08*(i%2),z=math.sin(a)*.34,rx=i*11,ry=i*23),root)
+            T(x=math.cos(a)*.34,y=.34+.10*(i%2),z=math.sin(a)*.34,rx=i*11,ry=i*23),root)
     if lod<2:
-        for i in range(4 if lod==0 else 2):
-            a=i*math.tau/(4 if lod==0 else 2)
-            add(scene,tapered_nacelle(-.30,.30,.07,.025,7,1.0),f'OrganicTendril_{i:02d}',RES_ACCENT,
-                T(x=math.cos(a)*.52,y=.22,z=math.sin(a)*.52,rx=90+math.sin(a)*18,ry=math.degrees(a)),root)
-        add(scene,subdivide_octahedron(1,255,(.20,.16,.22)),'OrganicCore',RES_CORE,T(y=.42),root)
+        tendrils=6 if lod==0 else 3
+        for i in range(tendrils):
+            a=i*math.tau/tendrils; h=.62+.10*(i%3)
+            mesh=upright(tapered_nacelle(-h/2,h/2,.045,.018,7,1.0))
+            add(scene,mesh,f'OrganicTendril_{i:02d}',RES_ACCENT,
+                T(x=math.cos(a)*.48,y=.32+h*.45,z=math.sin(a)*.48,rx=math.sin(a)*18,ry=math.degrees(a),rz=math.cos(a)*18),root)
+        add(scene,subdivide_octahedron(1,255,(.21,.20,.23)),'OrganicCore',RES_CORE,T(y=.48),root)
     return scene
-
 
 
 def resource_ice(lod:int):
     scene=trimesh.Scene(); root=f'RES_Ice_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(7,4,2)[lod]
+    count=(9,6,3)[lod]
+    base_h=(1.38,1.10,.86)[lod]
     for i in range(count):
-        a=i*2.18; rr=.16+.035*(i%3); h=(.92,.76,.60)[lod]*(.76+.08*(i%3))
-        add(scene,crystal_prism(rr,h,5 if lod<2 else 4,.18),f'IceShard_{i:02d}',RES_BASE,
-            T(x=math.cos(a)*(.20+.055*i),y=h*.44,z=math.sin(a)*(.20+.045*i),rx=(i%3-1)*12,ry=i*43,rz=(i%2*2-1)*10),root)
-    if lod<2:
-        add(scene,subdivide_octahedron(1 if lod==0 else 0,331,(.48,.18,.42)),'IceShelf',RES_DARK,T(y=.13,ry=18),root)
+        a=i*2.18; rr=.085+.025*(i%3); h=base_h*(.70+.10*(i%4))
+        mesh=upright(crystal_prism(rr,h,5 if lod<2 else 4,.16))
+        d=.16+.045*i
+        add(scene,mesh,f'IceBlade_{i:02d}',RES_BASE if i%3 else RES_ACCENT,
+            T(x=math.cos(a)*d,y=h*.45,z=math.sin(a)*d,rx=(i%3-1)*10,ry=i*43,rz=(i%2*2-1)*8),root)
+    core_h=(1.72,1.34,.98)[lod]
+    add(scene,upright(crystal_prism(.13,core_h,6 if lod<2 else 4,.15)),
+        'IceCore',RES_CORE,T(y=core_h*.45,ry=11,rz=6),root)
+    add(scene,subdivide_octahedron(1 if lod==0 else 0,331,(.58,.14,.52)),
+        'IceShelf',RES_DARK,T(y=.12,ry=18),root)
     return scene
 
 
 def resource_gas(lod:int):
     scene=trimesh.Scene(); root=f'RES_Gas_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(8,5,3)[lod]; sections=(9,7,6)[lod]
+    count=(9,6,3)[lod]; sections=(10,8,6)[lod]
     for i in range(count):
-        a=i*math.tau/count; r=.10+.025*(i%3); h=.42+.10*(i%4)
-        add(scene,tapered_nacelle(-h/2,h/2,r*1.30,r*.72,sections,1.0),f'Vent_{i:02d}',RES_BASE if i%2 else RES_DARK,
-            T(x=math.cos(a)*(.26+.03*(i%2)),y=h*.48,z=math.sin(a)*(.26+.03*((i+1)%2)),rx=math.cos(a)*10,rz=-math.sin(a)*10,ry=i*37),root)
+        a=i*math.tau/count; r=.075+.018*(i%3); h=(.72,.60,.48)[lod]+.10*(i%4)
+        vent=upright(tapered_nacelle(-h/2,h/2,r*1.34,r*.68,sections,1.0))
+        d=.24+.035*(i%2)
+        add(scene,vent,f'VentChimney_{i:02d}',RES_BASE if i%2 else RES_DARK,
+            T(x=math.cos(a)*d,y=.16+h*.45,z=math.sin(a)*d,rx=math.cos(a)*7,ry=i*37,rz=-math.sin(a)*7),root)
         if lod==0:
-            lip=trimesh.creation.cylinder(radius=r*1.38,height=.035,sections=sections)
-            add(scene,lip,f'VentLip_{i:02d}',RES_ACCENT,T(x=math.cos(a)*(.26+.03*(i%2)),y=h*.92,z=math.sin(a)*(.26+.03*((i+1)%2)),rx=90),root)
-    add(scene,subdivide_octahedron(1 if lod==0 else 0,377,(.50,.18,.46)),'VentBed',RES_DARK,T(y=.13),root)
+            # Bright inner throat is a small authored disc, not a whole glowing cylinder.
+            lip=trimesh.creation.cylinder(radius=r*1.25,height=.028,sections=sections)
+            add(scene,lip,f'VentThroat_{i:02d}',RES_ACCENT,
+                T(x=math.cos(a)*d,y=.16+h*.91,z=math.sin(a)*d,rx=90),root)
+    add(scene,subdivide_octahedron(1 if lod==0 else 0,377,(.56,.18,.50)),'VentBed',RES_DARK,T(y=.14),root)
     return scene
 
 
 def resource_salt(lod:int):
     scene=trimesh.Scene(); root=f'RES_Salt_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(9,5,3)[lod]
+    count=(12,7,4)[lod]
     for i in range(count):
-        a=i*2.399963; x=math.cos(a)*(.12+.052*i); z=math.sin(a)*(.12+.044*i)
-        size=.18+.035*(i%3); height=.22+.07*(i%4)
-        cube=panel_box([size,size,height],.018)
-        add(scene,cube,f'SaltBlock_{i:02d}',RES_BASE if i%3 else RES_ACCENT,
-            T(x=x,y=height*.48,z=z,rx=(i%2)*5,ry=i*29,rz=(i%3-1)*6),root)
+        a=i*2.399963; d=.08+.038*i; x=math.cos(a)*d; z=math.sin(a)*d
+        sx=.15+.035*(i%3); sz=.15+.025*((i+1)%3); sy=.22+.09*(i%4)
+        add(scene,panel_box([sx,sy,sz],.014),f'SaltCrystal_{i:02d}',RES_BASE if i%4 else RES_ACCENT,
+            T(x=x,y=.09+sy*.50,z=z,rx=(i%2)*3,ry=i*29,rz=(i%3-1)*4),root)
     if lod<2:
-        add(scene,panel_box([.60,.12,.54],.04),'SaltShelf',RES_DARK,T(y=.08,ry=22),root)
+        # Stepped evaporite pedestal gives cubic morphology a strong base silhouette.
+        for i,(sx,sy,sz,y) in enumerate(((.72,.12,.60,.06),(.50,.11,.44,.15),(.30,.10,.28,.245))):
+            add(scene,panel_box([sx,sy,sz],.025),f'SaltShelf_{i}',RES_DARK,T(y=y,ry=12+i*9),root)
     return scene
 
 
 def resource_glass(lod:int):
     scene=trimesh.Scene(); root=f'RES_Glass_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
-    count=(8,5,3)[lod]
+    count=(10,6,3)[lod]
     for i in range(count):
-        a=i*math.tau/count; w=.12+.035*(i%3); h=.58+.09*(i%4)
-        pts=[(-w,-h*.45),(-w*.55,h*.28),(0,h*.50),(w*.62,h*.22),(w,-h*.42)]
-        add(scene,prism_polygon(pts,.055 if lod==0 else .08,.0),f'GlassShard_{i:02d}',RES_DARK if i%2 else RES_BASE,
-            T(x=math.cos(a)*.30,y=h*.43,z=math.sin(a)*.30,rx=(i%3-1)*12,ry=i*41,rz=(i%2*2-1)*8),root)
+        a=i*math.tau/count; w=.075+.024*(i%3); h=(1.18,.94,.72)[lod]*(.72+.08*(i%4))
+        pts=[(-w,-h*.45),(-w*.58,h*.18),(-w*.12,h*.50),(w*.44,h*.26),(w,-h*.40)]
+        shard=upright(prism_polygon(pts,.045 if lod==0 else .065,.0))
+        d=.20+.032*i
+        add(scene,shard,f'GlassBlade_{i:02d}',RES_DARK if i%2 else RES_BASE,
+            T(x=math.cos(a)*d,y=h*.44,z=math.sin(a)*d,rx=(i%3-1)*9,ry=i*41,rz=(i%2*2-1)*7),root)
     if lod<2:
-        add(scene,subdivide_octahedron(1 if lod==0 else 0,419,(.38,.13,.42)),'GlassMatrix',RES_ACCENT,T(y=.12),root)
+        add(scene,subdivide_octahedron(1 if lod==0 else 0,419,(.46,.14,.48)),
+            'GlassMatrix',RES_ACCENT,T(y=.13,ry=18),root)
     return scene
 
 
 def resource_exotic(lod:int):
     scene=trimesh.Scene(); root=f'RES_Exotic_01_LOD{lod}'; scene.graph.update(frame_to=root,matrix=np.eye(4))
     core_level=(2,1,0)[lod]
-    add(scene,subdivide_octahedron(core_level,511,(.34,.28,.38)),'ExoticCore',RES_CORE,T(y=.36,ry=17),root)
-    spokes=(10,6,4)[lod]
+    add(scene,subdivide_octahedron(core_level,511,(.32,.42,.36)),'ExoticCore',RES_CORE,T(y=.48,ry=17),root)
+    spokes=(10,7,4)[lod]
     for i in range(spokes):
-        a=i*math.tau/spokes; y=.34+.12*math.sin(a*2); start=(math.cos(a)*.24,y,math.sin(a)*.24); end=(math.cos(a)*.66,y+.10*math.cos(a*3),math.sin(a)*.66)
-        add(scene,beam_between(start,end,.035 if lod==0 else .05,6),f'FieldSpoke_{i:02d}',RES_ACCENT,parent=root)
-        if lod==0 and i%2==0:
-            add(scene,crystal_prism(.075,.32,5,.22),f'ExoticNode_{i:02d}',RES_BASE,T(x=end[0],y=end[1],z=end[2],rx=90,ry=i*36),root)
+        a=i*math.tau/spokes; y=.48+.14*math.sin(a*2)
+        start=(math.cos(a)*.24,y,math.sin(a)*.24); end=(math.cos(a)*.68,y+.12*math.cos(a*3),math.sin(a)*.68)
+        add(scene,beam_between(start,end,.028 if lod==0 else .045,6),f'FieldSpoke_{i:02d}',RES_ACCENT,parent=root)
+        if lod<2 and i%2==0:
+            h=.42 if lod==0 else .30
+            add(scene,upright(crystal_prism(.055,h,5,.20)),f'ExoticSpire_{i:02d}',RES_BASE,
+                T(x=end[0],y=end[1]+h*.35,z=end[2],rx=math.sin(a)*20,ry=i*36,rz=math.cos(a)*20),root)
     return scene
 
 def export_scene(scene,path:Path):

@@ -1,3 +1,5 @@
+> **Status after owner review:** manual visual acceptance was rejected and is superseded by TASK-220. This document remains a historical GLB/LOD/collision regression contract; see `PRODUCTION_ART_RECOVERY.md`.
+
 # TASK-216 Production 3D Model Art Overhaul
 
 TASK-216 is a production-art pass, not a gameplay rewrite. It raises the close-range visual density of the Explorer, Interceptor and orbital station, and replaces primitive runtime resource presentation with production GLB assets while preserving the collision, mount-marker, persistence and interaction contracts established by TASK-184/186.

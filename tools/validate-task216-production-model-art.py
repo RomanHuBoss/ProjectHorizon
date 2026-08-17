@@ -73,7 +73,7 @@ def node_names(doc):
     return {n.get('name','') for n in doc.get('nodes', [])}
 
 version = text(VERSION).strip()
-if version not in {'0.1.0-alpha.216','0.1.0-alpha.218'}: fail(f'VERSION must preserve alpha.216 contract, got {version}')
+if version not in {'0.1.0-alpha.216','0.1.0-alpha.218','0.1.0-alpha.220'}: fail(f'VERSION must preserve alpha.216 contract, got {version}')
 
 gen = text(GEN)
 for token in ['TASK-216 production model authoring','vendor_mesh(', 'VENDOR_KENNEY',

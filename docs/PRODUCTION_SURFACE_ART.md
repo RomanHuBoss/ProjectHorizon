@@ -1,3 +1,5 @@
+> **Status after owner review:** visual acceptance was rejected and is superseded by TASK-220. This document remains a historical technical/PBR contract; see `PRODUCTION_ART_RECOVERY.md` for the replacement visual baseline.
+
 # TASK-218 — Production PBR Texture Atlas & Resource Visual Diversity
 
 TASK-218 is the next production-art layer after TASK-216. It does **not** replace the pending manual visual acceptance of TASK-216; it improves the actual surface treatment and expands the resource silhouette vocabulary while preserving gameplay collision and LOD contracts.

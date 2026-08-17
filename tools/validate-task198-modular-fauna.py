@@ -9,7 +9,7 @@ def need(cond,msg):
     if not cond: fail.append(msg)
 
 version=text('VERSION').strip()
-need(version in {'0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.198 or later accepted revision, got {version}')
+need(version in {'0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218','0.1.0-alpha.220'}, f'VERSION must preserve alpha.198 or later accepted revision, got {version}')
 body=text('src/Game.Client/Scripts/VerticalSlice/FaunaBodyPlanRuntime.cs')
 behavior=text('src/Game.Client/Scripts/VerticalSlice/FaunaBehaviorRuntime.cs')
 statistical=text('src/Game.Client/Scripts/VerticalSlice/FaunaStatisticalSimulationRuntime.cs')

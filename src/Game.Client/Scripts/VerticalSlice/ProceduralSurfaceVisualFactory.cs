@@ -159,24 +159,28 @@ public static class ProceduralSurfaceVisualFactory
 
     public static StandardMaterial3D BuildResourceMaterial(
         ResourceVisualDefinition visual,
-        float brightness = 1.0f)
+        float brightness = 1.0f,
+        float metallicScale = 1.0f,
+        float roughnessOffset = 0.0f,
+        float emissionScale = 1.0f)
     {
         ArgumentNullException.ThrowIfNull(visual);
         Color albedo = new(
             (float)Math.Clamp(visual.AlbedoR * brightness, 0.0, 1.0),
             (float)Math.Clamp(visual.AlbedoG * brightness, 0.0, 1.0),
             (float)Math.Clamp(visual.AlbedoB * brightness, 0.0, 1.0));
+        double emissionEnergy = Math.Clamp(visual.EmissionEnergy * emissionScale, 0.0, 1.35);
         return new StandardMaterial3D
         {
             AlbedoColor = albedo,
-            EmissionEnabled = visual.EmissionEnergy > 0.001,
+            EmissionEnabled = emissionEnergy > 0.001,
             Emission = new Color(
                 (float)visual.EmissionR,
                 (float)visual.EmissionG,
                 (float)visual.EmissionB),
-            EmissionEnergyMultiplier = (float)Math.Min(visual.EmissionEnergy, 0.75),
-            Metallic = (float)visual.Metallic,
-            Roughness = (float)Math.Clamp(visual.Roughness, 0.24, 0.96)
+            EmissionEnergyMultiplier = (float)emissionEnergy,
+            Metallic = (float)Math.Clamp(visual.Metallic * metallicScale, 0.0, 1.0),
+            Roughness = (float)Math.Clamp(visual.Roughness + roughnessOffset, 0.12, 0.96)
         };
     }
 

@@ -49,7 +49,7 @@ def png_size(path):
  if len(raw)<24 or raw[:8]!=b'\x89PNG\r\n\x1a\n' or raw[12:16]!=b'IHDR': fail(f'{path.name} invalid PNG')
  return struct.unpack('>II',raw[16:24])
 
-if VERSION.read_text().strip()!='0.1.0-alpha.218': fail('VERSION must be 0.1.0-alpha.218')
+if VERSION.read_text().strip() not in {'0.1.0-alpha.218','0.1.0-alpha.220'}: fail('VERSION must preserve alpha.218 contract')
 
 # Atlas authoring output and budget.
 for name in ATLAS:

@@ -1,3 +1,20 @@
+## [0.1.0-alpha.220] - 2026-08-17
+
+### Changed
+- Replaced the owner-rejected TASK-216/TASK-218 visual result with TASK-220 production-art recovery rather than treating technical GLB/PBR validation as visual acceptance.
+- Corrected longitudinal resource authoring from Z-axis placement to real Godot Y-up geometry; Crystal and Ice are now tall pointed clusters instead of flattened deposits.
+- Rebalanced Explorer/Interceptor atlas usage around a light industrial-alloy primary hull and light primary wing surfaces; intentionally dark values are limited to canopy/recess treatment.
+- Reworked all ten resource-family silhouettes and sub-part proportions, including upright glass blades, fiber stems and gas chimneys plus stepped salt and exotic field structures.
+- Resource catalog tinting now applies semantic roughness/metallic/emission roles to matrix, crystal/blade, core/vein/throat and salvage sub-parts instead of a flat brightness cycle.
+
+### Added
+- TASK-220 F5/xUnit/static/section-37/CI/release gate with primary-hull luminance and Crystal/Ice verticality checks.
+- `docs/PRODUCTION_ART_RECOVERY.md` documenting the rejected visual evidence, root causes and new owner acceptance criteria.
+
+### Status
+- TASK-216 and TASK-218 visual acceptance are superseded after owner rejection; their technical contracts remain regression gates.
+- TASK-220 remains subject to owner manual visual acceptance.
+
 ## [0.1.0-alpha.218] - 2026-08-17
 
 ### Added

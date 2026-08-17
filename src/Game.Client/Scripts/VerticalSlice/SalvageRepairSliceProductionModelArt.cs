@@ -29,7 +29,7 @@ public partial class SalvageRepairSlice
             "ships=explorer+interceptor-high-detail; station=industrial-detail-pass; " +
             "resources=ore+salvage+crystal+fiber+organic-GLB; lod=3-each; " +
             "resourceProcedural=fallback-only; collision=unchanged; " +
-            "visualAcceptance=owner-required; F5=acceptance.");
+            "visualAcceptance=owner-rejected; supersededBy=TASK-220; F5=regression-acceptance.");
     }
 
     private void RunProductionModelArtAcceptance()

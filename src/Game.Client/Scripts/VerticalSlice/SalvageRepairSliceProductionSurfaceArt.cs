@@ -53,7 +53,7 @@ public partial class SalvageRepairSlice
         GD.Print(
             "TASK-218 production surface art READY: atlas=4x1024; hardSurfaceMaterial=shared-PBR; " +
             "resourceFamilies=10; resourceGlb=30; catalogRouting=semantic; collision=unchanged; " +
-            "manualVisual=owner-required; F5=acceptance.");
+            "manualVisual=owner-rejected; supersededBy=TASK-220; F5=regression-acceptance.");
     }
 
     private void RunProductionSurfaceArtAcceptance()

@@ -152,18 +152,64 @@ public partial class SalvageResourceNode : StaticBody3D, IInteractable
     {
         if (node is MeshInstance3D mesh && mesh.Mesh is not null)
         {
-            int brightnessBand = detailIndex % 4;
+            string role = mesh.Name.ToString().ToLowerInvariant();
+            int brightnessBand = detailIndex % 3;
             float brightness = brightnessBand switch
             {
                 0 => 1.00f,
-                1 => 1.10f,
-                2 => 0.82f,
-                _ => 0.94f
+                1 => 1.08f,
+                _ => 0.92f
             };
+            float metallicScale = 1.0f;
+            float roughnessOffset = 0.0f;
+            float emissionScale = 0.55f;
+
+            if (role.Contains("core", StringComparison.Ordinal) ||
+                role.Contains("vein", StringComparison.Ordinal) ||
+                role.Contains("throat", StringComparison.Ordinal) ||
+                role.Contains("accent", StringComparison.Ordinal))
+            {
+                brightness *= 1.28f;
+                metallicScale = 1.10f;
+                roughnessOffset = -0.14f;
+                emissionScale = 1.25f;
+            }
+            else if (role.Contains("matrix", StringComparison.Ordinal) ||
+                     role.Contains("bed", StringComparison.Ordinal) ||
+                     role.Contains("shelf", StringComparison.Ordinal) ||
+                     role.Contains("mass", StringComparison.Ordinal))
+            {
+                brightness *= 0.62f;
+                metallicScale = 0.60f;
+                roughnessOffset = 0.20f;
+                emissionScale = 0.08f;
+            }
+            else if (role.Contains("crystal", StringComparison.Ordinal) ||
+                     role.Contains("spire", StringComparison.Ordinal) ||
+                     role.Contains("blade", StringComparison.Ordinal) ||
+                     role.Contains("shard", StringComparison.Ordinal))
+            {
+                brightness *= 1.12f;
+                metallicScale = 0.72f;
+                roughnessOffset = -0.10f;
+                emissionScale = 0.90f;
+            }
+            else if (role.Contains("scrap", StringComparison.Ordinal) ||
+                     role.Contains("coupler", StringComparison.Ordinal) ||
+                     role.Contains("beam", StringComparison.Ordinal))
+            {
+                metallicScale = 1.35f;
+                roughnessOffset = 0.05f;
+                emissionScale = 0.18f;
+            }
+
             mesh.MaterialOverride =
                 ProceduralSurfaceVisualFactory.BuildResourceMaterial(
                     visual,
-                    brightness);
+                    brightness,
+                    metallicScale,
+                    roughnessOffset,
+                    emissionScale);
             detailIndex++;
         }
 

@@ -9,7 +9,7 @@ def need(cond,msg):
     if not cond: failures.append(msg)
 
 version=text('VERSION').strip()
-need(version in {'0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.194 or later accepted revision, got {version}')
+need(version in {'0.1.0-alpha.194','0.1.0-alpha.196','0.1.0-alpha.198','0.1.0-alpha.200','0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218','0.1.0-alpha.220'}, f'VERSION must preserve alpha.194 or later accepted revision, got {version}')
 runtime=text('src/Game.Client/Scripts/VerticalSlice/WorldStreamingRuntime.cs')
 node=text('src/Game.Client/Scripts/VerticalSlice/WorldStreamingCoordinatorNode.cs')
 integration=text('src/Game.Client/Scripts/VerticalSlice/SalvageRepairSliceWorldStreaming.cs')

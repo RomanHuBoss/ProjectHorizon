@@ -9,7 +9,7 @@ def need(c,m):
     if not c: fail.append(m)
 
 version=text('VERSION').strip()
-need(version in {'0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218'}, f'VERSION must preserve alpha.202 or later accepted revision, got {version}')
+need(version in {'0.1.0-alpha.202','0.1.0-alpha.204','0.1.0-alpha.206','0.1.0-alpha.208','0.1.0-alpha.210','0.1.0-alpha.212','0.1.0-alpha.214','0.1.0-alpha.216','0.1.0-alpha.218','0.1.0-alpha.220'}, f'VERSION must preserve alpha.202 or later accepted revision, got {version}')
 policy=text('src/Game.Domain/Architecture/GraphicsQualityProfilePolicy.cs')
 settings=text('src/Game.Client/Scripts/Application/GameUserSettings.cs')
 panel=text('src/Game.Client/Scripts/Application/GameSettingsPanel.cs')

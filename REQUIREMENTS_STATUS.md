@@ -1,3 +1,47 @@
+## 0. Мега-итерация 2026-08-17 — TASK-220 Production Art Recovery
+
+**Исходный снимок:** `ProjectHorizon-main-task218-build-hotfix.zip` (`0.1.0-alpha.218`).  
+**Подготовленный снимок:** `ProjectHorizon-main-task220-production-art-recovery.zip`.  
+**Версия:** `0.1.0-alpha.220`  
+**ТЗ:** §26.1–26.2; §33.1–33.4; сохранение GLB/LOD/separate-collision contracts  
+**Фокус:** полная замена отвергнутого visual result / Y-up resource morphology / light-hull ship material balance  
+**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 69/69 + VERSION PASS / OWNER CLEAN BUILD + F5 + MANUAL VISUAL ACCEPTANCE PENDING`
+
+### Основание и синхронизация ручной приёмки
+
+Owner runtime после TASK-218 hotfix подтвердил штатный Godot 4.7.1 launch, загрузку всех 30 resource GLB и дальнейший gameplay smoke path без runtime crash. Однако последующая ручная визуальная оценка была отрицательной: кристаллы описаны как плоские «лепёшки», корабль — как наполовину чёрный, общее качество моделей признано неприемлемым. В соответствии с DEVELOPMENT_ITERATION_PROTOCOL это визуальное доказательство имеет приоритет над техническими PASS-метриками. TASK-216/TASK-218 не принимаются визуально и переводятся в `SUPERSEDED` новой реализацией TASK-220; их технические проверки остаются regression gates.
+
+### Реализация TASK-220
+
+- Найден и исправлен конкретный дефект авторинга ресурсов: `crystal_prism`/longitudinal helpers строились вдоль +Z, но размещались вверх по +Y без поворота. Добавлен `upright(...)`, который до placement запекает Z→Y rotation.
+- Полностью пересобраны десять resource families. Crystal теперь состоит из высоких многогранных pointed spires с доминирующим центральным кристаллом и низкой matrix; Ice — из вертикальных blades/core; Glass — из стоящих obsidian-like shards; Fiber и Gas получили реальные upright stems/chimneys; Salt — stepped evaporite + cubic crystals; Exotic — асимметричный core/field-spokes/upright spires.
+- После regeneration измеренная LOD0 геометрия: Crystal `Y/max(X,Z)≈1.43`, Ice `≈1.36`; предыдущий Crystal был `≈0.37` по cluster height/footprint и визуально читался плоским.
+- Primary hard-surface atlas переориентирован с graphite-first на light industrial alloy: legacy stable slot `MAT_Hull_Graphite` теперь светлый основной сплав, main Explorer/Interceptor wings также используют primary hull slot. Near-black сохранён в основном для canopy/recess use.
+- Runtime resource materials больше не перекрывают authored subparts одинаковым flat tint: matrix/bed/shelf темнее и rougher, crystal/spire/blade светлее и cleaner, core/vein/throat получают controlled emission/highlight, salvage metal — повышенный metallic response.
+- Добавлены `ProductionArtRecoveryAcceptance`, F5 integration, xUnit tests, static validator, section-37/CI/release gate и `docs/PRODUCTION_ART_RECOVERY.md`.
+- Gameplay collision, stable resource IDs, LOD wrappers, resource routing, save schema и mount markers не менялись.
+
+### Проверки этой итерации
+
+- Production asset generator выполнен после изменений; regenerated 9 hero GLB + 30 resource GLB + 4 atlas maps.
+- Геометрический local preview подтверждает, что Crystal имеет вертикальный pointed-cluster silhouette, а не прежний flattened footprint.
+- Static regression: `69/69 PASS`; `tools/ci/verify-version.py` также PASS для `0.1.0-alpha.220`.
+- `bash tools/run-section37-quality.sh` проходит dependency/version stage (`TASK-140 VERSION PASS`) и останавливается на `dotnet: command not found`; Godot runtime также отсутствует, поэтому clean build/xUnit/F5 нельзя выдавать за выполненные из этой среды.
+- Финальный source ZIP проходит `unzip -t` без ошибок compressed data; build/cache directories исключены.
+
+### Owner acceptance
+
+1. Clean build: `0 warnings / 0 errors`.
+2. F5 должен вывести `TASK-220 production art recovery acceptance PASS` с `hardSurfaceLod=9`, `resourceGlb=30`, `fallbacks=0`, `hullLuma>=0.55`, `crystalVerticality>=1.25`, `iceVerticality>=1.20`, `collisionSeparate=1`.
+3. В chase/external view Explorer должен читаться как светлый/среднетоновый металлический корабль; тёмным остаётся преимущественно canopy/recess detail, а не половина корпуса.
+4. Crystal должен выглядеть как вертикальный pointed crystal cluster; никаких дисков/лепёшек/лежащих призм.
+5. Отдельно осмотреть Ice, Glass, Fiber, Gas, Salt и Exotic: различимость должна обеспечиваться геометрией, не только цветом.
+6. При приближении к ресурсам проверить material hierarchy: host matrix rough/dark, spires/blades cleaner/brighter, cores/veins controlled emissive, без flat one-material look.
+7. Проверить LOD переходы на 18 m / 45 m и отсутствие изменения collision/interaction.
+8. При визуальном FAIL прислать screenshots Explorer + Crystal + Ice/Glass и 30–50 строк Output вокруг TASK-220; задача не переводится в VERIFIED только по F5 PASS.
+
+---
+
 ## 0. Мега-итерация 2026-08-17 — TASK-218 Production PBR Texture Atlas & Resource Visual Diversity
 
 **Исходный снимок:** `ProjectHorizon-main(1).zip` (`0.1.0-alpha.216`).  
@@ -5,7 +49,7 @@
 **Версия:** `0.1.0-alpha.218`  
 **ТЗ:** §26.1–26.2; §33.1–33.4; сохранение TASK-184/TASK-186/TASK-216 contracts  
 **Фокус:** production surface materials / shared PBR atlas / resource silhouette diversity  
-**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 69/69 / OWNER CLEAN BUILD + F5 + MANUAL VISUAL ACCEPTANCE PENDING`
+**Статус:** `SUPERSEDED BY TASK-220 / OWNER RUNTIME SMOKE PASS / MANUAL VISUAL ACCEPTANCE REJECTED`
 
 ### Основание
 
@@ -43,7 +87,7 @@ TASK-216 поднял геометрическую детализацию кор
 3. Explorer и Interceptor: на близкой дистанции проверить масштаб швов/fasteners, читаемую разницу hull/panel/accent/canopy и отсутствие растянутых/перескакивающих UV.
 4. Station: проверить atlas material при подлёте/стыковке, emissive surfaces и отсутствие material-pop между LOD.
 5. На поверхности/в пещерах осмотреть все 10 resource families, в особенности Ice/Gas/Salt/Glass/Exotic; силуэты должны различаться без опоры только на цвет.
-6. TASK-216 остаётся `IMPLEMENTED`, пока отдельная ручная visual acceptance его моделей не выполнена. TASK-218 также не переводится в VERIFIED по static evidence.
+6. Исторический критерий TASK-218 больше не является текущей visual acceptance: owner отклонил результат, TASK-216/TASK-218 помечены `SUPERSEDED`, замена — TASK-220.
 
 ---
 
@@ -53,7 +97,7 @@ TASK-216 поднял геометрическую детализацию кор
 **Подготовленный снимок:** `ProjectHorizon-main-task216-production-model-art.zip`.  
 **Версия:** `0.1.0-alpha.216`  
 **Фокус:** production 3D art / ships / station / resources  
-**Статус:** `IMPLEMENTED / STATIC REGRESSION PASS 67/67 / OWNER CLEAN BUILD + F5 + MANUAL VISUAL ACCEPTANCE PENDING`
+**Статус:** `SUPERSEDED BY TASK-220 / MANUAL VISUAL ACCEPTANCE REJECTED`
 
 ### Реализация TASK-216
 
@@ -72,7 +116,7 @@ TASK-216 поднял геометрическую детализацию кор
 4. Подлёт/стыковка к станции: industrial ring, truss, communications, cargo, conduits без изменения физической коллизии.
 5. Осмотреть Ore/Salvage/Crystal/Fiber/Organic на поверхности и в пещере; не должно быть старых примитивных SphereMesh/CylinderMesh при штатной загрузке.
 6. F5: `TASK-216 production model art acceptance PASS ... fallbacks=0; collisionSeparate=1`.
-7. Manual visual acceptance остаётся обязательной; при неудовлетворительном виде дальнейший art pass должен менять сами модели, а не только thresholds.
+7. Этот исторический manual visual acceptance был отклонён owner; TASK-216 помечен `SUPERSEDED`, а replacement implementation выполняется в TASK-220.
 
 ---
 
